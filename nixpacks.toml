@@ -1,2 +1,8 @@
-[variables]
-NODE_VERSION = '20'
+[phases.setup]
+nixPkgs = ['nodejs_20', 'pnpm-9_x', 'openssl']
+
+[phases.build]
+cmds = [
+  'pnpm prisma migrate deploy',
+  'pnpm run build'
+]
