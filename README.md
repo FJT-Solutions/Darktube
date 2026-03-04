@@ -15,9 +15,33 @@
 - **Shadcn/ui**: Biblioteca de componentes para desenvolvimento ágil de interface e consistência visual.
 
 ### Camada de Dados
+- **SQLite + Prisma**: Motor de persistência local para canais, vídeos e inteligência de nicho.
 - **YouTube Data API v3**: Fonte primária para dados precisos de canais e estatísticas reais de vídeos.
-- **Scraper Customizado (`lib/youtube.ts`)**: Motor de extração paralela que processa múltiplas abas (/videos, /shorts, /streams) para garantir a separação completa de tipos de conteúdo.
+- **Scraper Customizado (`lib/youtube.ts`)**: Motor de extração paralela que processa múltiplas abas (/videos, /shorts, /shorts) para garantir a separação completa de tipos de conteúdo.
 - **youtube-sr**: Wrapper secundário usado para busca rápida e autocompletar.
+
+### Inteligência Artificial
+- **IA de Visão (Gemini 1.5 Flash/Pro)**: Validação técnica de produção (IA vs Banco de Estoque vs Edição Manual).
+- **Processamento de Frames (ffmpeg + yt-dlp)**: Motor de baixo nível para extração de frames e análise visual profunda.
+- **Análise de Transcrição**: Decomposição de conteúdo para identificar padrões de viralização.
+
+---
+
+## 🎯 Transformação Organizacional (Core v2)
+
+A plataforma foi recentemente refatorada para um modelo de **Organização Pessoal**, garantindo isolamento total de dados e configurações customizadas:
+
+### 🔐 Autenticação & Conta
+- Login via **Google/YouTube NextAuth**.
+- Vinculação de canais e vídeos ao ID do usuário autenticado.
+
+### ⚙️ Configurações & Chaves Pessoais
+- Painel de controle para chaves de API individuais (**GEMINI_API_KEY**).
+- Armazenamento seguro e criptografado no banco de dados local.
+
+### 🍱 Isolamento Multi-tenant
+- Dashboard e Tracker exibem apenas dados pertencentes ao usuário logado.
+- Ambiente 100% privado e persistente.
 
 ---
 
@@ -72,5 +96,7 @@ npm run build
 ## 📈 Próximos Passos e Expansões
 - [x] Integração com a API Google Cloud YouTube v3 para métricas precisas.
 - [x] Separação de vídeos por tipo (Shorts, Long-form, Live).
-- [ ] Rastreamento de dados históricos via SocialBlade/NoxInfluencer.
+- [x] Persistência local com SQLite e Prisma.
+- [x] Autenticação Google e Isolamento de Usuário.
+- [x] Validação Visual Inteligente com Gemini Vision Pro.
 - [ ] Gerador de roteiros baseado em IA dentro do `MiningWizard`.
