@@ -16,8 +16,8 @@ export default function SetupPasswordPage() {
     const router = useRouter()
 
     useEffect(() => {
-        // Verificar se é um fluxo de reset de senha pelo hash da URL
-        if (window.location.hash.includes('type=recovery')) {
+        // Verificar se é um fluxo de reset de senha ou convite pelo hash da URL
+        if (window.location.hash.includes('type=recovery') || window.location.hash.includes('type=invite') || window.location.hash.includes('type=magiclink')) {
             setIsReset(true)
         }
         
@@ -70,7 +70,7 @@ export default function SetupPasswordPage() {
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600">
                         <Youtube className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-lg font-bold tracking-tight text-white">DarkTube <span className="text-red-500">Miner</span></span>
+                    <span className="text-lg font-bold tracking-tight text-white">DarkTube</span>
                 </Link>
             </header>
 

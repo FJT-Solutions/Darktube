@@ -186,7 +186,7 @@ export async function approveInviteAction(inviteId: string) {
             email: invite.email,
             options: {
                 data: { full_name: invite.name },
-                redirectTo: `${siteUrl}/dashboard`
+                redirectTo: `${siteUrl}/setup-password`
             }
         })
 
@@ -196,7 +196,7 @@ export async function approveInviteAction(inviteId: string) {
                 type: 'magiclink',
                 email: invite.email,
                 options: {
-                    redirectTo: `${siteUrl}/dashboard`
+                    redirectTo: `${siteUrl}/setup-password`
                 }
             })
             data = magicRes.data
@@ -347,7 +347,7 @@ export async function resendAccessAction(email: string, name: string) {
             type: 'magiclink',
             email: email,
             options: {
-                redirectTo: `${siteUrl}/dashboard`
+                redirectTo: `${siteUrl}/setup-password`
             }
         })
 
