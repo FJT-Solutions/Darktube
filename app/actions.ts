@@ -438,13 +438,35 @@ export async function deleteUserAction(userId: string) {
             throw new Error("Não autorizado")
         }
 
+        // 0. Get email of the target user first
+        const { data: targetProfile } = await adminSupabase
+            .from('profiles')
+            .select('email')
+            .eq('id', userId)
+            .single()
+        
+        let targetEmail = targetProfile?.email
+
+        // If not in profiles, try to get from Auth
+        if (!targetEmail) {
+            const { data: authUser } = await adminSupabase.auth.admin.getUserById(userId)
+            targetEmail = authUser?.user?.email
+        }
+
         // 1. Delete from App DB (Profiles etc)
         await db.deleteProfile(userId)
         
-        // 2. Delete from Auth (requires Admin Client)
+        // 2. Delete any matching invites (to allow re-requesting)
+        if (targetEmail) {
+            await adminSupabase.from('invites').delete().eq('email', targetEmail)
+            console.log(`[Admin] Cleaned up invites for ${targetEmail}`)
+        }
+        
+        // 3. Delete from Auth (requires Admin Client)
         const { error: authError } = await adminSupabase.auth.admin.deleteUser(userId)
         if (authError) console.warn("Auth deletion failed:", authError)
 
+        revalidatePath("/admin/users")
         revalidatePath("/settings")
         return { success: true }
     } catch (error: any) {
