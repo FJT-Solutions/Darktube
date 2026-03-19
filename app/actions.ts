@@ -194,3 +194,39 @@ export async function approveInviteAction(inviteId: string) {
         return { success: false, error: error.message }
     }
 }
+
+export async function getAllProfilesAction() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        // Security check
+        if (user?.email !== 'nathan.jordan@fjt-solutions.com') {
+            throw new Error("Não autorizado")
+        }
+
+        return await db.getAllProfiles()
+    } catch (error) {
+        console.error("Error in getAllProfilesAction:", error)
+        return []
+    }
+}
+
+export async function updateUserRoleAction(userId: string, role: 'admin' | 'user') {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        // Security check
+        if (user?.email !== 'nathan.jordan@fjt-solutions.com') {
+            throw new Error("Não autorizado")
+        }
+
+        const result = await db.updateProfileRole(userId, role)
+        revalidatePath("/settings")
+        return result
+    } catch (error: any) {
+        console.error("Error in updateUserRoleAction:", error)
+        return { success: false, error: error.message }
+    }
+}

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Youtube, Key, Save, LogOut, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from "lucide-react"
-import { updateSettingsAction, getSettingsAction } from "@/app/actions"
+import { updateSettingsAction, getSettingsAction, getAllProfilesAction, updateUserRoleAction } from "@/app/actions"
 
 export default function SettingsPage() {
     const { session, loading, signOut } = useAuth()
@@ -17,14 +17,23 @@ export default function SettingsPage() {
     const [geminiKey, setGeminiKey] = useState("")
     const [isSaving, setIsSaving] = useState(false)
     const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
+    
+    // User management state
+    const [profiles, setProfiles] = useState<any[]>([])
+    const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null)
+    const isAdmin = session?.user?.email === 'nathan.jordan@fjt-solutions.com'
 
     useEffect(() => {
         if (session) {
             getSettingsAction().then(settings => {
                 if (settings?.geminiApiKey) setGeminiKey(settings.geminiApiKey)
             })
+
+            if (isAdmin) {
+                getAllProfilesAction().then(setProfiles)
+            }
         }
-    }, [session])
+    }, [session, isAdmin])
 
     const handleSave = async () => {
         setIsSaving(true)
@@ -36,6 +45,18 @@ export default function SettingsPage() {
         if (result.success) {
             setTimeout(() => setSaveStatus("idle"), 3000)
         }
+    }
+
+    const handleRoleUpdate = async (userId: string, currentRole: string) => {
+        const newRole = currentRole === 'admin' ? 'user' : 'admin'
+        if (!confirm(`Deseja alterar o cargo deste usuário para ${newRole.toUpperCase()}?`)) return
+
+        setIsUpdatingRole(userId)
+        const result = await updateUserRoleAction(userId, newRole as any)
+        if (result.success) {
+            setProfiles(prev => prev.map(p => p.id === userId ? { ...p, role: newRole } : p))
+        }
+        setIsUpdatingRole(null)
     }
 
     if (loading) {
@@ -158,6 +179,51 @@ export default function SettingsPage() {
                                 {saveStatus === "success" ? "Salvo!" : saveStatus === "error" ? "Erro ao salvar" : "Salvar Alterações"}
                             </Button>
                         </CardFooter>
+                    </Card>
+                )}
+
+                {/* Admin User Management */}
+                {isAdmin && profiles.length > 0 && (
+                    <Card className="border-primary/10 bg-card/50 backdrop-blur-sm">
+                        <CardHeader>
+                            <CardTitle>Gerenciamento de Usuários</CardTitle>
+                            <CardDescription>Gerencie as permissões dos membros da plataforma.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {profiles.map((profile) => (
+                                    <div key={profile.id} className="flex items-center justify-between p-4 rounded-xl bg-secondary/20 border border-border/40">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border border-border/30">
+                                                {profile.avatar_url ? (
+                                                    <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <span className="text-xs font-bold text-muted-foreground">{(profile.full_name || profile.email)[0].toUpperCase()}</span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold">{profile.full_name || 'Usuário'}</p>
+                                                <p className="text-xs text-muted-foreground">{profile.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                                                {profile.role}
+                                            </Badge>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                disabled={isUpdatingRole === profile.id || profile.email === 'nathan.jordan@fjt-solutions.com'}
+                                                onClick={() => handleRoleUpdate(profile.id, profile.role)}
+                                                className="text-xs h-8"
+                                            >
+                                                {isUpdatingRole === profile.id ? <Loader2 className="h-3 w-3 animate-spin" /> : `Mudar para ${profile.role === 'admin' ? 'User' : 'Admin'}`}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
                     </Card>
                 )}
             </div>

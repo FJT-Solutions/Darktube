@@ -273,3 +273,25 @@ export async function updateProfileStatus(email: string, status: 'pending' | 'ap
     if (error) throw error
     return { success: true }
 }
+
+export async function getAllProfiles() {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data
+}
+
+export async function updateProfileRole(userId: string, role: 'admin' | 'user') {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', userId)
+    
+    if (error) throw error
+    return { success: true }
+}
