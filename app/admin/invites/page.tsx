@@ -2,23 +2,23 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
-import { getPendingInvitesAction, approveInviteAction } from "@/app/actions"
+import { getPendingInvitesAction, approveInviteAction, declineInviteAction } from "@/app/actions"
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useAppShell } from "@/components/layout/app-shell"
-import { Loader2, UserPlus, Mail, Clock, CheckCircle2, AlertCircle } from "lucide-react"
+import { Loader2, UserPlus, Mail, Clock, CheckCircle2, AlertCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
 
 export default function AdminInvitesPage() {
-    const { session, loading: authLoading } = useAuth()
+    const { session, profile, loading: authLoading } = useAuth()
     const { toggleSidebar } = useAppShell()
     const [invites, setInvites] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
-    const [approvingId, setApprovingId] = useState<string | null>(null)
+    const [processingId, setProcessingId] = useState<string | null>(null)
 
-    const isAdmin = session?.user?.email === 'nathan.jordan@fjt-solutions.com'
+    const isAdmin = profile?.role === 'admin'
 
     useEffect(() => {
         if (isAdmin) {
@@ -40,7 +40,7 @@ export default function AdminInvitesPage() {
     }
 
     async function handleApprove(id: string) {
-        setApprovingId(id)
+        setProcessingId(id)
         try {
             const result = await approveInviteAction(id)
             if (result.success) {
@@ -52,7 +52,26 @@ export default function AdminInvitesPage() {
         } catch (error) {
             toast.error("Ocorreu um erro inesperado")
         } finally {
-            setApprovingId(null)
+            setProcessingId(null)
+        }
+    }
+
+    async function handleDecline(id: string) {
+        if (!confirm("Tem certeza que deseja recusar este acesso?")) return
+        
+        setProcessingId(id)
+        try {
+            const result = await declineInviteAction(id)
+            if (result.success) {
+                toast.success("Solicitação recusada com sucesso.")
+                setInvites(prev => prev.filter(i => i.id !== id))
+            } else {
+                toast.error(`Erro: ${result.error}`)
+            }
+        } catch (error) {
+            toast.error("Ocorreu um erro inesperado")
+        } finally {
+            setProcessingId(null)
         }
     }
 
@@ -126,14 +145,24 @@ export default function AdminInvitesPage() {
                                                     size="sm" 
                                                     className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
                                                     onClick={() => handleApprove(invite.id)}
-                                                    disabled={approvingId === invite.id}
+                                                    disabled={processingId === invite.id}
                                                 >
-                                                    {approvingId === invite.id ? (
+                                                    {processingId === invite.id ? (
                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                     ) : (
                                                         <CheckCircle2 className="h-4 w-4" />
                                                     )}
                                                     Aprovar Acesso
+                                                </Button>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline"
+                                                    className="text-destructive hover:bg-destructive/10 border-destructive/20 gap-2"
+                                                    onClick={() => handleDecline(invite.id)}
+                                                    disabled={processingId === invite.id}
+                                                >
+                                                    <XCircle className="h-4 w-4" />
+                                                    Recusar
                                                 </Button>
                                             </div>
                                         </div>

@@ -149,11 +149,15 @@ export async function getPendingInvitesAction() {
 }
 
 import { sendAccessGrantedEmail } from "@/lib/email"
+import { createAdminClient } from "@/lib/supabase/server"
 
 export async function approveInviteAction(inviteId: string) {
     try {
         const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
         
+        if (!adminSupabase) throw new Error("Configuração de Admin ausente (SERVICE_ROLE_KEY)")
+
         // 1. Get invite details
         const { data: invite, error: fetchError } = await supabase
             .from('invites')
@@ -163,26 +167,29 @@ export async function approveInviteAction(inviteId: string) {
         
         if (fetchError || !invite) throw new Error("Convite não encontrado")
 
-        // 2. Create the Auth User (Manual Invite)
-        // We use inviteUserByEmail which sends a Supabase email, 
-        // OR we can use generating an invite link and sending our own email.
-        // Let's use our custom email service for better branding.
-        const { data: { properties }, error: authError } = await supabase.auth.admin.generateLink({
+        // 2. Create the Auth User (Generate Invite Link)
+        const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
             type: 'invite',
             email: invite.email,
             options: {
                 data: { full_name: invite.name },
-                redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/setup-password`
+                redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`
             }
         })
 
-        if (!properties) throw new Error("Falha ao gerar o link de convite")
+        if (authError || !data?.properties?.action_link) {
+            console.error("Auth error:", authError)
+            throw new Error("Falha ao gerar o link de convite: " + (authError?.message || "Erro desconhecido"))
+        }
 
         // 3. Update Profile Status
         await db.updateProfileStatus(invite.email, 'approved')
 
         // 4. Send Custom Email
-        await sendAccessGrantedEmail(invite.email, invite.name, properties.action_link)
+        const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, data.properties.action_link)
+        if (!emailResult.success) {
+             console.warn("Email failed but proceed:", emailResult.error)
+        }
 
         // 5. Cleanup Invite
         await supabase.from('invites').delete().eq('id', inviteId)
@@ -191,6 +198,32 @@ export async function approveInviteAction(inviteId: string) {
         return { success: true }
     } catch (error: any) {
         console.error("Error approving invite:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function declineInviteAction(inviteId: string) {
+    try {
+        const supabase = await createClient()
+        
+        // 1. Get invite to know the email
+        const { data: invite } = await supabase
+            .from('invites')
+            .select('email')
+            .eq('id', inviteId)
+            .single()
+            
+        if (invite) {
+            await db.updateProfileStatus(invite.email, 'rejected')
+        }
+
+        // 2. Delete Invite
+        await supabase.from('invites').delete().eq('id', inviteId)
+
+        revalidatePath("/admin/invites")
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error declining invite:", error)
         return { success: false, error: error.message }
     }
 }
