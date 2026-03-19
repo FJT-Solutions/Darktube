@@ -21,7 +21,7 @@ export default function SettingsPage() {
     // User management state
     const [profiles, setProfiles] = useState<any[]>([])
     const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null)
-    const isAdmin = session?.user?.email === 'nathan.jordan@fjt-solutions.com'
+    const isAdmin = profile?.role === 'admin'
 
     useEffect(() => {
         if (session) {

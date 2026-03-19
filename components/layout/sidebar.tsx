@@ -31,7 +31,7 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const { session, signOut } = useAuth()
+  const { session, profile, signOut } = useAuth()
   const { trackedCount } = useAppShell()
 
   return (
@@ -114,7 +114,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           })}
 
           {/* Admin Section */}
-          {session?.user?.email === 'nathan.jordan@fjt-solutions.com' && (
+          {profile?.role === 'admin' && (
             <div className="mt-8">
               <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Administração

@@ -199,9 +199,16 @@ export async function getAllProfilesAction() {
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
-        
-        // Security check
-        if (user?.email !== 'nathan.jordan@fjt-solutions.com') {
+        if (!user) return []
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        // Security check: must be admin OR nathan
+        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
             throw new Error("Não autorizado")
         }
 
@@ -216,9 +223,16 @@ export async function updateUserRoleAction(userId: string, role: 'admin' | 'user
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autenticado")
 
-        // Security check
-        if (user?.email !== 'nathan.jordan@fjt-solutions.com') {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        // Security check: must be admin OR nathan
+        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
             throw new Error("Não autorizado")
         }
 
