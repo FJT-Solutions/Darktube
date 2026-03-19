@@ -13,6 +13,7 @@ import {
   Settings,
   X,
   User as UserIcon,
+  UserPlus,
   LogOut,
   LogIn,
 } from "lucide-react"
@@ -124,13 +125,26 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 onClick={onClose}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  pathname.startsWith("/admin")
+                  pathname === "/admin/invites"
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 )}
               >
-                <UserIcon className={cn("h-[18px] w-[18px]", pathname.startsWith("/admin") ? "text-primary" : "")} />
+                <UserIcon className={cn("h-[18px] w-[18px]", pathname === "/admin/invites" ? "text-primary" : "")} />
                 Acessos / Invites
+              </Link>
+              <Link
+                href="/admin/users"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname === "/admin/users"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <UserPlus className={cn("h-[18px] w-[18px]", pathname === "/admin/users" ? "text-primary" : "")} />
+                Gerenciar Membros
               </Link>
             </div>
           )}

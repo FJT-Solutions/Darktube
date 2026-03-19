@@ -251,8 +251,48 @@ export async function declineInviteAction(inviteId: string) {
 export async function getAllProfilesAction() {
     try {
         const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return []
+        if (!user || !adminSupabase) return []
+
+        const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        // Security check
+        if (myProfile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
+            throw new Error("Não autorizado")
+        }
+
+        const profiles = await db.getAllProfiles()
+        const { data: { users: authUsers }, error: authError } = await adminSupabase.auth.admin.listUsers()
+        
+        if (authError) console.error("Error listing auth users:", authError)
+
+        // Enrich profiles with auth info
+        return profiles.map((p: any) => {
+            const authUser = authUsers?.find(u => u.email === p.email)
+            return {
+                ...p,
+                isRegistered: !!(authUser?.last_sign_in_at || authUser?.email_confirmed_at),
+                lastSignIn: authUser?.last_sign_in_at
+            }
+        })
+    } catch (error) {
+        console.error("Error in getAllProfilesAction:", error)
+        return []
+    }
+}
+
+export async function resendAccessAction(email: string, name: string) {
+    try {
+        const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user || !adminSupabase) throw new Error("Não autorizado")
 
         const { data: profile } = await supabase
             .from('profiles')
@@ -260,15 +300,34 @@ export async function getAllProfilesAction() {
             .eq('id', user.id)
             .single()
 
-        // Security check: must be admin OR nathan
         if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
             throw new Error("Não autorizado")
         }
 
-        return await db.getAllProfiles()
-    } catch (error) {
-        console.error("Error in getAllProfilesAction:", error)
-        return []
+        const host = (await headers()).get('host')
+        const protocol = host?.includes('localhost') ? 'http' : 'https'
+        const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.includes('localhost') || !process.env.NEXT_PUBLIC_SITE_URL) && host 
+            ? `${protocol}://${host}` 
+            : process.env.NEXT_PUBLIC_SITE_URL
+
+        // Generate magic link (works for existing users)
+        const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
+            type: 'magiclink',
+            email: email,
+            options: {
+                redirectTo: `${siteUrl}/dashboard`
+            }
+        })
+
+        if (authError || !data?.properties?.action_link) {
+            throw new Error("Falha ao gerar link: " + (authError?.message || "Erro desconhecido"))
+        }
+
+        const result = await sendAccessGrantedEmail(email, name, data.properties.action_link)
+        return result
+    } catch (error: any) {
+        console.error("Error in resendAccessAction:", error)
+        return { success: false, error: error.message }
     }
 }
 
