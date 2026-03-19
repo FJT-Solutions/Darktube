@@ -169,14 +169,15 @@ export async function approveInviteAction(inviteId: string) {
         if (fetchError || !invite) throw new Error("Convite não encontrado")
 
         // 2. Create the Auth User (Generate Invite Link)
-        const host = (await headers()).get('host')
-        const protocol = host?.includes('localhost') ? 'http' : 'https'
+        const heads = await headers()
+        const host = heads.get('x-forwarded-host') || heads.get('host')
+        const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
         let siteUrl = process.env.NEXT_PUBLIC_SITE_URL
         if (!siteUrl || siteUrl.includes('localhost')) {
             if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
                 siteUrl = `${protocol}://${host}`
-            } else if (!siteUrl) {
+            } else {
                 siteUrl = 'https://darktube.fjt.solutions'
             }
         }
@@ -287,7 +288,7 @@ export async function getAllProfilesAction() {
                 full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Membro Externo',
                 role: profile?.role || 'user',
                 status: profile?.status || 'approved',
-                isRegistered: !!(authUser.last_sign_in_at || authUser.email_confirmed_at),
+                isRegistered: !!authUser.last_sign_in_at,
                 lastSignIn: authUser.last_sign_in_at,
                 isAuthOnly: !profile
             }
@@ -330,14 +331,15 @@ export async function resendAccessAction(email: string, name: string) {
             throw new Error("Não autorizado")
         }
 
-        const host = (await headers()).get('host')
-        const protocol = host?.includes('localhost') ? 'http' : 'https'
+        const heads = await headers()
+        const host = heads.get('x-forwarded-host') || heads.get('host')
+        const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
         let siteUrl = process.env.NEXT_PUBLIC_SITE_URL
         if (!siteUrl || siteUrl.includes('localhost')) {
             if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
                 siteUrl = `${protocol}://${host}`
-            } else if (!siteUrl) {
+            } else {
                 siteUrl = 'https://darktube.fjt.solutions'
             }
         }
