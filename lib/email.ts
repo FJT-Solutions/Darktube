@@ -12,12 +12,12 @@ const transporter = nodemailer.createTransport({
 
 export async function sendAccessGrantedEmail(email: string, name: string, setupLink: string) {
     const mailOptions = {
-        from: `"DarkTube Miner" <${process.env.SMTP_USER}>`,
+        from: `"DarkTube" <${process.env.SMTP_USER}>`,
         to: email,
-        subject: '🚀 Seu acesso ao DarkTube Miner foi aprovado!',
+        subject: '🚀 Seu acesso ao DarkTube foi aprovado!',
         html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #141417;">
-                <h1 style="color: #ef4444;">Bem-vindo ao DarkTube Miner, ${name}!</h1>
+                <h1 style="color: #ef4444;">Bem-vindo ao DarkTube, ${name}!</h1>
                 <p>Boas notícias! Sua solicitação de acesso foi aprovada por um administrador.</p>
                 <p>Agora você pode acessar a ferramenta e começar sua mineração de canais dark.</p>
                 

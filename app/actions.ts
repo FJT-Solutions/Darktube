@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { TrackedChannel } from "@/lib/types"
 import { VideoAnalysisService } from "@/lib/video-analysis"
 import { createClient } from "@/lib/supabase/server"
+import { headers } from "next/headers"
 
 export async function getTrackedChannelsAction() {
     const supabase = await createClient()
@@ -168,12 +169,18 @@ export async function approveInviteAction(inviteId: string) {
         if (fetchError || !invite) throw new Error("Convite não encontrado")
 
         // 2. Create the Auth User (Generate Invite Link)
+        const host = (await headers()).get('host')
+        const protocol = host?.includes('localhost') ? 'http' : 'https'
+        const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.includes('localhost') || !process.env.NEXT_PUBLIC_SITE_URL) && host 
+            ? `${protocol}://${host}` 
+            : process.env.NEXT_PUBLIC_SITE_URL
+
         const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
             type: 'invite',
             email: invite.email,
             options: {
                 data: { full_name: invite.name },
-                redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`
+                redirectTo: `${siteUrl}/dashboard`
             }
         })
 
