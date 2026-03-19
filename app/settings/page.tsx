@@ -12,7 +12,7 @@ import { Youtube, Key, Save, LogOut, CheckCircle2, AlertCircle, Loader2, ArrowLe
 import { updateSettingsAction, getSettingsAction, getAllProfilesAction, updateUserRoleAction } from "@/app/actions"
 
 export default function SettingsPage() {
-    const { session, loading, signOut } = useAuth()
+    const { session, profile, loading, signOut } = useAuth()
     const router = useRouter()
     const [geminiKey, setGeminiKey] = useState("")
     const [isSaving, setIsSaving] = useState(false)
