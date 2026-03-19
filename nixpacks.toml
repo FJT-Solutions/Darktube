@@ -3,7 +3,11 @@ nixPkgs = ['nodejs_20', 'pnpm-9_x', 'openssl']
 
 [phases.build]
 cmds = [
-  'pnpm run build'
+  'pnpm run build',
+  'mkdir -p .next/standalone/public',
+  'cp -r public/* .next/standalone/public/ || true',
+  'mkdir -p .next/standalone/.next/static',
+  'cp -r .next/static/* .next/standalone/.next/static/ || true'
 ]
 
 [start]
