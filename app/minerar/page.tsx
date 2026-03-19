@@ -174,22 +174,38 @@ export default function MinerarPage() {
   }, [query, searchType, selectedNiche, minSubs])
 
   const handleTrack = async (channel: YouTubeChannel) => {
-    if (trackedIds.has(channel.id)) {
-      await removeTrackedChannelAction(channel.id)
+    const isCurrentlyTracked = trackedIds.has(channel.id)
+    
+    // Optimistic update
+    setTrackedIds((prev) => {
+      const next = new Set(prev)
+      if (isCurrentlyTracked) next.delete(channel.id)
+      else next.add(channel.id)
+      return next
+    })
+
+    try {
+      if (isCurrentlyTracked) {
+        await removeTrackedChannelAction(channel.id)
+      } else {
+        const tracked: TrackedChannel = {
+          ...channel,
+          trackedAt: new Date().toISOString(),
+          notes: "",
+          tags: [],
+        }
+        await saveTrackedChannelAction(tracked)
+      }
+    } catch (error) {
+      console.error("Error toggling track status:", error)
+      // Rollback
       setTrackedIds((prev) => {
         const next = new Set(prev)
-        next.delete(channel.id)
+        if (isCurrentlyTracked) next.add(channel.id)
+        else next.delete(channel.id)
         return next
       })
-    } else {
-      const tracked: TrackedChannel = {
-        ...channel,
-        trackedAt: new Date().toISOString(),
-        notes: "",
-        tags: [],
-      }
-      await saveTrackedChannelAction(tracked)
-      setTrackedIds((prev) => new Set(prev).add(channel.id))
+      alert("Erro ao salvar canal. Verifique sua conexão.")
     }
   }
 

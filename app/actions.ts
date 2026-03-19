@@ -5,24 +5,29 @@ import { getNicheIntelligence } from "@/lib/intelligence"
 import { revalidatePath } from "next/cache"
 import { TrackedChannel } from "@/lib/types"
 import { VideoAnalysisService } from "@/lib/video-analysis"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
+import { createClient } from "@/lib/supabase/server"
 
 export async function getTrackedChannelsAction() {
-    const session = await getServerSession(authOptions)
-    return await db.getTrackedChannels(session?.user ? (session.user as any).id : undefined)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    return await db.getTrackedChannels(user?.id)
 }
 
 export async function analyzeVideoAction(video: any, channel?: any) {
     try {
-        const session = await getServerSession(authOptions)
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
 
         // Fetch user's personal API key if logged in
         let userApiKey = process.env.GEMINI_API_KEY;
-        if (session?.user) {
-            const settings = await db.getUserSettings((session.user as any).id)
-            if (settings?.geminiApiKey) {
-                userApiKey = settings.geminiApiKey
+        if (user) {
+            // Use the get_api_key RPC for decryption
+            const { data: key } = await supabase.rpc('get_api_key', {
+                p_user_id: user.id,
+                p_provider: 'gemini'
+            })
+            if (key) {
+                userApiKey = key
             }
         }
 
@@ -40,13 +45,13 @@ export async function analyzeVideoAction(video: any, channel?: any) {
             };
         }
 
-        // Ensure channel exists if provided (prevents P2003 foreign key error)
+        // Ensure channel exists if provided
         if (channel) {
-            await db.ensureChannelExists(channel, session?.user ? (session.user as any).id : undefined)
+            await db.ensureChannelExists(channel, user?.id)
         }
 
-        // Update DB with results (uses upsert internally)
-        await db.updateVideoAnalysis(video, transcript, JSON.stringify(analysis), session?.user ? (session.user as any).id : undefined)
+        // Update DB with results
+        await db.updateVideoAnalysis(video, transcript, JSON.stringify(analysis), user?.id)
 
         revalidatePath(`/canal/[id]`, 'layout')
         return { success: true, analysis }
@@ -61,21 +66,35 @@ export async function getNicheIntelligenceAction(nicheId: string) {
 }
 
 export async function saveTrackedChannelAction(channel: TrackedChannel) {
-    const session = await getServerSession(authOptions)
-    await db.saveTrackedChannel(channel, session?.user ? (session.user as any).id : undefined)
-    revalidatePath("/")
-    revalidatePath("/tracker")
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        await db.saveTrackedChannel(channel, user?.id)
+        revalidatePath("/")
+        revalidatePath("/tracker")
+        revalidatePath(`/canal/${channel.id}`)
+    } catch (error: any) {
+        console.error("Error in saveTrackedChannelAction:", error)
+        throw new Error(error.message || "Falha ao salvar canal. Verifique sua conexão.")
+    }
 }
 
 export async function removeTrackedChannelAction(channelId: string) {
     await db.removeTrackedChannel(channelId)
     revalidatePath("/")
     revalidatePath("/tracker")
+    revalidatePath(`/canal/${channelId}`)
 }
 
 export async function isChannelTrackedAction(channelId: string) {
-    const session = await getServerSession(authOptions)
-    return await db.isChannelTracked(channelId, session?.user ? (session.user as any).id : undefined)
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        return await db.isChannelTracked(channelId, user?.id)
+    } catch (error) {
+        console.error("Error in isChannelTrackedAction:", error)
+        return false
+    }
 }
 
 export async function updateChannelNotesAction(channelId: string, notes: string) {
@@ -90,25 +109,88 @@ export async function updateChannelTagsAction(channelId: string, tags: string[])
 
 export async function updateSettingsAction(data: { geminiApiKey?: string }) {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return { success: false, error: "Não autorizado" }
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: "Não autorizado" }
 
-        await db.updateUserSettings((session.user as any).id, data)
+        if (data.geminiApiKey) {
+            await db.upsertUserApiKey(user.id, 'gemini', data.geminiApiKey)
+        }
+        
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error updating settings:", error)
-        return { success: false, error: error.message }
+        return { success: false, error: error?.message || "Erro desconhecido" }
     }
 }
 
 export async function getSettingsAction() {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session?.user) return null
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return null
 
-        return await db.getUserSettings((session.user as any).id)
+        const geminiKey = await db.getUserApiKey(user.id, 'gemini')
+        return { geminiApiKey: geminiKey }
     } catch (error) {
         console.error("Error getting settings:", error)
         return null
+    }
+}
+export async function getPendingInvitesAction() {
+    const supabase = await createClient()
+    const { data: invites, error } = await supabase
+        .from('invites')
+        .select('*')
+        .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return invites
+}
+
+import { sendAccessGrantedEmail } from "@/lib/email"
+
+export async function approveInviteAction(inviteId: string) {
+    try {
+        const supabase = await createClient()
+        
+        // 1. Get invite details
+        const { data: invite, error: fetchError } = await supabase
+            .from('invites')
+            .select('*')
+            .eq('id', inviteId)
+            .single()
+        
+        if (fetchError || !invite) throw new Error("Convite não encontrado")
+
+        // 2. Create the Auth User (Manual Invite)
+        // We use inviteUserByEmail which sends a Supabase email, 
+        // OR we can use generating an invite link and sending our own email.
+        // Let's use our custom email service for better branding.
+        const { data: { properties }, error: authError } = await supabase.auth.admin.generateLink({
+            type: 'invite',
+            email: invite.email,
+            options: {
+                data: { full_name: invite.name },
+                redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/setup-password`
+            }
+        })
+
+        if (!properties) throw new Error("Falha ao gerar o link de convite")
+
+        // 3. Update Profile Status
+        await db.updateProfileStatus(invite.email, 'approved')
+
+        // 4. Send Custom Email
+        await sendAccessGrantedEmail(invite.email, invite.name, properties.action_link)
+
+        // 5. Cleanup Invite
+        await supabase.from('invites').delete().eq('id', inviteId)
+
+        revalidatePath("/admin/invites")
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error approving invite:", error)
+        return { success: false, error: error.message }
     }
 }

@@ -1,17 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession, signIn, signOut } from "next-auth/react"
+import { useAuth } from "@/components/auth-provider"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Youtube, Key, Save, LogOut, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import { Youtube, Key, Save, LogOut, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from "lucide-react"
 import { updateSettingsAction, getSettingsAction } from "@/app/actions"
 
 export default function SettingsPage() {
-    const { data: session, status } = useSession()
+    const { session, loading, signOut } = useAuth()
+    const router = useRouter()
     const [geminiKey, setGeminiKey] = useState("")
     const [isSaving, setIsSaving] = useState(false)
     const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
@@ -36,7 +38,7 @@ export default function SettingsPage() {
         }
     }
 
-    if (status === "loading") {
+    if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -46,9 +48,19 @@ export default function SettingsPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 p-4">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-                <p className="text-muted-foreground mt-1">Gerencie suas conexões e chaves de API.</p>
+            <div className="flex items-center gap-4">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => router.back()}
+                    className="rounded-full hover:bg-white/10"
+                >
+                    <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+                    <p className="text-muted-foreground mt-1">Gerencie suas conexões e chaves de API.</p>
+                </div>
             </div>
 
             <div className="grid gap-6">
@@ -69,19 +81,26 @@ export default function SettingsPage() {
                         {session ? (
                             <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border/50">
                                 <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-primary/20">
-                                        <img src={session.user?.image || ""} alt={session.user?.name || ""} />
+                                    <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-primary/20 bg-muted flex items-center justify-center">
+                                        {(session.user?.user_metadata?.avatar_url || session.user?.user_metadata?.picture) ? (
+                                            <img 
+                                                src={session.user.user_metadata.avatar_url || session.user.user_metadata.picture} 
+                                                alt={session.user.user_metadata?.full_name || ""} 
+                                                className="h-full w-full object-cover"
+                                            />
+                                        ) : (
+                                            <span className="text-xl font-bold text-muted-foreground">
+                                                {(session.user?.user_metadata?.full_name || "U")[0]}
+                                            </span>
+                                        )}
                                     </div>
                                     <div>
-                                        <p className="font-semibold">{session.user?.name}</p>
+                                        <p className="font-semibold">{(session.user as any)?.user_metadata?.full_name || (session.user as any)?.name}</p>
                                         <p className="text-xs text-muted-foreground">{session.user?.email}</p>
-                                        <Badge variant="outline" className="mt-1 bg-green-500/10 text-green-500 border-green-500/20 gap-1">
-                                            <CheckCircle2 className="h-3 w-3" /> Conectado
-                                        </Badge>
                                     </div>
                                 </div>
                                 <Button variant="ghost" size="sm" onClick={() => signOut()} className="text-muted-foreground hover:text-destructive">
-                                    <LogOut className="h-4 w-4 mr-2" /> Desconectar
+                                    <LogOut className="h-4 w-4 mr-2" /> Sair
                                 </Button>
                             </div>
                         ) : (
@@ -89,17 +108,17 @@ export default function SettingsPage() {
                                 <Youtube className="h-12 w-12 mx-auto text-muted-foreground/30" />
                                 <div className="space-y-1">
                                     <p className="font-medium">Nenhuma conta conectada</p>
-                                    <p className="text-sm text-muted-foreground">Conecte sua conta Google para começar.</p>
+                                    <p className="text-sm text-muted-foreground">Faça login para gerenciar suas configurações.</p>
                                 </div>
-                                <Button onClick={() => signIn("google")} className="bg-red-600 hover:bg-red-700 text-white">
-                                    Conectar Canal YouTube
+                                <Button onClick={() => router.push('/login')} className="bg-primary hover:bg-primary/90 text-white">
+                                    Ir para Login
                                 </Button>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {status === "authenticated" && (
+                {session && (
                     <Card className="border-primary/10 bg-card/50 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <CardHeader>
                             <div className="flex items-center gap-3">
@@ -128,9 +147,13 @@ export default function SettingsPage() {
                                 </p>
                             </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between border-t border-border/50 pt-6">
+                        <CardFooter className="flex flex-col sm:flex-row justify-between items-center border-t border-border/50 pt-8 mt-6 gap-4">
                             <p className="text-xs text-muted-foreground">Suas chaves são criptografadas e salvas no banco de dados.</p>
-                            <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+                            <Button 
+                                onClick={handleSave} 
+                                disabled={isSaving} 
+                                className="gap-2 h-11 px-8 rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 transition-all active:scale-95"
+                            >
                                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                                 {saveStatus === "success" ? "Salvo!" : saveStatus === "error" ? "Erro ao salvar" : "Salvar Alterações"}
                             </Button>

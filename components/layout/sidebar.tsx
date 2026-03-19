@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useSession, signIn, signOut } from "next-auth/react"
+import { useAuth } from "@/components/auth-provider"
+import { useAppShell } from "@/components/layout/app-shell"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react"
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/minerar", label: "Minerar", icon: Search },
   { href: "/tracker", label: "Tracker", icon: Bookmark },
   { href: "/settings", label: "Configurações", icon: Settings },
@@ -30,7 +31,8 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { session, signOut } = useAuth()
+  const { trackedCount } = useAppShell()
 
   return (
     <>
@@ -52,7 +54,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b border-border px-6">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <Radio className="h-4 w-4 text-primary-foreground" />
             </div>
@@ -118,15 +120,26 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-secondary/30 border border-border/50">
               <Link
                 href="/settings"
-                className="flex items-center gap-3 overflow-hidden"
+                className="flex items-center gap-3 overflow-hidden flex-1"
                 onClick={onClose}
               >
-                <div className="h-8 w-8 rounded-full overflow-hidden border border-primary/20 shrink-0">
-                  <img src={session.user?.image || ""} alt={session.user?.name || ""} />
+                <div className="h-8 w-8 rounded-full overflow-hidden border border-primary/20 shrink-0 bg-muted flex items-center justify-center">
+                  {(session.user?.user_metadata?.avatar_url || session.user?.user_metadata?.picture) ? (
+                    <img 
+                      src={session.user.user_metadata.avatar_url || session.user.user_metadata.picture} 
+                      alt={session.user.user_metadata?.full_name || ""} 
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xs font-bold text-muted-foreground uppercase">
+                      {(session.user?.user_metadata?.full_name || session.user?.email || "U")[0]}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold truncate">{session.user?.name}</span>
-                  <span className="text-[10px] text-muted-foreground truncate italic">Logado</span>
+                  <span className="text-sm font-semibold truncate text-sidebar-foreground">
+                    {session.user?.user_metadata?.full_name || (session.user as any)?.name || session.user?.email}
+                  </span>
                 </div>
               </Link>
               <button
@@ -138,21 +151,21 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => signIn("google")}
+            <Link
+              href="/login"
               className="flex w-full items-center gap-3 rounded-xl bg-primary/5 p-3 text-sm font-medium text-primary border border-primary/10 hover:bg-primary/10 transition-colors"
             >
               <LogIn className="h-4 w-4" />
-              Entrar com Google
-            </button>
+              Entrar no DarkTube
+            </Link>
           )}
 
           <div className="rounded-lg bg-secondary/50 p-3">
             <p className="text-xs font-medium text-muted-foreground">
               Canais rastreados
             </p>
-            <p className="mt-1 text-lg font-bold text-sidebar-foreground" id="tracked-count">
-              --
+            <p className="mt-1 text-lg font-bold text-sidebar-foreground">
+              {trackedCount}
             </p>
           </div>
         </div>

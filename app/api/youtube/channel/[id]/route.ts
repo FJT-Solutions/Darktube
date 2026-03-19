@@ -104,11 +104,15 @@ export async function GET(
 
     return NextResponse.json({
       channel,
-      videos,
+      videos: videos as any[],
       metrics,
     })
   } catch (error) {
-    console.error("Channel fetch error:", error)
+    console.error("DEBUG: Channel fetch error details:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : "No stack trace",
+      errorObject: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    })
     return NextResponse.json(
       {
         error: "Failed to fetch channel data",

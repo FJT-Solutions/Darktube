@@ -1,34 +1,29 @@
-import { db } from "./db"
+import { createClient } from "./supabase/server"
 import type { YouTubeChannel, TrackedChannel } from "./types"
 import { NICHES } from "./constants"
 
 /**
  * Calculates a 'Remodeling Potential' score (0-100) for a channel.
- * Higher scores mean the channel is a great candidate for remodeling
- * (high revenue, low complexity, proven niche).
  */
 export function calculateRemodelingScore(channel: YouTubeChannel | TrackedChannel): number {
     let score = 0
 
     // 1. Dark Score (30%)
-    const darkScore = channel.darkType ? (channel as any).darkScore || 50 : 50
+    const darkScore = (channel as any).metrics?.darkScore || (channel as any).darkScore || 50
     score += (darkScore * 0.3)
 
     // 2. Revenue Efficiency (30%)
-    // We look for channels that make good money relative to their size
     if (channel.subscribers > 0) {
-        const monthlyViews = (channel as any).estimatedMonthlyViews || (channel.totalViews * 0.02)
+        const monthlyViews = (channel as any).metrics?.estimatedMonthlyViews || (channel.totalViews * 0.02)
         const efficiency = (monthlyViews / channel.subscribers)
-        // Normalize efficiency: 1 view per sub per month is very good (100 pts)
         const efficiencyScore = Math.min(efficiency * 100, 100)
         score += (efficiencyScore * 0.3)
     }
 
     // 3. Profitability (20%)
-    // Based on the niche CPM
     const niche = NICHES.find(n => n.id === (channel as any).darkType)
     const cpm = niche?.estimatedCpm || 2
-    const profitabilityScore = Math.min((cpm / 15) * 100, 100) // normalized to 15$ max cpm
+    const profitabilityScore = Math.min((cpm / 15) * 100, 100)
     score += (profitabilityScore * 0.2)
 
     // 4. Verification & Reliability (20%)
@@ -39,21 +34,26 @@ export function calculateRemodelingScore(channel: YouTubeChannel | TrackedChanne
 }
 
 /**
- * Gets insights about a specific niche based on tracked data in the database.
+ * Gets insights about a specific niche based on tracked data in Supabase.
  */
 export async function getNicheIntelligence(nicheId: string) {
-    const trackedChannels = await db.channel.findMany({
-        where: { darkType: nicheId },
-        include: { videos: true }
-    })
+    const supabase = await createClient()
+    const { data: trackedChannels, error } = await supabase
+        .from('channels')
+        .select(`
+            *,
+            videos ( * ),
+            metrics:channel_metrics_history ( * )
+        `)
+        .eq('dark_type', nicheId)
 
-    if (trackedChannels.length === 0) return null
+    if (error || !trackedChannels || trackedChannels.length === 0) return null
 
     const totalSubs = trackedChannels.reduce((acc, ch) => acc + Number(ch.subscribers || 0), 0)
     const avgSubs = totalSubs / trackedChannels.length
 
     // Find common tags/keywords
-    const allTags = trackedChannels.flatMap(ch => ch.tags ? JSON.parse(ch.tags) : [])
+    const allTags = trackedChannels.flatMap(ch => ch.tags || [])
     const tagFrequency = allTags.reduce((acc: Record<string, number>, tag: string) => {
         acc[tag] = (acc[tag] || 0) + 1
         return acc
@@ -72,7 +72,10 @@ export async function getNicheIntelligence(nicheId: string) {
             .map(ch => ({
                 id: ch.id,
                 name: ch.name,
-                score: calculateRemodelingScore(ch as any)
+                score: calculateRemodelingScore({
+                    ...ch,
+                    metrics: ch.metrics?.[0]
+                } as any)
             }))
             .sort((a, b) => b.score - a.score)
             .slice(0, 3)
@@ -84,7 +87,6 @@ export async function getNicheIntelligence(nicheId: string) {
  */
 export function getRemodelingInsight(channel: YouTubeChannel): string {
     const score = calculateRemodelingScore(channel)
-
     if (score > 80) return "🔥 Alta Viabilidade: Excelente modelo para remodelagem."
     if (score > 60) return "✅ Boa Oportunidade: Estilo de crescimento sólido."
     if (score > 40) return "📊 Estável: Requer análise de nicho mais profunda."

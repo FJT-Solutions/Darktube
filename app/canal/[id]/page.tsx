@@ -128,19 +128,28 @@ export default function ChannelDetailPage({
   const handleTrack = async () => {
     if (!channel) return
 
-    if (isTracked) {
-      await removeTrackedChannelAction(channel.id)
-      setIsTracked(false)
-    } else {
-      const tracked: TrackedChannel = {
-        ...channel,
-        trackedAt: new Date().toISOString(),
-        notes: "",
-        tags: [],
-        metrics: metrics || undefined,
+    const previousState = isTracked
+    // Optimistic UI update
+    setIsTracked(!previousState)
+
+    try {
+      if (previousState) {
+        await removeTrackedChannelAction(channel.id)
+      } else {
+        const tracked: TrackedChannel = {
+          ...channel,
+          trackedAt: new Date().toISOString(),
+          notes: "",
+          tags: [],
+          metrics: metrics || undefined,
+        }
+        await saveTrackedChannelAction(tracked)
       }
-      await saveTrackedChannelAction(tracked)
-      setIsTracked(true)
+    } catch (err) {
+      console.error("Error toggling track status:", err)
+      // Rollback on error
+      setIsTracked(previousState)
+      alert("Ocorreu um erro ao atualizar o status de rastreamento. Por favor, tente novamente.")
     }
   }
 

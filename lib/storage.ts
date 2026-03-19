@@ -1,59 +1,51 @@
-import type { TrackedChannel } from "./types"
+import { createClient as createServerClient } from "./supabase/server"
+import { createClient as createBrowserClient } from "./supabase/client"
 
-const STORAGE_KEY = "darktube_tracked_channels"
-
-export function getTrackedChannels(): TrackedChannel[] {
-  if (typeof window === "undefined") return []
-  try {
-    const data = localStorage.getItem(STORAGE_KEY)
-    return data ? JSON.parse(data) : []
-  } catch {
-    return []
+// Helper to get the correct client based on environment
+async function getSupabase() {
+  if (typeof window === "undefined") {
+    return await createServerClient()
   }
+  return createBrowserClient()
 }
 
-export function saveTrackedChannel(channel: TrackedChannel): void {
-  const channels = getTrackedChannels()
-  const existingIndex = channels.findIndex((c) => c.id === channel.id)
+export async function uploadThumbnail(buffer: Buffer, filename: string) {
+  const supabase = await getSupabase()
+  const { data, error } = await supabase.storage
+    .from('thumbnails')
+    .upload(filename, buffer, {
+      contentType: 'image/jpeg',
+      upsert: true
+    })
+  
+  if (error) throw error
 
-  if (existingIndex >= 0) {
-    channels[existingIndex] = channel
-  } else {
-    channels.unshift(channel)
-  }
+  const { data: { publicUrl } } = supabase.storage
+    .from('thumbnails')
+    .getPublicUrl(filename)
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(channels))
+  return publicUrl
 }
 
-export function removeTrackedChannel(channelId: string): void {
-  const channels = getTrackedChannels().filter((c) => c.id !== channelId)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(channels))
+export async function uploadFrame(buffer: Buffer, filename: string) {
+  const supabase = await getSupabase()
+  const { data, error } = await supabase.storage
+    .from('frames')
+    .upload(filename, buffer, {
+      contentType: 'image/jpeg',
+      upsert: true
+    })
+  
+  if (error) throw error
+  return data.path
 }
 
-export function isChannelTracked(channelId: string): boolean {
-  return getTrackedChannels().some((c) => c.id === channelId)
-}
-
-export function updateChannelNotes(
-  channelId: string,
-  notes: string
-): void {
-  const channels = getTrackedChannels()
-  const channel = channels.find((c) => c.id === channelId)
-  if (channel) {
-    channel.notes = notes
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(channels))
-  }
-}
-
-export function updateChannelTags(
-  channelId: string,
-  tags: string[]
-): void {
-  const channels = getTrackedChannels()
-  const channel = channels.find((c) => c.id === channelId)
-  if (channel) {
-    channel.tags = tags
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(channels))
-  }
+export async function getFrameUrl(path: string) {
+  const supabase = await getSupabase()
+  const { data, error } = await supabase.storage
+    .from('frames')
+    .createSignedUrl(path, 3600) // 1 hour
+  
+  if (error) throw error
+  return data.signedUrl
 }

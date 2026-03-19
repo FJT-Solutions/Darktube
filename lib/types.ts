@@ -63,6 +63,7 @@ export interface ChannelMetrics {
   darkScore: number
   cpm: number
   growthPotential: number
+  estimatedMonthlyViews?: number
 }
 
 export interface TrackedChannel extends YouTubeChannel {

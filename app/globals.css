@@ -138,7 +138,17 @@
   cursor: pointer;
 }
 .earnings-slider::-moz-range-track {
-  height: 6px;
   background: oklch(0.25 0.005 260);
   border-radius: 3px;
+}
+
+/* Animations */
+@keyframes scan {
+  0% { top: 0%; opacity: 0; }
+  50% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.animate-scan {
+  animation: scan 3s linear infinite;
 }
