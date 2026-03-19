@@ -5,3 +5,6 @@ nixPkgs = ['nodejs_20', 'pnpm-9_x', 'openssl']
 cmds = [
   'pnpm run build'
 ]
+
+[start]
+cmd = "node .next/standalone/server.js"
