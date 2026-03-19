@@ -48,7 +48,7 @@ export async function getTrackedChannels(userId?: string): Promise<TrackedChanne
         throw error
     }
 
-    return (data || []).map(c => ({
+    return (data || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         handle: c.handle,
@@ -263,12 +263,23 @@ export async function getDetailedNiches() {
     if (error) throw error
     return data
 }
-export async function updateProfileStatus(email: string, status: 'pending' | 'approved' | 'rejected') {
+export async function updateProfileStatus(email: string, status: 'pending' | 'approved' | 'rejected' | 'blocked') {
     const supabase = await createClient()
     const { error } = await supabase
         .from('profiles')
         .update({ status })
         .eq('email', email)
+    
+    if (error) throw error
+    return { success: true }
+}
+
+export async function deleteProfile(userId: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
     
     if (error) throw error
     return { success: true }

@@ -28,7 +28,6 @@ export async function sendAccessGrantedEmail(email: string, name: string, setupL
                 </div>
                 
                 <p style="font-size: 13px; color: #666;">Ao clicar no botão acima, você será direcionado para criar sua senha exclusiva e acessar o dashboard.</p>
-                <p style="font-size: 13px; color: #ef4444;">${setupLink}</p>
                 
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
                 <p style="font-size: 11px; color: #999;">Esta é uma ferramenta exclusiva. Por favor, não compartilhe seus dados de acesso.</p>

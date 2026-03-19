@@ -271,7 +271,7 @@ export async function updateUserRoleAction(userId: string, role: 'admin' | 'user
             .eq('id', user.id)
             .single()
 
-        // Security check: must be admin OR nathan
+        // Security check
         if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
             throw new Error("Não autorizado")
         }
@@ -281,6 +281,70 @@ export async function updateUserRoleAction(userId: string, role: 'admin' | 'user
         return result
     } catch (error: any) {
         console.error("Error in updateUserRoleAction:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateUserStatusAction(userId: string, status: 'approved' | 'blocked') {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autenticado")
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        // Security check
+        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
+            throw new Error("Não autorizado")
+        }
+
+        // We need to find the email of the target user
+        const { data: target } = await supabase.from('profiles').select('email').eq('id', userId).single()
+        if (!target) throw new Error("Usuário não encontrado")
+
+        const result = await db.updateProfileStatus(target.email, status)
+        revalidatePath("/settings")
+        return result
+    } catch (error: any) {
+        console.error("Error in updateUserStatusAction:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function deleteUserAction(userId: string) {
+    try {
+        const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!user || !adminSupabase) throw new Error("Não autorizado ou configuração ausente")
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        // Security check
+        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
+            throw new Error("Não autorizado")
+        }
+
+        // 1. Delete from App DB (Profiles etc)
+        await db.deleteProfile(userId)
+        
+        // 2. Delete from Auth (requires Admin Client)
+        const { error: authError } = await adminSupabase.auth.admin.deleteUser(userId)
+        if (authError) console.warn("Auth deletion failed:", authError)
+
+        revalidatePath("/settings")
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in deleteUserAction:", error)
         return { success: false, error: error.message }
     }
 }

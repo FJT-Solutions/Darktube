@@ -15,9 +15,8 @@ const _jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "DarkTube Miner - Mineracao de Canais YouTube",
-  description:
-    "Encontre, analise e rastreie os melhores canais dark do YouTube. Mineracao inteligente de nichos lucrativos para canais faceless.",
+  title: "DarkTube - Mineração de Canais",
+  description: "Plataforma avançada para análise e mineração de canais dark no YouTube.",
   icons: {
     icon: [
       { url: "/icon-light-32x32.png", media: "(prefers-color-scheme: light)" },

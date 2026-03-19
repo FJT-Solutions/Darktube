@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import { Youtube, Key, Save, LogOut, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from "lucide-react"
-import { updateSettingsAction, getSettingsAction, getAllProfilesAction, updateUserRoleAction } from "@/app/actions"
+import { updateSettingsAction, getSettingsAction, getAllProfilesAction, updateUserRoleAction, updateUserStatusAction, deleteUserAction } from "@/app/actions"
+import { toast } from "sonner" // Assuming sonner is used for toasts
 
 export default function SettingsPage() {
     const { session, profile, loading, signOut } = useAuth()
@@ -20,7 +22,7 @@ export default function SettingsPage() {
     
     // User management state
     const [profiles, setProfiles] = useState<any[]>([])
-    const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null)
+    const [isProcessing, setIsProcessing] = useState<string | null>(null)
     const isAdmin = profile?.role === 'admin'
 
     useEffect(() => {
@@ -28,12 +30,16 @@ export default function SettingsPage() {
             getSettingsAction().then(settings => {
                 if (settings?.geminiApiKey) setGeminiKey(settings.geminiApiKey)
             })
-
-            if (isAdmin) {
-                getAllProfilesAction().then(setProfiles)
-            }
+        }
+        if (session && isAdmin) {
+            loadProfiles()
         }
     }, [session, isAdmin])
+
+    async function loadProfiles() {
+        const data = await getAllProfilesAction()
+        setProfiles(data)
+    }
 
     const handleSave = async () => {
         setIsSaving(true)
@@ -51,12 +57,41 @@ export default function SettingsPage() {
         const newRole = currentRole === 'admin' ? 'user' : 'admin'
         if (!confirm(`Deseja alterar o cargo deste usuário para ${newRole.toUpperCase()}?`)) return
 
-        setIsUpdatingRole(userId)
+        setIsProcessing(userId)
         const result = await updateUserRoleAction(userId, newRole as any)
         if (result.success) {
             setProfiles(prev => prev.map(p => p.id === userId ? { ...p, role: newRole } : p))
+            toast.success("Cargo atualizado!")
         }
-        setIsUpdatingRole(null)
+        setIsProcessing(null)
+    }
+
+    const handleStatusUpdate = async (userId: string, currentStatus: string) => {
+        const newStatus = currentStatus === 'blocked' ? 'approved' : 'blocked'
+        const actionText = newStatus === 'blocked' ? 'BLOQUEAR/ARQUIVAR' : 'REATIVAR'
+        if (!confirm(`Deseja ${actionText} o acesso deste usuário?`)) return
+
+        setIsProcessing(userId)
+        const result = await updateUserStatusAction(userId, newStatus as any)
+        if (result.success) {
+            setProfiles(prev => prev.map(p => p.id === userId ? { ...p, status: newStatus } : p))
+            toast.success(newStatus === 'blocked' ? "Usuário arquivado!" : "Acesso reativado!")
+        }
+        setIsProcessing(null)
+    }
+
+    const handleDeleteUser = async (userId: string) => {
+        if (!confirm("⚠️ ATENÇÃO: Deseja REMOVER permanentemente este usuário? Esta ação não pode ser desfeita.")) return
+
+        setIsProcessing(userId)
+        const result = await deleteUserAction(userId)
+        if (result.success) {
+            setProfiles(prev => prev.filter(p => p.id !== userId))
+            toast.success("Usuário removido!")
+        } else {
+            toast.error(`Erro ao remover: ${result.error}`)
+        }
+        setIsProcessing(null)
     }
 
     if (loading) {
@@ -206,18 +241,46 @@ export default function SettingsPage() {
                                                 <p className="text-xs text-muted-foreground">{profile.email}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2">
                                             <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
                                                 {profile.role}
                                             </Badge>
+                                            {profile.status === 'blocked' && (
+                                                <Badge variant="destructive" className="bg-red-900/40 text-red-400 border-red-900/50">Bloqueado</Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
                                             <Button 
                                                 variant="outline" 
                                                 size="sm" 
-                                                disabled={isUpdatingRole === profile.id || profile.email === 'nathan.jordan@fjt-solutions.com'}
+                                                disabled={!!isProcessing || profile.email === 'nathan.jordan@fjt-solutions.com'}
                                                 onClick={() => handleRoleUpdate(profile.id, profile.role)}
-                                                className="text-xs h-8"
+                                                className="text-[10px] h-7 px-2"
                                             >
-                                                {isUpdatingRole === profile.id ? <Loader2 className="h-3 w-3 animate-spin" /> : `Mudar para ${profile.role === 'admin' ? 'User' : 'Admin'}`}
+                                                {isProcessing === profile.id ? <Loader2 className="h-3 w-3 animate-spin" /> : `${profile.role === 'admin' ? 'Ver User' : 'Ver Admin'}`}
+                                            </Button>
+
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                disabled={!!isProcessing || profile.email === 'nathan.jordan@fjt-solutions.com'}
+                                                onClick={() => handleStatusUpdate(profile.id, profile.status)}
+                                                className={cn(
+                                                    "text-[10px] h-7 px-2",
+                                                    profile.status === 'blocked' ? "text-green-500 hover:text-green-400" : "text-orange-500 hover:text-orange-400"
+                                                )}
+                                            >
+                                                {isProcessing === profile.id ? <Loader2 className="h-3 w-3 animate-spin" /> : (profile.status === 'blocked' ? 'Reativar' : 'Arquivar')}
+                                            </Button>
+
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                disabled={!!isProcessing || profile.email === 'nathan.jordan@fjt-solutions.com'}
+                                                onClick={() => handleDeleteUser(profile.id)}
+                                                className="text-[10px] h-7 px-2 text-muted-foreground hover:text-destructive"
+                                            >
+                                                {isProcessing === profile.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Remover'}
                                             </Button>
                                         </div>
                                     </div>

@@ -155,7 +155,9 @@ export default function LandingPage() {
                                 <div className="flex -space-x-1.5 focus-within:space-x-1 transition-all">
                                     {[1, 2, 3, 4].map(i => (
                                         <div key={i} className="h-5 w-5 rounded-full border-2 border-[#0C0C0E] bg-zinc-800 shadow-xl overflow-hidden">
-                                            <div className="h-full w-full bg-gradient-to-br from-zinc-700 to-zinc-900" />
+                                            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-red-600">
+              DarkTube
+            </span>
                                         </div>
                                     ))}
                                 </div>

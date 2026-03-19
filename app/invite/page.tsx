@@ -44,15 +44,15 @@ export default function InvitePage() {
 
             <main className="flex flex-1 items-center justify-center p-4">
                 <div className="w-full max-w-lg space-y-8">
-                    <div className="space-y-4 text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                            <ShieldCheck className="h-8 w-8 text-primary" />
-                        </div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Solicitar Acesso</h1>
-                        <p className="text-balance text-muted-foreground">
-                            O DarkTube Miner é uma ferramenta exclusiva para membros aprovados. Nos conte quem você é para avaliarmos sua entrada.
-                        </p>
+                    <div className="flex flex-col items-center gap-4 text-center">
+                    <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 shadow-lg shadow-red-500/5">
+                        <ShieldCheck className="h-8 w-8 text-red-500" />
                     </div>
+                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Solicitar Acesso</h1>
+                    <p className="text-muted-foreground text-sm max-w-[280px]">
+                        O <span className="text-red-500 font-semibold">DarkTube</span> é uma ferramenta exclusiva para membros aprovados. Nos conte quem você é para avaliarmos sua entrada.
+                    </p>
+                </div>
 
                     <div className="rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/20">
                         <form onSubmit={handleInviteRequest} className="space-y-5">

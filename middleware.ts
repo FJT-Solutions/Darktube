@@ -50,9 +50,10 @@ export async function middleware(request: NextRequest) {
       if (request.nextUrl.pathname !== '/pending') {
         return NextResponse.redirect(new URL('/pending', request.url))
       }
-    } else if (profile?.status === 'rejected') {
+    } else if (profile?.status === 'rejected' || profile?.status === 'blocked') {
       await supabase.auth.signOut()
-      return NextResponse.redirect(new URL('/login?reason=rejected', request.url))
+      const reason = profile?.status === 'blocked' ? 'blocked' : 'rejected'
+      return NextResponse.redirect(new URL(`/login?reason=${reason}`, request.url))
     }
 
     // Proteger rotas de admin
