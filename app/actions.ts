@@ -175,6 +175,7 @@ export async function approveInviteAction(inviteId: string) {
             ? `${protocol}://${host}` 
             : process.env.NEXT_PUBLIC_SITE_URL
 
+        console.log(`[Admin] Generating link for ${invite.email} with siteUrl: ${siteUrl}`)
         const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
             type: 'invite',
             email: invite.email,
@@ -185,17 +186,19 @@ export async function approveInviteAction(inviteId: string) {
         })
 
         if (authError || !data?.properties?.action_link) {
-            console.error("Auth error:", authError)
+            console.error("[Admin] Auth link generation failed:", authError)
             throw new Error("Falha ao gerar o link de convite: " + (authError?.message || "Erro desconhecido"))
         }
 
+        console.log(`[Admin] Link generated successfully. Updating profile status for ${invite.email}`)
         // 3. Update Profile Status
         await db.updateProfileStatus(invite.email, 'approved')
 
         // 4. Send Custom Email
+        console.log(`[Admin] Sending welcome email to ${invite.email}`)
         const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, data.properties.action_link)
         if (!emailResult.success) {
-             console.warn("Email failed but proceed:", emailResult.error)
+             console.warn("[Admin] Email failed but proceeding:", emailResult.error)
         }
 
         // 5. Cleanup Invite

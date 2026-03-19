@@ -25,19 +25,22 @@ export async function createClient() {
     },
   })
 }
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
 export async function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !serviceRoleKey) {
-    console.warn("createAdminClient: Missing URL or SERVICE_ROLE_KEY")
-    return null as any
+    if (!url) console.error("createAdminClient: SUPABASE_URL is missing")
+    if (!serviceRoleKey) console.error("createAdminClient: SUPABASE_SERVICE_ROLE_KEY is missing")
+    return null
   }
 
-  return createServerClient(url, serviceRoleKey, {
-    cookies: {
-      getAll() { return [] },
-      setAll() { },
-    },
+  return createSupabaseClient(url, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
   })
 }
