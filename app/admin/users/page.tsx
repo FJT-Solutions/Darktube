@@ -61,7 +61,7 @@ export default function AdminUsersPage() {
         
         setIsProcessing(userId)
         try {
-            const result = await updateUserRoleAction(userId, newRole)
+            const result = await updateUserRoleAction(userId, newRole) as any
             if (result.success) {
                 toast.success("Cargo atualizado")
                 setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u))
@@ -81,7 +81,7 @@ export default function AdminUsersPage() {
         
         setIsProcessing(userId)
         try {
-            const result = await updateUserStatusAction(userId, newStatus)
+            const result = await updateUserStatusAction(userId, newStatus) as any
             if (result.success) {
                 toast.success(newStatus === 'blocked' ? "Usuário arquivado" : "Usuário reativado")
                 setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u))
@@ -213,7 +213,14 @@ export default function AdminUsersPage() {
                                                             {user.full_name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="font-medium text-foreground">{user.full_name || "Sem nome"}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-foreground">{user.full_name || "Sem nome"}</span>
+                                                                {user.isAuthOnly && (
+                                                                    <Badge variant="outline" className="text-[9px] h-4 border-yellow-500/50 text-yellow-500 bg-yellow-500/5">
+                                                                        Resíduo / Remanescente
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
                                                             <span className="text-xs text-muted-foreground">{user.email}</span>
                                                         </div>
                                                     </div>

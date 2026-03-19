@@ -171,9 +171,15 @@ export async function approveInviteAction(inviteId: string) {
         // 2. Create the Auth User (Generate Invite Link)
         const host = (await headers()).get('host')
         const protocol = host?.includes('localhost') ? 'http' : 'https'
-        const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.includes('localhost') || !process.env.NEXT_PUBLIC_SITE_URL) && host 
-            ? `${protocol}://${host}` 
-            : process.env.NEXT_PUBLIC_SITE_URL
+        
+        let siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+        if (!siteUrl || siteUrl.includes('localhost')) {
+            if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+                siteUrl = `${protocol}://${host}`
+            } else if (!siteUrl) {
+                siteUrl = 'https://darktube.fjt.solutions'
+            }
+        }
 
         let { data, error: authError } = await adminSupabase.auth.admin.generateLink({
             type: 'invite',
@@ -272,14 +278,34 @@ export async function getAllProfilesAction() {
         if (authError) console.error("Error listing auth users:", authError)
 
         // Enrich profiles with auth info
-        return profiles.map((p: any) => {
-            const authUser = authUsers?.find(u => u.email === p.email)
+        // We iterate over authUsers to make sure "residuos" (remnants) also appear
+        const mergedUsers = authUsers.map(authUser => {
+            const profile = profiles.find((p: any) => p.email === authUser.email)
             return {
-                ...p,
-                isRegistered: !!(authUser?.last_sign_in_at || authUser?.email_confirmed_at),
-                lastSignIn: authUser?.last_sign_in_at
+                id: profile?.id || authUser.id,
+                email: authUser.email || profile?.email,
+                full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Membro Externo',
+                role: profile?.role || 'user',
+                status: profile?.status || 'approved',
+                isRegistered: !!(authUser.last_sign_in_at || authUser.email_confirmed_at),
+                lastSignIn: authUser.last_sign_in_at,
+                isAuthOnly: !profile
             }
         })
+
+        // Also add profiles that might not have an auth user yet (pending invites)
+        profiles.forEach((p: any) => {
+            if (!mergedUsers.find(u => u.email === p.email)) {
+                mergedUsers.push({
+                    ...p,
+                    isRegistered: false,
+                    lastSignIn: null,
+                    isAuthOnly: false
+                })
+            }
+        })
+
+        return mergedUsers
     } catch (error) {
         console.error("Error in getAllProfilesAction:", error)
         return []
@@ -306,9 +332,15 @@ export async function resendAccessAction(email: string, name: string) {
 
         const host = (await headers()).get('host')
         const protocol = host?.includes('localhost') ? 'http' : 'https'
-        const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL?.includes('localhost') || !process.env.NEXT_PUBLIC_SITE_URL) && host 
-            ? `${protocol}://${host}` 
-            : process.env.NEXT_PUBLIC_SITE_URL
+        
+        let siteUrl = process.env.NEXT_PUBLIC_SITE_URL
+        if (!siteUrl || siteUrl.includes('localhost')) {
+            if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+                siteUrl = `${protocol}://${host}`
+            } else if (!siteUrl) {
+                siteUrl = 'https://darktube.fjt.solutions'
+            }
+        }
 
         // Generate magic link (works for existing users)
         const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
