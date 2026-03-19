@@ -10,10 +10,12 @@ import { Badge } from "@/components/ui/badge"
 import { useAppShell } from "@/components/layout/app-shell"
 import { Loader2, UserPlus, Mail, Clock, CheckCircle2, AlertCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 export default function AdminInvitesPage() {
     const { session, profile, loading: authLoading } = useAuth()
     const { toggleSidebar } = useAppShell()
+    const router = useRouter()
     const [invites, setInvites] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [processingId, setProcessingId] = useState<string | null>(null)
@@ -30,7 +32,7 @@ export default function AdminInvitesPage() {
         setLoading(true)
         try {
             const data = await getPendingInvitesAction()
-            setInvites(data)
+            setInvites(data || [])
         } catch (error) {
             console.error("Error loading invites:", error)
             toast.error("Erro ao carregar solicitações")
@@ -46,10 +48,13 @@ export default function AdminInvitesPage() {
             if (result.success) {
                 toast.success("Solicitação aprovada com sucesso! E-mail enviado.")
                 setInvites(prev => prev.filter(i => i.id !== id))
+                router.refresh()
             } else {
+                console.error("Approval error:", result.error)
                 toast.error(`Erro: ${result.error}`)
             }
         } catch (error) {
+            console.error("Unexpected error:", error)
             toast.error("Ocorreu um erro inesperado")
         } finally {
             setProcessingId(null)
@@ -65,6 +70,7 @@ export default function AdminInvitesPage() {
             if (result.success) {
                 toast.success("Solicitação recusada com sucesso.")
                 setInvites(prev => prev.filter(i => i.id !== id))
+                router.refresh()
             } else {
                 toast.error(`Erro: ${result.error}`)
             }
@@ -95,7 +101,7 @@ export default function AdminInvitesPage() {
     }
 
     return (
-        <>
+        <div className="flex flex-col h-full bg-background">
             <Header 
                 title="Solicitações de Acesso" 
                 description="Gerencie quem pode entrar na plataforma"
@@ -173,6 +179,6 @@ export default function AdminInvitesPage() {
                     </Card>
                 </div>
             </div>
-        </>
+        </div>
     )
 }
