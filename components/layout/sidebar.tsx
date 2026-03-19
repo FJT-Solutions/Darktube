@@ -112,6 +112,28 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               </Link>
             )
           })}
+
+          {/* Admin Section */}
+          {session?.user?.email === 'nathan.jordan@fjt-solutions.com' && (
+            <div className="mt-8">
+              <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Administração
+              </p>
+              <Link
+                href="/admin/invites"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname.startsWith("/admin")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <UserIcon className={cn("h-[18px] w-[18px]", pathname.startsWith("/admin") ? "text-primary" : "")} />
+                Acessos / Invites
+              </Link>
+            </div>
+          )}
         </nav>
 
         {/* User Profile */}
