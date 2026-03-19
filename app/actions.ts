@@ -176,7 +176,7 @@ export async function approveInviteAction(inviteId: string) {
             : process.env.NEXT_PUBLIC_SITE_URL
 
         console.log(`[Admin] Generating link for ${invite.email} with siteUrl: ${siteUrl}`)
-        const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
+        let { data, error: authError } = await adminSupabase.auth.admin.generateLink({
             type: 'invite',
             email: invite.email,
             options: {
@@ -185,12 +185,26 @@ export async function approveInviteAction(inviteId: string) {
             }
         })
 
+        // If user already exists, try magiclink instead
+        if (authError?.message?.includes('already been registered') || (authError as any)?.code === 'email_exists') {
+            console.log(`[Admin] User exists, trying magiclink fallback for ${invite.email}`)
+            const magicRes = await adminSupabase.auth.admin.generateLink({
+                type: 'magiclink',
+                email: invite.email,
+                options: {
+                    redirectTo: `${siteUrl}/dashboard`
+                }
+            })
+            data = magicRes.data
+            authError = magicRes.error
+        }
+
         if (authError || !data?.properties?.action_link) {
             console.error("[Admin] Auth link generation failed:", authError)
             throw new Error("Falha ao gerar o link de convite: " + (authError?.message || "Erro desconhecido"))
         }
 
-        console.log(`[Admin] Link generated successfully. Updating profile status for ${invite.email}`)
+        console.log(`[Admin] Link generated successfully (type: ${data.properties.email_otp ? 'magiclink' : 'invite'}). Updating profile status for ${invite.email}`)
         // 3. Update Profile Status
         await db.updateProfileStatus(invite.email, 'approved')
 
