@@ -108,3 +108,12 @@ export interface NicheCategory {
     voice: string
   }
 }
+
+export interface BlotatoAccount {
+  id: string
+  user_id: string
+  platform: 'instagram' | 'tiktok' | 'youtube'
+  account_id: string
+  label?: string
+  created_at: string
+}

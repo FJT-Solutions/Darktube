@@ -45,7 +45,7 @@ export async function GET(
 
         // Busca vídeos com estatísticas reais
         try {
-          videos = await getOfficialChannelVideos(id, 30)
+          videos = (await getOfficialChannelVideos(id, 30)) as any as YouTubeVideo[]
         } catch (e) {
           console.warn("[Videos API] Falha ao buscar vídeos:", e instanceof Error ? e.message : e)
         }

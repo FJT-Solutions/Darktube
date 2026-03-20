@@ -33,6 +33,7 @@ export function calculateMetrics(
     estimatedMonthlyRevenue,
     darkScore: 0,
     cpm,
+    growthPotential,
   })
 
   return {

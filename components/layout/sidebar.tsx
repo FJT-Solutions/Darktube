@@ -16,12 +16,14 @@ import {
   UserPlus,
   LogOut,
   LogIn,
+  Key,
 } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/minerar", label: "Minerar", icon: Search },
   { href: "/tracker", label: "Tracker", icon: Bookmark },
+  { href: "/credentials", label: "Credenciais", icon: Key },
   { href: "/settings", label: "Configurações", icon: Settings },
 ]
 
@@ -131,7 +133,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 )}
               >
                 <UserIcon className={cn("h-[18px] w-[18px]", pathname === "/admin/invites" ? "text-primary" : "")} />
-                Acessos / Invites
+                Convites
               </Link>
               <Link
                 href="/admin/users"
@@ -150,52 +152,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           )}
         </nav>
 
-        {/* User Profile */}
-        <div className="border-t border-border p-4 space-y-3">
-          {session ? (
-            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-secondary/30 border border-border/50">
-              <Link
-                href="/settings"
-                className="flex items-center gap-3 overflow-hidden flex-1"
-                onClick={onClose}
-              >
-                <div className="h-8 w-8 rounded-full overflow-hidden border border-primary/20 shrink-0 bg-muted flex items-center justify-center">
-                  {(session.user?.user_metadata?.avatar_url || session.user?.user_metadata?.picture) ? (
-                    <img 
-                      src={session.user.user_metadata.avatar_url || session.user.user_metadata.picture} 
-                      alt={session.user.user_metadata?.full_name || ""} 
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-xs font-bold text-muted-foreground uppercase">
-                      {(session.user?.user_metadata?.full_name || session.user?.email || "U")[0]}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-semibold truncate text-sidebar-foreground">
-                    {session.user?.user_metadata?.full_name || (session.user as any)?.name || session.user?.email}
-                  </span>
-                </div>
-              </Link>
-              <button
-                onClick={() => signOut()}
-                className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                title="Sair"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="flex w-full items-center gap-3 rounded-xl bg-primary/5 p-3 text-sm font-medium text-primary border border-primary/10 hover:bg-primary/10 transition-colors"
-            >
-              <LogIn className="h-4 w-4" />
-              Entrar no DarkTube
-            </Link>
-          )}
-
+        {/* Sidebar Footer */}
+        <div className="border-t border-border p-4">
           <div className="rounded-lg bg-secondary/50 p-3">
             <p className="text-xs font-medium text-muted-foreground">
               Canais rastreados
