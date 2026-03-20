@@ -175,7 +175,7 @@ export async function approveInviteAction(inviteId: string) {
         
         console.log(`[Admin] Generating link. Host: ${host}, Protocol: ${protocol}`)
 
-        let siteUrl = 'https://darktube.fjt.solutions'
+        let siteUrl = 'https://darktube.fjt-solutions.com'
         
         // Only use localhost/detect automatically if we are VERY sure it's local dev
         if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
@@ -337,7 +337,7 @@ export async function resendAccessAction(email: string, name: string) {
         const host = heads.get('x-forwarded-host') || heads.get('host')
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
-        let siteUrl = 'https://darktube.fjt.solutions'
+        let siteUrl = 'https://darktube.fjt-solutions.com'
         
         if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
             siteUrl = `${protocol}://${host}`
