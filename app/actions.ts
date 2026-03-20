@@ -138,16 +138,39 @@ export async function getSettingsAction() {
         return null
     }
 }
+
 export async function getPendingInvitesAction() {
-    const supabase = await createClient()
-    const { data: invites, error } = await supabase
-        .from('invites')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return invites
+    try {
+        const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        const { data: invites, error } = await supabase
+            .from('invites')
+            .select('*')
+            .eq('status', 'pending')
+            .order('requested_at', { ascending: false })
+        
+        if (error) throw error
+
+        // 2. Filter out invites for users who already have a profile
+        const { data: profiles } = await adminSupabase.from('profiles').select('email')
+        const existingEmails = profiles?.map(p => p.email) || []
+        
+        const filteredInvites = (invites || []).filter((i: any) => !existingEmails.includes(i.email))
+        
+        // 3. Optional: Background cleanup of these stale invites
+        const staleInvites = (invites || []).filter((i: any) => existingEmails.includes(i.email))
+        if (staleInvites.length > 0 && adminSupabase) {
+            const staleIds = staleInvites.map((i: any) => i.id)
+            adminSupabase.from('invites').delete().in('id', staleIds).then(() => {
+                console.log(`[Admin] Cleaned up ${staleIds.length} stale invites.`)
+            })
+        }
+
+        return filteredInvites
+    } catch (error) {
+        console.error("Error in getPendingInvitesAction:", error)
+        return []
+    }
 }
 
 import { sendAccessGrantedEmail } from "@/lib/email"
@@ -221,8 +244,11 @@ export async function approveInviteAction(inviteId: string) {
              console.warn("[Admin] Email failed but proceeding:", emailResult.error)
         }
 
-        // 5. Cleanup Invite
-        await supabase.from('invites').delete().eq('id', inviteId)
+        // 5. Cleanup Invite (Use admin client to ensure bypass of RLS)
+        await adminSupabase.from('invites').delete().eq('id', inviteId)
+        
+        // Also cleanup any other invites with same email to be sure
+        await adminSupabase.from('invites').delete().eq('email', invite.email)
 
         revalidatePath("/admin/invites")
         return { success: true }
@@ -235,20 +261,49 @@ export async function approveInviteAction(inviteId: string) {
 export async function declineInviteAction(inviteId: string) {
     try {
         const supabase = await createClient()
-        
-        // 1. Get invite to know the email
+        const adminSupabase = await createAdminClient()
+        if (!adminSupabase) throw new Error("Configuração de Admin ausente (SERVICE_ROLE_KEY)")
+
+        // 1. Get invite details
         const { data: invite } = await supabase
             .from('invites')
             .select('email')
             .eq('id', inviteId)
             .single()
+
+        if (!invite) throw new Error("Convite não encontrado")
+
+        const email = invite.email
+
+        // 2. Find and Delete Profile (if exists)
+        const { data: profile } = await adminSupabase
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+        if (profile) {
+            // Delete profile
+            await adminSupabase.from('profiles').delete().eq('id', profile.id)
             
-        if (invite) {
-            await db.updateProfileStatus(invite.email, 'rejected')
+            // Delete Auth User
+            const { error: authError } = await adminSupabase.auth.admin.deleteUser(profile.id)
+            if (authError) {
+                console.warn("[Admin] Could not delete auth user (might not exist):", authError.message)
+            }
+        } else {
+            // If no profile, try to find by email in auth anyway to be safe
+            const { data: { users }, error: listError } = await adminSupabase.auth.admin.listUsers()
+            if (!listError) {
+                const userToDelete = users.find(u => u.email === email)
+                if (userToDelete) {
+                    await adminSupabase.auth.admin.deleteUser(userToDelete.id)
+                }
+            }
         }
 
-        // 2. Delete Invite
-        await supabase.from('invites').delete().eq('id', inviteId)
+        // 3. Delete ALL invites for this email
+        await adminSupabase.from('invites').delete().eq('email', email)
 
         revalidatePath("/admin/invites")
         return { success: true }
@@ -291,7 +346,7 @@ export async function getAllProfilesAction() {
                 full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Membro Externo',
                 role: profile?.role || 'user',
                 status: profile?.status || 'approved',
-                isRegistered: !!authUser.last_sign_in_at,
+                isRegistered: authUser.user_metadata?.password_set === true,
                 lastSignIn: authUser.last_sign_in_at,
                 isAuthOnly: !profile
             }
@@ -476,6 +531,53 @@ export async function deleteUserAction(userId: string) {
         return { success: true }
     } catch (error: any) {
         console.error("Error in deleteUserAction:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function requestInviteAction(email: string, name: string) {
+    try {
+        const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        if (!adminSupabase) throw new Error("Erro de configuração do servidor")
+
+        // 1. Check if an invite already exists
+        const { data: existingInvite } = await adminSupabase
+            .from('invites')
+            .select('id, status')
+            .eq('email', email)
+            .maybeSingle()
+
+        if (existingInvite) {
+            // Check if user actually exists in Auth or Profiles
+            const { data: profile } = await adminSupabase.from('profiles').select('id').eq('email', email).maybeSingle()
+            
+            const { data: { users: authUsers } } = await adminSupabase.auth.admin.listUsers()
+            const authUser = authUsers.find(u => u.email === email)
+
+            if (!profile && !authUser) {
+                // If neither exists, the invite is orphaned. Clean it up to allow a new request.
+                console.log(`[Invite] Cleaning up orphaned invite for ${email}`)
+                await adminSupabase.from('invites').delete().eq('email', email)
+            } else {
+                return { success: false, error: "ESTE_EMAIL_JA_SOLICITOU" }
+            }
+        }
+
+        // 2. Insert new invite (bypass RLS for the check using admin client if needed, 
+        // but here we just insert as public)
+        const { error } = await supabase
+            .from('invites')
+            .insert({ email, name })
+
+        if (error) {
+            if (error.code === '23505') return { success: false, error: "ESTE_EMAIL_JA_SOLICITOU" }
+            throw error
+        }
+
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in requestInviteAction:", error)
         return { success: false, error: error.message }
     }
 }
