@@ -152,8 +152,11 @@ export async function getPendingInvitesAction() {
         if (error) throw error
 
         // 2. Filter out invites for users who already have a profile
-        const { data: profiles } = await adminSupabase.from('profiles').select('email')
-        const existingEmails = profiles?.map(p => p.email) || []
+        let existingEmails: string[] = []
+        if (adminSupabase) {
+            const { data: profiles } = await adminSupabase.from('profiles').select('email')
+            existingEmails = profiles?.map(p => p.email) || []
+        }
         
         const filteredInvites = (invites || []).filter((i: any) => !existingEmails.includes(i.email))
         
@@ -579,5 +582,104 @@ export async function requestInviteAction(email: string, name: string) {
     } catch (error: any) {
         console.error("Error in requestInviteAction:", error)
         return { success: false, error: error.message }
+    }
+}
+
+export async function getCredentialsAction() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        const providers = [
+            'blotato', 'gemini', 'openai', 'elevenlabs', 'claude', 
+            'openrouter', 'kie_ai', 'meta_app_id', 'meta_app_secret', 
+            'meta_client_token', 'meta_access_token'
+        ]
+        const keys: Record<string, string> = {}
+        
+        for (const provider of providers) {
+            const key = await db.getUserApiKey(user.id, provider)
+            if (key) keys[provider] = key
+        }
+        
+        return keys
+    } catch (error: any) {
+        console.error("Error in getCredentialsAction:", error)
+        return {}
+    }
+}
+
+export async function updateCredentialsAction(provider: string, key: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: "Não autorizado" }
+
+        await db.upsertUserApiKey(user.id, provider, key)
+        revalidatePath('/credentials')
+        revalidatePath('/settings')
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in updateCredentialsAction:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function updateCredentialsBulkAction(data: Record<string, string>) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: "Não autorizado" }
+
+        for (const [provider, key] of Object.entries(data)) {
+            await db.upsertUserApiKey(user.id, provider, key)
+        }
+        
+        revalidatePath('/credentials')
+        revalidatePath('/settings')
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in updateCredentialsBulkAction:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function getBlotatoAccountsAction() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return []
+
+        return await db.getBlotatoAccounts(user.id)
+    } catch (error: any) {
+        console.error("Error in getBlotatoAccountsAction:", error)
+        return []
+    }
+}
+
+export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        return await db.addBlotatoAccount(user.id, platform, accountId, label)
+    } catch (error: any) {
+        console.error("Error in addBlotatoAccountAction:", error)
+        throw error
+    }
+}
+
+export async function removeBlotatoAccountAction(id: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        return await db.removeBlotatoAccount(id)
+    } catch (error: any) {
+        console.error("Error in removeBlotatoAccountAction:", error)
+        throw error
     }
 }
