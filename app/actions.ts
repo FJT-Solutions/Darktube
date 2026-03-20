@@ -3,7 +3,7 @@
 import * as db from "@/lib/database"
 import { getNicheIntelligence } from "@/lib/intelligence"
 import { revalidatePath } from "next/cache"
-import type { YouTubeChannel, TrackedChannel, YouTubeVideo, BlotatoAccount } from "@/lib/types"
+import { TrackedChannel } from "@/lib/types"
 import { VideoAnalysisService } from "@/lib/video-analysis"
 import { createClient } from "@/lib/supabase/server"
 import { headers } from "next/headers"
@@ -117,7 +117,7 @@ export async function updateSettingsAction(data: { geminiApiKey?: string }) {
         if (data.geminiApiKey) {
             await db.upsertUserApiKey(user.id, 'gemini', data.geminiApiKey)
         }
-
+        
         return { success: true }
     } catch (error: any) {
         console.error("Error updating settings:", error)
@@ -138,131 +138,39 @@ export async function getSettingsAction() {
         return null
     }
 }
-export async function getCredentialsAction() {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return null
-
-        const providers = [
-            'gemini', 'openai', 'elevenlabs', 'claude', 'openrouter', 'kie_ai', 'blotato',
-            'meta_app_id', 'meta_app_secret', 'meta_client_token', 'meta_access_token'
-        ]
-        const credentials: Record<string, string> = {}
-
-        for (const provider of providers) {
-            const key = await db.getUserApiKey(user.id, provider)
-            credentials[provider] = key || ''
-        }
-
-        return credentials
-    } catch (error) {
-        console.error("Error getting credentials:", error)
-        return null
-    }
-}
-
-export async function updateCredentialsAction(provider: string, key: string) {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { success: false, error: "Não autorizado" }
-
-        await db.upsertUserApiKey(user.id, provider, key)
-        return { success: true }
-    } catch (error: any) {
-        console.error("Error updating credentials:", error)
-        return { success: false, error: error?.message || "Erro desconhecido" }
-    }
-}
-
-export async function updateCredentialsBulkAction(data: Record<string, string>) {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { success: false, error: "Não autorizado" }
-
-        for (const [provider, key] of Object.entries(data)) {
-            await db.upsertUserApiKey(user.id, provider, key)
-        }
-        return { success: true }
-    } catch (error: any) {
-        console.error("Error updating credentials bulk:", error)
-        return { success: false, error: error?.message || "Erro desconhecido" }
-    }
-}
-
-export async function getBlotatoAccountsAction(): Promise<BlotatoAccount[]> {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return []
-        return await db.getBlotatoAccounts(user.id)
-    } catch (error) {
-        console.error("Error in getBlotatoAccountsAction:", error)
-        return []
-    }
-}
-
-export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string): Promise<BlotatoAccount> {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error("Não autorizado")
-        return await db.addBlotatoAccount(user.id, platform, accountId, label)
-    } catch (error: any) {
-        console.error("Error in addBlotatoAccountAction:", error)
-        throw new Error(error.message)
-    }
-}
-
-export async function removeBlotatoAccountAction(id: string) {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error("Não autorizado")
-        return await db.removeBlotatoAccount(id)
-    } catch (error: any) {
-        console.error("Error in removeBlotatoAccountAction:", error)
-        throw new Error(error.message)
-    }
-}
 
 export async function getPendingInvitesAction() {
-    const supabase = await createClient()
-    const { data: invites, error } = await supabase
-        .from('invites')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-
-    if (error) throw error
- 
-    // 1. Get all profiles emails
-    const { data: existingProfiles } = await supabase
-        .from('profiles')
-        .select('email')
- 
-    if (existingProfiles && existingProfiles.length > 0) {
-        const existingEmails = existingProfiles.map((p: { email: string }) => p.email)
+    try {
+        const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        const { data: invites, error } = await supabase
+            .from('invites')
+            .select('*')
+            .eq('status', 'pending')
+            .order('requested_at', { ascending: false })
         
+        if (error) throw error
+
         // 2. Filter out invites for users who already have a profile
+        const { data: profiles } = await adminSupabase.from('profiles').select('email')
+        const existingEmails = profiles?.map(p => p.email) || []
+        
         const filteredInvites = (invites || []).filter((i: any) => !existingEmails.includes(i.email))
         
         // 3. Optional: Background cleanup of these stale invites
         const staleInvites = (invites || []).filter((i: any) => existingEmails.includes(i.email))
-        if (staleInvites.length > 0) {
-            const adminSupabase = await createAdminClient()
-            if (adminSupabase) {
-                const staleIds = staleInvites.map((i: any) => i.id)
-                await adminSupabase.from('invites').delete().in('id', staleIds)
-            }
+        if (staleInvites.length > 0 && adminSupabase) {
+            const staleIds = staleInvites.map((i: any) => i.id)
+            adminSupabase.from('invites').delete().in('id', staleIds).then(() => {
+                console.log(`[Admin] Cleaned up ${staleIds.length} stale invites.`)
+            })
         }
-        
+
         return filteredInvites
+    } catch (error) {
+        console.error("Error in getPendingInvitesAction:", error)
+        return []
     }
- 
-    return invites || []
 }
 
 import { sendAccessGrantedEmail } from "@/lib/email"
@@ -272,7 +180,7 @@ export async function approveInviteAction(inviteId: string) {
     try {
         const supabase = await createClient()
         const adminSupabase = await createAdminClient()
-
+        
         if (!adminSupabase) throw new Error("Configuração de Admin ausente (SERVICE_ROLE_KEY)")
 
         // 1. Get invite details
@@ -281,23 +189,23 @@ export async function approveInviteAction(inviteId: string) {
             .select('*')
             .eq('id', inviteId)
             .single()
-
+        
         if (fetchError || !invite) throw new Error("Convite não encontrado")
 
         // 2. Create the Auth User (Generate Invite Link)
         const heads = await headers()
         const host = heads.get('x-forwarded-host') || heads.get('host')
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
-
+        
         console.log(`[Admin] Generating link. Host: ${host}, Protocol: ${protocol}`)
 
         let siteUrl = 'https://darktube.fjt-solutions.com'
-
+        
         // Only use localhost/detect automatically if we are VERY sure it's local dev
         if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
             siteUrl = `${protocol}://${host}`
         }
-
+        
         console.log(`[Admin] Using siteUrl: ${siteUrl}`)
 
         let { data, error: authError } = await adminSupabase.auth.admin.generateLink({
@@ -322,31 +230,18 @@ export async function approveInviteAction(inviteId: string) {
             authError = magicRes.error
         }
 
-        let skipEmail = false
         if (authError || !data?.properties?.action_link) {
-            // Check if user is already registered - if so, we can just proceed with profile update & cleanup
-            if (authError?.message?.toLowerCase().includes('already registered') || 
-                authError?.message?.toLowerCase().includes('already been invited') ||
-                (authError as any)?.code === 'email_exists') {
-                
-                console.log("[Admin] User already exists or invited, proceeding with profile activation only.")
-                skipEmail = true
-                authError = null
-            } else {
-                throw new Error("Falha ao gerar o link: " + (authError?.message || "Erro desconhecido"))
-            }
+            throw new Error("Falha ao gerar o link: " + (authError?.message || "Erro desconhecido"))
         }
 
         // 3. Update Profile Status
         await db.updateProfileStatus(invite.email, 'approved')
 
-        // 4. Send Custom Email (only if we have a link)
-        if (!skipEmail && data?.properties?.action_link) {
-            console.log(`[Admin] Sending welcome email to ${invite.email}`)
-            const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, data.properties.action_link)
-            if (!emailResult.success) {
-                console.warn("[Admin] Email failed but proceeding:", emailResult.error)
-            }
+        // 4. Send Custom Email
+        console.log(`[Admin] Sending welcome email to ${invite.email}`)
+        const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, data.properties.action_link)
+        if (!emailResult.success) {
+             console.warn("[Admin] Email failed but proceeding:", emailResult.error)
         }
 
         // 5. Cleanup Invite (Use admin client to ensure bypass of RLS)
@@ -366,23 +261,49 @@ export async function approveInviteAction(inviteId: string) {
 export async function declineInviteAction(inviteId: string) {
     try {
         const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        if (!adminSupabase) throw new Error("Configuração de Admin ausente (SERVICE_ROLE_KEY)")
 
-        // 1. Get invite to know the email
+        // 1. Get invite details
         const { data: invite } = await supabase
             .from('invites')
             .select('email')
             .eq('id', inviteId)
             .single()
 
-        if (invite) {
-            await db.updateProfileStatus(invite.email, 'rejected')
+        if (!invite) throw new Error("Convite não encontrado")
+
+        const email = invite.email
+
+        // 2. Find and Delete Profile (if exists)
+        const { data: profile } = await adminSupabase
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .single()
+
+        if (profile) {
+            // Delete profile
+            await adminSupabase.from('profiles').delete().eq('id', profile.id)
+            
+            // Delete Auth User
+            const { error: authError } = await adminSupabase.auth.admin.deleteUser(profile.id)
+            if (authError) {
+                console.warn("[Admin] Could not delete auth user (might not exist):", authError.message)
+            }
+        } else {
+            // If no profile, try to find by email in auth anyway to be safe
+            const { data: { users }, error: listError } = await adminSupabase.auth.admin.listUsers()
+            if (!listError) {
+                const userToDelete = users.find(u => u.email === email)
+                if (userToDelete) {
+                    await adminSupabase.auth.admin.deleteUser(userToDelete.id)
+                }
+            }
         }
 
-        // 2. Delete Invite (Use admin client)
-        const adminSupabase = await createAdminClient()
-        if (adminSupabase) {
-            await adminSupabase.from('invites').delete().eq('id', inviteId)
-        }
+        // 3. Delete ALL invites for this email
+        await adminSupabase.from('invites').delete().eq('email', email)
 
         revalidatePath("/admin/invites")
         return { success: true }
@@ -412,7 +333,7 @@ export async function getAllProfilesAction() {
 
         const profiles = await db.getAllProfiles()
         const { data: { users: authUsers }, error: authError } = await adminSupabase.auth.admin.listUsers()
-
+        
         if (authError) console.error("Error listing auth users:", authError)
 
         // Enrich profiles with auth info
@@ -425,7 +346,7 @@ export async function getAllProfilesAction() {
                 full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Membro Externo',
                 role: profile?.role || 'user',
                 status: profile?.status || 'approved',
-                isRegistered: !!authUser.last_sign_in_at,
+                isRegistered: authUser.user_metadata?.password_set === true,
                 lastSignIn: authUser.last_sign_in_at,
                 isAuthOnly: !profile
             }
@@ -455,7 +376,7 @@ export async function resendAccessAction(email: string, name: string) {
         const supabase = await createClient()
         const adminSupabase = await createAdminClient()
         const { data: { user } } = await supabase.auth.getUser()
-
+        
         if (!user || !adminSupabase) throw new Error("Não autorizado")
 
         const { data: profile } = await supabase
@@ -471,15 +392,15 @@ export async function resendAccessAction(email: string, name: string) {
         const heads = await headers()
         const host = heads.get('x-forwarded-host') || heads.get('host')
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
-
+        
         let siteUrl = 'https://darktube.fjt-solutions.com'
-
+        
         if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
             siteUrl = `${protocol}://${host}`
         }
-
+        
         console.log(`[Admin] Resending access. Host: ${host}, Using siteUrl: ${siteUrl}`)
-
+        
 
         // Generate magic link (works for existing users)
         const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
@@ -563,7 +484,7 @@ export async function deleteUserAction(userId: string) {
         const supabase = await createClient()
         const adminSupabase = await createAdminClient()
         const { data: { user } } = await supabase.auth.getUser()
-
+        
         if (!user || !adminSupabase) throw new Error("Não autorizado ou configuração ausente")
 
         const { data: profile } = await supabase
@@ -583,7 +504,7 @@ export async function deleteUserAction(userId: string) {
             .select('email')
             .eq('id', userId)
             .single()
-
+        
         let targetEmail = targetProfile?.email
 
         // If not in profiles, try to get from Auth
@@ -594,13 +515,13 @@ export async function deleteUserAction(userId: string) {
 
         // 1. Delete from App DB (Profiles etc)
         await db.deleteProfile(userId)
-
+        
         // 2. Delete any matching invites (to allow re-requesting)
         if (targetEmail) {
             await adminSupabase.from('invites').delete().eq('email', targetEmail)
             console.log(`[Admin] Cleaned up invites for ${targetEmail}`)
         }
-
+        
         // 3. Delete from Auth (requires Admin Client)
         const { error: authError } = await adminSupabase.auth.admin.deleteUser(userId)
         if (authError) console.warn("Auth deletion failed:", authError)
@@ -610,6 +531,53 @@ export async function deleteUserAction(userId: string) {
         return { success: true }
     } catch (error: any) {
         console.error("Error in deleteUserAction:", error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function requestInviteAction(email: string, name: string) {
+    try {
+        const supabase = await createClient()
+        const adminSupabase = await createAdminClient()
+        if (!adminSupabase) throw new Error("Erro de configuração do servidor")
+
+        // 1. Check if an invite already exists
+        const { data: existingInvite } = await adminSupabase
+            .from('invites')
+            .select('id, status')
+            .eq('email', email)
+            .maybeSingle()
+
+        if (existingInvite) {
+            // Check if user actually exists in Auth or Profiles
+            const { data: profile } = await adminSupabase.from('profiles').select('id').eq('email', email).maybeSingle()
+            
+            const { data: { users: authUsers } } = await adminSupabase.auth.admin.listUsers()
+            const authUser = authUsers.find(u => u.email === email)
+
+            if (!profile && !authUser) {
+                // If neither exists, the invite is orphaned. Clean it up to allow a new request.
+                console.log(`[Invite] Cleaning up orphaned invite for ${email}`)
+                await adminSupabase.from('invites').delete().eq('email', email)
+            } else {
+                return { success: false, error: "ESTE_EMAIL_JA_SOLICITOU" }
+            }
+        }
+
+        // 2. Insert new invite (bypass RLS for the check using admin client if needed, 
+        // but here we just insert as public)
+        const { error } = await supabase
+            .from('invites')
+            .insert({ email, name })
+
+        if (error) {
+            if (error.code === '23505') return { success: false, error: "ESTE_EMAIL_JA_SOLICITOU" }
+            throw error
+        }
+
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in requestInviteAction:", error)
         return { success: false, error: error.message }
     }
 }

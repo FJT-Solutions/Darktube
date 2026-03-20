@@ -8,6 +8,7 @@ import {
   Bookmark, 
   BarChart3, 
   Youtube, 
+  ShieldCheck, 
   TrendingUp, 
   Target, 
   Users, 
@@ -21,10 +22,24 @@ import {
   X
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    // Fallback: If we detect auth tokens in the hash while on the home page,
+    // redirect to the setup-password page. This happens if Supabase redirects 
+    // to the base Site URL instead of the specified redirectTo URL.
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash
+      if (hash.includes('access_token=') || hash.includes('error=')) {
+        router.replace(`/setup-password${hash}`)
+      }
+    }
+  }, [router])
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050506] text-white selection:bg-red-500/30 font-sans overflow-x-hidden">
@@ -135,19 +150,15 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Dashboard Preview — simplified for mobile */}
           <div className="mt-16 w-full max-w-5xl px-0 sm:px-4">
             <div className="relative rounded-2xl sm:rounded-[2.5rem] border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-2 sm:p-3 backdrop-blur-sm">
               <div className="rounded-xl sm:rounded-[2rem] bg-[#0A0A0B] overflow-hidden border border-white/5 shadow-2xl">
-                {/* Browser chrome */}
                 <div className="flex h-8 items-center gap-1.5 px-4 border-b border-white/5 bg-zinc-900/50">
                   <div className="h-2 w-2 rounded-full bg-red-500/30" />
                   <div className="h-2 w-2 rounded-full bg-zinc-700" />
                   <div className="h-2 w-2 rounded-full bg-zinc-700" />
                 </div>
-                {/* Grid: 1 col mobile, 3 cols desktop */}
                 <div className="p-4 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                  {/* Janela 1: Live Intel */}
                   <div className="rounded-2xl bg-[#0C0C0E] border border-white/5 p-4 sm:p-5 flex flex-col gap-4">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Live Intel</span>
@@ -170,7 +181,6 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Janela 2: Estimativa Mensal */}
                   <div className="rounded-2xl bg-[#0C0C0E] border border-white/5 p-4 sm:p-5 flex flex-col gap-4">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Estimativa Mensal</span>
@@ -186,7 +196,6 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Janela 3: Global Tracker */}
                   <div className="rounded-2xl bg-[#0C0C0E] border border-white/5 p-4 sm:p-5 flex flex-col gap-4">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -241,7 +250,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Core Pillars */}
         <section id="vision" className="py-20 sm:py-32 border-t border-white/5">
           <div className="mx-auto max-w-7xl px-4">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
@@ -282,7 +290,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Intelligence Cards */}
         <section id="intel" className="py-20 sm:py-32 bg-white/[0.01]">
           <div className="mx-auto max-w-7xl px-4 text-center">
             <Badge color="zinc">DARK INTELLIGENCE</Badge>
@@ -323,7 +330,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Final CTA */}
         <section className="py-24 sm:py-40 relative">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] sm:w-[800px] h-[400px] sm:h-[800px] bg-red-600/10 rounded-full blur-[100px] sm:blur-[150px] pointer-events-none" />
           <div className="mx-auto max-w-4xl px-4 text-center">
@@ -349,7 +355,6 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-white/5 py-12 sm:py-20 bg-[#050506]">
         <div className="mx-auto max-w-7xl px-4 grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12">
           <div className="col-span-2">
