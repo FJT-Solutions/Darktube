@@ -516,7 +516,6 @@ export default function MinerarPage() {
                         channel={channel}
                         isTracked={trackedIds.has(channel.id)}
                         onTrack={() => handleTrack(channel)}
-                        estimatedMonetization={channel.estimatedMonetization}
                       />
                     ))}
                   </div>

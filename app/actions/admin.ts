@@ -1,8 +1,8 @@
-import { createClient } from "@/lib/supabase/admin"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function getPendingInvites() {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data, error } = await supabase
         .from('invites')
         .select('*')
@@ -13,7 +13,8 @@ export async function getPendingInvites() {
 }
 
 export async function approveInviteAction(inviteId: string, email: string) {
-    const supabase = createClient()
+    const supabase = await createAdminClient()
+    if (!supabase) throw new Error("Não foi possível inicializar o cliente admin")
     
     // 1. Create a magic link or just invite the user via Supabase Auth
     // The middleware and triggers will handle the rest
@@ -37,7 +38,7 @@ export async function approveInviteAction(inviteId: string, email: string) {
 }
 
 export async function rejectInviteAction(inviteId: string) {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { error } = await supabase
         .from('invites')
         .delete()

@@ -22,7 +22,7 @@ export const VideoAnalysisService = {
     /**
      * Orchestrates a deep visual analysis using frame extraction and Gemini Vision.
      */
-    async performVisionAnalysis(videoId: string, customApiKey?: string): Promise<AIAnalysisResult | null> {
+    async performVisionAnalysis(videoId: string, customApiKey?: string): Promise<any | null> {
         try {
             const framePaths = await VideoCaptureService.extractFrames(videoId);
             const visionResult = await GeminiVisionService.analyzeFrames(framePaths, customApiKey);
