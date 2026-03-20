@@ -49,11 +49,11 @@ export async function getNicheIntelligence(nicheId: string) {
 
     if (error || !trackedChannels || trackedChannels.length === 0) return null
 
-    const totalSubs = trackedChannels.reduce((acc, ch) => acc + Number(ch.subscribers || 0), 0)
+    const totalSubs = trackedChannels.reduce((acc: number, ch: any) => acc + Number(ch.subscribers || 0), 0)
     const avgSubs = totalSubs / trackedChannels.length
 
     // Find common tags/keywords
-    const allTags = trackedChannels.flatMap(ch => ch.tags || [])
+    const allTags = trackedChannels.flatMap((ch: any) => ch.tags || [])
     const tagFrequency = allTags.reduce((acc: Record<string, number>, tag: string) => {
         acc[tag] = (acc[tag] || 0) + 1
         return acc
@@ -69,15 +69,15 @@ export async function getNicheIntelligence(nicheId: string) {
         averageSubscribers: Math.round(avgSubs),
         recommendedStyles: topStyles,
         remodelingGems: trackedChannels
-            .map(ch => ({
-                id: ch.id,
-                name: ch.name,
+            .map((ch: any) => ({
+                id: ch.id as string,
+                name: ch.name as string,
                 score: calculateRemodelingScore({
                     ...ch,
                     metrics: ch.metrics?.[0]
                 } as any)
             }))
-            .sort((a, b) => b.score - a.score)
+            .sort((a: any, b: any) => b.score - a.score)
             .slice(0, 3)
     }
 }

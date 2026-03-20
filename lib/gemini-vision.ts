@@ -49,7 +49,7 @@ export const GeminiVisionService = {
 
             // Extract JSON from response
             const jsonMatch = text.match(/\{.*\}/s);
-            if (!jsonMatch) throw new Error("Resposta da IA inválida.");
+            if (!jsonMatch || !jsonMatch[0]) throw new Error("Resposta da IA inválida.");
 
             return JSON.parse(jsonMatch[0]);
         } catch (error) {
