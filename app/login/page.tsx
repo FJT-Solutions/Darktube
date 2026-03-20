@@ -62,8 +62,8 @@ export default function LoginPage() {
                 </Link>
             </header>
 
-            <main className="flex flex-1 items-center justify-center p-4">
-                <div className="w-full max-w-md space-y-8 rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/20">
+        <main className="flex flex-1 flex-col items-center justify-center p-4">
+                <div className="w-full max-w-md space-y-8 rounded-none border-0 bg-transparent p-6 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-8 sm:shadow-xl sm:shadow-black/20">
                     <div className="space-y-2 text-center">
                         <h1 className="text-2xl font-bold tracking-tight text-foreground">
                             {mode === 'login' ? 'Acesso ao Sistema' : 'Recuperar Senha'}
@@ -87,7 +87,7 @@ export default function LoginPage() {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="h-11 w-full rounded-xl border border-border bg-input pl-10 pr-4 text-sm transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                                    className="h-12 w-full rounded-xl border border-border bg-input pl-10 pr-4 text-base transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
                                 />
                             </div>
                         </div>
@@ -111,7 +111,7 @@ export default function LoginPage() {
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="h-11 w-full rounded-xl border border-border bg-input px-4 text-sm transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                                    className="h-12 w-full rounded-xl border border-border bg-input px-4 text-base transition-all focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
                                 />
                             </div>
                         )}
@@ -130,7 +130,7 @@ export default function LoginPage() {
                             disabled={loading}
                             className="flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-bold text-white transition-all hover:bg-primary/90 disabled:opacity-50"
                         >
-                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? "Entrar no Sistema" : "Enviar Link de Recuperação"}
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? "Entrar" : "Enviar Link de Recuperação"}
                         </button>
 
                         {mode === 'reset' && (

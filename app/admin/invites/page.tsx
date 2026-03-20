@@ -103,8 +103,8 @@ export default function AdminInvitesPage() {
     return (
         <div className="flex flex-col h-full bg-background">
             <Header 
-                title="Solicitações de Acesso" 
-                description="Gerencie quem pode entrar na plataforma"
+                title="Convites" 
+                description="Gerencie os convites e acessos pendentes"
                 onMenuToggle={toggleSidebar}
             />
             <div className="flex-1 overflow-y-auto p-4 lg:p-6">
@@ -118,7 +118,7 @@ export default function AdminInvitesPage() {
                                 <div>
                                     <CardTitle>Pendentes</CardTitle>
                                     <CardDescription>
-                                        Existem {invites.length} solicitações aguardando sua revisão.
+                                        Existem {invites.length} convites aguardando sua revisão.
                                     </CardDescription>
                                 </div>
                             </div>
@@ -127,7 +127,7 @@ export default function AdminInvitesPage() {
                             <div className="space-y-4">
                                 {invites.length === 0 ? (
                                     <div className="text-center py-12 border-2 border-dashed rounded-xl opacity-50">
-                                        <p>Nenhuma solicitação pendente no momento.</p>
+                                        <p>Nenhum convite pendente no momento.</p>
                                     </div>
                                 ) : (
                                     invites.map((invite) => (

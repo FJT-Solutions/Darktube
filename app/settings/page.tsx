@@ -62,7 +62,6 @@ export default function SettingsPage() {
                 </Button>
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-                    <p className="text-muted-foreground mt-1">Gerencie suas conexões e chaves de API.</p>
                 </div>
             </div>
 
@@ -75,8 +74,7 @@ export default function SettingsPage() {
                                 <Youtube className="h-5 w-5 text-red-500" />
                             </div>
                             <div>
-                                <CardTitle>Conexão YouTube</CardTitle>
-                                <CardDescription>Conta conectada ao DarkTube.</CardDescription>
+                                <CardTitle className="text-lg">Conta conectada ao DarkTube.</CardTitle>
                             </div>
                         </div>
                     </CardHeader>
@@ -121,48 +119,6 @@ export default function SettingsPage() {
                     </CardContent>
                 </Card>
 
-                {session && (
-                    <Card className="border-primary/10 bg-card/50 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <CardHeader>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-primary/10">
-                                    <Key className="h-5 w-5 text-primary" />
-                                </div>
-                                <div>
-                                    <CardTitle>Credenciais de IA</CardTitle>
-                                    <CardDescription>Configure suas chaves para análise avançada de canais.</CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="gemini-key">Google Gemini API Key</Label>
-                                <Input
-                                    id="gemini-key"
-                                    type="password"
-                                    placeholder="Paste your API key here..."
-                                    value={geminiKey}
-                                    onChange={(e) => setGeminiKey(e.target.value)}
-                                    className="font-mono bg-background/50"
-                                />
-                                <p className="text-[10px] text-muted-foreground">
-                                    Necessária para a **Validação Visual Real**. Obtenha sua chave gratuita em <a href="https://aistudio.google.com/" target="_blank" className="text-primary underline">Google AI Studio</a>.
-                                </p>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="flex flex-col sm:flex-row justify-between items-center border-t border-border/50 pt-8 mt-6 gap-4">
-                            <p className="text-xs text-muted-foreground text-center sm:text-left">Suas chaves são criptografadas e salvas com segurança no banco de dados.</p>
-                            <Button 
-                                onClick={handleSave} 
-                                disabled={isSaving} 
-                                className="w-full sm:w-auto gap-2 h-11 px-8 rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20 transition-all active:scale-95"
-                            >
-                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                {saveStatus === "success" ? "Salvo!" : saveStatus === "error" ? "Erro ao salvar" : "Salvar Alterações"}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                )}
             </div>
         </div>
     )

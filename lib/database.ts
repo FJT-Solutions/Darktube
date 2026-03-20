@@ -1,5 +1,5 @@
 import { createClient } from "./supabase/server"
-import type { TrackedChannel, YouTubeChannel, YouTubeVideo } from "./types"
+import type { TrackedChannel, YouTubeChannel, YouTubeVideo, BlotatoAccount } from "./types"
 
 /**
  * UTILS
@@ -302,6 +302,49 @@ export async function updateProfileRole(userId: string, role: 'admin' | 'user') 
         .from('profiles')
         .update({ role })
         .eq('id', userId)
+    
+    if (error) throw error
+    return { success: true }
+}
+
+/**
+ * BLOTATO ACCOUNTS
+ */
+export async function getBlotatoAccounts(userId: string): Promise<BlotatoAccount[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('blotato_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+}
+
+export async function addBlotatoAccount(userId: string, platform: string, accountId: string, label?: string): Promise<BlotatoAccount> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('blotato_accounts')
+        .insert({
+            user_id: userId,
+            platform,
+            account_id: accountId,
+            label
+        })
+        .select()
+        .single()
+    
+    if (error) throw error
+    return data
+}
+
+export async function removeBlotatoAccount(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('blotato_accounts')
+        .delete()
+        .eq('id', id)
     
     if (error) throw error
     return { success: true }

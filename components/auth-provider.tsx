@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { User, Session, AuthChangeEvent } from "@supabase/supabase-js"
+import { useRouter } from "next/navigation"
 
 type AuthContextType = {
     user: User | null
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [profile, setProfile] = useState<any | null>(null)
     const [loading, setLoading] = useState(true)
     const supabase = createClient()
+    const router = useRouter()
 
     useEffect(() => {
         const fetchProfile = async (userId: string) => {
@@ -74,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut()
+        router.push('/login')
     }
 
     return (
