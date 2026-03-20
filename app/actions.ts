@@ -173,14 +173,16 @@ export async function approveInviteAction(inviteId: string) {
         const host = heads.get('x-forwarded-host') || heads.get('host')
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
-        let siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-        if (!siteUrl || siteUrl.includes('localhost')) {
-            if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-                siteUrl = `${protocol}://${host}`
-            } else {
-                siteUrl = 'https://darktube.fjt.solutions'
-            }
+        console.log(`[Admin] Generating link. Host: ${host}, Protocol: ${protocol}`)
+
+        let siteUrl = 'https://darktube.fjt.solutions'
+        
+        // Only use localhost/detect automatically if we are VERY sure it's local dev
+        if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+            siteUrl = `${protocol}://${host}`
         }
+        
+        console.log(`[Admin] Using siteUrl: ${siteUrl}`)
 
         let { data, error: authError } = await adminSupabase.auth.admin.generateLink({
             type: 'invite',
@@ -335,14 +337,14 @@ export async function resendAccessAction(email: string, name: string) {
         const host = heads.get('x-forwarded-host') || heads.get('host')
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
-        let siteUrl = process.env.NEXT_PUBLIC_SITE_URL
-        if (!siteUrl || siteUrl.includes('localhost')) {
-            if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-                siteUrl = `${protocol}://${host}`
-            } else {
-                siteUrl = 'https://darktube.fjt.solutions'
-            }
+        let siteUrl = 'https://darktube.fjt.solutions'
+        
+        if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+            siteUrl = `${protocol}://${host}`
         }
+        
+        console.log(`[Admin] Resending access. Host: ${host}, Using siteUrl: ${siteUrl}`)
+        
 
         // Generate magic link (works for existing users)
         const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
