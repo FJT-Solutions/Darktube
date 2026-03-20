@@ -143,6 +143,7 @@ export async function getPendingInvitesAction() {
     const { data: invites, error } = await supabase
         .from('invites')
         .select('*')
+        .eq('status', 'pending')
         .order('created_at', { ascending: false })
     
     if (error) throw error
