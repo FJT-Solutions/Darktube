@@ -87,7 +87,8 @@ export default function SetupPasswordPage() {
         setStatus(null)
 
         const { error } = await supabase.auth.updateUser({
-            password: password
+            password: password,
+            data: { password_set: true }
         })
 
         if (error) {

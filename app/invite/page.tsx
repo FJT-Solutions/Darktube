@@ -17,19 +17,23 @@ export default function InvitePage() {
         setLoading(true)
         setMessage(null)
 
-        const { error } = await supabase
-            .from('invites')
-            .insert({ email, name })
+        try {
+            const { requestInviteAction } = await import("@/app/actions")
+            const result = await requestInviteAction(email, name)
 
-        if (error) {
-            if (error.code === '23505') {
-                setMessage({ type: 'error', text: "Este e-mail já solicitou acesso anteriormente." })
+            if (result.success) {
+                setMessage({ type: 'success', text: "Solicitação enviada com sucesso! Analisaremos seu perfil em breve." })
             } else {
-                setMessage({ type: 'error', text: error.message })
+                if (result.error === "ESTE_EMAIL_JA_SOLICITOU") {
+                    setMessage({ type: 'error', text: "Este e-mail já solicitou acesso anteriormente." })
+                } else {
+                    setMessage({ type: 'error', text: result.error || "Erro ao enviar solicitação." })
+                }
             }
-        } else {
-            setMessage({ type: 'success', text: "Solicitação enviada com sucesso! Analisaremos seu perfil em breve." })
+        } catch (error: any) {
+            setMessage({ type: 'error', text: "Erro de conexão com o servidor." })
         }
+        
         setLoading(false)
     }
 
