@@ -74,7 +74,7 @@ export default function SettingsPage() {
                                 <Youtube className="h-5 w-5 text-red-500" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg">Conta conectada ao DarkTube.</CardTitle>
+                                <CardTitle className="text-lg">Conta conectada ao <span className="uppercase font-black tracking-tighter">DARK<span className="text-red-500">TUBE</span></span>.</CardTitle>
                             </div>
                         </div>
                     </CardHeader>
@@ -111,7 +111,7 @@ export default function SettingsPage() {
                                     <p className="font-medium">Nenhuma conta conectada</p>
                                     <p className="text-sm text-muted-foreground">Faça login para gerenciar suas configurações.</p>
                                 </div>
-                                <Button onClick={() => router.push('/login')} className="bg-primary hover:bg-primary/90 text-white">
+                                <Button onClick={() => router.push('/login')}>
                                     Ir para Login
                                 </Button>
                             </div>

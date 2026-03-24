@@ -15,7 +15,7 @@ const _jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "DarkTube - Mineração de Canais",
+  title: "DARKTUBE",
   description: "Plataforma avançada para análise e mineração de canais dark no YouTube.",
   icons: {
     icon: [
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "DarkTube",
+    title: "DARKTUBE",
   },
   formatDetection: {
     telephone: false,
@@ -45,6 +45,7 @@ export const viewport: Viewport = {
 }
 
 import { AuthProvider } from "@/components/auth-provider"
+import { ThemeProvider } from "@/components/theme-provider"
 
 export default function RootLayout({
   children,
@@ -52,12 +53,19 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="pt-BR" className="dark">
-      <body className="font-sans antialiased" suppressHydrationWarning>
-        <AuthProvider>
-          <AppShell>{children}</AppShell>
-          <Analytics />
-        </AuthProvider>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={`${_inter.variable} ${_jetbrainsMono.variable} font-sans antialiased`} suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+            <Analytics />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { ThemeToggle } from "@/components/layout/theme-toggle"
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -42,39 +43,42 @@ export default function LandingPage() {
   }, [router])
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#050506] text-white selection:bg-red-500/30 font-sans overflow-x-hidden">
+    <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/30 font-sans overflow-x-hidden">
       {/* Header */}
-      <header className="fixed top-0 z-50 w-full border-b border-white/5 bg-[#050506]/90 backdrop-blur-xl">
+      <header className="fixed top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-red-800 shadow-lg shadow-red-900/20">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 shadow-lg shadow-red-600/20">
               <Youtube className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-black tracking-tighter">DARK<span className="text-red-500">TUBE</span></span>
+            <span className="text-xl font-black tracking-tighter uppercase">DARK<span className="text-red-600">TUBE</span></span>
           </div>
           
           {/* Desktop nav */}
           <nav className="hidden items-center gap-8 md:flex">
-            <a href="#vision" className="text-sm font-semibold text-zinc-400 hover:text-white transition-all">Visão</a>
-            <a href="#intel" className="text-sm font-semibold text-zinc-400 hover:text-white transition-all">Inteligência</a>
+            <a href="#vision" className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 hover:text-foreground transition-all">Visão</a>
+            <a href="#intel" className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 hover:text-foreground transition-all">Inteligência</a>
           </nav>
 
           {/* Desktop CTA */}
           <div className="hidden items-center gap-4 md:flex">
             <Link href="/login">
-              <Button variant="ghost" className="text-sm font-bold text-zinc-400 hover:text-white hover:bg-white/5">Entrar</Button>
+              <Button variant="ghost" className="text-sm font-bold text-muted-foreground hover:text-foreground hover:bg-accent/50">Entrar</Button>
             </Link>
             <Link href="/invite">
-              <Button className="rounded-full bg-white px-6 py-5 text-sm font-black text-black hover:bg-zinc-200 transition-transform hover:scale-105 shadow-xl">
+              <Button variant="inverted" className="rounded-full px-6 py-5 text-sm font-black shadow-xl">
                 SOLICITAR ACESSO
               </Button>
             </Link>
+            <div className="ml-2 border-l border-border/40 pl-4">
+              <ThemeToggle />
+            </div>
           </div>
 
           {/* Mobile: only hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="rounded-xl p-2 text-zinc-400 hover:bg-white/5 hover:text-white md:hidden"
+            className="rounded-xl p-2 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -82,7 +86,7 @@ export default function LandingPage() {
 
         {/* Mobile dropdown menu */}
         {mobileMenuOpen && (
-          <div className="border-t border-white/5 bg-[#050506]/95 backdrop-blur-xl md:hidden">
+          <div className="border-t border-border/10 bg-background/95 backdrop-blur-xl md:hidden">
             <div className="flex flex-col gap-1 px-4 py-4">
               <a href="#vision" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-zinc-400 hover:bg-white/5 hover:text-white">Visão</a>
               <a href="#intel" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-zinc-400 hover:bg-white/5 hover:text-white">Inteligência</a>
@@ -93,9 +97,9 @@ export default function LandingPage() {
                 </button>
               </Link>
               <Link href="/invite" onClick={() => setMobileMenuOpen(false)}>
-                <button className="w-full rounded-2xl bg-red-600 py-3.5 text-sm font-black text-white">
+                <Button variant="inverted" className="w-full rounded-2xl py-6 text-sm font-black">
                   SOLICITAR ACESSO
-                </button>
+                </Button>
               </Link>
             </div>
           </div>
@@ -112,19 +116,22 @@ export default function LandingPage() {
           </div>
 
           <div className="relative z-10 mx-auto max-w-5xl w-full">
-            <div className="inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-red-400 mb-8">
+            <div className="inline-flex items-center gap-2 rounded-full border border-foreground/20 bg-foreground/5 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-foreground mb-8">
               <Sparkles className="h-3 w-3" />
               A Nova Era da Gestão de Canais Faceless
             </div>
             
             <h1 className="text-4xl font-black tracking-tight sm:text-6xl lg:text-8xl mb-6 leading-[0.95] mx-auto">
-              O <span className="text-red-600 italic">Big Data</span> por trás dos canais de{" "}
-              <span className="whitespace-nowrap underline decoration-red-600/50 underline-offset-4 sm:underline-offset-8">Social Media</span>
+              O <span className="text-primary italic">Big Data</span> por trás dos canais de{" "}
+              <span className="whitespace-nowrap underline decoration-primary/50 underline-offset-4 sm:underline-offset-8">Social Media</span>
             </h1>
             
-            <p className="mx-auto max-w-xl text-base sm:text-lg text-zinc-400 mb-10 leading-relaxed font-medium">
+            
+
+            
+            <p className="mx-auto max-w-xl text-base sm:text-lg text-muted-foreground mb-10 leading-relaxed font-medium">
               Inteligência multiplataforma para minerar, analisar e dominar nichos lucrativos no{" "}
-              <span className="text-red-500 font-bold">YouTube</span>,{" "}
+              <span className="text-primary font-bold">YouTube</span>,{" "}
               <span className="font-bold" style={{background: 'linear-gradient(90deg, #25F4EE, #FE2C55)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'}}>TikTok</span>,{" "}
               <span className="text-pink-500 font-bold">Instagram</span> e{" "}
               <span className="text-blue-500 font-bold">Facebook</span> sem aparecer.
@@ -132,8 +139,8 @@ export default function LandingPage() {
 
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
               <Link href="/invite" className="w-full sm:w-auto">
-                <Button className="h-14 w-full rounded-2xl bg-red-600 px-10 text-base font-black text-white hover:bg-red-500 hover:scale-105 transition-all shadow-[0_0_40px_-10px_rgba(220,38,38,0.5)] sm:w-auto">
-                  QUERO ACESSO EXCLUSIVO
+                <Button variant="inverted" className="h-14 sm:h-16 px-8 sm:px-10 rounded-2xl font-black text-base sm:text-lg shadow-xl">
+                  SOLICITAR ACESSO AGORA
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
@@ -151,15 +158,15 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-16 w-full max-w-5xl px-0 sm:px-4">
-            <div className="relative rounded-2xl sm:rounded-[2.5rem] border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-2 sm:p-3 backdrop-blur-sm">
-              <div className="rounded-xl sm:rounded-[2rem] bg-[#0A0A0B] overflow-hidden border border-white/5 shadow-2xl">
-                <div className="flex h-8 items-center gap-1.5 px-4 border-b border-white/5 bg-zinc-900/50">
-                  <div className="h-2 w-2 rounded-full bg-red-500/30" />
-                  <div className="h-2 w-2 rounded-full bg-zinc-700" />
-                  <div className="h-2 w-2 rounded-full bg-zinc-700" />
+            <div className="relative rounded-2xl sm:rounded-[2.5rem] border border-border/40 bg-gradient-to-b from-muted/50 to-transparent p-2 sm:p-3 backdrop-blur-sm">
+              <div className="rounded-xl sm:rounded-[2rem] bg-card overflow-hidden border border-border shadow-2xl">
+                <div className="flex h-8 items-center gap-1.5 px-4 border-b border-border bg-muted/30">
+                  <div className="h-2 w-2 rounded-full bg-primary/40" />
+                  <div className="h-2 w-2 rounded-full bg-muted-foreground/20" />
+                  <div className="h-2 w-2 rounded-full bg-muted-foreground/20" />
                 </div>
                 <div className="p-4 sm:p-8 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                  <div className="rounded-2xl bg-[#0C0C0E] border border-white/5 p-4 sm:p-5 flex flex-col gap-4">
+                  <div className="rounded-2xl bg-card border border-border/50 p-4 sm:p-5 flex flex-col gap-4 shadow-sm">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Live Intel</span>
                       <div className="flex gap-1">
@@ -169,51 +176,52 @@ export default function LandingPage() {
                     </div>
                     <div className="space-y-2">
                       {[
-                        { t: "Nicho: Curiosidades Espaciais", v: "840k views/dia", c: "text-emerald-400" },
-                        { t: "Trend: IA Voz de Celebridade", v: "CPM Médio R$ 42", c: "text-red-400" },
-                        { t: "Gap: Finanças p/ Adolescentes", v: "Competição Baixa", c: "text-blue-400" }
+                        { t: "Nicho: Curiosidades Espaciais", v: "840k views/dia", c: "text-emerald-600 dark:text-emerald-400" },
+                        { t: "Trend: IA Voz de Celebridade", v: "CPM Médio R$ 42", c: "text-red-600 dark:text-red-400" },
+                        { t: "Gap: Finanças p/ Adolescentes", v: "Competição Baixa", c: "text-blue-600 dark:text-blue-400" }
                       ].map((row, i) => (
-                        <div key={i} className="flex flex-col gap-1 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                          <div className="text-[9px] font-bold text-zinc-300 uppercase tracking-tight">{row.t}</div>
+                        <div key={i} className="flex flex-col gap-1 p-3 rounded-xl bg-muted/30 border border-border/40">
+                          <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-tight">{row.t}</div>
                           <div className={`text-[10px] font-black ${row.c}`}>{row.v}</div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-[#0C0C0E] border border-white/5 p-4 sm:p-5 flex flex-col gap-4">
+                  <div className="rounded-2xl bg-card border border-border/50 p-4 sm:p-5 flex flex-col gap-4 shadow-sm">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Estimativa Mensal</span>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Estimativa Mensal</span>
                       <TrendingUp className="h-3 w-3 text-red-500/50" />
                     </div>
                     <div className="flex flex-col justify-end gap-3">
-                      <div className="text-2xl sm:text-3xl font-black text-white tracking-tighter">R$ 12.450 <span className="text-xs text-zinc-500">/canal</span></div>
+                      <div className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">R$ 12.450 <span className="text-xs text-muted-foreground">/canal</span></div>
                       <div className="grid grid-cols-7 gap-1 items-end h-12">
                         {[40, 70, 50, 90, 60, 80, 100].map((h, i) => (
-                          <div key={i} style={{ height: `${h}%` }} className="bg-red-600/20 rounded-t-[2px] border-t border-red-500/40" />
+                          <div key={i} style={{ height: `${h}%` }} className="bg-red-500/30 dark:bg-red-500/20 rounded-t-[2px] border-t border-red-500/40" />
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-[#0C0C0E] border border-white/5 p-4 sm:p-5 flex flex-col gap-4">
-                    <div className="flex justify-between items-center">
+                  <div className="rounded-2xl bg-white dark:bg-[#0C0C0E] border border-border/50 dark:border-white/5 p-4 sm:p-5 flex flex-col gap-4 shadow-sm relative overflow-hidden">
+                    <div className="absolute inset-0 bg-transparent dark:bg-transparent pointer-events-none" />
+                    <div className="relative z-10 flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Global Tracker</span>
+                        <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Global Tracker</span>
                       </div>
                     </div>
                     <div className="space-y-3">
                       {[
                         { n: "@AlphaArchives", s: "82k subs", p: 72, h: true, type: 'yt' },
-                        { n: "@HorrorPulse", s: "1.2M views", p: 100, h: false, type: 'tt' },
+                        { n: "@HorrorPulse", s: "1.2M views", p: 100, h: true, type: 'tt' },
                         { n: "@LifeHacksFB", s: "500k likes", p: 45, h: true, type: 'fb' },
                         { n: "@AI_Discovery", s: "14k followers", p: 35, h: true, type: 'ig' }
                       ].map((item, i) => (
                         <div key={i}>
                           <div className="flex justify-between items-end mb-1.5">
                             <div className="flex flex-col">
-                              <span className="text-[10px] font-bold text-white tracking-tight flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-foreground tracking-tight flex items-center gap-1.5">
                                 {item.type === 'yt' && <Youtube className="h-2.5 w-2.5 text-[#FF0000]" />}
                                 {item.type === 'tt' && (
                                   <div className="relative h-2.5 w-2.5 shrink-0 overflow-visible">
@@ -228,16 +236,16 @@ export default function LandingPage() {
                                 {item.type === 'ig' && <Instagram className="h-2.5 w-2.5 text-[#E4405F]" />}
                                 {item.type === 'fb' && <Facebook className="h-2.5 w-2.5 text-[#1877F2]" />}
                                 {item.n}
-                                {item.h && <span className="px-1 py-0.5 rounded-[4px] bg-red-500/10 text-red-500 text-[7px] font-black border border-red-500/20">HIGH CPM</span>}
+                                {item.h && <span className="px-1 py-0.5 rounded-[4px] bg-foreground/10 text-foreground text-[7px] font-black border border-foreground/20">HIGH CPM</span>}
                               </span>
-                              <span className="text-[8px] text-zinc-500 font-medium">{item.s}</span>
+                              <span className="text-[8px] text-muted-foreground font-medium">{item.s}</span>
                             </div>
-                            <span className={`text-[9px] font-black ${item.p === 100 ? 'text-emerald-500' : 'text-zinc-400'}`}>{item.p}%</span>
+                            <span className={`text-[9px] font-black ${item.p === 100 ? 'text-emerald-500' : 'text-muted-foreground'}`}>{item.p}%</span>
                           </div>
-                          <div className="h-1.5 w-full bg-white/[0.03] rounded-full overflow-hidden border border-white/5">
+                          <div className="h-1.5 w-full bg-muted/20 rounded-full overflow-hidden border border-border">
                             <div
                               style={{ width: `${item.p}%` }}
-                              className={`h-full rounded-full ${item.p === 100 ? 'bg-gradient-to-r from-emerald-600/50 to-emerald-400/80' : 'bg-gradient-to-r from-red-600/40 to-red-500/60'}`}
+                              className={`h-full rounded-full ${item.p === 100 ? 'bg-gradient-to-r from-emerald-600/50 to-emerald-400/80' : 'bg-gradient-to-r from-primary/40 to-primary/60'}`}
                             />
                           </div>
                         </div>
@@ -250,15 +258,15 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="vision" className="py-20 sm:py-32 border-t border-white/5">
+        <section id="vision" className="py-20 sm:py-32 border-t border-border">
           <div className="mx-auto max-w-7xl px-4">
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
               <div>
                 <Badge color="red">NOSSA VISÃO</Badge>
                 <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black mt-6 mb-6 leading-tight">
-                  Social Media é sobre <span className="text-zinc-500 italic">algoritmo</span>, não rosto.
+                  Social Media é sobre <span className="text-muted-foreground italic">algoritmo</span>, não rosto.
                 </h2>
-                <p className="text-base sm:text-xl text-zinc-400 leading-relaxed font-medium mb-8">
+                <p className="text-base sm:text-xl text-muted-foreground leading-relaxed font-medium mb-8">
                   Acreditamos que os canais mais rentáveis são aqueles que operam como máquinas de dados. Nós fornecemos o combustível.
                 </p>
                 <div className="space-y-3">
@@ -267,11 +275,11 @@ export default function LandingPage() {
                     { icon: Users, text: "Engenharia reversa de viralização" },
                     { icon: Cpu, text: "Automação via Inteligência Artificial" }
                   ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/5 transition-colors">
+                    <div key={i} className="flex items-center gap-4 p-4 rounded-2xl hover:bg-foreground/5 transition-colors group">
                       <div className="bg-red-600/10 p-2 rounded-lg text-red-500 shrink-0">
                         <item.icon className="h-5 w-5" />
                       </div>
-                      <span className="font-bold text-zinc-200">{item.text}</span>
+                      <span className="font-bold text-foreground/80 dark:text-zinc-200">{item.text}</span>
                     </div>
                   ))}
                 </div>
@@ -290,7 +298,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="intel" className="py-20 sm:py-32 bg-white/[0.01]">
+        <section id="intel" className="py-20 sm:py-32 bg-muted/20">
           <div className="mx-auto max-w-7xl px-4 text-center">
             <Badge color="zinc">DARK INTELLIGENCE</Badge>
             <h2 className="text-3xl sm:text-5xl lg:text-6xl font-black mt-8 mb-12 sm:mb-20 leading-tight">
@@ -336,17 +344,17 @@ export default function LandingPage() {
             <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black mb-8 leading-[0.9]">
               Não deixe o <span className="text-red-600 italic">próximo hit</span> escapar entre os dados.
             </h2>
-            <p className="text-base sm:text-xl text-zinc-400 mb-10 font-bold max-w-2xl mx-auto">
+            <p className="text-base sm:text-xl text-foreground dark:text-muted-foreground mb-10 font-bold max-w-2xl mx-auto">
               Vagas restritas para agências e produtores sérios. Solicite seu convite hoje.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">
               <Link href="/invite" className="w-full sm:w-auto">
-                <Button className="h-16 sm:h-20 w-full sm:w-auto rounded-2xl sm:rounded-3xl bg-white text-black px-10 sm:px-14 text-base sm:text-xl font-black hover:bg-zinc-100 hover:scale-105 transition-all shadow-2xl">
+                <Button variant="inverted" className="h-16 sm:h-20 w-full sm:w-auto rounded-2xl sm:rounded-3xl px-10 sm:px-14 text-base sm:text-xl font-black shadow-2xl">
                   SOLICITAR CONVITE AGORA
                 </Button>
               </Link>
               <Link href="/login">
-                <button className="text-zinc-500 hover:text-white font-bold transition-colors text-sm sm:text-base">
+                <button className="text-muted-foreground hover:text-foreground font-bold transition-colors text-sm sm:text-base">
                   Já sou membro
                 </button>
               </Link>
@@ -355,30 +363,30 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-white/5 py-12 sm:py-20 bg-[#050506]">
+      <footer className="border-t border-border/40 py-12 sm:py-20 bg-background">
         <div className="mx-auto max-w-7xl px-4 grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12">
           <div className="col-span-2">
             <div className="flex items-center gap-3 mb-6">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 shadow-lg shadow-red-600/20">
                 <Youtube className="h-5 w-5 text-white" />
               </div>
-              <span className="text-xl font-black tracking-tighter">DARK<span className="text-red-500">TUBE</span></span>
+              <span className="text-xl font-black tracking-tighter uppercase">DARK<span className="text-red-600">TUBE</span></span>
             </div>
-            <p className="text-zinc-500 max-w-xs font-medium leading-relaxed text-sm">
+            <p className="text-foreground/70 dark:text-zinc-500 max-w-xs font-medium leading-relaxed text-sm">
               A inteligência de elite para quem constrói o futuro do conteúdo nas redes sociais.
             </p>
           </div>
           <div className="space-y-4">
-            <h4 className="font-black text-xs uppercase tracking-widest text-white">Legal</h4>
-            <div className="flex flex-col gap-3 text-zinc-500 text-sm font-bold">
+            <h4 className="font-black text-xs uppercase tracking-widest text-foreground">Legal</h4>
+            <div className="flex flex-col gap-3 text-foreground/60 dark:text-muted-foreground text-sm font-bold">
               <a href="#" className="hover:text-red-500 transition-colors">Privacidade</a>
               <a href="#" className="hover:text-red-500 transition-colors">Termos</a>
               <a href="#" className="hover:text-red-500 transition-colors">Compliance</a>
             </div>
           </div>
           <div className="space-y-4">
-            <h4 className="font-black text-xs uppercase tracking-widest text-white">Contato</h4>
-            <div className="flex flex-col gap-3 text-zinc-500 text-sm font-bold">
+            <h4 className="font-black text-xs uppercase tracking-widest text-foreground">Contato</h4>
+            <div className="flex flex-col gap-3 text-foreground/60 dark:text-muted-foreground text-sm font-bold">
               <a href="#" className="hover:text-red-500 transition-colors flex items-center gap-2">
                 <Mail className="h-4 w-4" /> admin@darktube.com
               </a>
@@ -386,7 +394,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="mx-auto max-w-7xl px-4 pt-12 text-center text-zinc-600 text-[10px] font-black tracking-widest uppercase">
-          DarkTube Miner &copy; 2026 &mdash; Built for the elite
+          DARKTUBE &copy; 2026 &mdash; Built for the elite
         </div>
       </footer>
     </div>
@@ -395,8 +403,8 @@ export default function LandingPage() {
 
 function Badge({ children, color }: { children: React.ReactNode, color: 'red' | 'zinc' }) {
   const styles = {
-    red: 'border-red-500/20 bg-red-500/5 text-red-500',
-    zinc: 'border-white/10 bg-white/5 text-zinc-400'
+    red: 'border-foreground/20 bg-foreground/5 text-foreground',
+    zinc: 'border-border bg-muted/50 text-muted-foreground'
   }
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] ${styles[color]}`}>

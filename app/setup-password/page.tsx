@@ -5,6 +5,7 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Youtube, Lock, Loader2, AlertCircle, CheckCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 export default function SetupPasswordPage() {
     const [password, setPassword] = useState("")
@@ -103,23 +104,23 @@ export default function SetupPasswordPage() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col bg-[#050506]">
-            <header className="flex h-16 items-center justify-center border-b border-white/5 bg-[#050506]">
+        <div className="flex min-h-screen flex-col bg-background">
+            <header className="flex h-16 items-center justify-center border-b border-border bg-background">
                 <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600">
-                        <Youtube className="h-5 w-5 text-white" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 shadow-lg shadow-red-600/20">
+                        <Youtube className="h-6 w-6 text-white" />
                     </div>
-                    <span className="text-lg font-bold tracking-tight text-white">DarkTube</span>
+                    <span className="text-xl font-black tracking-tighter uppercase">DARK<span className="text-red-600">TUBE</span></span>
                 </Link>
             </header>
 
             <main className="flex flex-1 items-center justify-center p-4">
-                <div className="w-full max-w-md space-y-8 rounded-2xl border border-white/5 bg-zinc-900/50 p-8 backdrop-blur-xl">
+                <div className="w-full max-w-md space-y-8 rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/20">
                     <div className="space-y-2 text-center">
-                        <h1 className="text-2xl font-bold tracking-tight text-white">
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
                             Criar sua Senha de Acesso
                         </h1>
-                        <p className="text-sm text-zinc-400">
+                        <p className="text-sm text-muted-foreground">
                             {userEmail ? `Definindo senha para ${userEmail}` : 'Validando seu link de acesso...'}
                         </p>
                     </div>
@@ -141,7 +142,7 @@ export default function SetupPasswordPage() {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="h-11 w-full rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-white transition-all focus:border-red-500 focus:outline-none"
+                                        className="h-11 w-full rounded-xl border border-border bg-input pl-10 pr-4 text-sm text-foreground transition-all focus:border-primary focus:outline-none"
                                     />
                                 </div>
                             </div>
@@ -155,7 +156,7 @@ export default function SetupPasswordPage() {
                                         required
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="h-11 w-full rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-white transition-all focus:border-red-500 focus:outline-none"
+                                        className="h-11 w-full rounded-xl border border-border bg-input pl-10 pr-4 text-sm text-foreground transition-all focus:border-primary focus:outline-none"
                                     />
                                 </div>
                             </div>
@@ -169,13 +170,13 @@ export default function SetupPasswordPage() {
                                 </div>
                             )}
 
-                            <button
+                            <Button
                                 type="submit"
                                 disabled={loading}
-                                className="flex h-11 w-full items-center justify-center rounded-xl bg-red-600 text-sm font-bold text-white transition-all hover:bg-red-500 disabled:opacity-50"
+                                className="h-12 w-full rounded-xl text-sm font-black shadow-lg"
                             >
                                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Finalizar Configuração"}
-                            </button>
+                            </Button>
                         </form>
                     )}
 

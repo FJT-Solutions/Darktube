@@ -1,8 +1,9 @@
 "use client"
 
-import { Menu, LogOut, Radio } from "lucide-react"
+import { Menu, LogOut } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import Link from "next/link"
+import { ThemeToggle } from "./theme-toggle"
 
 interface HeaderProps {
   title: string
@@ -48,6 +49,8 @@ export function Header({ title, description, onMenuToggle, actions }: HeaderProp
       {/* Right: custom actions + profile */}
       <div className="flex items-center gap-2">
         {actions}
+        
+        <ThemeToggle />
 
         {session && (
           <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-secondary/30 p-1">
