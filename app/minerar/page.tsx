@@ -244,7 +244,7 @@ export default function MinerarPage() {
             </div>
             <Button
               onClick={() => setWizardOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+              className="rounded-xl shadow-lg"
             >
               Iniciar Assistente
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -290,14 +290,14 @@ export default function MinerarPage() {
                 <SlidersHorizontal className="h-4 w-4" />
                 <span className="hidden sm:inline">Filtros</span>
               </button>
-              <button
+              <Button
                 onClick={handleSearch}
                 disabled={loading}
-                className="flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                className="flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-medium shadow-md"
               >
                 <Search className="h-4 w-4" />
                 <span className="hidden sm:inline">Buscar</span>
-              </button>
+              </Button>
             </div>
 
             {/* Search type toggle */}
@@ -386,7 +386,7 @@ export default function MinerarPage() {
                           key={range.value}
                           onClick={() => setMinSubs(range.value)}
                           className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${minSubs === range.value
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-foreground text-background"
                             : "bg-secondary text-secondary-foreground hover:bg-accent"
                             }`}
                         >

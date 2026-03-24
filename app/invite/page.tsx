@@ -4,6 +4,7 @@ import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Youtube, Send, ShieldCheck, Loader2, AlertCircle, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export default function InvitePage() {
     const [email, setEmail] = useState("")
@@ -52,16 +53,13 @@ export default function InvitePage() {
                     <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 shadow-lg shadow-red-500/5">
                         <ShieldCheck className="h-8 w-8 text-red-500" />
                     </div>
-                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Solicitar Acesso</h1>
-                    <p className="text-muted-foreground text-sm max-w-[280px]">
-                        O <span className="text-red-500 font-semibold">DarkTube</span> é uma ferramenta exclusiva para membros aprovados. Nos conte quem você é para avaliarmos sua entrada.
-                    </p>
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">Solicitar Acesso</h1>
                 </div>
 
                     <div className="rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/20">
                         <form onSubmit={handleInviteRequest} className="space-y-5">
                             <div className="space-y-2">
-                                <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seu Nome Complete</label>
+                                <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Seu Nome Completo</label>
                                 <input
                                     id="name"
                                     type="text"
@@ -95,10 +93,10 @@ export default function InvitePage() {
                                 </div>
                             )}
 
-                            <button
+                            <Button
                                 type="submit"
                                 disabled={loading || message?.type === 'success'}
-                                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50"
+                                className="h-14 w-full rounded-xl text-sm font-black shadow-lg"
                             >
                                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
                                     <>
@@ -106,7 +104,7 @@ export default function InvitePage() {
                                         Solicitar Autorização
                                     </>
                                 )}
-                            </button>
+                            </Button>
                         </form>
                     </div>
 

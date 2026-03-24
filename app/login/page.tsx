@@ -5,7 +5,9 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
-import { Youtube, Mail, Loader2, AlertCircle, ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Youtube, Mail, Loader2, AlertCircle, ArrowRight, ShieldAlert } from "lucide-react"
+import { checkUserAccessAction } from "@/app/actions"
 
 export default function LoginPage() {
     const [mode, setMode] = useState<'login' | 'reset'>('login')
@@ -20,6 +22,35 @@ export default function LoginPage() {
         e.preventDefault()
         setLoading(true)
         setMessage(null)
+
+        const access = await checkUserAccessAction(email)
+
+        if (access.status === 'no_access') {
+            setMessage({ 
+                type: 'error', 
+                text: "Você ainda não possui acesso ou convite aprovado. Por favor, solicite seu acesso." 
+            })
+            setLoading(false)
+            return
+        }
+
+        if (access.status === 'pending_invite') {
+            setMessage({ 
+                type: 'error', 
+                text: "Sua solicitação de acesso ainda está em análise. Avisaremos por e-mail quando for aprovada." 
+            })
+            setLoading(false)
+            return
+        }
+
+        if (access.status === 'blocked') {
+            setMessage({ 
+                type: 'error', 
+                text: "Seu acesso foi suspenso. Entre em contato com o suporte." 
+            })
+            setLoading(false)
+            return
+        }
 
         const { error } = await supabase.auth.signInWithPassword({
             email,
@@ -39,6 +70,17 @@ export default function LoginPage() {
         setLoading(true)
         setMessage(null)
 
+        const access = await checkUserAccessAction(email)
+
+        if (access.status === 'no_access' || access.status === 'pending_invite') {
+            setMessage({ 
+                type: 'error', 
+                text: "Não encontramos uma conta aprovada para este e-mail. Solicite seu acesso primeiro." 
+            })
+            setLoading(false)
+            return
+        }
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${window.location.origin}/setup-password`,
         })
@@ -55,10 +97,10 @@ export default function LoginPage() {
         <div className="flex min-h-screen flex-col bg-background">
             <header className="flex h-16 items-center justify-between border-b border-border px-4 lg:px-6">
                 <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                        <Youtube className="h-5 w-5 text-primary-foreground" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 shadow-lg shadow-red-600/20">
+                        <Youtube className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-lg font-bold tracking-tight">DarkTube <span className="text-primary">Miner</span></span>
+                    <span className="text-xl font-black tracking-tighter uppercase">DARK<span className="text-red-600">TUBE</span></span>
                 </Link>
             </header>
 
@@ -125,19 +167,19 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <button
+                        <Button
                             type="submit"
                             disabled={loading}
-                            className="flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-bold text-white transition-all hover:bg-primary/90 disabled:opacity-50"
+                            className="h-12 w-full rounded-xl text-sm font-bold shadow-lg"
                         >
                             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? "Entrar" : "Enviar Link de Recuperação"}
-                        </button>
+                        </Button>
 
                         {mode === 'reset' && (
                             <button
                                 type="button"
                                 onClick={() => setMode('login')}
-                                className="w-full text-center text-xs font-bold text-muted-foreground hover:text-white transition-colors"
+                                className="w-full text-center text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
                             >
                                 Voltar para o Login
                             </button>

@@ -1,5 +1,6 @@
 "use client"
 
+
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { getPendingInvitesAction, approveInviteAction, declineInviteAction } from "@/app/actions"
@@ -149,7 +150,7 @@ export default function AdminInvitesPage() {
                                             <div className="flex items-center gap-2">
                                                 <Button 
                                                     size="sm" 
-                                                    className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                                                    className="gap-2"
                                                     onClick={() => handleApprove(invite.id)}
                                                     disabled={processingId === invite.id}
                                                 >

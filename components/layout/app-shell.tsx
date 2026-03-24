@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation"
 
 interface AppShellContextType {
   sidebarOpen: boolean
+  sidebarCollapsed: boolean
   toggleSidebar: () => void
   trackedCount: number
   refreshTrackedCount: () => Promise<void>
@@ -15,6 +16,7 @@ interface AppShellContextType {
 
 const AppShellContext = createContext<AppShellContextType>({
   sidebarOpen: false,
+  sidebarCollapsed: false,
   toggleSidebar: () => {},
   trackedCount: 0,
   refreshTrackedCount: async () => {},
@@ -28,6 +30,7 @@ const AUTH_PAGES = ["/login", "/invite", "/pending", "/", "/setup-password"]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [trackedCount, setTrackedCount] = useState(0)
   const pathname = usePathname()
 
@@ -47,11 +50,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!isAuthPage) refreshTrackedCount()
   }, [pathname])
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev)
+  const toggleSidebar = () => {
+    // Check if we are on desktop (lg: 1024px)
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      setSidebarCollapsed((prev) => !prev)
+    } else {
+      setSidebarOpen((prev) => !prev)
+    }
+  }
 
   return (
     <AppShellContext.Provider
-      value={{ sidebarOpen, toggleSidebar, trackedCount, refreshTrackedCount }}
+      value={{ sidebarOpen, sidebarCollapsed, toggleSidebar, trackedCount, refreshTrackedCount }}
     >
       <div
         className={cn(
@@ -61,7 +71,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         {/* Sidebar — slide drawer on mobile, static on desktop */}
         {!isAuthPage && (
-          <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <Sidebar 
+            open={sidebarOpen} 
+            collapsed={sidebarCollapsed}
+            onClose={() => setSidebarOpen(false)} 
+          />
         )}
 
         {/* Main content */}

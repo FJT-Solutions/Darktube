@@ -27,7 +27,7 @@ export default function PendingPage() {
                     <div className="flex flex-col gap-3 pt-6">
                         <button
                             onClick={() => window.location.reload()}
-                            className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90"
+                            className="flex h-12 items-center justify-center gap-2 rounded-xl bg-foreground text-sm font-bold text-background transition-all hover:opacity-90"
                         >
                             <RefreshCw className="h-4 w-4" />
                             Verificar Status Novamente

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/layout/header"
 import { useAppShell } from "@/components/layout/app-shell"
+import { Button } from "@/components/ui/button"
 import { DarkScoreBadge } from "@/components/dark-score-badge"
 import { EmptyState } from "@/components/loading-states"
 import { formatNumber, formatCurrency } from "@/lib/metrics"
@@ -143,8 +144,8 @@ export default function TrackerPage() {
                       key={key}
                       onClick={() => handleSort(key)}
                       className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${sortKey === key
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "bg-red-600 text-white shadow-sm shadow-red-600/20"
+                        : "text-muted-foreground hover:text-red-600 hover:bg-red-600/10"
                         }`}
                     >
                       {label}
@@ -329,12 +330,14 @@ export default function TrackerPage() {
               title="Nenhum canal rastreado"
               description="Comece minerando canais e adicionando-os ao seu tracker para acompanhar."
               action={
-                <Link
-                  href="/minerar"
-                  className="mt-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                <Button
+                  asChild
+                  className="mt-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-md"
                 >
-                  Comecar a minerar
-                </Link>
+                  <Link href="/minerar">
+                    Comecar a minerar
+                  </Link>
+                </Button>
               }
             />
           )}

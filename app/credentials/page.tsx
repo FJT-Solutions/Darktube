@@ -159,13 +159,13 @@ export default function CredentialsPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-4rem)] p-4 lg:p-8 animate-in fade-in duration-500 overflow-hidden">
+        <div className="w-full max-w-4xl mx-auto flex flex-col h-[calc(100vh-4rem)] p-4 lg:p-8 animate-in fade-in duration-500 overflow-hidden">
             <div className="flex items-center gap-4 mb-8 shrink-0">
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => router.back()}
-                    className="rounded-full hover:bg-white/10"
+                    className="rounded-full hover:bg-secondary/50 transition-colors"
                 >
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -176,30 +176,32 @@ export default function CredentialsPage() {
             </div>
 
             {/* TAB SELECTOR */}
-            <div className="flex gap-2 p-1.5 bg-secondary/20 border border-border/50 rounded-2xl mb-8 shrink-0 overflow-x-auto no-scrollbar">
+            <div className="flex w-full gap-2 p-1.5 bg-secondary/20 border border-border/50 rounded-2xl mb-8 shrink-0">
                 <button
                     onClick={() => setActiveTab("media")}
+                    style={{ width: '50%' }}
                     className={cn(
-                        "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
+                        "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-w-0",
                         activeTab === "media"
-                            ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]"
-                            : "text-muted-foreground hover:bg-white/5"
+                            ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
+                            : "text-muted-foreground hover:bg-red-600/10"
                     )}
                 >
-                    <Globe className="h-4 w-4" />
-                    Canais e Mídias
+                    <Globe className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Canais e Mídias</span>
                 </button>
                 <button
                     onClick={() => setActiveTab("ai")}
+                    style={{ width: '50%' }}
                     className={cn(
-                        "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
+                        "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-w-0",
                         activeTab === "ai"
-                            ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]"
-                            : "text-muted-foreground hover:bg-white/5"
+                            ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
+                            : "text-muted-foreground hover:bg-red-600/10"
                     )}
                 >
-                    <Cpu className="h-4 w-4" />
-                    IA (Inteligência Artificial)
+                    <Cpu className="h-4 w-4 shrink-0" />
+                    <span className="truncate">IA (Inteligência Artificial)</span>
                 </button>
             </div>
 
@@ -239,7 +241,7 @@ export default function CredentialsPage() {
                                                 <Button
                                                     onClick={() => handleSave('blotato')}
                                                     disabled={isSaving === 'blotato'}
-                                                    className="shrink-0 h-12 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                                                    className="shrink-0 h-12 px-6 font-bold"
                                                 >
                                                     {isSaving === 'blotato' ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                                                     Salvar
@@ -294,7 +296,7 @@ export default function CredentialsPage() {
                                                 <Button
                                                     onClick={handleAddAccount}
                                                     disabled={isAddingAccount}
-                                                    className="w-full h-10 mt-8 bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                                                    className="w-full h-10 mt-8 font-bold"
                                                 >
                                                     {isAddingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                                                     Vincular
@@ -420,7 +422,7 @@ export default function CredentialsPage() {
                                         <Button
                                             onClick={handleSaveMeta}
                                             disabled={isSaving === 'meta_bulk'}
-                                            className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-lg shadow-blue-500/20"
+                                            className="w-full h-12 font-bold transition-all shadow-lg"
                                         >
                                             {isSaving === 'meta_bulk' ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
                                             Salvar Configurações Facebook

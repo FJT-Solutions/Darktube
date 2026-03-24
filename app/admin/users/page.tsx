@@ -1,5 +1,6 @@
 "use client"
 
+
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { getAllProfilesAction, updateUserRoleAction, updateUserStatusAction, deleteUserAction, resendAccessAction } from "@/app/actions"
@@ -34,6 +35,7 @@ export default function AdminUsersPage() {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
     const [isProcessing, setIsProcessing] = useState<string | null>(null)
+    const [isSent, setIsSent] = useState<string | null>(null)
 
     const isAdmin = myProfile?.role === 'admin'
 
@@ -93,12 +95,12 @@ export default function AdminUsersPage() {
         }
     }
 
-    const handleDelete = async (userId: string) => {
+    const handleDelete = async (userId: string, email: string) => {
         if (!confirm("AVISO CRÍTICO: Isso excluirá permanentemente o usuário e seus dados de acesso. Deseja continuar?")) return
         
         setIsProcessing(userId)
         try {
-            const result = await deleteUserAction(userId)
+            const result = await deleteUserAction(userId, email)
             if (result.success) {
                 toast.success("Usuário removido permanentemente")
                 setUsers(prev => prev.filter(u => u.id !== userId))
@@ -116,6 +118,8 @@ export default function AdminUsersPage() {
             const result = await resendAccessAction(email, name)
             if (result.success) {
                 toast.success("E-mail de acesso reenviado com sucesso")
+                setIsSent(userId)
+                setTimeout(() => setIsSent(null), 3000)
             } else {
                 toast.error(result.error || "Falha ao enviar e-mail")
             }
@@ -257,11 +261,21 @@ export default function AdminUsersPage() {
                                                             <Button 
                                                                 variant="ghost" 
                                                                 size="sm" 
-                                                                className="h-7 text-[10px] text-primary hover:bg-primary/10 gap-1.5"
+                                                                className={cn(
+                                                                    "h-7 text-[10px] gap-1.5 transition-all duration-300",
+                                                                    isSent === user.id ? "text-green-500 bg-green-500/10" : "text-foreground hover:bg-foreground/10"
+                                                                )}
                                                                 onClick={() => handleResendAccess(user.email, user.full_name, user.id)}
-                                                                disabled={isProcessing === user.id}
+                                                                disabled={isProcessing === user.id || isSent === user.id}
                                                             >
-                                                                <Send className="h-3 w-3" /> Reenviar Convite
+                                                                {isProcessing === user.id ? (
+                                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                                ) : isSent === user.id ? (
+                                                                    <CheckCircle2 className="h-3 w-3" />
+                                                                ) : (
+                                                                    <Send className="h-3 w-3" />
+                                                                )}
+                                                                {isProcessing === user.id ? "Enviando..." : isSent === user.id ? "Enviado!" : "Reenviar Convite"}
                                                             </Button>
                                                         )}
                                                     </div>
@@ -271,7 +285,7 @@ export default function AdminUsersPage() {
                                                         <Button 
                                                             variant="ghost" 
                                                             size="icon" 
-                                                            className="h-8 w-8 text-primary hover:bg-primary/10"
+                                                            className="h-8 w-8 text-foreground hover:bg-foreground/10"
                                                             title="Mudar Cargo"
                                                             onClick={() => handleUpdateRole(user.id, user.role)}
                                                             disabled={isProcessing === user.id || user.email === 'nathan.jordan@fjt-solutions.com'}
@@ -295,7 +309,7 @@ export default function AdminUsersPage() {
                                                             size="icon" 
                                                             className="h-8 w-8 text-destructive hover:bg-destructive/10"
                                                             title="Excluir"
-                                                            onClick={() => handleDelete(user.id)}
+                                                            onClick={() => handleDelete(user.id, user.email)}
                                                             disabled={isProcessing === user.id || user.email === 'nathan.jordan@fjt-solutions.com'}
                                                         >
                                                             <Trash2 className="h-4 w-4" />

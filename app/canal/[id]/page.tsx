@@ -10,6 +10,7 @@ import { VideoCard } from "@/components/video-card"
 import { EarningsCalculator } from "@/components/earnings-calculator"
 import { DarkScoreBadge } from "@/components/dark-score-badge"
 import { PageLoader, VideoCardSkeleton } from "@/components/loading-states"
+import { Button } from "@/components/ui/button"
 import { formatNumber, formatCurrency } from "@/lib/metrics"
 import {
   saveTrackedChannelAction,
@@ -227,25 +228,24 @@ export default function ChannelDetailPage({
               <ExternalLink className="h-3.5 w-3.5" />
               YouTube
             </a>
-            <button
+            <Button
               onClick={handleTrack}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${isTracked
-                ? "bg-primary/10 text-primary"
-                : "bg-primary text-primary-foreground hover:bg-primary/90"
-                }`}
+              variant={isTracked ? "secondary" : "default"}
+              size="sm"
+              className="px-3 py-2 text-xs font-medium"
             >
               {isTracked ? (
                 <>
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3.5 w-3.5 mr-1" />
                   Rastreando
                 </>
               ) : (
                 <>
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5 mr-1" />
                   Rastrear
                 </>
               )}
-            </button>
+            </Button>
           </div>
         }
       />
@@ -525,33 +525,30 @@ export default function ChannelDetailPage({
             <div className="space-y-6">
               {/* Sub-tabs for video types */}
               <div className="flex gap-2">
-                <button
+                <Button
                   onClick={() => setVideoSubTab("video")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${videoSubTab === "video"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                  variant={videoSubTab === "video" ? "default" : "secondary"}
+                  size="sm"
+                  className="rounded-full px-3 py-1.5 text-xs font-bold"
                 >
                   Vídeos ({filteredVideos.video.length})
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setVideoSubTab("shorts")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${videoSubTab === "shorts"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                  variant={videoSubTab === "shorts" ? "default" : "secondary"}
+                  size="sm"
+                  className="rounded-full px-3 py-1.5 text-xs font-bold"
                 >
                   Shorts ({filteredVideos.shorts.length})
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setVideoSubTab("live")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${videoSubTab === "live"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
+                  variant={videoSubTab === "live" ? "default" : "secondary"}
+                  size="sm"
+                  className="rounded-full px-3 py-1.5 text-xs font-bold"
                 >
                   Ao Vivo ({filteredVideos.live.length})
-                </button>
+                </Button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
