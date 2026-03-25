@@ -322,7 +322,7 @@ export async function getBlotatoAccounts(userId: string): Promise<BlotatoAccount
     return data || []
 }
 
-export async function addBlotatoAccount(userId: string, platform: string, accountId: string, label?: string): Promise<BlotatoAccount> {
+export async function addBlotatoAccount(userId: string, platform: string, accountId: string, label?: string, pageId?: string, pageName?: string): Promise<BlotatoAccount> {
     const supabase = await createClient()
     const { data, error } = await supabase
         .from('blotato_accounts')
@@ -330,7 +330,9 @@ export async function addBlotatoAccount(userId: string, platform: string, accoun
             user_id: userId,
             platform,
             account_id: accountId,
-            label
+            label,
+            ...(pageId && { page_id: pageId }),
+            ...(pageName && { page_name: pageName }),
         })
         .select()
         .single()
