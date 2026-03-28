@@ -139,7 +139,8 @@ export async function generateScriptAction(
     videoTitle: string,
     analysisJson: string,
     transcript: string,
-    provider: ScriptProvider = 'gemini'
+    provider: ScriptProvider = 'openai',
+    videoDuration?: number
 ) {
     try {
         const supabase = await createClient()
@@ -164,22 +165,72 @@ export async function generateScriptAction(
 
         const analysis = JSON.parse(analysisJson)
         const template = analysis?.remodeling_template
+        const audioType = analysis?.detected_audio_type || 'voice'
+        const audioDesc = analysis?.original_audio_description || ''
+        const duration = videoDuration || analysis?.duration || null
+        const durationText = duration ? `DURAÇÃO EXATA DO VÍDEO: ${Math.round(duration)} segundos. O último timestamp DEVE terminar em exatamente ${Math.round(duration)} segundos. NÃO EXCEDA este tempo.` : '';
 
-        const systemPrompt = `Você é um roteirista especialista em conteúdo para YouTube no estilo dark, informativo e narrativo.
-Sua tarefa é criar um roteiro completo e pronto para gravação baseado em um vídeo de referência analisado pela IA.
+        // Build audio-aware instructions
+        let audioRules = '';
+        if (audioType === 'music_only') {
+            audioRules = `REGRA CRÍTICA DE ÁUDIO: O vídeo original NÃO tem narração/voz humana. Ele tem APENAS música/som de fundo ("${audioDesc}").
+O campo "voiceover" de CADA segmento deve ter:
+- "text": "" (vazio - SEM texto de locução)
+- "style": "Sem narração - apenas música de fundo: ${audioDesc}"
+NÃO invente narração. O vídeo remodelado deve ser FIEL ao original: apenas visual + música.`;
+        } else if (audioType === 'none') {
+            audioRules = `REGRA CRÍTICA DE ÁUDIO: O vídeo original NÃO tem áudio (silêncio total).
+O campo "voiceover" de CADA segmento deve ter:
+- "text": "" (vazio)
+- "style": "Sem áudio - silêncio ou música ambiente sutil"
+NÃO invente narração nem música. Mantenha fidelidade ao original.`;
+        } else {
+            audioRules = `ÁUDIO: O vídeo original TEM narração humana ("${audioDesc}").
+O campo "voiceover" deve conter o texto de locução ORIGINAL remodelado (novo, original, mas com o mesmo tom e estilo) e instruções de estilo detalhadas.`;
+        }
 
-INSTRUÇÕES:
-- Tom: ${template?.visual_directives || 'Profissional e envolvente'}
+        const systemPrompt = `Você é um roteirista e engenheiro de produção de vídeo especialista em automação via n8n.
+Sua tarefa: criar um ROTEIRO DE PRODUÇÃO ESTRUTURADO em JSON para remodelar o vídeo "${videoTitle}".
+
+${durationText}
+${audioRules}
+
+ANÁLISE VISUAL DO GEMINI (referência):
 - Estilo: ${analysis?.style || 'Informativo'}
-- Formato: Gancho → Desenvolvimento (3-5 pontos) → CTA
-- Use a transcrição do vídeo original APENAS como referência de tópicos, NÃO copie o conteúdo.
-- O roteiro deve ser novo, original e seguir as diretrizes visuais do template.
+- Diretrizes visuais: ${template?.visual_directives || 'Manter coerência visual'}
+- Estilo de vídeo: ${template?.video_style || 'Cinematográfico'}
+- Composição: ${template?.composition_rules || 'Regra dos terços'}
+- Música sugerida: ${template?.music_style || 'Épica'}
+- AI Stack: ${JSON.stringify(template?.ai_stack || {})}
 
-TRANSCRIÇÃO DO VÍDEO ORIGINAL (referência):
+TRANSCRIÇÃO (referência de tópicos apenas):
 ${transcript?.slice(0, 2000) || 'Não disponível'}
 
-TEMPLATE DE REMODELAGEM:
-${JSON.stringify(template, null, 2)}`;
+FORMATO DE SAÍDA OBRIGATÓRIO - Responda APENAS com JSON:
+{
+  "script_base": [
+    {
+      "timestamp": "0:00-0:05",
+      "segment_type": "GANCHO | DESENVOLVIMENTO_N | CLÍMAX | CALL_TO_ACTION",
+      "voiceover": {
+        "text": "texto da locução (ou vazio se sem voz)",
+        "style": "instruções de tom, ritmo, entonação"
+      },
+      "visual_content": {
+        "image_prompt": "Prompt DETALHADO em inglês para gerar a imagem com Flux/Midjourney. Descreva iluminação, composição, estilo, cores, objetos.",
+        "animation_instructions": "Instruções EXATAS de movimento para Kling/Runway: tipo de câmera (zoom, pan, tilt, dolly), velocidade, efeitos de partículas, transições."
+      },
+      "emotion": "emoção alvo"
+    }
+  ]
+}
+
+REGRAS:
+1. Os timestamps DEVEM cobrir a duração total do vídeo sem lacunas.
+2. Cada image_prompt deve ser autossuficiente e gerar uma imagem COERENTE com os outros segmentos.
+3. As animation_instructions devem ser TÉCNICAS e executáveis por IA de vídeo.
+4. Crie entre 4 a 8 segmentos dependendo da duração.
+5. Os prompts de imagem devem ser em INGLÊS (padrão Flux/MJ). O resto em português.`;
 
         let scriptText = '';
 
@@ -189,7 +240,7 @@ ${JSON.stringify(template, null, 2)}`;
             const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
             const result = await model.generateContent([
                 systemPrompt,
-                `Crie o roteiro completo para um vídeo sobre "${videoTitle}".`
+                `Gere o roteiro de produção estruturado em JSON.`
             ]);
             scriptText = result.response.text();
         } else if (provider === 'openai') {
@@ -203,12 +254,16 @@ ${JSON.stringify(template, null, 2)}`;
                     model: 'gpt-4o',
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: `Crie o roteiro completo para um vídeo sobre "${videoTitle}".` }
+                        { role: 'user', content: `Gere o roteiro de produção estruturado em JSON para "${videoTitle}".` }
                     ],
                     temperature: 0.7,
+                    response_format: { type: "json_object" },
                 })
             });
             const data = await response.json();
+            if (!response.ok) {
+                return { success: false, error: `Erro OpenAI: ${data?.error?.message || response.statusText}` }
+            }
             scriptText = data?.choices?.[0]?.message?.content || '';
         } else if (provider === 'claude') {
             const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -220,14 +275,17 @@ ${JSON.stringify(template, null, 2)}`;
                 },
                 body: JSON.stringify({
                     model: 'claude-3-5-sonnet-20241022',
-                    max_tokens: 4096,
+                    max_tokens: 8192,
                     system: systemPrompt,
                     messages: [
-                        { role: 'user', content: `Crie o roteiro completo para um vídeo sobre "${videoTitle}".` }
+                        { role: 'user', content: `Gere o roteiro de produção estruturado em JSON para "${videoTitle}". Responda SOMENTE com o JSON, sem markdown.` }
                     ]
                 })
             });
             const data = await response.json();
+            if (!response.ok) {
+                return { success: false, error: `Erro Claude: ${data?.error?.message || response.statusText}` }
+            }
             scriptText = data?.content?.[0]?.text || '';
         }
 
@@ -235,12 +293,25 @@ ${JSON.stringify(template, null, 2)}`;
             return { success: false, error: "O provider não retornou um roteiro válido." }
         }
 
-        return { success: true, script: scriptText }
+        // Parse structured segments from the response
+        let scriptSegments: any[] = [];
+        try {
+            const cleanJson = scriptText.includes('```json')
+                ? scriptText.split('```json')[1].split('```')[0].trim()
+                : scriptText.trim();
+            const parsed = JSON.parse(cleanJson);
+            scriptSegments = parsed.script_base || parsed.segments || [];
+        } catch (parseErr) {
+            console.warn("[generateScriptAction] Could not parse structured JSON, returning raw text:", parseErr);
+        }
+
+        return { success: true, script: scriptText, scriptSegments }
     } catch (error) {
         console.error("generateScriptAction error:", error)
         return { success: false, error: (error as Error).message }
     }
 }
+
 
 export async function getNicheIntelligenceAction(nicheId: string) {
     return await getNicheIntelligence(nicheId)
@@ -841,13 +912,13 @@ export async function updateCredentialsAction(provider: string, key: string) {
     }
 }
 
-export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string, pageId?: string, pageName?: string) {
+export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string, pageId?: string, pageName?: string, avatarUrl?: string) {
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autorizado")
 
-        return await db.addBlotatoAccount(user.id, platform, accountId, label, pageId, pageName)
+        return await db.addBlotatoAccount(user.id, platform, accountId, label, pageId, pageName, avatarUrl)
     } catch (error: any) {
         console.error("Error in addBlotatoAccountAction:", error)
         throw error
@@ -874,17 +945,30 @@ export async function fetchBlotatoAccountsFromAPIAction() {
         }
 
         const rawResponse = await res.json()
+        if (!rawResponse) throw new Error("Resposta da API Blotato vazia.")
 
-        // Blotato API returns { items: [...] }
-        const accounts: any[] = Array.isArray(rawResponse)
+        // Blotato API returns { items: [...] } or array
+        const rawItems: any[] = Array.isArray(rawResponse)
             ? rawResponse
             : (rawResponse.items || rawResponse.accounts || rawResponse.data || [])
+
+        if (!Array.isArray(rawItems)) {
+            return { success: true, accounts: [] }
+        }
+
+        // Map accounts to a standard format for easier processing
+        const accounts = rawItems.map(acc => ({
+            ...acc,
+            id: acc.id || acc.accountId || acc._id,
+            platform: acc.platform || acc.type,
+            username: acc.username || acc.fullname || acc.name || acc.handle
+        }))
 
         // For Facebook and LinkedIn, fetch subaccounts (pages) automatically
         const PLATFORMS_WITH_PAGES = ['facebook', 'linkedin']
         await Promise.all(
             accounts.map(async (acc) => {
-                if (!PLATFORMS_WITH_PAGES.includes(acc.platform)) return
+                if (!acc.id || !PLATFORMS_WITH_PAGES.includes(acc.platform)) return
                 try {
                     const subRes = await fetch(
                         `https://backend.blotato.com/v2/users/me/accounts/${acc.id}/subaccounts`,
@@ -899,7 +983,7 @@ export async function fetchBlotatoAccountsFromAPIAction() {
                         acc.pages = subItems
                     }
                 } catch {
-                    // Silently ignore if subaccounts endpoint doesn't exist for this account
+                    // Silently ignore if subaccounts endpoint doesn't exist
                 }
             })
         )
@@ -1016,6 +1100,22 @@ export async function getRemodelingTemplatesAction() {
     } catch (error) {
         console.error("Error in getRemodelingTemplatesAction:", error)
         return []
+    }
+}
+
+export async function getRemodelingTemplateByIdAction(id: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+        
+        const template = await db.getRemodelingTemplateById(id)
+        if (template.user_id !== user.id) throw new Error("Acesso negado")
+        
+        return template
+    } catch (error: any) {
+        console.error("Error in getRemodelingTemplateByIdAction:", error)
+        return null
     }
 }
 

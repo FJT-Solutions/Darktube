@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { VideoCaptureService, detectPlatform } from '@/lib/video-capture';
+import { VideoCaptureService } from '@/lib/video-capture';
+import { detectPlatform } from '@/lib/utils';
 import type { VideoSource } from '@/lib/types';
 import { createClient } from '@/lib/supabase/server';
 

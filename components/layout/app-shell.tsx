@@ -81,8 +81,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Main content */}
         <main
           className={cn(
-            "flex flex-1 flex-col min-w-0",
-            isAuthPage ? "w-full" : "overflow-hidden"
+            "flex flex-1 flex-col min-w-0 h-full",
+            isAuthPage ? "w-full" : "overflow-y-auto"
           )}
         >
           {children}

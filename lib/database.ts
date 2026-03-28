@@ -322,23 +322,32 @@ export async function getBlotatoAccounts(userId: string): Promise<BlotatoAccount
     return data || []
 }
 
-export async function addBlotatoAccount(userId: string, platform: string, accountId: string, label?: string, pageId?: string, pageName?: string): Promise<BlotatoAccount> {
+export async function addBlotatoAccount(userId: string, platform: string, accountId: string, label?: string, pageId?: string, pageName?: string, avatarUrl?: string): Promise<BlotatoAccount> {
     const supabase = await createClient()
+    
+    // We use upsert to avoid Unique Violation (23505) and update existing records
+    // Assuming conflict on user_id, platform, account_id, and page_id after SQL fix
     const { data, error } = await supabase
         .from('blotato_accounts')
-        .insert({
+        .upsert({
             user_id: userId,
             platform,
-            account_id: accountId,
+            account_id: accountId.toString(),
             label,
-            ...(pageId && { page_id: pageId }),
-            ...(pageName && { page_name: pageName }),
+            page_id: pageId?.toString() || '',
+            page_name: pageName || null,
+            avatar_url: avatarUrl || null,
+        }, {
+            onConflict: 'user_id,platform,account_id,page_id'
         })
         .select()
-        .single()
     
-    if (error) throw error
-    return data
+    if (error) {
+        console.error("Supabase upsert error:", error)
+        throw error
+    }
+    
+    return data && data.length > 0 ? data[0] : null as any
 }
 
 export async function removeBlotatoAccount(id: string) {
@@ -381,8 +390,8 @@ export async function saveRemodelingTemplate(
     userId: string,
     data: Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<RemodelingTemplateEntity> {
-    const supabase = await createAdminClient()
-    if (!supabase) throw new Error("Admin client not available")
+    const supabase = await createClient()
+    if (!supabase) throw new Error("Client not available")
     const { data: inserted, error } = await supabase
         .from('remodeling_templates')
         .insert({
@@ -406,6 +415,18 @@ export async function getRemodelingTemplates(userId: string): Promise<Remodeling
     
     if (error) throw error
     return data || []
+}
+
+export async function getRemodelingTemplateById(id: string): Promise<RemodelingTemplateEntity> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('remodeling_templates')
+        .select('*')
+        .eq('id', id)
+        .single()
+    
+    if (error) throw error
+    return data
 }
 
 export async function deleteRemodelingTemplate(id: string) {

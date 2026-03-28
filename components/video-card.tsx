@@ -8,7 +8,7 @@ import { analyzeVideoAction, analyzeExternalVideoAction, generateScriptAction, t
 import {
   Eye, Clock, Calendar, DollarSign, Sparkles, Wand2, Loader2, CheckCircle2,
   Zap, Wrench, Info, X, Download, CloudUpload, Brain, BookText, Save, ChevronDown,
-  LayoutTemplate,
+  LayoutTemplate, Mic2, ImageIcon, Video, AlertTriangle,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
@@ -31,6 +31,14 @@ function formatDate(iso: string): string {
   } catch {
     return iso
   }
+}
+
+function parseDuration(dur?: string): number | undefined {
+  if (!dur) return undefined
+  const parts = dur.split(':').map(Number)
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  return undefined
 }
 
 type AnalysisStep = 'idle' | 'downloading' | 'uploading' | 'analyzing' | 'scripting' | 'done' | 'error'
@@ -58,9 +66,11 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
   const [analysisResult, setAnalysisResult] = useState<any>(null)
   const [transcript, setTranscript] = useState<string>('')
   const [script, setScript] = useState<string>('')
+  const [scriptSegments, setScriptSegments] = useState<any[]>([])
   const [errorMsg, setErrorMsg] = useState<string>('')
+  const [scriptError, setScriptError] = useState<string>('')
   const [activeTab, setActiveTab] = useState<'analysis' | 'script'>('analysis')
-  const [scriptProvider, setScriptProvider] = useState<ScriptProvider>('gemini')
+  const [scriptProvider, setScriptProvider] = useState<ScriptProvider>('openai')
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
 
@@ -86,6 +96,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
     setErrorMsg('')
     setAnalysisResult(null)
     setScript('')
+    setScriptSegments([])
 
     try {
       // Determine if this is an external video (non-YouTube source)
@@ -121,11 +132,15 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
         video.title,
         JSON.stringify(result.analysis),
         result.transcript || '',
-        scriptProvider
+        scriptProvider,
+        parseDuration(video.duration)
       )
 
       if (scriptResult.success && scriptResult.script) {
         setScript(scriptResult.script)
+        if (scriptResult.scriptSegments?.length) {
+          setScriptSegments(scriptResult.scriptSegments)
+        }
       }
 
       setStep('done')
@@ -138,9 +153,16 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
   async function reGenerateScript() {
     if (!analysis) return
     setScript('')
+    setScriptSegments([])
+    setScriptError('')
     setIsGeneratingScript(true)
-    const r = await generateScriptAction(video.id, video.title, JSON.stringify(analysis), transcript, scriptProvider)
-    if (r.success && r.script) setScript(r.script)
+    const r = await generateScriptAction(video.id, video.title, JSON.stringify(analysis), transcript, scriptProvider, parseDuration(video.duration))
+    if (r.success && r.script) {
+      setScript(r.script)
+      if (r.scriptSegments?.length) setScriptSegments(r.scriptSegments)
+    } else {
+      setScriptError(r.error || 'Erro ao gerar o roteiro.')
+    }
     setIsGeneratingScript(false)
   }
 
@@ -309,7 +331,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                   Template de Análise
                 </button>
                 <button onClick={() => setActiveTab('script')} className={cn("flex-1 text-xs py-1.5 rounded-md transition-all font-medium", activeTab === 'script' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
-                  Roteiro Gerado
+                  Roteiro de Produção {scriptSegments.length > 0 && <span className="ml-1 text-[9px] bg-primary/20 text-primary px-1 rounded">{scriptSegments.length}</span>}
                 </button>
               </div>
 
@@ -361,9 +383,9 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                       onChange={e => setScriptProvider(e.target.value as ScriptProvider)}
                       className="text-xs rounded-md bg-secondary border border-border px-2 py-1 text-foreground flex-1"
                     >
-                      <option value="gemini">Gemini (Google)</option>
                       <option value="openai">GPT-4o (OpenAI)</option>
                       <option value="claude">Claude (Anthropic)</option>
+                      <option value="gemini">Gemini (Google)</option>
                     </select>
                     <button
                       onClick={reGenerateScript}
@@ -374,13 +396,66 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                     </button>
                   </div>
 
-                  {script ? (
-                    <div className="rounded-lg bg-secondary/30 border border-border/50 p-3 max-h-64 overflow-y-auto">
-                      <pre className="text-xs text-foreground/80 leading-relaxed whitespace-pre-wrap font-sans">{script}</pre>
+                  {scriptError && (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive text-xs p-3 rounded-md flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed">{scriptError}</p>
                     </div>
-                  ) : (
+                  )}
+
+                  {isGeneratingScript && (
+                    <div className="flex flex-col items-center gap-2 py-6">
+                      <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                      <span className="text-xs text-muted-foreground">Gerando roteiro estruturado...</span>
+                    </div>
+                  )}
+
+                  {!isGeneratingScript && scriptSegments.length > 0 ? (
+                    <div className="space-y-0 rounded-lg border overflow-hidden max-h-[400px] overflow-y-auto">
+                      {scriptSegments.map((seg: any, idx: number) => (
+                        <div key={idx} className="border-b last:border-0 p-3 hover:bg-secondary/20 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">{seg.timestamp}</span>
+                              <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{seg.segment_type}</span>
+                            </div>
+                            {seg.emotion && <span className="text-[8px] italic text-muted-foreground">{seg.emotion}</span>}
+                          </div>
+
+                          {/* Voiceover */}
+                          {seg.voiceover?.text && (
+                            <div className="mb-2 bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/10">
+                              <div className="flex items-center gap-1 text-emerald-600 mb-1">
+                                <Mic2 className="h-3 w-3" />
+                                <span className="text-[8px] font-bold uppercase">Locução ({seg.voiceover.style?.slice(0, 40)}...)</span>
+                              </div>
+                              <p className="text-[11px] leading-relaxed italic">"{seg.voiceover.text}"</p>
+                            </div>
+                          )}
+
+                          {/* Visual */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-blue-500/5 p-2 rounded-lg border border-blue-500/10">
+                              <div className="flex items-center gap-1 text-blue-500 mb-1">
+                                <ImageIcon className="h-3 w-3" />
+                                <span className="text-[8px] font-bold uppercase">Imagem</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-3">{seg.visual_content?.image_prompt}</p>
+                            </div>
+                            <div className="bg-purple-500/5 p-2 rounded-lg border border-purple-500/10">
+                              <div className="flex items-center gap-1 text-purple-500 mb-1">
+                                <Video className="h-3 w-3" />
+                                <span className="text-[8px] font-bold uppercase">Animação</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-3">{seg.visual_content?.animation_instructions}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : !isGeneratingScript && (
                     <div className="text-center text-xs text-muted-foreground py-6">
-                      Selecione o provider e clique em "Gerar" para criar o roteiro.
+                      Selecione o provider e clique em "Gerar" para criar o roteiro de produção.
                     </div>
                   )}
                 </div>

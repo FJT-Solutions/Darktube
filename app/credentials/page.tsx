@@ -113,32 +113,40 @@ export default function CredentialsPage() {
             const result = await fetchBlotatoAccountsFromAPIAction()
 
             if (result.success && result.accounts) {
-                const alreadyLinkedIds = new Set(blotatoAccounts.map(a => a.account_id))
+                // Fix: use composite key to allow multiple pages for the same parent account
+                const alreadyLinkedSet = new Set(
+                    blotatoAccounts.map(a => `${a.account_id}_${a.page_id || ''}`)
+                )
                 const flatAccounts: any[] = []
 
                 for (const acc of result.accounts as any[]) {
-                    const accountId = acc.id || acc.accountId || acc._id
-                    const displayUsername = acc.username || acc.fullname || acc.name || acc.handle || accountId
-                    const platform = acc.platform || acc.type
-                    const pages = acc.pages || acc.linkedPages || acc.subaccounts || []
-                    // Parent account avatar (Facebook Graph API)
+                    // Normalize fields as mapped by the simplified server action
+                    const accountId = acc.id
+                    const displayUsername = acc.username || accountId
+                    const platform = acc.platform || 'facebook'
+                    const pages = acc.pages || []
+                    
+                    if (!accountId || !platform) continue
+
                     const accountImageUrl = platform === 'facebook'
                         ? `https://graph.facebook.com/${accountId}/picture?type=square&width=80`
                         : undefined
 
                     if (pages.length > 0) {
                         for (const page of pages) {
-                            const pid = page.id || page.pageId
-                            if (!alreadyLinkedIds.has(accountId)) {
+                            const pid = page.id || page.pageId || page._id
+                            // Use empty string to match DB standard
+                            const compositeKey = `${accountId}_${pid || ''}`
+                            
+                            if (!alreadyLinkedSet.has(compositeKey)) {
                                 flatAccounts.push({
                                     id: accountId,
                                     platform,
                                     username: displayUsername,
                                     imageUrl: accountImageUrl,
                                     pageId: pid,
-                                    pageName: page.name || page.pageName,
-                                    displayName: `${page.name || page.pageName} (${displayUsername})`,
-                                    // Page-specific avatar
+                                    pageName: page.name || page.pageName || page.label || page.title,
+                                    displayName: `${page.name || page.pageName || page.label || page.title} (${displayUsername})`,
                                     pageImageUrl: pid
                                         ? `https://graph.facebook.com/${pid}/picture?type=square&width=80`
                                         : accountImageUrl,
@@ -146,7 +154,8 @@ export default function CredentialsPage() {
                             }
                         }
                     } else {
-                        if (!alreadyLinkedIds.has(accountId)) {
+                        const compositeKey = `${accountId}_`
+                        if (!alreadyLinkedSet.has(compositeKey)) {
                             flatAccounts.push({
                                 id: accountId,
                                 platform,
@@ -158,19 +167,49 @@ export default function CredentialsPage() {
                     }
                 }
 
-                setApiAccounts(flatAccounts)
-                setSyncFailed(false)
-                if (!silent) {
-                    if (flatAccounts.length === 0) {
-                        if ((result.accounts as any[]).length > 0) {
-                            toast.warning("Conta(s) encontrada(s) mas já estão todas vinculadas.")
-                        } else {
-                            toast.info("Nenhuma conta conectada no Blotato. Conecte em my.blotato.com/settings.")
+                if (flatAccounts.length > 0) {
+                    let linkedCount = 0
+                    const errors: string[] = []
+                    
+                    for (const acc of flatAccounts) {
+                        try {
+                            const result = await addBlotatoAccountAction(
+                                acc.platform,
+                                acc.id,
+                                acc.displayName,
+                                acc.pageId,
+                                acc.pageName,
+                                acc.pageImageUrl || acc.imageUrl
+                            )
+                            if (result) linkedCount++
+                        } catch (e: any) {
+                            console.error(`Falha ao sincronizar conta ${acc.id}:`, e)
+                            errors.push(acc.displayName)
                         }
+                    }
+                    
+                    if (!silent) {
+                        if (linkedCount > 0) {
+                            toast.success(`${linkedCount} nova(s) conta(s) vinculada(s) com sucesso!`)
+                        }
+                        if (errors.length > 0) {
+                            toast.warning(`Não foi possível vincular: ${errors.join(', ')}. Verifique se já existem no sistema.`)
+                        }
+                    }
+                    fetchBlotatoAccounts()
+                } else if (!silent) {
+                    if ((result.accounts as any[]).length > 0) {
+                        // Se retornou contas mas nenhuma é nova
+                        toast.info("Suas contas do Blotato já estão todas sincronizadas.", {
+                             description: `${(result.accounts as any[]).length} conta(s) detectada(s).`
+                        })
                     } else {
-                        toast.success(`${flatAccounts.length} contas/páginas encontradas no Blotato!`)
+                        toast.info("Nenhuma conta encontrada no Blotato. Verifique em my.blotato.com.")
                     }
                 }
+
+                setApiAccounts([])
+                setSyncFailed(false)
             } else {
                 setSyncFailed(true)
                 if (!silent) toast.error(result.error || "Erro ao buscar contas no Blotato")
@@ -180,27 +219,6 @@ export default function CredentialsPage() {
             if (!silent) toast.error(`Erro: ${error.message}`)
         } finally {
             if (!silent) setIsRefreshingAPI(false)
-        }
-    }
-
-    const handleImportAccount = async (acc: any) => {
-        try {
-            const result = await addBlotatoAccountAction(
-                acc.platform,
-                acc.id,           // account_id (the main Blotato account ID)
-                acc.displayName,  // label
-                acc.pageId,       // page_id (only for Facebook/LinkedIn)
-                acc.pageName      // page_name
-            )
-            if (result) {
-                toast.success(`"${acc.displayName}" vinculada com sucesso!`)
-                setBlotatoAccounts(prev => [result, ...prev])
-                setApiAccounts(prev => prev.filter(a =>
-                    !(a.id === acc.id && a.pageId === acc.pageId)
-                ))
-            }
-        } catch (error: any) {
-            toast.error(`Erro ao vincular conta: ${error.message}`)
         }
     }
 
@@ -339,33 +357,35 @@ export default function CredentialsPage() {
 
                             {/* SOCIAL MEDIA ACCOUNTS */}
                             <section className="space-y-4">
-                                <div className="flex items-center justify-between px-1">
+                                <div className="flex items-center justify-between px-1 border-l-2 border-emerald-500/50 pl-4">
                                     <div className="flex items-center gap-2">
                                         <Plus className="h-5 w-5 text-emerald-400" />
-                                        <h2 className="text-lg font-bold uppercase tracking-wider text-muted-foreground">Contas Conectadas</h2>
+                                        <h2 className="text-sm font-bold uppercase tracking-widest text-foreground/90">Contas Conectadas</h2>
                                     </div>
-                                    <div className="text-[10px] py-1 px-2 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 uppercase tracking-tighter">
+                                    <div className="text-[10px] py-1 px-3 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 uppercase tracking-widest">
                                         {blotatoAccounts.length} Contas
                                     </div>
                                 </div>
 
-                                <Card className="border-emerald-500/10 bg-emerald-500/5 backdrop-blur-sm">
+                                <Card className="border-emerald-500/10 bg-emerald-500/[0.02] backdrop-blur-md overflow-hidden">
                                     <CardHeader className="pb-4">
-                                        <CardTitle className="text-base">Adicionar Nova Conta</CardTitle>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <CardDescription>Gerencie suas conexões automáticas via Blotato.</CardDescription>
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            onClick={() => handleSyncBlotato()}
-                                            disabled={isRefreshingAPI}
-                                            className="h-8 text-xs font-bold"
-                                        >
-                                            {isRefreshingAPI ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
-                                            Sincronizar com Blotato
-                                        </Button>
-                                    </div>
-                                </CardHeader>
+                                        <CardTitle className="text-base font-bold text-foreground/90">Adicionar Nova Conta</CardTitle>
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <CardDescription className="text-xs text-muted-foreground/70">
+                                                Gerencie suas conexões automáticas via Blotato.
+                                            </CardDescription>
+                                            <Button 
+                                                variant="secondary" 
+                                                size="sm" 
+                                                onClick={() => handleSyncBlotato()}
+                                                disabled={isRefreshingAPI}
+                                                className="h-9 px-4 text-xs font-bold border bg-background/50 hover:bg-background transition-all shadow-sm group"
+                                            >
+                                                {isRefreshingAPI ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2 group-hover:rotate-180 transition-transform duration-500" />}
+                                                Sincronizar com Blotato
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
                                 <CardContent className="space-y-6">
                                     {/* MANUAL FORM — only shown if auto-sync failed */}
                                     {syncFailed === true && (
@@ -418,83 +438,53 @@ export default function CredentialsPage() {
                                     </div>
                                     )}
 
-                                    {/* API ACCOUNTS FOUND — grouped by parent account */}
-                                    {apiAccounts.length > 0 && (() => {
-                                        // Group accounts by parent (same id = same parent)
-                                        const groups: Record<string, { platform: string; username: string; imageUrl?: string; pages: typeof apiAccounts }> = {}
-                                        for (const acc of apiAccounts) {
-                                            if (!groups[acc.id]) {
-                                                groups[acc.id] = { platform: acc.platform, username: acc.username, imageUrl: acc.imageUrl, pages: [] }
-                                            }
-                                            groups[acc.id].pages.push(acc)
-                                        }
-                                        return (
-                                            <div className="space-y-3 border-t border-border/10 pt-4 animate-in slide-in-from-bottom-2 duration-300">
-                                                <Label className="text-[10px] uppercase text-primary font-bold tracking-widest px-1">Novas contas detectadas no Blotato</Label>
-                                                <div className="space-y-2">
-                                                    {Object.entries(groups).map(([id, group]) => (
-                                                        <div key={id} className="rounded-xl border border-border/30 overflow-hidden">
-                                                            {/* Parent header */}
-                                                            <div className="flex items-center gap-3 px-3 py-2 bg-muted/30">
-                                                                <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center bg-background/60 shrink-0">
-                                                                    {group.imageUrl
-                                                                        ? <img src={group.imageUrl} alt={group.username} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                                                                        : getPlatformIcon(group.platform)
-                                                                    }
-                                                                </div>
-                                                                <div>
-                                                                    <p className="font-bold text-xs">{group.username}</p>
-                                                                    <p className="text-[9px] uppercase text-muted-foreground">{group.platform}</p>
-                                                                </div>
-                                                            </div>
-                                                            {/* Pages / sub-items */}
-                                                            <div className="divide-y divide-border/20">
-                                                                {group.pages.map((acc, i) => (
-                                                                    <div key={`${acc.id}-${acc.pageId || i}`} className="flex items-center justify-between pl-4 pr-3 py-2 bg-background/30 hover:bg-primary/5 transition-colors">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className="h-6 w-6 rounded-full overflow-hidden flex items-center justify-center bg-muted/50 shrink-0">
-                                                                                {acc.pageImageUrl
-                                                                                    ? <img src={acc.pageImageUrl} alt={acc.pageName} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                                                                                    : <span className="text-[8px] text-muted-foreground">FB</span>
-                                                                                }
-                                                                            </div>
-                                                                            <p className="text-xs text-foreground/80">{acc.pageId ? acc.pageName : acc.displayName}</p>
-                                                                        </div>
-                                                                        <Button size="sm" onClick={() => handleImportAccount(acc)} className="h-7 text-[10px] font-bold ml-4">
-                                                                            Vincular
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )
-                                    })()}
+
                                 </CardContent>
                                 </Card>
 
                                 <div className="grid gap-3 pt-2">
                                     {blotatoAccounts.length === 0 ? (
-                                        <div className="p-12 text-center border-2 border-dashed border-border/50 rounded-2xl">
-                                            <Globe className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-                                            <p className="text-sm text-muted-foreground italic">Nenhuma conta social conectada ainda.</p>
+                                        <div className="p-12 text-center border-2 border-dashed border-border/20 rounded-2xl bg-background/20">
+                                            <Globe className="h-10 w-10 mx-auto text-muted-foreground/20 mb-3" />
+                                            <p className="text-sm text-muted-foreground/60 italic">Nenhuma conta social conectada ainda.</p>
                                         </div>
                                     ) : (
                                         blotatoAccounts.map((acc) => (
                                             <div
                                                 key={acc.id}
-                                                className="flex items-center justify-between p-4 bg-card/50 border border-border/50 rounded-xl group hover:border-primary/30 transition-all hover:bg-card/80"
+                                                className="flex items-center justify-between p-4 bg-background/40 border border-white/[0.03] rounded-xl group hover:border-emerald-500/30 transition-all hover:bg-background/60 shadow-sm"
                                             >
                                                 <div className="flex items-center gap-4">
-                                                    <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-background/50 border border-border/30">
-                                                        {getPlatformIcon(acc.platform)}
+                                                    <div className={cn(
+                                                        "h-12 w-12 flex items-center justify-center rounded-xl bg-background border border-white/[0.05] shadow-inner overflow-hidden relative",
+                                                        !acc.avatar_url && acc.platform === 'facebook' && "text-blue-500",
+                                                        !acc.avatar_url && acc.platform === 'instagram' && "text-pink-500",
+                                                        !acc.avatar_url && acc.platform === 'youtube' && "text-red-500",
+                                                        !acc.avatar_url && acc.platform === 'tiktok' && "text-foreground"
+                                                    )}>
+                                                        {acc.avatar_url ? (
+                                                            <img 
+                                                                src={acc.avatar_url} 
+                                                                alt={acc.label || 'Avatar'} 
+                                                                className="w-full h-full object-cover"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            getPlatformIcon(acc.platform)
+                                                        )}
+                                                        <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-1 border border-white/10 scale-75">
+                                                            {getPlatformIcon(acc.platform)}
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-sm tracking-tight">{acc.label || acc.account_id}</p>
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">
-                                                            {acc.platform} {acc.label ? `• ${acc.account_id}` : ''}
+                                                        <p className="font-bold text-sm tracking-tight text-foreground/90">
+                                                            {acc.label || acc.page_name || acc.account_id}
+                                                            {acc.page_name && acc.label && <span className="text-muted-foreground/60 font-medium ml-1.5 text-xs">({acc.page_name})</span>}
+                                                        </p>
+                                                        <p className="text-[10px] text-muted-foreground/60 uppercase font-black tracking-widest mt-0.5">
+                                                            {acc.platform}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -502,7 +492,7 @@ export default function CredentialsPage() {
                                                     variant="ghost"
                                                     size="icon"
                                                     onClick={() => handleRemoveAccount(acc.id)}
-                                                    className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    className="h-10 w-10 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-full transition-colors"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>

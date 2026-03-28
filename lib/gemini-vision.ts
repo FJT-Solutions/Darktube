@@ -5,6 +5,20 @@ import os from "os";
 import path from "path";
 
 
+export interface ScriptSegment {
+    timestamp: string;
+    segment_type: string;
+    voiceover: {
+        text: string;
+        style: string;
+    };
+    visual_content: {
+        image_prompt: string;
+        animation_instructions: string;
+    };
+    emotion: string;
+}
+
 export interface RemodelingTemplate {
     feasibility: 'Alta' | 'Média' | 'Baixa';
     style: string;
@@ -16,8 +30,10 @@ export interface RemodelingTemplate {
     tools: string[];
     summary: string;
     remodelingTip: string;
+    detected_audio_type: 'voice' | 'music_only' | 'none';
+    has_text_on_screen: boolean;
+    original_audio_description: string;
     remodeling_template: {
-        script_base: string[];
         visual_directives: string;
         composition_rules: string;
         thumbnail_prompt: string;
@@ -40,7 +56,7 @@ export const GeminiVisionService = {
      * pytubefix handles the download; frames are extracted locally by ffmpeg.
      */
     async analyzeVideo(
-        params: { videoPath?: string; audioPath?: string; framePaths?: string[]; transcript?: string },
+        params: { videoPath?: string; audioPath?: string; framePaths?: string[]; transcript?: string; duration?: number },
         customApiKey?: string
     ): Promise<RemodelingTemplate> {
         const apiKey = customApiKey || process.env.GEMINI_API_KEY;
@@ -98,7 +114,7 @@ export const GeminiVisionService = {
             throw new Error("Nenhuma mídia disponível para análise (sem frames nem transcrição).");
         }
 
-        contentParts.push({ text: this.getPrompt() });
+        contentParts.push({ text: this.getPrompt(params.duration) });
 
         try {
             const result = await model.generateContent(contentParts);
@@ -120,60 +136,54 @@ export const GeminiVisionService = {
         }
     },
 
-    getPrompt() {
-        return `Você é um engenheiro de remodelagem de conteúdo de vídeo de elite.
-Sua missão: analisar este vídeo QUADRO A QUADRO e criar um MOLDE DE REMODELAGEM IDÊNTICO em estrutura.
+    getPrompt(duration?: number) {
+        const durationText = duration ? `O vídeo original tem EXATAMENTE ${Math.round(duration)} segundos.` : 'A duração do vídeo original é curta.';
+        return `Você é um analista de conteúdo de vídeo de elite.
+Sua missão: analisar os FRAMES deste vídeo e criar uma FICHA TÉCNICA de análise visual.
 
-REGRAS ABSOLUTAS:
-1. O molde deve ESPELHAR a estrutura exata do vídeo original — mesma ordem de cenas, mesmos tempos, mesmas transições.
-2. Cada cena deve ter TIMESTAMP correspondente ao original (ex: 0:00-0:05, 0:05-0:15, etc.)
-3. O script_base NÃO é genérico. É uma lista DETALHADA de cenas com tempo, visual e narração moldados no original.
-4. Se o vídeo tem 10 cenas, seu molde tem 10 cenas. Se tem 25 cenas, seu molde tem 25 cenas.
-5. A thumbnail_prompt deve descrever EXATAMENTE a composição visual que funcionaria como thumbnail, baseada no que torna este vídeo atrativo.
+VOCÊ NÃO GERA ROTEIRO. Você APENAS analisa o que VÊ e OUVE nos frames.
 
-ANÁLISE OBRIGATÓRIA:
-- Observe cada frame fornecido como representante de um trecho do vídeo
-- Identifique a narrativa: como o vídeo ABRE (gancho), DESENVOLVE (meio) e FECHA (CTA/encerramento)
-- Note transições, cortes, efeitos visuais, texto na tela, zooms
-- Analise o ritmo: cortes rápidos? Planos longos? Alternância?
-- Identifique a psicologia: que emoção cada parte está tentando gerar?
+${durationText}
 
-RESPONDA APENAS COM O JSON ABAIXO (sem comentários, sem markdown):
+ANÁLISE DE ÁUDIO OBRIGATÓRIA:
+Olhe e ouça os frames com extrema atenção:
+- Se há uma VOZ HUMANA narrando/falando → detected_audio_type = "voice"
+- Se há APENAS música de fundo sem fala humana → detected_audio_type = "music_only"
+- Se NÃO há som algum (silêncio total) → detected_audio_type = "none"
+Descreva o áudio original em "original_audio_description" (ex: "Música orquestral épica sem narração", "Narrador masculino grave com música de suspense", "Silêncio total").
+
+CATÁLOGO DE FERRAMENTAS (Use no ai_stack):
+- Imagem: "Black Forest Labs flux-2 pro", "ideogram v3", "seedream 5.0 Lite".
+- Vídeo: "Kling 3.0", "Open AI sora 2", "wan 2.5", "Runway Gen-3".
+- Voz: "Elevenlabs V3", "Elevenlabs Text to Speech (multilingual v2)".
+- Música: "Suno v3.5".
+
+RESPONDA APENAS COM O JSON:
 {
   "feasibility": "Alta | Média | Baixa",
-  "style": "descrição detalhada do estilo/nicho do vídeo",
+  "style": "descrição do nicho/tipo do conteúdo",
   "visualStyle": "Cinematográfico | Dinâmico | Estoque/IA | Vlog/Real | Misto",
   "pacing": "Lento | Equilibrado | Frenético",
   "productionMethod": "IA Gerativa | Banco de Estoque | Edição Manual | Misto",
   "confidence": 0.85,
-  "justification": "análise técnica detalhada do vídeo e por que é remodelável",
-  "tools": ["ferramentas necessárias para remodelar"],
-  "summary": "resumo em 2 frases do vídeo original",
-  "remodelingTip": "dica prática e específica para remodelar este vídeo com sucesso",
+  "justification": "análise técnica do que foi observado nos frames",
+  "tools": ["ferramentas recomendadas"],
+  "summary": "resumo do conteúdo visual observado",
+  "remodelingTip": "dica estratégica para remodelar este conteúdo",
+  "detected_audio_type": "voice | music_only | none",
+  "has_text_on_screen": true,
+  "original_audio_description": "descrição exata do áudio original",
   "remodeling_template": {
-    "script_base": [
-      "**0:00-0:05 | GANCHO:** [Descreva EXATAMENTE o que acontece visual e narrativamente neste trecho. Ex: 'Plano aéreo de drone mostrando terreno vazio. Texto na tela: ANTES. Música tensa crescendo. Narração: Ninguém acreditava que isso era possível.']",
-      "**0:05-0:15 | APRESENTAÇÃO DO PROBLEMA:** [Descreva a cena com o mesmo nível de detalhe - visual, texto, narração, música, emoção]",
-      "**0:15-0:30 | DESENVOLVIMENTO 1:** [Continue cena a cena, espelhando cada trecho do vídeo original]",
-      "**0:30-0:45 | DESENVOLVIMENTO 2:** [Cada entrada deve ter timestamp + visual + narração + emoção alvo]",
-      "... continue para CADA trecho do vídeo, sem pular nenhum momento ...",
-      "**ÚLTIMO TRECHO | CTA/ENCERRAMENTO:** [Como o vídeo fecha - visual final, narração final, call to action]"
-    ],
-    "visual_directives": "diretrizes visuais completas: paleta de cores, tipo de footage, estilo de edição, efeitos usados, transições entre cenas",
-    "composition_rules": "regras de composição: enquadramento, texto overlay, motion graphics, razão de aspecto, ritmo de cortes (ex: corte a cada X segundos)",
-    "thumbnail_prompt": "Prompt DETALHADO para gerar a thumbnail: descreva composição, cores dominantes, elementos visuais, texto overlay se houver, contraste, expressão facial se aplicável. Deve causar o mesmo impacto do original.",
-    "music_style": "estilo musical exato: gênero, BPM aproximado, instrumentos, mood. Ex: 'Música cinematográfica épica, 120 BPM, orquestra com percussão pesada, mood inspiracional crescendo'",
-    "video_style": "estilo de vídeo detalhado: tipo de footage, movimento de câmera, color grading, velocidade, estilo de transição",
-    "ai_stack": {
-      "image": "ferramenta recomendada para imagens (flux/midjourney/dalle)",
-      "video": "ferramenta recomendada para vídeo (kling/runway/pika)",
-      "voice": "ferramenta recomendada para voz (elevenlabs/murf/speechify)",
-      "music": "ferramenta recomendada para música (suno/udio/musicfy)"
-    },
-    "target_audience_psychology": "análise psicológica do público-alvo: que emoção o vídeo explora, que gatilho mental usa, por que as pessoas clicam e assistem até o final"
+    "visual_directives": "diretrizes visuais baseadas no que foi observado",
+    "composition_rules": "regras de composição",
+    "thumbnail_prompt": "prompt detalhado para thumbnail com alto CTR",
+    "music_style": "estilo de música que COMBINA com o áudio original",
+    "video_style": "estilo de vídeo observado",
+    "ai_stack": { "image": "...", "video": "...", "voice": "...", "music": "..." },
+    "target_audience_psychology": "perfil do público-alvo"
   }
 }
 
-IMPORTANTE: O script_base deve ter PELO MENOS 6 entradas com timestamps. Quanto mais detalhado, melhor. Cada entrada deve ser um parágrafo completo descrevendo visual + narração + emoção daquele trecho específico.`;
+IMPORTANTE: Seja 100% fiel ao que OBSERVA. Não invente narração se não há voz. Não invente música se há silêncio.`;
     }
 };

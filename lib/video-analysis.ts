@@ -1,5 +1,6 @@
 import { YoutubeTranscript } from 'youtube-transcript';
-import { VideoCaptureService, type DownloadResult, detectPlatform, urlToId } from './video-capture';
+import { VideoCaptureService, type DownloadResult, urlToId } from './video-capture';
+import { detectPlatform } from './utils';
 import { GeminiVisionService, type RemodelingTemplate } from './gemini-vision';
 
 export type { RemodelingTemplate } from './gemini-vision';
@@ -33,6 +34,7 @@ export const VideoAnalysisService = {
                 videoPath: downloadResult.videoPath,
                 framePaths: downloadResult.framePaths,
                 audioPath: downloadResult.audioPath,
+                duration: downloadResult.duration,
                 transcript,
             }, apiKey);
 
@@ -72,6 +74,7 @@ export const VideoAnalysisService = {
                 videoPath: downloadResult.videoPath,
                 framePaths: downloadResult.framePaths,
                 audioPath: downloadResult.audioPath,
+                duration: downloadResult.duration,
                 transcript,
             }, apiKey);
 

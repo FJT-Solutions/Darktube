@@ -19,7 +19,8 @@ import {
   Wrench,
   Search,
   Filter,
-  Users
+  Users,
+  Mic2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -253,5 +254,3 @@ export default function TemplatesPage() {
     </div>
   )
 }
-
-function Mic2(props: any) { return <Sparkles {...props} /> } // Helper placeholder or import correct one

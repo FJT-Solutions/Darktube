@@ -13,6 +13,7 @@ export interface DownloadResult {
     audioPath?: string;
     framePaths?: string[];
     isFallback?: boolean;
+    duration?: number;
 }
 
 export interface VideoMetadata {
@@ -178,6 +179,7 @@ export const VideoCaptureService = {
                 videoPath: result.videoPath,
                 framePaths: result.framePaths || [],
                 audioPath: result.audioPath || undefined,
+                duration: result.duration || 0,
                 isFallback: false,
             };
         } catch (error: any) {
