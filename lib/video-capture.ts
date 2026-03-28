@@ -292,10 +292,24 @@ export const VideoCaptureService = {
             const thumbnail = this.maybeProxyThumbnail(rawThumbnail);
             
             // Tentar extrair duração de tags de vídeo (comum em FB/IG)
-            const durationStr = getMeta('video:duration') || getMeta('og:video:duration') || '0';
-            const duration = parseInt(durationStr, 10) || 0;
+            // FB costuma usar og:video:duration (segundos) ou formatos ISO
+            const durationStr = getMeta('video:duration') || getMeta('og:video:duration') || getMeta('video:duration_sec') || '0';
             
-            if (!title && !thumbnail) {
+            let duration = 0;
+            if (durationStr.startsWith('PT')) {
+                // Parse ISO8601 duration (ex: PT1M30S)
+                const m = durationStr.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+                if (m) {
+                    const h = parseInt(m[1] || '0', 10);
+                    const min = parseInt(m[2] || '0', 10);
+                    const s = parseInt(m[3] || '0', 10);
+                    duration = h * 3600 + min * 60 + s;
+                }
+            } else {
+                duration = parseInt(durationStr, 10) || 0;
+            }
+            
+            if (!title && !thumbnail && duration === 0) {
                 console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
                 return null;
             }
