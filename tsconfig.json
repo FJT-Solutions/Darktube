@@ -37,6 +37,9 @@
   ],
   "exclude": [
     "node_modules",
-    "v0-mineracao-de-canais-you-tube"
+    "v0-mineracao-de-canais-you-tube",
+    "provision_user.ts",
+    "tmp_check_user.ts",
+    "verify_supabase.ts"
   ]
 }

@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server';
 import { VideoCaptureService, detectPlatform } from '@/lib/video-capture';
 import type { VideoSource } from '@/lib/types';
+import { createClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/video/extract
  * Extracts metadata from any video URL using yt-dlp + OpenGraph fallback.
+ * Requires authentication.
  * 
  * Body: { url: string }
  * Returns: VideoMetadata compatible with YouTubeVideo card rendering
  */
 export async function POST(request: Request) {
     try {
+        // SEC-04 FIX: Require authentication
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+        }
+
         const { url } = await request.json();
 
         if (!url || typeof url !== 'string') {

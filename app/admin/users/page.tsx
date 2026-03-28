@@ -288,7 +288,7 @@ export default function AdminUsersPage() {
                                                             className="h-8 w-8 text-foreground hover:bg-foreground/10"
                                                             title="Mudar Cargo"
                                                             onClick={() => handleUpdateRole(user.id, user.role)}
-                                                            disabled={isProcessing === user.id || user.email === 'nathan.jordan@fjt-solutions.com'}
+                                                            disabled={isProcessing === user.id || user.id === myProfile?.id}
                                                         >
                                                             <Shield className="h-4 w-4" />
                                                         </Button>
@@ -299,7 +299,7 @@ export default function AdminUsersPage() {
                                                             className={cn("h-8 w-8 hover:bg-secondary", user.status === 'blocked' ? "text-green-500" : "text-yellow-500")}
                                                             title={user.status === 'blocked' ? "Reativar" : "Arquivar"}
                                                             onClick={() => handleUpdateStatus(user.id, user.status)}
-                                                            disabled={isProcessing === user.id || user.email === 'nathan.jordan@fjt-solutions.com'}
+                                                            disabled={isProcessing === user.id || user.id === myProfile?.id}
                                                         >
                                                             {user.status === 'blocked' ? <CheckCircle2 className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
                                                         </Button>
@@ -310,7 +310,7 @@ export default function AdminUsersPage() {
                                                             className="h-8 w-8 text-destructive hover:bg-destructive/10"
                                                             title="Excluir"
                                                             onClick={() => handleDelete(user.id, user.email)}
-                                                            disabled={isProcessing === user.id || user.email === 'nathan.jordan@fjt-solutions.com'}
+                                                            disabled={isProcessing === user.id || user.id === myProfile?.id}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
