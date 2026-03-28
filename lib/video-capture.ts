@@ -291,6 +291,10 @@ export const VideoCaptureService = {
             const rawThumbnail = getMeta('og:image') || getMeta('twitter:image') || '';
             const thumbnail = this.maybeProxyThumbnail(rawThumbnail);
             
+            // Tentar extrair duração de tags de vídeo (comum em FB/IG)
+            const durationStr = getMeta('video:duration') || getMeta('og:video:duration') || '0';
+            const duration = parseInt(durationStr, 10) || 0;
+            
             if (!title && !thumbnail) {
                 console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
                 return null;
@@ -300,7 +304,7 @@ export const VideoCaptureService = {
                 id: urlToId(url),
                 title: decodeHtmlEntities(title || 'Vídeo Externo'),
                 thumbnail,
-                duration: 0,
+                duration,
                 views: 0,
                 likes: 0,
                 comments: 0,
