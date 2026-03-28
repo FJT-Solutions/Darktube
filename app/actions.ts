@@ -524,7 +524,6 @@ export async function getAllProfilesAction() {
         if (authError) console.error("Error listing auth users:", authError)
 
         // Enrich profiles with auth info
-        // We iterate over authUsers to make sure "residuos" (remnants) also appear
         const mergedUsers = authUsers.map(authUser => {
             const profile = profiles.find((p: any) => p.email === authUser.email)
             return {
