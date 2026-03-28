@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { Youtube, Clock, RefreshCw, LogOut, Zap, ShieldAlert, Mail, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
@@ -9,7 +10,7 @@ import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { checkUserAccessAction } from "@/app/actions"
 
-export default function PendingPage() {
+function PendingContent() {
     const { signOut, user, profile: authProfile } = useAuth()
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -170,5 +171,17 @@ export default function PendingPage() {
                 </div>
             </main>
         </div>
+    )
+}
+
+export default function PendingPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center bg-background">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        }>
+            <PendingContent />
+        </Suspense>
     )
 }
