@@ -39,6 +39,7 @@ import {
 import { MiningWizard } from "@/components/mining/mining-wizard"
 import { NicheBadge } from "@/components/mining/niche-badge"
 import { Button } from "@/components/ui/button"
+import { detectPlatform } from "@/lib/utils"
 
 export default function MinerarPage() {
   const { toggleSidebar } = useAppShell()
@@ -69,6 +70,7 @@ export default function MinerarPage() {
 
   // Auto-detect if user is typing a URL
   const isUrlMode = /^https?:\/\//i.test(query.trim())
+  const currentPlatform = isUrlMode ? detectPlatform(query.trim()) : null
   
   // Determine whether to show Canais/Videos tabs based on 'youtube' in URL
   const showYoutubeTabs = /youtube/i.test(query.trim())
@@ -581,9 +583,22 @@ export default function MinerarPage() {
               <Link2 className="h-4 w-4 text-emerald-500 shrink-0" />
               <span className="text-xs text-emerald-400 font-medium">Link detectado — clique em Extrair para minerar este vídeo</span>
               <div className="ml-auto flex items-center gap-1.5 flex-wrap">
-                {["YouTube", "TikTok", "Instagram", "Vimeo", "Facebook", "X"].map(p => (
-                  <span key={p} className="text-[9px] font-bold text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded border border-border/50">{p}</span>
-                ))}
+                {["YouTube", "TikTok", "Instagram", "Vimeo", "Facebook", "X"].map(p => {
+                  const isActive = currentPlatform?.toLowerCase() === p.toLowerCase() || 
+                                  (p === "X" && currentPlatform === "twitter");
+                  return (
+                    <span 
+                      key={p} 
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors ${
+                        isActive 
+                          ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]" 
+                          : "text-muted-foreground bg-muted/50 border-border/50"
+                      }`}
+                    >
+                      {p}
+                    </span>
+                  );
+                })}
                 <span className="text-[9px] text-muted-foreground">+1700</span>
               </div>
             </div>

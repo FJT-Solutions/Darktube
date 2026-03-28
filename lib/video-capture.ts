@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import type { VideoSource } from './types';
+import { detectPlatform } from './utils';
 
 const execFilePromise = promisify(execFile);
 const execPromise = promisify(exec);
@@ -31,21 +32,23 @@ export interface VideoMetadata {
 }
 
 /**
- * Detect platform from URL
+ * Decode common HTML entities and numeric codes (e.g. &#xa0;, &amp;).
  */
-export function detectPlatform(url: string): VideoSource {
-    const u = url.toLowerCase();
-    if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
-    if (u.includes('tiktok.com')) return 'tiktok';
-    if (u.includes('instagram.com')) return 'instagram';
-    if (u.includes('vimeo.com')) return 'vimeo';
-    if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
-    if (u.includes('facebook.com') || u.includes('fb.watch')) return 'facebook';
-    if (u.includes('dailymotion.com') || u.includes('dai.ly')) return 'dailymotion';
-    if (u.includes('twitch.tv')) return 'twitch';
-    if (u.includes('reddit.com') || u.includes('redd.it')) return 'reddit';
-    return 'other';
+function decodeHtmlEntities(text: string | null | undefined): string {
+    if (!text) return '';
+    return text
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+        .replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+        .replace(/\u00A0/g, ' ') // NBSP to normal space
+        .trim();
 }
+
+
 
 /**
  * Generate a safe filesystem ID from a URL
@@ -221,18 +224,18 @@ export const VideoCaptureService = {
             
             return {
                 id: data.id || urlToId(url),
-                title: data.title || data.fulltitle || 'Sem título',
+                title: decodeHtmlEntities(data.title || data.fulltitle || 'Sem título'),
                 thumbnail: data.thumbnail || data.thumbnails?.[data.thumbnails.length - 1]?.url || '',
                 duration: data.duration || 0,
                 views: data.view_count || 0,
                 likes: data.like_count || 0,
                 comments: data.comment_count || 0,
-                uploader: data.uploader || data.channel || data.creator || 'Desconhecido',
+                uploader: decodeHtmlEntities(data.uploader || data.channel || data.creator || 'Desconhecido'),
                 uploaderId: data.channel_id || data.uploader_id || '',
                 uploadDate,
                 url: data.webpage_url || url,
                 source,
-                description: (data.description || '').slice(0, 500),
+                description: decodeHtmlEntities((data.description || '').slice(0, 500)),
             };
         } catch (error: any) {
             console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
@@ -270,18 +273,18 @@ export const VideoCaptureService = {
             
             return {
                 id: urlToId(url),
-                title: title || 'Vídeo Externo',
+                title: decodeHtmlEntities(title || 'Vídeo Externo'),
                 thumbnail,
                 duration: 0,
                 views: 0,
                 likes: 0,
                 comments: 0,
-                uploader: getMeta('og:site_name') || source,
+                uploader: decodeHtmlEntities(getMeta('og:site_name') || source),
                 uploaderId: '',
                 uploadDate: '',
                 url,
                 source,
-                description: (getMeta('og:description') || getMeta('twitter:description') || '').slice(0, 500),
+                description: decodeHtmlEntities((getMeta('og:description') || getMeta('twitter:description') || '').slice(0, 500)),
             };
         } catch (error: any) {
             console.error(`[VideoCaptureService] OpenGraph extraction failed: ${error.message}`);
