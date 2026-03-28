@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { getRemodelingTemplatesAction, deleteRemodelingTemplateAction, updateTemplateStatusAction } from "@/app/actions"
+import { getRemodelingTemplatesAction, deleteRemodelingTemplateAction, updateTemplateStatusAction, getBlotatoAccountsAction } from "@/app/actions"
 import { 
   LayoutTemplate, 
   Trash2, 
@@ -18,7 +18,8 @@ import {
   Zap,
   Wrench,
   Search,
-  Filter
+  Filter,
+  Users
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,6 +43,7 @@ import { formatNumber } from "@/lib/metrics"
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<any[]>([])
+  const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
 
@@ -52,8 +54,12 @@ export default function TemplatesPage() {
   async function fetchTemplates() {
     setLoading(true)
     try {
-      const data = await getRemodelingTemplatesAction()
-      setTemplates(data || [])
+      const [templatesData, accountsData] = await Promise.all([
+        getRemodelingTemplatesAction(),
+        getBlotatoAccountsAction()
+      ])
+      setTemplates(templatesData || [])
+      setAccounts(accountsData || [])
     } catch (err) {
       toast.error("Erro ao carregar templates.")
     } finally {
@@ -178,6 +184,30 @@ export default function TemplatesPage() {
                     <Calendar className="mr-1 h-3 w-3" /> {template.post_frequency}
                   </Badge>
                 </div>
+
+                {/* Blotato Accounts */}
+                {template.target_accounts && template.target_accounts.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                      <Users className="h-3 w-3" /> Contas de Destino:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {template.target_accounts.map((accId: string) => {
+                        const account = accounts.find(a => a.id === accId)
+                        if (!account) return null
+                        return (
+                          <Badge 
+                            key={accId} 
+                            variant="outline" 
+                            className="text-[9px] px-1.5 py-0 h-4 bg-primary/5 border-primary/20 text-primary truncate max-w-[120px]"
+                          >
+                            {account.label || account.page_name || account.platform}
+                          </Badge>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="mt-4 grid grid-cols-3 gap-1">
                   <div className="rounded bg-secondary/50 p-1.5 text-center">
