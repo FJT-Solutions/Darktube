@@ -9,22 +9,28 @@ export async function GET(request: Request) {
     }
 
     try {
-        console.log(`[Image Proxy] Fetching: ${imageUrl}`);
+        console.log(`[Image Proxy] Original URL: ${imageUrl}`);
         
-        // Decodificar a URL caso venha escapada (especialmente de Facebook/Instagram)
-        const decodedUrl = decodeURIComponent(imageUrl);
+        // 1. Decodificar a URL da query string
+        let decodedUrl = decodeURIComponent(imageUrl);
         
+        // 2. Corrigir entidades HTML comuns (&amp; -> &) que o Meta costuma injetar
+        decodedUrl = decodedUrl.replace(/&amp;/g, '&');
+        
+        console.log(`[Image Proxy] Fetching decoded: ${decodedUrl}`);
+
         const response = await fetch(decodedUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Referer': 'https://www.facebook.com/',
                 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
             },
-            next: { revalidate: 3600 } // Cache básico de 1 hora
+            next: { revalidate: 3600 }
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+            console.error(`[Image Proxy] Remote server returned ${response.status} for ${decodedUrl}`);
+            throw new Error(`Failed to fetch image: ${response.status}`);
         }
 
         const buffer = await response.arrayBuffer();
