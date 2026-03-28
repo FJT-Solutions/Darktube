@@ -10,6 +10,64 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { headers } from "next/headers"
 import { sendAccessGrantedEmail } from "@/lib/email"
 
+/**
+ * Analyze a video from any external URL (TikTok, Instagram, Vimeo, etc.)
+ * Uses yt-dlp for download and Gemini 2.5 Flash for AI analysis.
+ */
+export async function analyzeExternalVideoAction(url: string, videoMetadata?: any) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+            return { success: false, error: "Você precisa estar logado para analisar vídeos." }
+        }
+
+        // Fetch Gemini API key
+        let geminiApiKey: string | undefined = process.env.GEMINI_API_KEY;
+        const { data: userKey } = await supabase.rpc('get_api_key', {
+            p_user_id: user.id,
+            p_provider: 'gemini'
+        })
+        if (userKey) geminiApiKey = userKey;
+
+        if (!geminiApiKey) {
+            return {
+                success: false,
+                error: "Chave de API Gemini não encontrada. Adicione sua chave em Credenciais."
+            }
+        }
+
+        // Run external analysis via yt-dlp download + Gemini
+        const analysis = await VideoAnalysisService.performExternalAnalysis(url, geminiApiKey)
+
+        // Save to database if metadata was provided
+        if (videoMetadata) {
+            const videoForDb = {
+                id: videoMetadata.id || url,
+                title: videoMetadata.title || 'Vídeo Externo',
+                thumbnail: videoMetadata.thumbnail || '',
+                views: videoMetadata.views || 0,
+                duration: videoMetadata.duration || '0:00',
+                publishedAt: videoMetadata.publishedAt || null,
+                channelId: '',
+                channelName: videoMetadata.channelName || 'Externo',
+                description: videoMetadata.description || '',
+                url: videoMetadata.url || url,
+                likes: videoMetadata.likes || 0,
+                comments: videoMetadata.comments || 0,
+            }
+            await db.updateVideoAnalysis(videoForDb, analysis.transcript || '', JSON.stringify(analysis), user.id)
+        }
+
+        return { success: true, analysis, transcript: analysis.transcript || '' }
+    } catch (error) {
+        console.error("analyzeExternalVideoAction error:", error)
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+
 export async function getTrackedChannelsAction() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -21,45 +79,153 @@ export async function analyzeVideoAction(video: any, channel?: any) {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
-        // Fetch user's personal API key if logged in
-        let userApiKey = process.env.GEMINI_API_KEY;
-        if (user) {
-            // Use the get_api_key RPC for decryption
-            const { data: key } = await supabase.rpc('get_api_key', {
-                p_user_id: user.id,
-                p_provider: 'gemini'
-            })
-            if (key) {
-                userApiKey = key
-            }
+        if (!user) {
+            return { success: false, error: "Você precisa estar logado para analisar vídeos." }
         }
 
-        const transcript = await VideoAnalysisService.getTranscript(video.id)
-        let analysis = VideoAnalysisService.analyzeContent(transcript, video.duration)
+        // Fetch Gemini API key (required for visual analysis)
+        let geminiApiKey: string | undefined = process.env.GEMINI_API_KEY;
+        const { data: userKey } = await supabase.rpc('get_api_key', {
+            p_user_id: user.id,
+            p_provider: 'gemini'
+        })
+        if (userKey) geminiApiKey = userKey;
 
-        // Attempt Deep Vision Analysis with the best available key
-        const visionResult = await VideoAnalysisService.performVisionAnalysis(video.id, userApiKey);
-        if (visionResult) {
-            analysis = {
-                ...analysis,
-                productionMethod: visionResult.productionMethod,
-                confidence: visionResult.confidence,
-                justification: visionResult.justification
-            };
+        if (!geminiApiKey) {
+            return {
+                success: false,
+                error: "Chave de API Gemini não encontrada. Adicione sua chave em Credenciais para usar a análise visual."
+            }
         }
 
         // Ensure channel exists if provided
         if (channel) {
-            await db.ensureChannelExists(channel, user?.id)
+            await db.ensureChannelExists(channel, user.id)
         }
 
-        // Update DB with results
-        await db.updateVideoAnalysis(video, transcript, JSON.stringify(analysis), user?.id)
+        // Fetch transcript in background (optional — used later for script generation)
+        const transcript = await VideoAnalysisService.getTranscript(video.id)
+
+        // Run full visual analysis via Gemini 2.5 Flash + File API
+        const analysis = await VideoAnalysisService.performVisualAnalysis(video.id, geminiApiKey)
+
+        // Save to database
+        await db.updateVideoAnalysis(video, transcript, JSON.stringify(analysis), user.id)
 
         revalidatePath(`/canal/[id]`, 'layout')
-        return { success: true, analysis }
+        return { success: true, analysis, transcript }
     } catch (error) {
-        console.error("Analysis action error:", error)
+        console.error("analyzeVideoAction error:", error)
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export type ScriptProvider = 'gemini' | 'openai' | 'claude';
+
+export async function generateScriptAction(
+    videoId: string,
+    videoTitle: string,
+    analysisJson: string,
+    transcript: string,
+    provider: ScriptProvider = 'gemini'
+) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) return { success: false, error: "Não autorizado." }
+
+        // Retrieve the chosen provider's API key
+        let providerData: string | undefined;
+        const { data: apiKey } = await supabase.rpc('get_api_key', {
+            p_user_id: user.id,
+            p_provider: provider
+        })
+        providerData = apiKey || (provider === 'gemini' ? process.env.GEMINI_API_KEY : undefined);
+
+        if (!providerData) {
+            return {
+                success: false,
+                error: `Chave de API para "${provider}" não encontrada. Adicione em Credenciais.`
+            }
+        }
+
+        const analysis = JSON.parse(analysisJson)
+        const template = analysis?.remodeling_template
+
+        const systemPrompt = `Você é um roteirista especialista em conteúdo para YouTube no estilo dark, informativo e narrativo.
+Sua tarefa é criar um roteiro completo e pronto para gravação baseado em um vídeo de referência analisado pela IA.
+
+INSTRUÇÕES:
+- Tom: ${template?.visual_directives || 'Profissional e envolvente'}
+- Estilo: ${analysis?.style || 'Informativo'}
+- Formato: Gancho → Desenvolvimento (3-5 pontos) → CTA
+- Use a transcrição do vídeo original APENAS como referência de tópicos, NÃO copie o conteúdo.
+- O roteiro deve ser novo, original e seguir as diretrizes visuais do template.
+
+TRANSCRIÇÃO DO VÍDEO ORIGINAL (referência):
+${transcript?.slice(0, 2000) || 'Não disponível'}
+
+TEMPLATE DE REMODELAGEM:
+${JSON.stringify(template, null, 2)}`;
+
+        let scriptText = '';
+
+        if (provider === 'gemini') {
+            const { GoogleGenerativeAI } = await import('@google/generative-ai');
+            const genAI = new GoogleGenerativeAI(providerData);
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+            const result = await model.generateContent([
+                systemPrompt,
+                `Crie o roteiro completo para um vídeo sobre "${videoTitle}".`
+            ]);
+            scriptText = result.response.text();
+        } else if (provider === 'openai') {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${providerData}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: `Crie o roteiro completo para um vídeo sobre "${videoTitle}".` }
+                    ],
+                    temperature: 0.7,
+                })
+            });
+            const data = await response.json();
+            scriptText = data?.choices?.[0]?.message?.content || '';
+        } else if (provider === 'claude') {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'x-api-key': providerData,
+                    'anthropic-version': '2023-06-01',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-5-sonnet-20241022',
+                    max_tokens: 4096,
+                    system: systemPrompt,
+                    messages: [
+                        { role: 'user', content: `Crie o roteiro completo para um vídeo sobre "${videoTitle}".` }
+                    ]
+                })
+            });
+            const data = await response.json();
+            scriptText = data?.content?.[0]?.text || '';
+        }
+
+        if (!scriptText) {
+            return { success: false, error: "O provider não retornou um roteiro válido." }
+        }
+
+        return { success: true, script: scriptText }
+    } catch (error) {
+        console.error("generateScriptAction error:", error)
         return { success: false, error: (error as Error).message }
     }
 }
@@ -703,20 +869,6 @@ export async function updateCredentialsAction(provider: string, key: string) {
     }
 }
 
-
-export async function getBlotatoAccountsAction() {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return []
-
-        return await db.getBlotatoAccounts(user.id)
-    } catch (error: any) {
-        console.error("Error in getBlotatoAccountsAction:", error)
-        return []
-    }
-}
-
 export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string, pageId?: string, pageName?: string) {
     try {
         const supabase = await createClient()
@@ -851,3 +1003,193 @@ export async function checkUserAccessAction(email: string) {
         return { status: 'error', error: (error as any).message }
     }
 }
+
+export async function getBlotatoAccountsAction() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return []
+        return await db.getBlotatoAccounts(user.id)
+    } catch (error) {
+        console.error("Error in getBlotatoAccountsAction:", error)
+        return []
+    }
+}
+
+export async function saveRemodelingTemplateAction(data: any) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        const result = await db.saveRemodelingTemplate(user.id, data)
+        return { success: true, data: result }
+    } catch (error: any) {
+        console.error("Error in saveRemodelingTemplateAction:", error)
+        return { success: false, error: error.message || "Falha ao salvar template." }
+    }
+}
+
+export async function getRemodelingTemplatesAction() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return []
+        return await db.getRemodelingTemplates(user.id)
+    } catch (error) {
+        console.error("Error in getRemodelingTemplatesAction:", error)
+        return []
+    }
+}
+
+export async function deleteRemodelingTemplateAction(id: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+        return await db.deleteRemodelingTemplate(id)
+    } catch (error: any) {
+        console.error("Error in deleteRemodelingTemplateAction:", error)
+        return { success: false, error: error.message || "Falha ao excluir template." }
+    }
+}
+
+export async function updateTemplateStatusAction(id: string, isActive: boolean) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+        return await db.updateRemodelingTemplateStatus(id, isActive)
+    } catch (error: any) {
+        console.error("Error in updateTemplateStatusAction:", error)
+        return { success: false, error: error.message || "Falha ao atualizar status." }
+    }
+}
+
+export async function getRecentVideosAction(limit = 12) {
+    try {
+        // Optional auth check (we might want everyone logged in to see them)
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return []
+        
+        return await db.getRecentVideos(limit)
+    } catch (error: any) {
+        console.error("Error in getRecentVideosAction:", error)
+        return []
+    }
+}
+
+export async function getSmartRecommendationsAction(limit = 12) {
+    const YouTube = (await import("youtube-sr")).default
+
+    // Helper: search YouTube with fallback
+    async function searchYouTube(query: string, searchLimit: number) {
+        console.log("[SmartRecommendations] Buscando YouTube:", query)
+        const results = await YouTube.search(query, {
+            limit: searchLimit,
+            type: "video",
+            safeSearch: false
+        })
+        return (results || []).map((video: any) => ({
+            id: video.id || "",
+            title: video.title || "",
+            thumbnail: video.thumbnail?.url || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+            views: video.views || 0,
+            likes: 0,
+            comments: 0,
+            duration: video.durationFormatted || "0:00",
+            publishedAt: video.uploadedAt || "",
+            channelId: video.channel?.id || "",
+            channelName: video.channel?.name || "",
+            description: video.description || "",
+            url: video.url || `https://www.youtube.com/watch?v=${video.id}`
+        }))
+    }
+
+    // Pool de buscas genéricas para contas novas ou fallback
+    const trendingSearches = [
+        "motivação viral shorts 2024",
+        "curiosidades incríveis mundo",
+        "finanças renda passiva dicas",
+        "estoicismo mentalidade forte",
+        "desenvolvimento pessoal sucesso",
+        "psicologia fatos surpreendentes",
+        "inteligência artificial novidades",
+        "história fatos pouco conhecidos",
+        "saúde dicas cientificas",
+        "produtividade hábitos milionários",
+    ]
+
+    try {
+        // 1. Tenta busca personalizada se o usuário estiver logado
+        let queryWords: string[] = []
+        
+        try {
+            const supabase = await createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            
+            if (user) {
+                // Busca canais rastreados para contexto
+                const { data: trackedData } = await supabase
+                    .from("tracked_channels")
+                    .select("name, tags")
+                    .eq("user_id", user.id)
+                    .order("tracked_at", { ascending: false })
+                    .limit(5)
+
+                if (trackedData && trackedData.length > 0) {
+                    trackedData.forEach((c: any) => {
+                        if (c.name) queryWords.push(...c.name.split(" ").filter((w: string) => w.length > 3))
+                        if (c.tags && Array.isArray(c.tags)) queryWords.push(...c.tags)
+                    })
+                }
+
+                // Busca vídeos já analisados para mais contexto
+                const { data: analyzedData } = await supabase
+                    .from("videos")
+                    .select("title")
+                    .eq("user_id", user.id)
+                    .order("created_at", { ascending: false })
+                    .limit(3)
+
+                if (analyzedData && analyzedData.length > 0) {
+                    analyzedData.forEach((v: any) => {
+                        if (v.title) queryWords.push(...v.title.split(" ").filter((w: string) => w.length > 4).slice(0, 2))
+                    })
+                }
+            }
+        } catch (authErr) {
+            console.warn("[SmartRecommendations] Auth/DB lookup falhou, usando busca genérica:", authErr)
+        }
+
+        // 2. Se temos contexto do usuário, usa; senão, escolhe buscas aleatórias do pool
+        if (queryWords.length > 0) {
+            queryWords = queryWords.sort(() => 0.5 - Math.random())
+            const personalQuery = queryWords.slice(0, 3).join(" ") + " viral"
+            const results = await searchYouTube(personalQuery, limit)
+            if (results.length > 0) return results
+        }
+
+        // 3. Fallback: escolha aleatória de buscas genéricas (sempre funciona)
+        const shuffled = trendingSearches.sort(() => 0.5 - Math.random())
+        // Faz 2 buscas diferentes para ter variedade
+        const results1 = await searchYouTube(shuffled[0], Math.ceil(limit / 2))
+        const results2 = await searchYouTube(shuffled[1], Math.ceil(limit / 2))
+        const combined = [...results1, ...results2]
+
+        if (combined.length > 0) return combined.slice(0, limit)
+
+        // 4. Último fallback: busca super genérica
+        return await searchYouTube("trending videos viral 2024", limit)
+    } catch (error: any) {
+        console.error("[SmartRecommendations] Erro total:", error)
+        // 5. Fallback absoluto: tenta Supabase
+        try {
+            return await db.getRecentVideos(limit)
+        } catch {
+            return []
+        }
+    }
+}
+

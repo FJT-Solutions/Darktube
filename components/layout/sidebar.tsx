@@ -17,6 +17,7 @@ import {
   LogIn,
   Key,
   Youtube,
+  LayoutTemplate,
 } from "lucide-react"
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/minerar", label: "Minerar", icon: Search },
   { href: "/tracker", label: "Tracker", icon: Bookmark },
   { href: "/credentials", label: "Credenciais", icon: Key },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/settings", label: "Configurações", icon: Settings },
 ]
 

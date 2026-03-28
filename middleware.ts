@@ -27,15 +27,20 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Rotas públicas
-  const publicRoutes = ['/', '/login', '/invite', '/auth/callback', '/pending']
-  const isPublic = publicRoutes.some(r => request.nextUrl.pathname.startsWith(r))
+  const publicRoutes = ['/login', '/invite', '/auth/callback', '/pending', '/setup-password']
+  const pathname = request.nextUrl.pathname
+  
+  // A raiz '/' deve ser correspondência exata
+  // Outras rotas públicas podem ser prefixos
+  const isPublic = pathname === '/' || publicRoutes.some(r => pathname.startsWith(r))
 
   // Allow static assets
-  if (request.nextUrl.pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)$/)) {
+  if (pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)$/)) {
     return supabaseResponse
   }
 
   if (!user && !isPublic) {
+    console.log(`[Middleware] Blocking unauthenticated access to: ${pathname}`)
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

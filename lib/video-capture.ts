@@ -2,58 +2,406 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import type { VideoSource } from './types';
 
 const execPromise = promisify(exec);
 
+export interface DownloadResult {
+    videoPath?: string;
+    audioPath?: string;
+    framePaths?: string[];
+    isFallback?: boolean;
+}
+
+export interface VideoMetadata {
+    id: string;
+    title: string;
+    thumbnail: string;
+    duration: number;
+    views: number;
+    likes: number;
+    comments: number;
+    uploader: string;
+    uploaderId: string;
+    uploadDate: string;
+    url: string;
+    source: VideoSource;
+    description: string;
+}
+
+/**
+ * Detect platform from URL
+ */
+export function detectPlatform(url: string): VideoSource {
+    const u = url.toLowerCase();
+    if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+    if (u.includes('tiktok.com')) return 'tiktok';
+    if (u.includes('instagram.com')) return 'instagram';
+    if (u.includes('vimeo.com')) return 'vimeo';
+    if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
+    if (u.includes('facebook.com') || u.includes('fb.watch')) return 'facebook';
+    if (u.includes('dailymotion.com') || u.includes('dai.ly')) return 'dailymotion';
+    if (u.includes('twitch.tv')) return 'twitch';
+    if (u.includes('reddit.com') || u.includes('redd.it')) return 'reddit';
+    return 'other';
+}
+
+/**
+ * Generate a safe filesystem ID from a URL
+ */
+function urlToId(url: string): string {
+    const hash = Buffer.from(url).toString('base64url').replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
+    return `ext_${hash}`;
+}
+
+/**
+ * Format seconds to HH:MM:SS or MM:SS duration string
+ */
+function formatDuration(seconds: number): string {
+    if (!seconds || seconds <= 0) return '0:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * Python script that uses pytubefix to bypass YouTube's PO Token requirement.
+ */
+function buildPytubefixScript(videoId: string, outputDir: string, frameDir: string): string {
+    return `
+import sys, os, subprocess, json
+try:
+    from pytubefix import YouTube
+except ImportError:
+    print(json.dumps({"error": "pytubefix not installed. Run: pip3 install pytubefix --break-system-packages"}))
+    sys.exit(1)
+
+video_id = "${videoId}"
+url = f"https://www.youtube.com/watch?v={video_id}"
+output_dir = "${outputDir.replace(/\\/g, '/')}"
+frame_dir = "${frameDir.replace(/\\/g, '/')}"
+os.makedirs(output_dir, exist_ok=True)
+os.makedirs(frame_dir, exist_ok=True)
+
+try:
+    yt = YouTube(url)
+    title = yt.title
+
+    stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+    if not stream:
+        stream = yt.streams.filter(file_extension='mp4').order_by('filesize').first()
+
+    video_path = os.path.join(output_dir, f"{video_id}.mp4")
+    stream.download(output_path=output_dir, filename=f"{video_id}.mp4")
+
+    probe = subprocess.run(
+        ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', video_path],
+        capture_output=True, text=True
+    )
+    duration = float(probe.stdout.strip() or 60)
+    intervals = max(1, int(duration / 6))
+
+    frame_paths = []
+    for i in range(6):
+        ts = min(i * intervals, int(duration) - 1)
+        fp = os.path.join(frame_dir, f"f_{i:02d}.jpg")
+        subprocess.run(
+            ['ffmpeg', '-ss', str(ts), '-i', video_path, '-frames:v', '1', '-q:v', '2', fp, '-y'],
+            capture_output=True
+        )
+        if os.path.exists(fp) and os.path.getsize(fp) > 0:
+            frame_paths.append(fp)
+
+    audio_path = os.path.join(output_dir, f"{video_id}.aac")
+    subprocess.run(
+        ['ffmpeg', '-i', video_path, '-t', '60', '-vn', '-c:a', 'aac', '-b:a', '64k', audio_path, '-y'],
+        capture_output=True
+    )
+
+    result = {
+        "success": True,
+        "videoPath": video_path,
+        "framePaths": frame_paths,
+        "audioPath": audio_path if os.path.exists(audio_path) else None,
+        "title": title,
+        "duration": duration
+    }
+    print(json.dumps(result))
+
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+    sys.exit(1)
+`.trim();
+}
+
 export const VideoCaptureService = {
     /**
-     * Extracts strategic keyframes from a YouTube video.
+     * Download YouTube video via pytubefix (existing flow)
      */
-    async extractFrames(videoId: string, count: number = 5): Promise<string[]> {
-        const outputDir = path.join(process.cwd(), 'tmp', 'frames', videoId);
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
+    async downloadVideo(videoId: string): Promise<DownloadResult> {
+        const outputDir = path.join(process.cwd(), 'tmp', 'videos');
+        const frameDir = path.join(process.cwd(), 'tmp', 'frames', videoId);
+
+        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+        if (!fs.existsSync(frameDir)) fs.mkdirSync(frameDir, { recursive: true });
+
+        const cachedVideo = path.join(outputDir, `${videoId}.mp4`);
+        if (fs.existsSync(cachedVideo) && fs.statSync(cachedVideo).size > 100000) {
+            console.log(`[VideoCaptureService] Using cached video for ${videoId}`);
+            const frames = fs.readdirSync(frameDir)
+                .filter(f => f.endsWith('.jpg'))
+                .map(f => path.join(frameDir, f));
+            return { videoPath: cachedVideo, framePaths: frames, isFallback: false };
         }
 
+        const script = buildPytubefixScript(videoId, outputDir, frameDir);
+        const scriptPath = path.join(outputDir, `${videoId}_dl.py`);
+        fs.writeFileSync(scriptPath, script);
+
         try {
-            // 1. Get duration and stream URL
-            const { stdout: durationStr } = await execPromise(`yt-dlp --get-duration "https://www.youtube.com/watch?v=${videoId}"`);
-            const { stdout: streamUrl } = await execPromise(`yt-dlp -g -f "bestvideo[ext=mp4]/best[ext=mp4]/best" "https://www.youtube.com/watch?v=${videoId}"`);
+            console.log(`[VideoCaptureService] Downloading ${videoId} via pytubefix...`);
+            const { stdout } = await execPromise(`python3 "${scriptPath}"`, { timeout: 180000 });
+            const result = JSON.parse(stdout.trim());
 
-            const url = streamUrl.trim();
-            const durationParts = durationStr.trim().split(':').map(Number);
-            let totalSeconds = 0;
-            if (durationParts.length === 3) totalSeconds = durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2];
-            else if (durationParts.length === 2) totalSeconds = durationParts[0] * 60 + durationParts[1];
-            else totalSeconds = durationParts[0] || 0;
-
-            const framePaths: string[] = [];
-            // Sample at 10%, 30%, 50%, 70%, 90%
-            const samplePoints = [0.1, 0.3, 0.5, 0.7, 0.9];
-
-            for (let i = 0; i < Math.min(count, samplePoints.length); i++) {
-                const timestamp = Math.floor(totalSeconds * samplePoints[i]);
-                const outputPath = path.join(outputDir, `frame_${i}.jpg`);
-
-                // Fast seek (-ss before -i) + 1 frame capture
-                await execPromise(`ffmpeg -ss ${timestamp} -i "${url}" -frames:v 1 -q:v 2 "${outputPath}" -y`);
-                framePaths.push(outputPath);
+            if (result.error) {
+                throw new Error(`pytubefix: ${result.error}`);
             }
 
-            return framePaths;
-        } catch (error) {
-            console.error('Error in VideoCaptureService:', error);
-            throw new Error('Falha ao capturar frames do vídeo. Verifique se ffmpeg e yt-dlp estão configurados.');
+            console.log(`[VideoCaptureService] Success: ${result.framePaths?.length} frames`);
+            return {
+                videoPath: result.videoPath,
+                framePaths: result.framePaths || [],
+                audioPath: result.audioPath || undefined,
+                isFallback: false,
+            };
+        } catch (error: any) {
+            console.error(`[VideoCaptureService] pytubefix failed: ${error.message}`);
+            
+            const thumbPath = path.join(frameDir, 'thumb.jpg');
+            try {
+                await execPromise(`curl -s -L -o "${thumbPath}" "https://img.youtube.com/vi/${videoId}/maxresdefault.jpg"`, { timeout: 10000 });
+                if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 1000) {
+                    console.warn(`[VideoCaptureService] Using thumbnail-only fallback for ${videoId}`);
+                    return { framePaths: [thumbPath], isFallback: true };
+                }
+            } catch {}
+
+            throw new Error(`Não foi possível acessar o vídeo. Verifique se ele é público e não tem restrição de idade. Detalhe: ${error.message}`);
+        } finally {
+            if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
         }
     },
 
     /**
-     * Cleans up temporary frames for a video.
+     * Extract metadata from any video URL using yt-dlp.
+     * Falls back to OpenGraph if yt-dlp fails.
      */
-    async cleanup(videoId: string) {
-        const outputDir = path.join(process.cwd(), 'tmp', 'frames', videoId);
-        if (fs.existsSync(outputDir)) {
-            fs.rmSync(outputDir, { recursive: true, force: true });
+    async extractMetadataFromUrl(url: string): Promise<VideoMetadata | null> {
+        const source = detectPlatform(url);
+        
+        try {
+            console.log(`[VideoCaptureService] Extracting metadata from ${source}: ${url}`);
+            const { stdout } = await execPromise(
+                `yt-dlp --dump-json --no-download --no-warnings --no-playlist "${url}"`,
+                { timeout: 30000 }
+            );
+            
+            const data = JSON.parse(stdout.trim());
+            
+            let uploadDate = '';
+            if (data.upload_date) {
+                const d = data.upload_date;
+                uploadDate = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+            }
+            
+            return {
+                id: data.id || urlToId(url),
+                title: data.title || data.fulltitle || 'Sem título',
+                thumbnail: data.thumbnail || data.thumbnails?.[data.thumbnails.length - 1]?.url || '',
+                duration: data.duration || 0,
+                views: data.view_count || 0,
+                likes: data.like_count || 0,
+                comments: data.comment_count || 0,
+                uploader: data.uploader || data.channel || data.creator || 'Desconhecido',
+                uploaderId: data.channel_id || data.uploader_id || '',
+                uploadDate,
+                url: data.webpage_url || url,
+                source,
+                description: (data.description || '').slice(0, 500),
+            };
+        } catch (error: any) {
+            console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
+            return this.extractOpenGraphMetadata(url, source);
         }
+    },
+
+    /**
+     * Fallback: Extract basic metadata from Open Graph meta tags.
+     * Works for any website with proper meta tags.
+     */
+    async extractOpenGraphMetadata(url: string, source: VideoSource): Promise<VideoMetadata | null> {
+        try {
+            console.log(`[VideoCaptureService] Falling back to OpenGraph for: ${url}`);
+            const { stdout } = await execPromise(
+                `curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --max-time 10 "${url}"`,
+                { timeout: 15000 }
+            );
+            
+            const html = stdout;
+            const getMeta = (property: string): string => {
+                const regex = new RegExp(`<meta[^>]*(?:property|name)=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i');
+                const altRegex = new RegExp(`<meta[^>]*content=["']([^"']*?)["'][^>]*(?:property|name)=["']${property}["']`, 'i');
+                return regex.exec(html)?.[1] || altRegex.exec(html)?.[1] || '';
+            };
+            
+            const title = getMeta('og:title') || getMeta('twitter:title') || '';
+            const thumbnail = getMeta('og:image') || getMeta('twitter:image') || '';
+            
+            if (!title && !thumbnail) {
+                console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
+                return null;
+            }
+            
+            return {
+                id: urlToId(url),
+                title: title || 'Vídeo Externo',
+                thumbnail,
+                duration: 0,
+                views: 0,
+                likes: 0,
+                comments: 0,
+                uploader: getMeta('og:site_name') || source,
+                uploaderId: '',
+                uploadDate: '',
+                url,
+                source,
+                description: (getMeta('og:description') || getMeta('twitter:description') || '').slice(0, 500),
+            };
+        } catch (error: any) {
+            console.error(`[VideoCaptureService] OpenGraph extraction failed: ${error.message}`);
+            return null;
+        }
+    },
+
+    /**
+     * Download video from ANY URL using yt-dlp (universal).
+     * Falls back to thumbnail-only if download fails.
+     */
+    async downloadFromUrl(url: string): Promise<DownloadResult> {
+        const fileId = urlToId(url);
+        const outputDir = path.join(process.cwd(), 'tmp', 'videos');
+        const frameDir = path.join(process.cwd(), 'tmp', 'frames', fileId);
+
+        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+        if (!fs.existsSync(frameDir)) fs.mkdirSync(frameDir, { recursive: true });
+
+        // Check cache
+        const cachedVideo = path.join(outputDir, `${fileId}.mp4`);
+        if (fs.existsSync(cachedVideo) && fs.statSync(cachedVideo).size > 100000) {
+            console.log(`[VideoCaptureService] Using cached video for ${fileId}`);
+            const frames = fs.readdirSync(frameDir)
+                .filter(f => f.endsWith('.jpg'))
+                .map(f => path.join(frameDir, f));
+            if (frames.length > 0) return { videoPath: cachedVideo, framePaths: frames, isFallback: false };
+        }
+
+        try {
+            console.log(`[VideoCaptureService] Downloading via yt-dlp: ${url}`);
+            
+            const videoPath = path.join(outputDir, `${fileId}.mp4`);
+            await execPromise(
+                `yt-dlp --no-warnings --no-playlist -f "worst[ext=mp4]/worst" -o "${videoPath}" "${url}"`,
+                { timeout: 180000 }
+            );
+
+            if (!fs.existsSync(videoPath) || fs.statSync(videoPath).size < 10000) {
+                throw new Error('Download produziu arquivo vazio ou muito pequeno');
+            }
+
+            // Extract 6 frames evenly distributed
+            const { stdout: probeOut } = await execPromise(
+                `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${videoPath}"`,
+                { timeout: 10000 }
+            ).catch(() => ({ stdout: '60' }));
+            
+            const duration = parseFloat(probeOut.trim()) || 60;
+            const intervals = Math.max(1, Math.floor(duration / 6));
+            const framePaths: string[] = [];
+
+            for (let i = 0; i < 6; i++) {
+                const ts = Math.min(i * intervals, Math.floor(duration) - 1);
+                const fp = path.join(frameDir, `f_${String(i).padStart(2, '0')}.jpg`);
+                try {
+                    await execPromise(
+                        `ffmpeg -ss ${ts} -i "${videoPath}" -frames:v 1 -q:v 2 "${fp}" -y`,
+                        { timeout: 10000 }
+                    );
+                    if (fs.existsSync(fp) && fs.statSync(fp).size > 0) {
+                        framePaths.push(fp);
+                    }
+                } catch {}
+            }
+
+            // Extract 60s audio
+            const audioPath = path.join(outputDir, `${fileId}.aac`);
+            try {
+                await execPromise(
+                    `ffmpeg -i "${videoPath}" -t 60 -vn -c:a aac -b:a 64k "${audioPath}" -y`,
+                    { timeout: 30000 }
+                );
+            } catch {}
+
+            console.log(`[VideoCaptureService] yt-dlp success: ${framePaths.length} frames`);
+            return {
+                videoPath,
+                framePaths,
+                audioPath: fs.existsSync(audioPath) ? audioPath : undefined,
+                isFallback: false,
+            };
+        } catch (error: any) {
+            console.error(`[VideoCaptureService] yt-dlp download failed: ${error.message}`);
+
+            // Fallback: grab thumbnail via metadata
+            try {
+                const meta = await this.extractMetadataFromUrl(url);
+                if (meta?.thumbnail) {
+                    const thumbPath = path.join(frameDir, 'thumb.jpg');
+                    await execPromise(
+                        `curl -sL -o "${thumbPath}" "${meta.thumbnail}"`,
+                        { timeout: 10000 }
+                    );
+                    if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 1000) {
+                        console.warn(`[VideoCaptureService] Using thumbnail-only fallback`);
+                        return { framePaths: [thumbPath], isFallback: true };
+                    }
+                }
+            } catch {}
+
+            throw new Error(
+                `Não foi possível baixar o vídeo. Verifique se o link é público e compartilhável. ` +
+                `Algumas plataformas (Instagram, TikTok) podem bloquear downloads de servidores. ` +
+                `Detalhe: ${error.message}`
+            );
+        }
+    },
+
+    async cleanupVideo(videoId: string) {
+        const video = path.join(process.cwd(), 'tmp', 'videos', `${videoId}.mp4`);
+        const audio = path.join(process.cwd(), 'tmp', 'videos', `${videoId}.aac`);
+        const frames = path.join(process.cwd(), 'tmp', 'frames', videoId);
+        if (fs.existsSync(video)) fs.unlinkSync(video);
+        if (fs.existsSync(audio)) fs.unlinkSync(audio);
+        if (fs.existsSync(frames)) fs.rmSync(frames, { recursive: true, force: true });
+    },
+
+    async cleanupAll() {
+        const vDir = path.join(process.cwd(), 'tmp', 'videos');
+        const fDir = path.join(process.cwd(), 'tmp', 'frames');
+        if (fs.existsSync(vDir)) fs.rmSync(vDir, { recursive: true, force: true });
+        if (fs.existsSync(fDir)) fs.rmSync(fDir, { recursive: true, force: true });
     }
 };
+
+export { formatDuration, urlToId };

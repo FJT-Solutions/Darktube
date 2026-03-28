@@ -1,4 +1,4 @@
-import { createClient } from "./supabase/server"
+import { createClient, createAdminClient } from "./supabase/server"
 import type { TrackedChannel, YouTubeChannel, YouTubeVideo, BlotatoAccount } from "./types"
 
 /**
@@ -213,7 +213,7 @@ export async function updateVideoAnalysis(video: YouTubeVideo, transcript: strin
         .from('videos')
         .upsert({
             id: video.id,
-            channel_id: video.channelId,
+            channel_id: video.channelId || null,
             title: video.title,
             thumbnail_url: video.thumbnail,
             views: video.views,
@@ -351,3 +351,115 @@ export async function removeBlotatoAccount(id: string) {
     if (error) throw error
     return { success: true }
 }
+
+/**
+ * REMODELING TEMPLATES
+ */
+export interface RemodelingTemplateEntity {
+    id: string;
+    user_id: string;
+    video_id: string;
+    video_title?: string;
+    video_thumbnail?: string;
+    name: string;
+    template_data: any;
+    generated_script?: string;
+    format: 'horizontal' | 'vertical';
+    has_music: boolean;
+    music_style?: string;
+    voice_type?: string;
+    post_frequency: string;
+    post_interval_days?: number;
+    is_active: boolean;
+    target_accounts: string[];
+    tags: string[];
+    created_at: string;
+    updated_at: string;
+}
+
+export async function saveRemodelingTemplate(
+    userId: string,
+    data: Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+): Promise<RemodelingTemplateEntity> {
+    const supabase = await createAdminClient()
+    if (!supabase) throw new Error("Admin client not available")
+    const { data: inserted, error } = await supabase
+        .from('remodeling_templates')
+        .insert({
+            user_id: userId,
+            ...data
+        })
+        .select()
+        .single()
+    
+    if (error) throw error
+    return inserted
+}
+
+export async function getRemodelingTemplates(userId: string): Promise<RemodelingTemplateEntity[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('remodeling_templates')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+}
+
+export async function deleteRemodelingTemplate(id: string) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('remodeling_templates')
+        .delete()
+        .eq('id', id)
+    
+    if (error) throw error
+    return { success: true }
+}
+
+export async function updateRemodelingTemplateStatus(id: string, isActive: boolean) {
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('remodeling_templates')
+        .update({ is_active: isActive })
+        .eq('id', id)
+    
+    if (error) throw error
+    return { success: true }
+}
+
+export async function getRecentVideos(limit = 12): Promise<YouTubeVideo[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('videos')
+        .select(`
+            id, title, views, likes, comments, published_at, duration, thumbnail_url,
+            channel_id, type, description, external_url
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+    if (error) {
+        console.error('Error fetching recent videos:', error)
+        return []
+    }
+
+    return data.map((v: any) => ({
+        id: v.id,
+        title: v.title,
+        views: v.views || 0,
+        likes: v.likes || 0,
+        comments: v.comments || 0,
+        publishedAt: v.published_at,
+        duration: v.duration,
+        thumbnail: v.thumbnail_url,
+        channelId: v.channel_id || '',
+        channelName: 'Externo', // Defaulting to 'Externo', we could join channels table if needed
+        source: v.type as any || 'youtube',
+        url: v.external_url || `https://youtube.com/watch?v=${v.id}`,
+        description: v.description || ''
+    }))
+}
+

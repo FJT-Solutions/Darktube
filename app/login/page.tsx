@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
-import { Youtube, Mail, Loader2, AlertCircle, ArrowRight, ShieldAlert } from "lucide-react"
+import { Youtube, Mail, Loader2, AlertCircle, ArrowRight, ShieldAlert, Search } from "lucide-react"
 import { checkUserAccessAction } from "@/app/actions"
 
 export default function LoginPage() {
@@ -167,13 +167,30 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="h-12 w-full rounded-xl text-sm font-bold shadow-lg"
-                        >
-                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? "Entrar" : "Enviar Link de Recuperação"}
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                type="submit"
+                                disabled={loading}
+                                className="h-12 w-full rounded-xl text-sm font-bold shadow-lg"
+                            >
+                                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : mode === 'login' ? "Entrar" : "Enviar Link de Recuperação"}
+                            </Button>
+
+                            {mode === 'login' && (
+                                <Link 
+                                    href={email ? `/pending?email=${encodeURIComponent(email)}` : '/pending'} 
+                                    className="w-full"
+                                >
+                                    <button
+                                        type="button"
+                                        className="h-10 w-full rounded-xl bg-secondary/80 text-[11px] font-black text-foreground hover:bg-secondary transition-all flex items-center justify-center gap-2 shadow-sm border border-border/50"
+                                    >
+                                        <Search className="h-3 w-3 text-primary" />
+                                        CONSULTAR STATUS DO MEU ACESSO
+                                    </button>
+                                </Link>
+                            )}
+                        </div>
 
                         {mode === 'reset' && (
                             <button

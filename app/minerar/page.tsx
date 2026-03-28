@@ -17,6 +17,7 @@ import {
   isChannelTrackedAction,
   getTrackedChannelsAction,
   getNicheIntelligenceAction,
+  getSmartRecommendationsAction,
 } from "../actions"
 import type { YouTubeChannel, YouTubeVideo, TrackedChannel } from "@/lib/types"
 import {
@@ -31,6 +32,9 @@ import {
   TrendingUp,
   ArrowRight,
   ChevronRight,
+  Link2,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { MiningWizard } from "@/components/mining/mining-wizard"
 import { NicheBadge } from "@/components/mining/niche-badge"
@@ -52,6 +56,22 @@ export default function MinerarPage() {
   const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
   const [wizardOpen, setWizardOpen] = useState(false)
   const [nicheIntel, setNicheIntel] = useState<any>(null)
+  const [tracks, setTracks] = useState<any[]>([])
+  
+  // Feed/Recommended state
+  const [recommendedVideos, setRecommendedVideos] = useState<YouTubeVideo[]>([])
+  const [loadingRecommended, setLoadingRecommended] = useState(true)
+
+  // Link extraction state (merged into main search)
+  const [extractedVideo, setExtractedVideo] = useState<YouTubeVideo | null>(null)
+  const [extracting, setExtracting] = useState(false)
+  const [extractError, setExtractError] = useState("")
+
+  // Auto-detect if user is typing a URL
+  const isUrlMode = /^https?:\/\//i.test(query.trim())
+  
+  // Determine whether to show Canais/Videos tabs based on 'youtube' in URL
+  const showYoutubeTabs = /youtube/i.test(query.trim())
 
   // Persistence Key
   const STORAGE_KEY = "minerar_search_state"
@@ -76,6 +96,17 @@ export default function MinerarPage() {
         console.error("Failed to restore search state", e)
       }
     }
+
+    // Load smart recommendations (uses Supabase as context to fetch fresh YouTube videos)
+    getSmartRecommendationsAction(16)
+      .then((vids) => {
+        setRecommendedVideos(vids)
+        setLoadingRecommended(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoadingRecommended(false)
+      })
   }, [])
 
   // Save state on changes
@@ -107,6 +138,14 @@ export default function MinerarPage() {
     let searchQuery = (typeof overrideQuery === 'string' ? overrideQuery : query).trim()
     const activeNicheId = overrideNicheId !== undefined ? overrideNicheId : selectedNiche
 
+    if (!searchQuery) return
+
+    // AUTO-DETECT URL: If user pasted a video link, extract instead of search
+    if (/^https?:\/\//i.test(searchQuery)) {
+      handleExtractUrl(searchQuery)
+      return
+    }
+
     // Add niche keywords if selected
     if (activeNicheId) {
       const niche = NICHES.find((n) => n.id === activeNicheId)
@@ -120,8 +159,6 @@ export default function MinerarPage() {
         }
       }
     }
-
-    if (!searchQuery) return
 
     setLoading(true)
     setHasSearched(true)
@@ -223,6 +260,55 @@ export default function MinerarPage() {
     }
   }
 
+  const handleExtractUrl = useCallback(async (urlOverride?: string) => {
+    const url = (urlOverride || query).trim()
+    if (!url) return
+
+    setExtracting(true)
+    setExtractError("")
+    setExtractedVideo(null)
+    setChannels([])
+    setVideos([])
+    setHasSearched(true)
+
+    try {
+      const response = await fetch("/api/video/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || data.error) {
+        setExtractError(data.error || "Erro ao extrair vídeo. Tente outro link.")
+        return
+      }
+
+      // Map to YouTubeVideo format for VideoCard
+      setExtractedVideo({
+        id: data.video.id,
+        title: data.video.title,
+        thumbnail: data.video.thumbnail,
+        views: data.video.views || 0,
+        likes: data.video.likes || 0,
+        comments: data.video.comments || 0,
+        duration: data.video.duration || "0:00",
+        publishedAt: data.video.publishedAt || "",
+        channelId: data.video.channelId || "",
+        channelName: data.video.channelName || "Externo",
+        description: data.video.description || "",
+        url: data.video.url || url,
+        source: data.video.source || "other",
+        originalUrl: url,
+      })
+    } catch (error: any) {
+      setExtractError("Erro de conexão. Verifique sua internet e tente novamente.")
+    } finally {
+      setExtracting(false)
+    }
+  }, [query])
+
   return (
     <>
       <Header
@@ -270,14 +356,14 @@ export default function MinerarPage() {
           <div className="space-y-4">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                {isUrlMode ? <Link2 className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-emerald-500" /> : <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
                 <input
                   type="text"
-                  placeholder="Buscar canais, nichos, palavras-chave..."
+                  placeholder="Buscar canais, vídeos ou colar link de qualquer plataforma..."
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => { setQuery(e.target.value); setExtractError(""); }}
                   onKeyDown={handleKeyDown}
-                  className="h-11 w-full rounded-lg border border-border bg-input pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                  className={`h-11 w-full rounded-lg border bg-input pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:ring-1 focus:outline-none ${isUrlMode ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-emerald-500' : 'border-border focus:border-primary focus:ring-primary'}`}
                 />
               </div>
               <button
@@ -291,38 +377,48 @@ export default function MinerarPage() {
                 <span className="hidden sm:inline">Filtros</span>
               </button>
               <Button
-                onClick={handleSearch}
-                disabled={loading}
-                className="flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-medium shadow-md"
+                onClick={() => handleSearch()}
+                disabled={loading || extracting}
+                className={`flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-medium shadow-md ${isUrlMode ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
               >
-                <Search className="h-4 w-4" />
-                <span className="hidden sm:inline">Buscar</span>
+                {extracting ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline">Extraindo...</span></>
+                ) : isUrlMode ? (
+                  <><Link2 className="h-4 w-4" /><span className="hidden sm:inline">Extrair</span></>
+                ) : (
+                  <><Search className="h-4 w-4" /><span className="hidden sm:inline">Buscar</span></>
+                )}
               </Button>
             </div>
 
-            {/* Search type toggle */}
+            {/* Search type toggle & view mode */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSearchType("channel")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${searchType === "channel"
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
-              >
-                <Tv className="h-3.5 w-3.5" />
-                Canais
-              </button>
-              <button
-                onClick={() => setSearchType("video")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${searchType === "video"
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
-              >
-                <PlayCircle className="h-3.5 w-3.5" />
-                Videos
-              </button>
-              <div className="mx-2 h-4 w-px bg-border" />
+              {showYoutubeTabs && (
+                <>
+                  <button
+                    onClick={() => setSearchType("channel")}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${searchType === "channel"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    <Tv className="h-3.5 w-3.5" />
+                    Canais
+                  </button>
+                  <button
+                    onClick={() => setSearchType("video")}
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${searchType === "video"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                      }`}
+                  >
+                    <PlayCircle className="h-3.5 w-3.5" />
+                    Videos
+                  </button>
+                  <div className="mx-2 h-4 w-px bg-border" />
+                </>
+              )}
+
               <button
                 onClick={() => setViewMode("grid")}
                 className={`rounded-md p-1.5 ${viewMode === "grid"
@@ -479,6 +575,54 @@ export default function MinerarPage() {
             )}
           </div>
 
+          {/* URL Detection Hint */}
+          {isUrlMode && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 animate-in fade-in duration-200">
+              <Link2 className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span className="text-xs text-emerald-400 font-medium">Link detectado — clique em Extrair para minerar este vídeo</span>
+              <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+                {["YouTube", "TikTok", "Instagram", "Vimeo", "Facebook", "X"].map(p => (
+                  <span key={p} className="text-[9px] font-bold text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded border border-border/50">{p}</span>
+                ))}
+                <span className="text-[9px] text-muted-foreground">+1700</span>
+              </div>
+            </div>
+          )}
+
+          {/* Extract Error */}
+          {extractError && (
+            <div className="flex items-start gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-3">
+              <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+              <p className="text-xs text-destructive">{extractError}</p>
+            </div>
+          )}
+
+          {/* Extracted Video Result */}
+          {extractedVideo && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`h-2 w-2 rounded-full ${
+                  extractedVideo.source === 'youtube' ? 'bg-red-500' :
+                  extractedVideo.source === 'tiktok' ? 'bg-pink-500' :
+                  extractedVideo.source === 'instagram' ? 'bg-purple-500' :
+                  extractedVideo.source === 'vimeo' ? 'bg-cyan-500' :
+                  extractedVideo.source === 'twitter' ? 'bg-sky-500' :
+                  extractedVideo.source === 'facebook' ? 'bg-blue-500' :
+                  'bg-emerald-500'
+                }`} />
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Vídeo extraído — {extractedVideo.source || 'externo'}
+                </span>
+              </div>
+              <div className="max-w-xl">
+                <VideoCard
+                  video={extractedVideo}
+                  compact={false}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Results */}
           {loading ? (
             <div
@@ -557,17 +701,58 @@ export default function MinerarPage() {
               />
             )
           ) : (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-secondary">
-                <Search className="h-10 w-10 text-muted-foreground" />
+            <div className="flex flex-col py-6 animate-in fade-in duration-500">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-foreground">
+                  🔥 Tendências para Replicar
+                </h3>
+                <p className="text-sm text-muted-foreground hidden sm:block">
+                  Novos estilos e vídeos virais para inspiração
+                </p>
               </div>
-              <h3 className="mt-5 text-lg font-semibold text-foreground">
-                Comece a minerar
-              </h3>
-              <p className="mt-2 max-w-md text-center text-sm text-muted-foreground">
-                Busque por palavras-chave, selecione um nicho ou use os filtros
-                avançados para encontrar os melhores canais dark do YouTube.
-              </p>
+
+              {loadingRecommended ? (
+                <div
+                  className={
+                    viewMode === "grid"
+                      ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                      : "space-y-3"
+                  }
+                >
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <VideoCardSkeleton key={`rec-skel-${i}`} compact={viewMode === "list"} />
+                  ))}
+                </div>
+              ) : recommendedVideos.length > 0 ? (
+                <div
+                  className={
+                    viewMode === "grid"
+                      ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                      : "space-y-3"
+                  }
+                >
+                  {recommendedVideos.map((video) => (
+                    <VideoCard
+                      key={`rec-${video.id}`}
+                      video={video}
+                      compact={viewMode === "list"}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 bg-card rounded-xl border border-border">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-secondary mb-4">
+                    <Search className="h-10 w-10 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Comece a minerar
+                  </h3>
+                  <p className="mt-2 max-w-md text-center text-sm text-muted-foreground">
+                    Busque por palavras-chave, cole links ou use os filtros
+                    avançados para encontrar vídeos no seu nicho.
+                  </p>
+                </div>
+              )}
 
               {/* Hot Niches Suggestions */}
               <div className="mt-12 w-full max-w-4xl">

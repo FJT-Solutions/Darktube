@@ -1,16 +1,18 @@
 "use client"
 
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Youtube, Send, ShieldCheck, Loader2, AlertCircle, ArrowLeft } from "lucide-react"
+import { Youtube, Mail, Loader2, AlertCircle, Send, ArrowLeft, ShieldCheck, Search } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export default function InvitePage() {
     const [email, setEmail] = useState("")
     const [name, setName] = useState("")
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+    const router = useRouter()
     const supabase = createClient()
 
     const handleInviteRequest = async (e: React.FormEvent) => {
@@ -93,18 +95,33 @@ export default function InvitePage() {
                                 </div>
                             )}
 
-                            <Button
-                                type="submit"
-                                disabled={loading || message?.type === 'success'}
-                                className="h-14 w-full rounded-xl text-sm font-black shadow-lg"
-                            >
-                                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
-                                    <>
-                                        <Send className="h-4 w-4" />
-                                        Solicitar Autorização
-                                    </>
-                                )}
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                                <Button
+                                    type="submit"
+                                    disabled={loading || message?.type === 'success'}
+                                    className="h-14 w-full rounded-xl text-sm font-black shadow-lg"
+                                >
+                                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : (
+                                        <>
+                                            <Send className="h-4 w-4" />
+                                            Solicitar Autorização
+                                        </>
+                                    )}
+                                </Button>
+
+                                <Link 
+                                    href={email ? `/pending?email=${encodeURIComponent(email)}` : '/pending'} 
+                                    className="w-full"
+                                >
+                                    <button
+                                        type="button"
+                                        className="h-11 w-full rounded-xl bg-secondary/80 text-[11px] font-black text-foreground hover:bg-secondary transition-all flex items-center justify-center gap-2 shadow-sm border border-border/50"
+                                    >
+                                        <Search className="h-3 w-3 text-primary" />
+                                        CONFERIR SE JÁ SOLICITEI
+                                    </button>
+                                </Link>
+                            </div>
                         </form>
                     </div>
 

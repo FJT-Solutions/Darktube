@@ -558,8 +558,6 @@ export default function ChannelDetailPage({
                       key={video.id}
                       video={video}
                       cpm={metrics?.cpm}
-                      onAnalyze={handleAnalyzeVideo}
-                      isAnalyzing={analyzingVideoId === video.id}
                     />
                   ))
                 ) : (

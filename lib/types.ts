@@ -35,6 +35,8 @@ export interface DarkScoringFactors {
   contentComplexity: number
 }
 
+export type VideoSource = 'youtube' | 'tiktok' | 'instagram' | 'vimeo' | 'twitter' | 'facebook' | 'dailymotion' | 'twitch' | 'reddit' | 'other'
+
 export interface YouTubeVideo {
   id: string
   title: string
@@ -51,6 +53,8 @@ export interface YouTubeVideo {
   type?: 'video' | 'shorts' | 'live'
   transcript?: string
   aiAnalysis?: string // Stored as JSON string
+  source?: VideoSource
+  originalUrl?: string
 }
 
 export interface ChannelMetrics {
