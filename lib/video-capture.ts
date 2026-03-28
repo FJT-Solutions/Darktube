@@ -227,7 +227,7 @@ export const VideoCaptureService = {
             return {
                 id: data.id || urlToId(url),
                 title: decodeHtmlEntities(data.title || data.fulltitle || 'Sem título'),
-                thumbnail: data.thumbnail || data.thumbnails?.[data.thumbnails.length - 1]?.url || '',
+                thumbnail: this.maybeProxyThumbnail(data.thumbnail || data.thumbnails?.[data.thumbnails.length - 1]?.url || ''),
                 duration: data.duration || 0,
                 views: data.view_count || 0,
                 likes: data.like_count || 0,
@@ -243,6 +243,28 @@ export const VideoCaptureService = {
             console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
             return this.extractOpenGraphMetadata(url, source);
         }
+    },
+
+    /**
+     * Determine if a thumbnail URL needs to be proxied.
+     * Use case: Meta (FB, IG) blocks direct access (403).
+     */
+    maybeProxyThumbnail(url: string | null | undefined): string {
+        if (!url) return '';
+        
+        // Domínios problemáticos que frequentemente retornam 403
+        const needsProxy = [
+            'fbcdn.net',
+            'cdninstagram.com',
+            'static.xx.fbcdn.net',
+            'tiktokcdn.com'
+        ].some(domain => url.includes(domain));
+
+        if (needsProxy) {
+            return `/api/proxy/image?url=${encodeURIComponent(url)}`;
+        }
+        
+        return url;
     },
 
     /**
@@ -266,7 +288,8 @@ export const VideoCaptureService = {
             };
             
             const title = getMeta('og:title') || getMeta('twitter:title') || '';
-            const thumbnail = getMeta('og:image') || getMeta('twitter:image') || '';
+            const rawThumbnail = getMeta('og:image') || getMeta('twitter:image') || '';
+            const thumbnail = this.maybeProxyThumbnail(rawThumbnail);
             
             if (!title && !thumbnail) {
                 console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
