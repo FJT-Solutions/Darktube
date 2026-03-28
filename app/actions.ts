@@ -1,6 +1,5 @@
 "use server"
 
-
 import * as db from "@/lib/database"
 import { getNicheIntelligence } from "@/lib/intelligence"
 import { revalidatePath } from "next/cache"
@@ -9,6 +8,19 @@ import { VideoAnalysisService } from "@/lib/video-analysis"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { headers } from "next/headers"
 import { sendAccessGrantedEmail } from "@/lib/email"
+
+async function assertAdmin(userId: string) {
+    const supabase = await createClient()
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
+    
+    if (profile?.role !== 'admin') {
+        throw new Error('Não autorizado')
+    }
+}
 
 /**
  * Analyze a video from any external URL (TikTok, Instagram, Vimeo, etc.)
@@ -249,6 +261,11 @@ export async function saveTrackedChannelAction(channel: TrackedChannel) {
 }
 
 export async function removeTrackedChannelAction(channelId: string) {
+    // BUG-01 FIX: Verify ownership via RLS (user_id filter happens via Supabase RLS)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Não autorizado')
+
     await db.removeTrackedChannel(channelId)
     revalidatePath("/")
     revalidatePath("/tracker")
@@ -507,16 +524,7 @@ export async function getAllProfilesAction() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user || !adminSupabase) return []
 
-        const { data: myProfile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        // Security check
-        if (myProfile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
-            throw new Error("Não autorizado")
-        }
+        await assertAdmin(user.id)
 
         const profiles = await db.getAllProfiles()
         const { data: { users: authUsers }, error: authError } = await adminSupabase.auth.admin.listUsers()
@@ -566,15 +574,7 @@ export async function resendAccessAction(email: string, name: string) {
         
         if (!user || !adminSupabase) throw new Error("Não autorizado")
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
-            throw new Error("Não autorizado")
-        }
+        await assertAdmin(user.id)
 
         const heads = await headers()
         const host = heads.get('x-forwarded-host') || heads.get('host')
@@ -616,16 +616,7 @@ export async function updateUserRoleAction(userId: string, role: 'admin' | 'user
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autenticado")
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        // Security check
-        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
-            throw new Error("Não autorizado")
-        }
+        await assertAdmin(user.id)
 
         const result = await db.updateProfileRole(userId, role)
         revalidatePath("/settings")
@@ -642,16 +633,7 @@ export async function updateUserStatusAction(userId: string, status: 'approved' 
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autenticado")
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        // Security check
-        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
-            throw new Error("Não autorizado")
-        }
+        await assertAdmin(user.id)
 
         // We need to find the email of the target user
         const { data: target } = await supabase.from('profiles').select('email').eq('id', userId).single()
@@ -674,16 +656,7 @@ export async function deleteUserAction(userId: string, email?: string) {
         
         if (!user || !adminSupabase) throw new Error("Não autorizado ou configuração ausente")
 
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-
-        // Security check
-        if (profile?.role !== 'admin' && user.email !== 'nathan.jordan@fjt-solutions.com') {
-            throw new Error("Não autorizado")
-        }
+        await assertAdmin(user.id)
 
         // 0. Determine email for invite cleanup
         let targetEmail = email?.trim().toLowerCase()
@@ -945,6 +918,15 @@ export async function removeBlotatoAccountAction(id: string) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autorizado")
 
+        // BUG-02 FIX: Verify ownership before deleting
+        const { data: account } = await supabase
+            .from('blotato_accounts')
+            .select('id')
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .single()
+        if (!account) throw new Error("Conta não encontrada ou não pertence a você.")
+
         return await db.removeBlotatoAccount(id)
     } catch (error: any) {
         console.error("Error in removeBlotatoAccountAction:", error)
@@ -976,25 +958,21 @@ export async function checkUserAccessAction(email: string) {
             .maybeSingle()
 
         if (invite) {
-            // Check if user was deleted but invite remained
-            const { data: { users: authUsers } } = await adminSupabase.auth.admin.listUsers()
-            const authUser = authUsers.find(u => u.email === email)
-            if (!authUser) {
-                 // Orphaned invite, let them in or handle as no access?
-                 // Actually if they have a pending invite, they should wait.
-                 // But if they WERE deleted, they shouldn't have an invite.
-                 return { status: 'pending_invite' }
-            }
             return { status: 'pending_invite' }
         }
 
-        // 3. Final Check: Even if no profile/invite, if they are in Auth, they have access
-        // This covers Admins and users created manually
-        const { data: { users: authUsers } } = await adminSupabase.auth.admin.listUsers()
-        const isAuthUser = authUsers.some(u => u.email === email)
-        
-        if (isAuthUser) {
-            return { status: 'has_access' }
+        // SEC-05 FIX: Only fetch first page and check instead of loading ALL users
+        // 3. Final Check: if in Auth but no profile/invite, they have access
+        try {
+            const { data: { users }, error: authErr } = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+            if (!authErr && users) {
+                const isAuthUser = users.some((u: any) => u.email === email)
+                if (isAuthUser) {
+                    return { status: 'has_access' }
+                }
+            }
+        } catch {
+            // Auth check failed, continue to no_access
         }
 
         return { status: 'no_access' }
@@ -1047,6 +1025,16 @@ export async function deleteRemodelingTemplateAction(id: string) {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autorizado")
+
+        // BUG-03 FIX: Verify ownership before deleting
+        const { data: template } = await supabase
+            .from('remodeling_templates')
+            .select('id')
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .single()
+        if (!template) throw new Error("Template não encontrado ou não pertence a você.")
+
         return await db.deleteRemodelingTemplate(id)
     } catch (error: any) {
         console.error("Error in deleteRemodelingTemplateAction:", error)

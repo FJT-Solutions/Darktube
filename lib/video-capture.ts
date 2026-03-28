@@ -1,9 +1,10 @@
-import { exec } from 'child_process';
+import { execFile, exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import type { VideoSource } from './types';
 
+const execFilePromise = promisify(execFile);
 const execPromise = promisify(exec);
 
 export interface DownloadResult {
@@ -162,7 +163,7 @@ export const VideoCaptureService = {
 
         try {
             console.log(`[VideoCaptureService] Downloading ${videoId} via pytubefix...`);
-            const { stdout } = await execPromise(`python3 "${scriptPath}"`, { timeout: 180000 });
+            const { stdout } = await execFilePromise('python3', [scriptPath], { timeout: 180000 });
             const result = JSON.parse(stdout.trim());
 
             if (result.error) {
@@ -181,7 +182,7 @@ export const VideoCaptureService = {
             
             const thumbPath = path.join(frameDir, 'thumb.jpg');
             try {
-                await execPromise(`curl -s -L -o "${thumbPath}" "https://img.youtube.com/vi/${videoId}/maxresdefault.jpg"`, { timeout: 10000 });
+                await execFilePromise('curl', ['-s', '-L', '-o', thumbPath, `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`], { timeout: 10000 });
                 if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 1000) {
                     console.warn(`[VideoCaptureService] Using thumbnail-only fallback for ${videoId}`);
                     return { framePaths: [thumbPath], isFallback: true };
@@ -203,8 +204,10 @@ export const VideoCaptureService = {
         
         try {
             console.log(`[VideoCaptureService] Extracting metadata from ${source}: ${url}`);
-            const { stdout } = await execPromise(
-                `yt-dlp --dump-json --no-download --no-warnings --no-playlist "${url}"`,
+            // SEC-02 FIX: Use execFile with args array to prevent command injection
+            const { stdout } = await execFilePromise(
+                'yt-dlp',
+                ['--dump-json', '--no-download', '--no-warnings', '--no-playlist', url],
                 { timeout: 30000 }
             );
             
@@ -239,13 +242,14 @@ export const VideoCaptureService = {
 
     /**
      * Fallback: Extract basic metadata from Open Graph meta tags.
-     * Works for any website with proper meta tags.
      */
     async extractOpenGraphMetadata(url: string, source: VideoSource): Promise<VideoMetadata | null> {
         try {
             console.log(`[VideoCaptureService] Falling back to OpenGraph for: ${url}`);
-            const { stdout } = await execPromise(
-                `curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" --max-time 10 "${url}"`,
+            // SEC-02 FIX: Use execFile with args array
+            const { stdout } = await execFilePromise(
+                'curl',
+                ['-sL', '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', '--max-time', '10', url],
                 { timeout: 15000 }
             );
             
@@ -287,7 +291,6 @@ export const VideoCaptureService = {
 
     /**
      * Download video from ANY URL using yt-dlp (universal).
-     * Falls back to thumbnail-only if download fails.
      */
     async downloadFromUrl(url: string): Promise<DownloadResult> {
         const fileId = urlToId(url);
@@ -311,8 +314,10 @@ export const VideoCaptureService = {
             console.log(`[VideoCaptureService] Downloading via yt-dlp: ${url}`);
             
             const videoPath = path.join(outputDir, `${fileId}.mp4`);
-            await execPromise(
-                `yt-dlp --no-warnings --no-playlist -f "worst[ext=mp4]/worst" -o "${videoPath}" "${url}"`,
+            // SEC-02 FIX: Use execFile with args array
+            await execFilePromise(
+                'yt-dlp',
+                ['--no-warnings', '--no-playlist', '-f', 'worst[ext=mp4]/worst', '-o', videoPath, url],
                 { timeout: 180000 }
             );
 
@@ -320,22 +325,28 @@ export const VideoCaptureService = {
                 throw new Error('Download produziu arquivo vazio ou muito pequeno');
             }
 
-            // Extract 6 frames evenly distributed
-            const { stdout: probeOut } = await execPromise(
-                `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${videoPath}"`,
-                { timeout: 10000 }
-            ).catch(() => ({ stdout: '60' }));
-            
-            const duration = parseFloat(probeOut.trim()) || 60;
+            // Extract duration using ffprobe
+            let duration = 60;
+            try {
+                const { stdout: probeOut } = await execFilePromise(
+                    'ffprobe',
+                    ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', videoPath],
+                    { timeout: 10000 }
+                );
+                duration = parseFloat(probeOut.trim()) || 60;
+            } catch {}
+
             const intervals = Math.max(1, Math.floor(duration / 6));
             const framePaths: string[] = [];
 
+            // Extract 6 frames evenly distributed
             for (let i = 0; i < 6; i++) {
                 const ts = Math.min(i * intervals, Math.floor(duration) - 1);
                 const fp = path.join(frameDir, `f_${String(i).padStart(2, '0')}.jpg`);
                 try {
-                    await execPromise(
-                        `ffmpeg -ss ${ts} -i "${videoPath}" -frames:v 1 -q:v 2 "${fp}" -y`,
+                    await execFilePromise(
+                        'ffmpeg',
+                        ['-ss', String(ts), '-i', videoPath, '-frames:v', '1', '-q:v', '2', fp, '-y'],
                         { timeout: 10000 }
                     );
                     if (fs.existsSync(fp) && fs.statSync(fp).size > 0) {
@@ -347,8 +358,9 @@ export const VideoCaptureService = {
             // Extract 60s audio
             const audioPath = path.join(outputDir, `${fileId}.aac`);
             try {
-                await execPromise(
-                    `ffmpeg -i "${videoPath}" -t 60 -vn -c:a aac -b:a 64k "${audioPath}" -y`,
+                await execFilePromise(
+                    'ffmpeg',
+                    ['-i', videoPath, '-t', '60', '-vn', '-c:a', 'aac', '-b:a', '64k', audioPath, '-y'],
                     { timeout: 30000 }
                 );
             } catch {}
@@ -368,8 +380,9 @@ export const VideoCaptureService = {
                 const meta = await this.extractMetadataFromUrl(url);
                 if (meta?.thumbnail) {
                     const thumbPath = path.join(frameDir, 'thumb.jpg');
-                    await execPromise(
-                        `curl -sL -o "${thumbPath}" "${meta.thumbnail}"`,
+                    await execFilePromise(
+                        'curl',
+                        ['-sL', '-o', thumbPath, meta.thumbnail],
                         { timeout: 10000 }
                     );
                     if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 1000) {

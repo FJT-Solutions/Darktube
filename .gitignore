@@ -41,3 +41,11 @@ next-env.d.ts
 *.db-journal
 *.db-wal
 *.db-shm
+
+# SEC-07: Debug/provisioning scripts (contain hardcoded credentials)
+provision_user.ts
+tmp_check_user.ts
+verify_supabase.ts
+
+# Temp video/frame downloads
+/tmp/

@@ -37,8 +37,6 @@ export async function createAdminClient() {
     return null
   }
 
-  console.log(`[createAdminClient] URL: ${url}, Key present: ${!!serviceRoleKey}, Key starts with: ${serviceRoleKey.substring(0, 10)}...`)
-
   return createSupabaseClient(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
