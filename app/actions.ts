@@ -670,8 +670,7 @@ export async function getCredentialsAction() {
 
         const providers = [
             'blotato', 'gemini', 'openai', 'elevenlabs', 'claude', 
-            'openrouter', 'kie_ai', 'meta_app_id', 'meta_app_secret', 
-            'meta_client_token', 'meta_access_token'
+            'openrouter', 'kie_ai'
         ]
         const keys: Record<string, string> = {}
         
@@ -703,24 +702,6 @@ export async function updateCredentialsAction(provider: string, key: string) {
     }
 }
 
-export async function updateCredentialsBulkAction(data: Record<string, string>) {
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { success: false, error: "Não autorizado" }
-
-        for (const [provider, key] of Object.entries(data)) {
-            await db.upsertUserApiKey(user.id, provider, key)
-        }
-        
-        revalidatePath('/credentials')
-        revalidatePath('/settings')
-        return { success: true }
-    } catch (error: any) {
-        console.error("Error in updateCredentialsBulkAction:", error)
-        return { success: false, error: error.message }
-    }
-}
 
 export async function getBlotatoAccountsAction() {
     try {
@@ -735,16 +716,73 @@ export async function getBlotatoAccountsAction() {
     }
 }
 
-export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string) {
+export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string, pageId?: string, pageName?: string) {
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autorizado")
 
-        return await db.addBlotatoAccount(user.id, platform, accountId, label)
+        return await db.addBlotatoAccount(user.id, platform, accountId, label, pageId, pageName)
     } catch (error: any) {
         console.error("Error in addBlotatoAccountAction:", error)
         throw error
+    }
+}
+
+export async function fetchBlotatoAccountsFromAPIAction() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        const apiKey = await db.getUserApiKey(user.id, 'blotato')
+        if (!apiKey) return { success: false, error: "Chave API do Blotato não encontrada. Configure-a na aba IA primeiro." }
+
+
+        const res = await fetch('https://backend.blotato.com/v2/users/me/accounts', {
+            headers: { 'blotato-api-key': apiKey }
+        })
+
+        if (!res.ok) {
+            const errorText = await res.text()
+            throw new Error(`Erro na API Blotato: ${res.status} - ${errorText}`)
+        }
+
+        const rawResponse = await res.json()
+
+        // Blotato API returns { items: [...] }
+        const accounts: any[] = Array.isArray(rawResponse)
+            ? rawResponse
+            : (rawResponse.items || rawResponse.accounts || rawResponse.data || [])
+
+        // For Facebook and LinkedIn, fetch subaccounts (pages) automatically
+        const PLATFORMS_WITH_PAGES = ['facebook', 'linkedin']
+        await Promise.all(
+            accounts.map(async (acc) => {
+                if (!PLATFORMS_WITH_PAGES.includes(acc.platform)) return
+                try {
+                    const subRes = await fetch(
+                        `https://backend.blotato.com/v2/users/me/accounts/${acc.id}/subaccounts`,
+                        { headers: { 'blotato-api-key': apiKey } }
+                    )
+                    if (!subRes.ok) return
+                    const subRaw = await subRes.json()
+                    const subItems: any[] = Array.isArray(subRaw)
+                        ? subRaw
+                        : (subRaw.items || subRaw.pages || subRaw.data || [])
+                    if (subItems.length > 0) {
+                        acc.pages = subItems
+                    }
+                } catch {
+                    // Silently ignore if subaccounts endpoint doesn't exist for this account
+                }
+            })
+        )
+
+        return { success: true, accounts }
+    } catch (error: any) {
+        console.error("Error in fetchBlotatoAccountsFromAPIAction:", error)
+        return { success: false, error: error.message }
     }
 }
 

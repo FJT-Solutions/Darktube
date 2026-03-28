@@ -7,14 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Key, Save, Loader2, ArrowLeft, Cpu, Globe, Eye, EyeOff, Sparkles, Plus, Trash2, Instagram, Youtube as YoutubeIcon, Music2, Facebook } from "lucide-react"
+import { Key, Save, Loader2, ArrowLeft, Cpu, Globe, Eye, EyeOff, Sparkles, Plus, Trash2, Instagram, Youtube as YoutubeIcon, Music2, Facebook, RefreshCw } from "lucide-react"
 import {
     updateCredentialsAction,
     getCredentialsAction,
     getBlotatoAccountsAction,
     addBlotatoAccountAction,
     removeBlotatoAccountAction,
-    updateCredentialsBulkAction
+    fetchBlotatoAccountsFromAPIAction
 } from "@/app/actions"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -39,11 +39,14 @@ export default function CredentialsPage() {
 
     const [activeTab, setActiveTab] = useState<"media" | "ai">("media")
     const [blotatoAccounts, setBlotatoAccounts] = useState<any[]>([])
+    const [apiAccounts, setApiAccounts] = useState<any[]>([])
+    const [isRefreshingAPI, setIsRefreshingAPI] = useState(false)
     const [newAccount, setNewAccount] = useState({ platform: "instagram", accountId: "", label: "" })
 
     const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
     const [isSaving, setIsSaving] = useState<string | null>(null)
     const [isAddingAccount, setIsAddingAccount] = useState(false)
+    const [syncFailed, setSyncFailed] = useState<boolean | null>(null) // null=not tried, false=ok, true=failed
 
     useEffect(() => {
         if (session) {
@@ -51,6 +54,7 @@ export default function CredentialsPage() {
                 if (data) setKeys(prev => ({ ...prev, ...data }))
             })
             fetchBlotatoAccounts()
+            handleSyncBlotato(true) // auto-sync silently on load
         }
     }, [session])
 
@@ -71,23 +75,6 @@ export default function CredentialsPage() {
         }
     }
 
-    const handleSaveMeta = async () => {
-        setIsSaving('meta_bulk')
-        const metaKeys = {
-            meta_app_id: keys.meta_app_id,
-            meta_app_secret: keys.meta_app_secret,
-            meta_client_token: keys.meta_client_token,
-            meta_access_token: keys.meta_access_token
-        }
-        const result = await updateCredentialsBulkAction(metaKeys)
-        setIsSaving(null)
-
-        if (result.success) {
-            toast.success("Configurações do Facebook salvas com sucesso!")
-        } else {
-            toast.error(`Erro ao salvar configurações do Facebook: ${result.error}`)
-        }
-    }
 
     const handleAddAccount = async () => {
         if (!newAccount.accountId) {
@@ -120,6 +107,103 @@ export default function CredentialsPage() {
         }
     }
 
+    const handleSyncBlotato = async (silent = false) => {
+        if (!silent) setIsRefreshingAPI(true)
+        try {
+            const result = await fetchBlotatoAccountsFromAPIAction()
+
+            if (result.success && result.accounts) {
+                const alreadyLinkedIds = new Set(blotatoAccounts.map(a => a.account_id))
+                const flatAccounts: any[] = []
+
+                for (const acc of result.accounts as any[]) {
+                    const accountId = acc.id || acc.accountId || acc._id
+                    const displayUsername = acc.username || acc.fullname || acc.name || acc.handle || accountId
+                    const platform = acc.platform || acc.type
+                    const pages = acc.pages || acc.linkedPages || acc.subaccounts || []
+                    // Parent account avatar (Facebook Graph API)
+                    const accountImageUrl = platform === 'facebook'
+                        ? `https://graph.facebook.com/${accountId}/picture?type=square&width=80`
+                        : undefined
+
+                    if (pages.length > 0) {
+                        for (const page of pages) {
+                            const pid = page.id || page.pageId
+                            if (!alreadyLinkedIds.has(accountId)) {
+                                flatAccounts.push({
+                                    id: accountId,
+                                    platform,
+                                    username: displayUsername,
+                                    imageUrl: accountImageUrl,
+                                    pageId: pid,
+                                    pageName: page.name || page.pageName,
+                                    displayName: `${page.name || page.pageName} (${displayUsername})`,
+                                    // Page-specific avatar
+                                    pageImageUrl: pid
+                                        ? `https://graph.facebook.com/${pid}/picture?type=square&width=80`
+                                        : accountImageUrl,
+                                })
+                            }
+                        }
+                    } else {
+                        if (!alreadyLinkedIds.has(accountId)) {
+                            flatAccounts.push({
+                                id: accountId,
+                                platform,
+                                username: displayUsername,
+                                imageUrl: accountImageUrl,
+                                displayName: displayUsername
+                            })
+                        }
+                    }
+                }
+
+                setApiAccounts(flatAccounts)
+                setSyncFailed(false)
+                if (!silent) {
+                    if (flatAccounts.length === 0) {
+                        if ((result.accounts as any[]).length > 0) {
+                            toast.warning("Conta(s) encontrada(s) mas já estão todas vinculadas.")
+                        } else {
+                            toast.info("Nenhuma conta conectada no Blotato. Conecte em my.blotato.com/settings.")
+                        }
+                    } else {
+                        toast.success(`${flatAccounts.length} contas/páginas encontradas no Blotato!`)
+                    }
+                }
+            } else {
+                setSyncFailed(true)
+                if (!silent) toast.error(result.error || "Erro ao buscar contas no Blotato")
+            }
+        } catch (error: any) {
+            setSyncFailed(true)
+            if (!silent) toast.error(`Erro: ${error.message}`)
+        } finally {
+            if (!silent) setIsRefreshingAPI(false)
+        }
+    }
+
+    const handleImportAccount = async (acc: any) => {
+        try {
+            const result = await addBlotatoAccountAction(
+                acc.platform,
+                acc.id,           // account_id (the main Blotato account ID)
+                acc.displayName,  // label
+                acc.pageId,       // page_id (only for Facebook/LinkedIn)
+                acc.pageName      // page_name
+            )
+            if (result) {
+                toast.success(`"${acc.displayName}" vinculada com sucesso!`)
+                setBlotatoAccounts(prev => [result, ...prev])
+                setApiAccounts(prev => prev.filter(a =>
+                    !(a.id === acc.id && a.pageId === acc.pageId)
+                ))
+            }
+        } catch (error: any) {
+            toast.error(`Erro ao vincular conta: ${error.message}`)
+        }
+    }
+
     const toggleShow = (provider: string) => {
         setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
     }
@@ -129,6 +213,7 @@ export default function CredentialsPage() {
             case 'instagram': return <Instagram className="h-4 w-4 text-pink-500" />
             case 'tiktok': return <Music2 className="h-4 w-4 text-cyan-400" />
             case 'youtube': return <YoutubeIcon className="h-4 w-4 text-red-500" />
+            case 'facebook': return <Facebook className="h-4 w-4 text-blue-600" />
             default: return <Globe className="h-4 w-4" />
         }
     }
@@ -267,12 +352,30 @@ export default function CredentialsPage() {
                                 <Card className="border-emerald-500/10 bg-emerald-500/5 backdrop-blur-sm">
                                     <CardHeader className="pb-4">
                                         <CardTitle className="text-base">Adicionar Nova Conta</CardTitle>
-                                        <CardDescription>Vincule uma conta de rede social ao seu Blotato.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="grid gap-4 sm:grid-cols-3">
-                                            <div className="space-y-2">
-                                                <Label>Plataforma</Label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <CardDescription>Gerencie suas conexões automáticas via Blotato.</CardDescription>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => handleSyncBlotato()}
+                                            disabled={isRefreshingAPI}
+                                            className="h-8 text-xs font-bold"
+                                        >
+                                            {isRefreshingAPI ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                                            Sincronizar com Blotato
+                                        </Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    {/* MANUAL FORM — only shown if auto-sync failed */}
+                                    {syncFailed === true && (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest px-1">Vínculo Manual</Label>
+                                        </div>
+                                        <div className="grid gap-4 sm:grid-cols-10">
+                                            <div className="sm:col-span-3 space-y-2">
+                                                <Label className="text-[10px]">Plataforma</Label>
                                                 <select
                                                     value={newAccount.platform}
                                                     onChange={(e) => setNewAccount(prev => ({ ...prev, platform: e.target.value }))}
@@ -281,29 +384,95 @@ export default function CredentialsPage() {
                                                     <option value="instagram">Instagram</option>
                                                     <option value="tiktok">TikTok</option>
                                                     <option value="youtube">YouTube</option>
+                                                    <option value="facebook">Facebook</option>
                                                 </select>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>ID da Conta/Handle</Label>
+                                            <div className="sm:col-span-3 space-y-2">
+                                                <Label className="text-[10px]">ID da Conta/URL</Label>
                                                 <Input
-                                                    placeholder="@usuario ou ID"
+                                                    placeholder="@user"
                                                     value={newAccount.accountId}
                                                     onChange={(e) => setNewAccount(prev => ({ ...prev, accountId: e.target.value }))}
                                                     className="h-10 text-sm bg-background/50"
                                                 />
                                             </div>
-                                            <div className="space-y-2">
+                                            <div className="sm:col-span-2 space-y-2">
+                                                <Label className="text-[10px]">Apelido</Label>
+                                                <Input
+                                                    placeholder="Página X"
+                                                    value={newAccount.label}
+                                                    onChange={(e) => setNewAccount(prev => ({ ...prev, label: e.target.value }))}
+                                                    className="h-10 text-sm bg-background/50"
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-2 space-y-2 flex items-end">
                                                 <Button
                                                     onClick={handleAddAccount}
                                                     disabled={isAddingAccount}
-                                                    className="w-full h-10 mt-8 font-bold"
+                                                    className="w-full h-10 font-bold"
                                                 >
-                                                    {isAddingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
-                                                    Vincular
+                                                    {isAddingAccount ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                                                 </Button>
                                             </div>
                                         </div>
-                                    </CardContent>
+                                    </div>
+                                    )}
+
+                                    {/* API ACCOUNTS FOUND — grouped by parent account */}
+                                    {apiAccounts.length > 0 && (() => {
+                                        // Group accounts by parent (same id = same parent)
+                                        const groups: Record<string, { platform: string; username: string; imageUrl?: string; pages: typeof apiAccounts }> = {}
+                                        for (const acc of apiAccounts) {
+                                            if (!groups[acc.id]) {
+                                                groups[acc.id] = { platform: acc.platform, username: acc.username, imageUrl: acc.imageUrl, pages: [] }
+                                            }
+                                            groups[acc.id].pages.push(acc)
+                                        }
+                                        return (
+                                            <div className="space-y-3 border-t border-border/10 pt-4 animate-in slide-in-from-bottom-2 duration-300">
+                                                <Label className="text-[10px] uppercase text-primary font-bold tracking-widest px-1">Novas contas detectadas no Blotato</Label>
+                                                <div className="space-y-2">
+                                                    {Object.entries(groups).map(([id, group]) => (
+                                                        <div key={id} className="rounded-xl border border-border/30 overflow-hidden">
+                                                            {/* Parent header */}
+                                                            <div className="flex items-center gap-3 px-3 py-2 bg-muted/30">
+                                                                <div className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center bg-background/60 shrink-0">
+                                                                    {group.imageUrl
+                                                                        ? <img src={group.imageUrl} alt={group.username} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                                                        : getPlatformIcon(group.platform)
+                                                                    }
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-bold text-xs">{group.username}</p>
+                                                                    <p className="text-[9px] uppercase text-muted-foreground">{group.platform}</p>
+                                                                </div>
+                                                            </div>
+                                                            {/* Pages / sub-items */}
+                                                            <div className="divide-y divide-border/20">
+                                                                {group.pages.map((acc, i) => (
+                                                                    <div key={`${acc.id}-${acc.pageId || i}`} className="flex items-center justify-between pl-4 pr-3 py-2 bg-background/30 hover:bg-primary/5 transition-colors">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="h-6 w-6 rounded-full overflow-hidden flex items-center justify-center bg-muted/50 shrink-0">
+                                                                                {acc.pageImageUrl
+                                                                                    ? <img src={acc.pageImageUrl} alt={acc.pageName} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                                                                    : <span className="text-[8px] text-muted-foreground">FB</span>
+                                                                                }
+                                                                            </div>
+                                                                            <p className="text-xs text-foreground/80">{acc.pageId ? acc.pageName : acc.displayName}</p>
+                                                                        </div>
+                                                                        <Button size="sm" onClick={() => handleImportAccount(acc)} className="h-7 text-[10px] font-bold ml-4">
+                                                                            Vincular
+                                                                        </Button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )
+                                    })()}
+                                </CardContent>
                                 </Card>
 
                                 <div className="grid gap-3 pt-2">
@@ -323,8 +492,10 @@ export default function CredentialsPage() {
                                                         {getPlatformIcon(acc.platform)}
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-sm tracking-tight">{acc.account_id}</p>
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">{acc.platform}</p>
+                                                        <p className="font-bold text-sm tracking-tight">{acc.label || acc.account_id}</p>
+                                                        <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                                                            {acc.platform} {acc.label ? `• ${acc.account_id}` : ''}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <Button
@@ -341,95 +512,6 @@ export default function CredentialsPage() {
                                 </div>
                             </section>
 
-                            {/* FACEBOOK API (OFFICIAL) */}
-                            <section className="space-y-4">
-                                <div className="flex items-center gap-2 px-1">
-                                    <Facebook className="h-5 w-5 text-blue-600" />
-                                    <h2 className="text-lg font-bold uppercase tracking-wider text-muted-foreground">Facebook API (Oficial)</h2>
-                                </div>
-
-                                <Card className="border-blue-500/10 bg-blue-500/5 backdrop-blur-sm overflow-hidden">
-                                    <CardContent className="grid gap-6 pt-6 md:grid-cols-2">
-                                        {/* App ID */}
-                                        <div className="space-y-2">
-                                            <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider">App ID</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    type={showKeys['meta_app_id'] ? "text" : "password"}
-                                                    placeholder="Meta App ID"
-                                                    value={keys.meta_app_id}
-                                                    onChange={(e) => setKeys(prev => ({ ...prev, meta_app_id: e.target.value }))}
-                                                    className="bg-background/50 pr-10 h-11 border-blue-500/20"
-                                                />
-                                                <button onClick={() => toggleShow('meta_app_id')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-blue-400 transition-colors">
-                                                    {showKeys['meta_app_id'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* App Secret */}
-                                        <div className="space-y-2">
-                                            <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider">App Secret</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    type={showKeys['meta_app_secret'] ? "text" : "password"}
-                                                    placeholder="Meta App Secret"
-                                                    value={keys.meta_app_secret}
-                                                    onChange={(e) => setKeys(prev => ({ ...prev, meta_app_secret: e.target.value }))}
-                                                    className="bg-background/50 pr-10 h-11 border-blue-500/20"
-                                                />
-                                                <button onClick={() => toggleShow('meta_app_secret')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-blue-400 transition-colors">
-                                                    {showKeys['meta_app_secret'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Client Token */}
-                                        <div className="space-y-2">
-                                            <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider">Client Token</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    type={showKeys['meta_client_token'] ? "text" : "password"}
-                                                    placeholder="Meta Client Token"
-                                                    value={keys.meta_client_token}
-                                                    onChange={(e) => setKeys(prev => ({ ...prev, meta_client_token: e.target.value }))}
-                                                    className="bg-background/50 pr-10 h-11 border-blue-500/20"
-                                                />
-                                                <button onClick={() => toggleShow('meta_client_token')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-blue-400 transition-colors">
-                                                    {showKeys['meta_client_token'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Access Token */}
-                                        <div className="space-y-2">
-                                            <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider">Access Token (Page/User)</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    type={showKeys['meta_access_token'] ? "text" : "password"}
-                                                    placeholder="Meta Access Token"
-                                                    value={keys.meta_access_token}
-                                                    onChange={(e) => setKeys(prev => ({ ...prev, meta_access_token: e.target.value }))}
-                                                    className="bg-background/50 pr-10 h-11 border-blue-500/20"
-                                                />
-                                                <button onClick={() => toggleShow('meta_access_token')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-blue-400 transition-colors">
-                                                    {showKeys['meta_access_token'] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                    <div className="px-6 pb-6 mt-2">
-                                        <Button
-                                            onClick={handleSaveMeta}
-                                            disabled={isSaving === 'meta_bulk'}
-                                            className="w-full h-12 font-bold transition-all shadow-lg"
-                                        >
-                                            {isSaving === 'meta_bulk' ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
-                                            Salvar Configurações Facebook
-                                        </Button>
-                                    </div>
-                                </Card>
-                            </section>
                         </div>
                     )}
 

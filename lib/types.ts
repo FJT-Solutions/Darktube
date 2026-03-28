@@ -112,8 +112,10 @@ export interface NicheCategory {
 export interface BlotatoAccount {
   id: string
   user_id: string
-  platform: 'instagram' | 'tiktok' | 'youtube'
+  platform: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'linkedin' | 'twitter' | 'bluesky' | 'threads' | 'pinterest'
   account_id: string
+  page_id?: string     // For Facebook Pages and LinkedIn Company Pages
+  page_name?: string  // Friendly name of the page (display only)
   label?: string
   created_at: string
 }
