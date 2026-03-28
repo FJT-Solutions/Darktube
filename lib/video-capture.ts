@@ -309,6 +309,15 @@ export const VideoCaptureService = {
                 duration = parseInt(durationStr, 10) || 0;
             }
             
+            // Tentar extrair views/engajamento
+            const viewsStr = getMeta('video:views') || getMeta('og:video:views') || getMeta('video:watch_count') || '0';
+            const views = parseInt(viewsStr.replace(/[^0-9]/g, ''), 10) || 0;
+            
+            const likesStr = getMeta('video:likes') || getMeta('og:video:likes') || '0';
+            const likes = parseInt(likesStr.replace(/[^0-9]/g, ''), 10) || 0;
+            
+            const uploadDate = getMeta('video:release_date') || getMeta('og:video:release_date') || getMeta('article:published_time') || '';
+            
             if (!title && !thumbnail && duration === 0) {
                 console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
                 return null;
@@ -319,12 +328,12 @@ export const VideoCaptureService = {
                 title: decodeHtmlEntities(title || 'Vídeo Externo'),
                 thumbnail,
                 duration,
-                views: 0,
-                likes: 0,
+                views,
+                likes,
                 comments: 0,
                 uploader: decodeHtmlEntities(getMeta('og:site_name') || source),
                 uploaderId: '',
-                uploadDate: '',
+                uploadDate: uploadDate.split('T')[0], // YYYY-MM-DD
                 url,
                 source,
                 description: decodeHtmlEntities((getMeta('og:description') || getMeta('twitter:description') || '').slice(0, 500)),
