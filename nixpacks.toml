@@ -1,5 +1,12 @@
 [phases.setup]
-nixPkgs = ['nodejs_20', 'pnpm-9_x', 'openssl']
+nixPkgs = ['nodejs_20', 'pnpm-9_x', 'openssl', 'curl', 'ffmpeg', 'python3']
+aptPkgs = []
+
+[phases.install]
+cmds = [
+  'pnpm install',
+  'pip3 install --break-system-packages yt-dlp || python3 -m pip install --break-system-packages yt-dlp || true'
+]
 
 [phases.build]
 cmds = [

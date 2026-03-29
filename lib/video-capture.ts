@@ -229,9 +229,9 @@ export const VideoCaptureService = {
                 title: decodeHtmlEntities(data.title || data.fulltitle || 'Sem título'),
                 thumbnail: this.maybeProxyThumbnail(data.thumbnail || data.thumbnails?.[data.thumbnails.length - 1]?.url || ''),
                 duration: data.duration || 0,
-                views: source === 'youtube' ? (data.view_count || 0) : 0,
-                likes: source === 'youtube' ? (data.like_count || 0) : 0,
-                comments: source === 'youtube' ? (data.comment_count || 0) : 0,
+                views: data.view_count || 0,
+                likes: data.like_count || 0,
+                comments: data.comment_count || 0,
                 uploader: decodeHtmlEntities(data.uploader || data.channel || data.creator || 'Desconhecido'),
                 uploaderId: data.channel_id || data.uploader_id || '',
                 uploadDate,
@@ -241,7 +241,54 @@ export const VideoCaptureService = {
             };
         } catch (error: any) {
             console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
+            // Para YouTube, tentar oEmbed API (leve, sem HTML parsing)
+            if (source === 'youtube') {
+                const oEmbedResult = await this.extractYouTubeOEmbed(url);
+                if (oEmbedResult) return oEmbedResult;
+            }
             return this.extractOpenGraphMetadata(url, source);
+        }
+    },
+
+    /**
+     * YouTube-specific fallback: oEmbed API returns lightweight JSON (~500 bytes).
+     * No yt-dlp or HTML parsing needed.
+     */
+    async extractYouTubeOEmbed(url: string): Promise<VideoMetadata | null> {
+        try {
+            console.log(`[VideoCaptureService] Trying YouTube oEmbed for: ${url}`);
+            const oEmbedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+            const response = await fetch(oEmbedUrl, { signal: AbortSignal.timeout(10000) });
+            
+            if (!response.ok) {
+                console.warn(`[VideoCaptureService] oEmbed returned ${response.status}`);
+                return null;
+            }
+            
+            const data = await response.json();
+            
+            // Extrair video ID da URL para construir thumbnail de alta qualidade
+            const videoIdMatch = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+            const videoId = videoIdMatch?.[1] || '';
+            
+            return {
+                id: videoId || urlToId(url),
+                title: decodeHtmlEntities(data.title || 'Sem título'),
+                thumbnail: videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : (data.thumbnail_url || ''),
+                duration: 0, // oEmbed não fornece duração
+                views: 0,    // oEmbed não fornece views
+                likes: 0,
+                comments: 0,
+                uploader: decodeHtmlEntities(data.author_name || 'Desconhecido'),
+                uploaderId: '',
+                uploadDate: '',
+                url,
+                source: 'youtube' as VideoSource,
+                description: '',
+            };
+        } catch (error: any) {
+            console.warn(`[VideoCaptureService] YouTube oEmbed failed: ${error.message}`);
+            return null;
         }
     },
 
@@ -277,7 +324,7 @@ export const VideoCaptureService = {
             const { stdout } = await execFilePromise(
                 'curl',
                 ['-sL', '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', '--max-time', '10', url],
-                { timeout: 15000 }
+                { timeout: 15000, maxBuffer: 5 * 1024 * 1024 }
             );
             
             const html = stdout;
