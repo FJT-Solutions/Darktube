@@ -8,6 +8,16 @@ import { detectPlatform } from './utils';
 const execFilePromise = promisify(execFile);
 const execPromise = promisify(exec);
 
+/**
+ * Resolve local standalone binary inside Dokploy/Docker containers,
+ * or fallback to global system PATH when running in local dev.
+ */
+function getYtDlpPath(): string {
+    const standalonePath = path.join(process.cwd(), 'yt-dlp');
+    if (fs.existsSync(standalonePath)) return standalonePath;
+    return 'yt-dlp';
+}
+
 export interface DownloadResult {
     videoPath?: string;
     audioPath?: string;
@@ -211,7 +221,7 @@ export const VideoCaptureService = {
             console.log(`[VideoCaptureService] Extracting metadata from ${source}: ${url}`);
             // SEC-02 FIX: Use execFile with args array to prevent command injection
             const { stdout } = await execFilePromise(
-                'yt-dlp',
+                getYtDlpPath(),
                 ['--dump-json', '--no-download', '--no-warnings', '--no-playlist', url],
                 { timeout: 30000 }
             );
@@ -425,7 +435,7 @@ export const VideoCaptureService = {
             const videoPath = path.join(outputDir, `${fileId}.mp4`);
             // SEC-02 FIX: Use execFile with args array
             await execFilePromise(
-                'yt-dlp',
+                getYtDlpPath(),
                 ['--no-warnings', '--no-playlist', '-f', 'worst[ext=mp4]/worst', '-o', videoPath, url],
                 { timeout: 180000 }
             );

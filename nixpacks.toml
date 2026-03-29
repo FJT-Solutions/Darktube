@@ -4,8 +4,7 @@ aptPkgs = ['curl', 'ca-certificates', 'ffmpeg']
 
 [phases.install]
 cmds = [
-  'pnpm install',
-  'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && chmod a+rx /usr/local/bin/yt-dlp || true'
+  'pnpm install'
 ]
 
 [phases.build]
@@ -14,7 +13,9 @@ cmds = [
   'mkdir -p .next/standalone/public',
   'cp -r public/* .next/standalone/public/ || true',
   'mkdir -p .next/standalone/.next/static',
-  'cp -r .next/static/* .next/standalone/.next/static/ || true'
+  'cp -r .next/static/* .next/standalone/.next/static/ || true',
+  'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o .next/standalone/yt-dlp',
+  'chmod a+rx .next/standalone/yt-dlp'
 ]
 
 [start]
