@@ -1,6 +1,6 @@
 [phases.setup]
 nixPkgs = ['nodejs_20', 'pnpm-9_x', 'openssl']
-aptPkgs = ['curl', 'ca-certificates']
+aptPkgs = ['curl', 'ca-certificates', 'ffmpeg']
 
 [phases.install]
 cmds = [
