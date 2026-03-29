@@ -320,14 +320,27 @@ export const VideoCaptureService = {
     async extractOpenGraphMetadata(url: string, source: VideoSource): Promise<VideoMetadata | null> {
         try {
             console.log(`[VideoCaptureService] Falling back to OpenGraph for: ${url}`);
-            // SEC-02 FIX: Use execFile with args array
-            const { stdout } = await execFilePromise(
-                'curl',
-                ['-sL', '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', '--max-time', '10', url],
-                { timeout: 15000, maxBuffer: 5 * 1024 * 1024 }
-            );
+            // Use Node.js native fetch instead of curl to avoid external binary dependency
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             
-            const html = stdout;
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml',
+                    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8',
+                },
+                signal: controller.signal,
+                redirect: 'follow',
+            });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                console.warn(`[VideoCaptureService] OpenGraph fetch returned ${response.status}`);
+                return null;
+            }
+            
+            const html = await response.text();
             const getMeta = (property: string): string => {
                 const regex = new RegExp(`<meta[^>]*(?:property|name)=["']${property}["'][^>]*content=["']([^"']*)["']`, 'i');
                 const altRegex = new RegExp(`<meta[^>]*content=["']([^"']*?)["'][^>]*(?:property|name)=["']${property}["']`, 'i');
@@ -338,12 +351,26 @@ export const VideoCaptureService = {
             const rawThumbnail = getMeta('og:image') || getMeta('twitter:image') || '';
             const thumbnail = this.maybeProxyThumbnail(rawThumbnail);
             
-            // Para FB/IG, as views e likes costumam estar no título: "13 M vues · 60 K réactions | ..."
-            // Vamos apenas exibir o card, sem tentar forçar metas que o Meta bloqueia no servidor
+            // Extrair views/likes do título OG (Facebook pattern: "4.5M views · 25K reactions | Title")
+            let views = 0;
+            let likes = 0;
+            const ogTitle = getMeta('og:title') || '';
+            const viewsMatch = ogTitle.match(/([\d,.]+)\s*([MKmk])?\s*(?:views?|vues?|visualizaç)/i);
+            if (viewsMatch) {
+                let num = parseFloat(viewsMatch[1].replace(',', '.'));
+                if (viewsMatch[2]?.toUpperCase() === 'M') num *= 1_000_000;
+                if (viewsMatch[2]?.toUpperCase() === 'K') num *= 1_000;
+                views = Math.round(num);
+            }
+            const reactionsMatch = ogTitle.match(/([\d,.]+)\s*([MKmk])?\s*(?:reactions?|réactions?|curtidas)/i);
+            if (reactionsMatch) {
+                let num = parseFloat(reactionsMatch[1].replace(',', '.'));
+                if (reactionsMatch[2]?.toUpperCase() === 'M') num *= 1_000_000;
+                if (reactionsMatch[2]?.toUpperCase() === 'K') num *= 1_000;
+                likes = Math.round(num);
+            }
             const duration = 0;
-            const views = 0;
-            const likes = 0;
-            const uploadDate = '';
+            const uploadDate = getMeta('og:updated_time') || getMeta('article:published_time') || '';
             
             if (!title && !thumbnail && duration === 0) {
                 console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
