@@ -186,7 +186,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
           <a href={video.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-card-foreground hover:text-primary transition-colors">{video.title}</a>
           <p className="text-xs text-muted-foreground">{video.channelName}</p>
           <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{formatNumber(video.views)}</span>
+            {video.views > 0 && <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{formatNumber(video.views)}</span>}
             {video.publishedAt && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(video.publishedAt)}</span>}
             {estimatedRevenue > 0 && <span className="flex items-center gap-1 text-emerald-500 font-medium"><DollarSign className="h-3 w-3" />{estimatedRevenue < 10 ? estimatedRevenue.toFixed(2) : formatNumber(Math.round(estimatedRevenue))}</span>}
           </div>
@@ -211,8 +211,8 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
           <a href={video.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-card-foreground hover:text-primary transition-colors">{video.title}</a>
           <Link href={`/canal/${encodeURIComponent(video.channelId)}`} className="text-xs text-muted-foreground hover:text-primary transition-colors truncate" title={video.channelName}>{video.channelName}</Link>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-            <span className="flex items-center gap-1 shrink-0"><Eye className="h-2.5 w-2.5" />{formatNumber(video.views)}</span>
-            <span className="flex items-center gap-1 shrink-0"><Clock className="h-2.5 w-2.5" />{video.duration}</span>
+            {video.views > 0 && <span className="flex items-center gap-1 shrink-0"><Eye className="h-2.5 w-2.5" />{formatNumber(video.views)}</span>}
+            {video.duration && video.duration !== '0:00' && <span className="flex items-center gap-1 shrink-0"><Clock className="h-2.5 w-2.5" />{video.duration}</span>}
             {video.publishedAt && <span className="flex items-center gap-1 shrink-0"><Calendar className="h-2.5 w-2.5" />{formatDate(video.publishedAt)}</span>}
             {estimatedRevenue > 0 && <span className="flex items-center gap-1 text-emerald-500 font-medium shrink-0"><DollarSign className="h-2.5 w-2.5" />{estimatedRevenue < 10 ? estimatedRevenue.toFixed(2) : formatNumber(Math.round(estimatedRevenue))}</span>}
           </div>

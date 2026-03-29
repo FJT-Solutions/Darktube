@@ -229,9 +229,9 @@ export const VideoCaptureService = {
                 title: decodeHtmlEntities(data.title || data.fulltitle || 'Sem título'),
                 thumbnail: this.maybeProxyThumbnail(data.thumbnail || data.thumbnails?.[data.thumbnails.length - 1]?.url || ''),
                 duration: data.duration || 0,
-                views: data.view_count || 0,
-                likes: data.like_count || 0,
-                comments: data.comment_count || 0,
+                views: source === 'youtube' ? (data.view_count || 0) : 0,
+                likes: source === 'youtube' ? (data.like_count || 0) : 0,
+                comments: source === 'youtube' ? (data.comment_count || 0) : 0,
                 uploader: decodeHtmlEntities(data.uploader || data.channel || data.creator || 'Desconhecido'),
                 uploaderId: data.channel_id || data.uploader_id || '',
                 uploadDate,
@@ -291,32 +291,12 @@ export const VideoCaptureService = {
             const rawThumbnail = getMeta('og:image') || getMeta('twitter:image') || '';
             const thumbnail = this.maybeProxyThumbnail(rawThumbnail);
             
-            // Tentar extrair duração de tags de vídeo (comum em FB/IG)
-            // FB costuma usar og:video:duration (segundos) ou formatos ISO
-            const durationStr = getMeta('video:duration') || getMeta('og:video:duration') || getMeta('video:duration_sec') || '0';
-            
-            let duration = 0;
-            if (durationStr.startsWith('PT')) {
-                // Parse ISO8601 duration (ex: PT1M30S)
-                const m = durationStr.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-                if (m) {
-                    const h = parseInt(m[1] || '0', 10);
-                    const min = parseInt(m[2] || '0', 10);
-                    const s = parseInt(m[3] || '0', 10);
-                    duration = h * 3600 + min * 60 + s;
-                }
-            } else {
-                duration = parseInt(durationStr, 10) || 0;
-            }
-            
-            // Tentar extrair views/engajamento
-            const viewsStr = getMeta('video:views') || getMeta('og:video:views') || getMeta('video:watch_count') || '0';
-            const views = parseInt(viewsStr.replace(/[^0-9]/g, ''), 10) || 0;
-            
-            const likesStr = getMeta('video:likes') || getMeta('og:video:likes') || '0';
-            const likes = parseInt(likesStr.replace(/[^0-9]/g, ''), 10) || 0;
-            
-            const uploadDate = getMeta('video:release_date') || getMeta('og:video:release_date') || getMeta('article:published_time') || '';
+            // Para FB/IG, as views e likes costumam estar no título: "13 M vues · 60 K réactions | ..."
+            // Vamos apenas exibir o card, sem tentar forçar metas que o Meta bloqueia no servidor
+            const duration = 0;
+            const views = 0;
+            const likes = 0;
+            const uploadDate = '';
             
             if (!title && !thumbnail && duration === 0) {
                 console.warn(`[VideoCaptureService] No OpenGraph data found for: ${url}`);
