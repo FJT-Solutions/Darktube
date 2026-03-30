@@ -211,12 +211,26 @@ export const VideoCaptureService = {
     },
 
     /**
-     * Extract metadata from any video URL using yt-dlp.
-     * Falls back to OpenGraph if yt-dlp fails.
+     * Extract metadata from any video URL.
+     * YouTube: uses official Data API v3 (yt-dlp gets blocked by anti-bot).
+     * Other platforms: uses yt-dlp → OpenGraph fallback chain.
      */
     async extractMetadataFromUrl(url: string): Promise<VideoMetadata | null> {
         const source = detectPlatform(url);
         
+        // YouTube: use official API v3 directly (yt-dlp gets anti-bot blocked on servers)
+        if (source === 'youtube') {
+            console.log(`[VideoCaptureService] Extracting YouTube metadata via API v3: ${url}`);
+            const apiResult = await this.extractYouTubeViaAPI(url);
+            if (apiResult) return apiResult;
+            // Fallback to oEmbed if API key missing or quota exceeded
+            console.warn(`[VideoCaptureService] YouTube API v3 failed, trying oEmbed`);
+            const oEmbedResult = await this.extractYouTubeOEmbed(url);
+            if (oEmbedResult) return oEmbedResult;
+            return this.extractOpenGraphMetadata(url, source);
+        }
+        
+        // Non-YouTube: use yt-dlp → OpenGraph fallback
         try {
             console.log(`[VideoCaptureService] Extracting metadata from ${source}: ${url}`);
             // SEC-02 FIX: Use execFile with args array to prevent command injection
@@ -251,12 +265,77 @@ export const VideoCaptureService = {
             };
         } catch (error: any) {
             console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
-            // Para YouTube, tentar oEmbed API (leve, sem HTML parsing)
-            if (source === 'youtube') {
-                const oEmbedResult = await this.extractYouTubeOEmbed(url);
-                if (oEmbedResult) return oEmbedResult;
-            }
             return this.extractOpenGraphMetadata(url, source);
+        }
+    },
+
+    /**
+     * YouTube Data API v3: returns full metadata (views, likes, duration, date).
+     * Uses the same API key already configured in the project.
+     */
+    async extractYouTubeViaAPI(url: string): Promise<VideoMetadata | null> {
+        try {
+            const apiKey = process.env.YOUTUBE_API_KEY;
+            if (!apiKey) {
+                console.warn('[VideoCaptureService] YOUTUBE_API_KEY not configured');
+                return null;
+            }
+
+            const videoIdMatch = url.match(/(?:v=|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})/);
+            const videoId = videoIdMatch?.[1];
+            if (!videoId) {
+                console.warn('[VideoCaptureService] Could not extract YouTube video ID');
+                return null;
+            }
+
+            const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,statistics,contentDetails&key=${apiKey}`;
+            const response = await fetch(apiUrl, { signal: AbortSignal.timeout(10000) });
+            
+            if (!response.ok) {
+                console.warn(`[VideoCaptureService] YouTube API returned ${response.status}`);
+                return null;
+            }
+
+            const data = await response.json();
+            const item = data.items?.[0];
+            if (!item) {
+                console.warn('[VideoCaptureService] YouTube API returned no items');
+                return null;
+            }
+
+            // Parse ISO 8601 duration (PT1H2M3S) to seconds
+            const durationStr = item.contentDetails?.duration || '';
+            const durationMatch = durationStr.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            const hours = parseInt(durationMatch?.[1] || '0', 10);
+            const minutes = parseInt(durationMatch?.[2] || '0', 10);
+            const seconds = parseInt(durationMatch?.[3] || '0', 10);
+            const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
+            const publishedAt = item.snippet?.publishedAt || '';
+            const uploadDate = publishedAt ? publishedAt.split('T')[0] : '';
+
+            console.log(`[VideoCaptureService] YouTube API v3 success: "${item.snippet?.title}"`);
+
+            return {
+                id: videoId,
+                title: decodeHtmlEntities(item.snippet?.title || 'Sem título'),
+                thumbnail: item.snippet?.thumbnails?.maxres?.url ||
+                    item.snippet?.thumbnails?.high?.url ||
+                    `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                duration: totalSeconds,
+                views: parseInt(item.statistics?.viewCount || '0', 10),
+                likes: parseInt(item.statistics?.likeCount || '0', 10),
+                comments: parseInt(item.statistics?.commentCount || '0', 10),
+                uploader: decodeHtmlEntities(item.snippet?.channelTitle || 'Desconhecido'),
+                uploaderId: item.snippet?.channelId || '',
+                uploadDate,
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                source: 'youtube' as VideoSource,
+                description: decodeHtmlEntities((item.snippet?.description || '').slice(0, 500)),
+            };
+        } catch (error: any) {
+            console.warn(`[VideoCaptureService] YouTube API v3 error: ${error.message}`);
+            return null;
         }
     },
 
