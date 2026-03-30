@@ -14,7 +14,7 @@ cmds = [
   'cp -r public/* .next/standalone/public/ || true',
   'mkdir -p .next/standalone/.next/static',
   'cp -r .next/static/* .next/standalone/.next/static/ || true',
-  'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o .next/standalone/yt-dlp',
+  'curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o .next/standalone/yt-dlp',
   'chmod a+rx .next/standalone/yt-dlp'
 ]
 
