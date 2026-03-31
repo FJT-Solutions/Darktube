@@ -19,6 +19,7 @@ RUN pnpm i --frozen-lockfile
 
 # 2. Build Next.js app
 FROM base AS builder
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 # Configurando ARGs para que o Dokploy possa injetar variáveis no tempo de build
 ARG NEXT_PUBLIC_SUPABASE_URL
@@ -69,6 +70,7 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 
 # Install runtime dependencies required by the application
 RUN apt-get update && apt-get install -y --no-install-recommends \
