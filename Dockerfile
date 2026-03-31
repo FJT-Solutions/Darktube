@@ -2,6 +2,7 @@ FROM node:20-bookworm-slim AS base
 ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+RUN echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
 RUN npm install -g pnpm
 
 # 1. Install dependencies
