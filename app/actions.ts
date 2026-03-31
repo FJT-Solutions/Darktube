@@ -1173,25 +1173,30 @@ export async function getSmartRecommendationsAction(limit = 12) {
     // Helper: search YouTube with fallback
     async function searchYouTube(query: string, searchLimit: number) {
         console.log("[SmartRecommendations] Buscando YouTube:", query)
-        const results = await YouTube.search(query, {
-            limit: searchLimit,
-            type: "video",
-            safeSearch: false
-        })
-        return (results || []).map((video: any) => ({
-            id: video.id || "",
-            title: video.title || "",
-            thumbnail: video.thumbnail?.url || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
-            views: video.views || 0,
-            likes: 0,
-            comments: 0,
-            duration: video.durationFormatted || "0:00",
-            publishedAt: video.uploadedAt || "",
-            channelId: video.channel?.id || "",
-            channelName: video.channel?.name || "",
-            description: video.description || "",
-            url: video.url || `https://www.youtube.com/watch?v=${video.id}`
-        }))
+        try {
+            const results = await YouTube.search(query, {
+                limit: searchLimit,
+                type: "video",
+                safeSearch: false
+            })
+            return (results || []).map((video: any) => ({
+                id: video.id || "",
+                title: video.title || "",
+                thumbnail: video.thumbnail?.url || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+                views: video.views || 0,
+                likes: 0,
+                comments: 0,
+                duration: video.durationFormatted || "0:00",
+                publishedAt: video.uploadedAt || "",
+                channelId: video.channel?.id || "",
+                channelName: video.channel?.name || "",
+                description: video.description || "",
+                url: video.url || `https://www.youtube.com/watch?v=${video.id}`
+            }))
+        } catch (err: any) {
+            console.warn("[SmartRecommendations] Falha no youtube-sr para a query:", query)
+            return []
+        }
     }
 
     // Pool de buscas genéricas para contas novas ou fallback

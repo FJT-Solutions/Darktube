@@ -456,8 +456,7 @@ export async function getRecentVideos(limit = 12): Promise<YouTubeVideo[]> {
     const { data, error } = await supabase
         .from('videos')
         .select(`
-            id, title, views, likes, comments, published_at, duration, thumbnail_url,
-            channel_id, type, description, external_url
+            id, title, views, published_at, duration, thumbnail_url, channel_id
         `)
         .order('created_at', { ascending: false })
         .limit(limit)
@@ -471,16 +470,16 @@ export async function getRecentVideos(limit = 12): Promise<YouTubeVideo[]> {
         id: v.id,
         title: v.title,
         views: v.views || 0,
-        likes: v.likes || 0,
-        comments: v.comments || 0,
+        likes: 0,
+        comments: 0,
         publishedAt: v.published_at,
         duration: v.duration,
         thumbnail: v.thumbnail_url,
         channelId: v.channel_id || '',
         channelName: 'Externo', // Defaulting to 'Externo', we could join channels table if needed
-        source: v.type as any || 'youtube',
-        url: v.external_url || `https://youtube.com/watch?v=${v.id}`,
-        description: v.description || ''
+        source: 'youtube',
+        url: `https://youtube.com/watch?v=${v.id}`,
+        description: ''
     }))
 }
 
