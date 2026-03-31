@@ -49,7 +49,7 @@ ENV SMTP_PORT=$SMTP_PORT
 ENV SMTP_USER=$SMTP_USER
 ENV SMTP_PASS=$SMTP_PASS
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
