@@ -385,6 +385,8 @@ export default function MinerarPage() {
               >
                 {extracting ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline">Extraindo...</span></>
+                ) : loading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline">Minerando...</span></>
                 ) : isUrlMode ? (
                   <><Link2 className="h-4 w-4" /><span className="hidden sm:inline">Extrair</span></>
                 ) : (
@@ -727,16 +729,22 @@ export default function MinerarPage() {
               </div>
 
               {loadingRecommended ? (
-                <div
-                  className={
-                    viewMode === "grid"
-                      ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                      : "space-y-3"
-                  }
-                >
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <VideoCardSkeleton key={`rec-skel-${i}`} compact={viewMode === "list"} />
-                  ))}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-center gap-3 py-8 rounded-xl border border-primary/20 bg-primary/5">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="text-lg font-semibold text-primary animate-pulse">Minerando vídeos em alta no YouTube...</span>
+                  </div>
+                  <div
+                    className={
+                      viewMode === "grid"
+                        ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                        : "space-y-3"
+                    }
+                  >
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <VideoCardSkeleton key={`rec-skel-${i}`} compact={viewMode === "list"} />
+                    ))}
+                  </div>
                 </div>
               ) : recommendedVideos.length > 0 ? (
                 <div
