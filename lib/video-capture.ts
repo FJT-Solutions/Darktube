@@ -165,8 +165,10 @@ export const VideoCaptureService = {
      * Download YouTube video via pytubefix (existing flow)
      */
     async downloadVideo(videoId: string): Promise<DownloadResult> {
-        const outputDir = path.join(process.cwd(), 'tmp', 'videos');
-        const frameDir = path.join(process.cwd(), 'tmp', 'frames', videoId);
+        // Enforce absolute path in Docker standalone runner
+        const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
+        const outputDir = path.join(baseTmp, 'videos');
+        const frameDir = path.join(baseTmp, 'frames', videoId);
 
         if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
         if (!fs.existsSync(frameDir)) fs.mkdirSync(frameDir, { recursive: true });
@@ -501,8 +503,9 @@ export const VideoCaptureService = {
      */
     async downloadFromUrl(url: string): Promise<DownloadResult> {
         const fileId = urlToId(url);
-        const outputDir = path.join(process.cwd(), 'tmp', 'videos');
-        const frameDir = path.join(process.cwd(), 'tmp', 'frames', fileId);
+        const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
+        const outputDir = path.join(baseTmp, 'videos');
+        const frameDir = path.join(baseTmp, 'frames', fileId);
 
         if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
         if (!fs.existsSync(frameDir)) fs.mkdirSync(frameDir, { recursive: true });
