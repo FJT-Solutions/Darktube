@@ -155,8 +155,10 @@ try:
     print(json.dumps(result))
 
 except Exception as e:
-    print(json.dumps({"error": str(e)}))
-    sys.exit(1)
+    import traceback
+    err_str = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+    print(json.dumps({"error": str(e), "traceback": err_str}))
+    sys.exit(0)
 `.trim();
 }
 
@@ -213,7 +215,20 @@ export const VideoCaptureService = {
             };
         } catch (error: any) {
             const stderrString = error.stderr || '';
-            console.error(`[VideoCaptureService] pytubefix failed: ${error.message}${stderrString ? `\nSTDERR: ${stderrString}` : ''}`);
+            const stdoutString = error.stdout || '';
+            let realErrorTitle = error.message;
+
+            try {
+                if (stdoutString) {
+                    const parsed = JSON.parse(stdoutString.trim());
+                    if (parsed.error) realErrorTitle = parsed.error;
+                    if (parsed.traceback) console.error(`[VideoCaptureService] Python Traceback: \n${parsed.traceback}`);
+                }
+            } catch (e) {
+                // If stdout isn't valid JSON, fallback to standard message
+            }
+
+            console.error(`[VideoCaptureService] pytubefix failed: ${realErrorTitle}${stderrString ? `\nSTDERR: ${stderrString}` : ''}`);
             
             const thumbPath = path.join(frameDir, 'thumb.jpg');
             try {
@@ -224,7 +239,7 @@ export const VideoCaptureService = {
                 }
             } catch {}
 
-            throw new Error(`Não foi possível acessar o vídeo. Verifique se ele é público e não tem restrição de idade. Detalhe: ${error.message}${stderrString ? ` (stderr: ${stderrString.slice(0, 50)})` : ''}`);
+            throw new Error(`Não foi possível acessar o vídeo. Verifique se ele é público e não tem restrição de idade. Detalhe: ${realErrorTitle}${stderrString ? ` (stderr: ${stderrString.slice(0, 50)})` : ''}`);
         } finally {
             if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
         }
