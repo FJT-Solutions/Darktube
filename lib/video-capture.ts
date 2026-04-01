@@ -185,10 +185,18 @@ export const VideoCaptureService = {
         const script = buildPytubefixScript(videoId, outputDir, frameDir);
         const scriptPath = path.join(outputDir, `${videoId}_dl.py`);
         fs.writeFileSync(scriptPath, script);
+        // Ensure the script is readable/executable for the nextjs user
+        fs.chmodSync(scriptPath, 0o777);
 
         try {
-            console.log(`[VideoCaptureService] Downloading ${videoId} via pytubefix...`);
-            const { stdout } = await execFilePromise('python3', [scriptPath], { timeout: 180000 });
+            console.log(`[VideoCaptureService] Downloading ${videoId} via pytubefix... (from ${scriptPath})`);
+            const { stdout, stderr } = await execFilePromise('python3', [scriptPath], { 
+                timeout: 180000,
+                env: { ...process.env, PYTHONUNBUFFERED: '1' } 
+            });
+            
+            if (stderr) console.warn(`[VideoCaptureService] Python stderr: ${stderr}`);
+
             const result = JSON.parse(stdout.trim());
 
             if (result.error) {
@@ -204,7 +212,8 @@ export const VideoCaptureService = {
                 isFallback: false,
             };
         } catch (error: any) {
-            console.error(`[VideoCaptureService] pytubefix failed: ${error.message}`);
+            const stderrString = error.stderr || '';
+            console.error(`[VideoCaptureService] pytubefix failed: ${error.message}${stderrString ? `\nSTDERR: ${stderrString}` : ''}`);
             
             const thumbPath = path.join(frameDir, 'thumb.jpg');
             try {
@@ -215,7 +224,7 @@ export const VideoCaptureService = {
                 }
             } catch {}
 
-            throw new Error(`Não foi possível acessar o vídeo. Verifique se ele é público e não tem restrição de idade. Detalhe: ${error.message}`);
+            throw new Error(`Não foi possível acessar o vídeo. Verifique se ele é público e não tem restrição de idade. Detalhe: ${error.message}${stderrString ? ` (stderr: ${stderrString.slice(0, 50)})` : ''}`);
         } finally {
             if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
         }

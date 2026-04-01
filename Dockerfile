@@ -91,7 +91,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 
 # Create temporary directory and set permissions for nextjs user
-RUN mkdir -p /app/tmp/videos && chown -R nextjs:nodejs /app/tmp
+RUN mkdir -p /app/tmp/videos /app/tmp/frames && chmod -R 777 /app/tmp && chown -R nextjs:nodejs /app/tmp
 
 USER nextjs
 EXPOSE 3000
