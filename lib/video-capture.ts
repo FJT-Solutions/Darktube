@@ -197,7 +197,7 @@ export const VideoCaptureService = {
             // SEC-02 FIX: Use execFile with args array to prevent command injection
             const { stdout } = await execFilePromise(
                 getYtDlpPath(),
-                ['--dump-json', '--no-download', '--no-warnings', '--no-playlist', url],
+                ['--dump-json', '--no-download', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=ios,tv,android', url],
                 { timeout: 30000 }
             );
             
@@ -477,7 +477,7 @@ export const VideoCaptureService = {
             // SEC-02 FIX: Use execFile with args array
             await execFilePromise(
                 getYtDlpPath(),
-                ['--no-warnings', '--no-playlist', '-f', 'worst[ext=mp4]/worst', '-o', videoPath, url],
+                ['--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=ios,tv,android', '-f', 'worst[ext=mp4]/worst', '-o', videoPath, url],
                 { timeout: 180000 }
             );
 
