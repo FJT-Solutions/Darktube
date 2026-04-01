@@ -90,6 +90,9 @@ RUN adduser --system --uid 1001 nextjs
 # Copy standalone output including the public and static copied inside .next/standalone
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 
+# Create temporary directory and set permissions for nextjs user
+RUN mkdir -p /app/tmp/videos && chown -R nextjs:nodejs /app/tmp
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
