@@ -76,9 +76,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
+    python3-pip \
     ca-certificates \
     openssl \
     && rm -rf /var/lib/apt/lists/*
+
+# Ensure pip3 is available and install pytubefix
+RUN pip3 install --no-cache-dir --break-system-packages pytubefix
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -90,5 +94,7 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Add /app to PATH so yt-dlp and other local binaries are found
+ENV PATH="/app:${PATH}"
 
 CMD ["node", "server.js"]

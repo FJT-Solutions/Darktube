@@ -13,9 +13,18 @@ const execPromise = promisify(exec);
  * or fallback to global system PATH when running in local dev.
  */
 function getYtDlpPath(): string {
-    const standalonePath = path.join(process.cwd(), 'yt-dlp');
-    if (fs.existsSync(standalonePath)) return standalonePath;
-    return 'yt-dlp';
+    // Check common locations in Docker/standalone
+    const possiblePaths = [
+        path.join(process.cwd(), 'yt-dlp'),
+        '/app/yt-dlp',
+        path.join(process.cwd(), '.next/standalone/yt-dlp')
+    ];
+    
+    for (const p of possiblePaths) {
+        if (fs.existsSync(p)) return p;
+    }
+    
+    return 'yt-dlp'; // Fallback to system PATH
 }
 
 export interface DownloadResult {

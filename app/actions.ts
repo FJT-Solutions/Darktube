@@ -4,6 +4,7 @@ import * as db from "@/lib/database"
 import { getNicheIntelligence } from "@/lib/intelligence"
 import { revalidatePath } from "next/cache"
 import { TrackedChannel } from "@/lib/types"
+import { parseYouTubeDate } from "@/lib/utils"
 import { VideoAnalysisService } from "@/lib/video-analysis"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { headers } from "next/headers"
@@ -61,14 +62,31 @@ export async function analyzeExternalVideoAction(url: string, videoMetadata?: an
                 thumbnail: videoMetadata.thumbnail || '',
                 views: videoMetadata.views || 0,
                 duration: videoMetadata.duration || '0:00',
-                publishedAt: videoMetadata.publishedAt || null,
-                channelId: '',
-                channelName: videoMetadata.channelName || 'Externo',
+                publishedAt: parseYouTubeDate(videoMetadata.publishedAt) || null,
+                channelId: videoMetadata.uploaderId || '',
+                channelName: videoMetadata.channelName || videoMetadata.uploader || 'Externo',
                 description: videoMetadata.description || '',
                 url: videoMetadata.url || url,
                 likes: videoMetadata.likes || 0,
                 comments: videoMetadata.comments || 0,
             }
+            // Ensure channel exists before updating video analysis to avoid FK error
+            const channelObj = {
+                id: videoMetadata.uploaderId || videoMetadata.channelId || '',
+                name: videoMetadata.uploader || videoMetadata.channelName || 'Externo',
+                handle: '',
+                avatar: videoMetadata.thumbnail || '',
+                banner: '',
+                subscribers: 0,
+                totalViews: 0,
+                videoCount: 0,
+                description: '',
+                url: '',
+            };
+            if (channelObj.id) {
+                await db.ensureChannelExists(channelObj as any, user.id);
+            }
+            
             await db.updateVideoAnalysis(videoForDb, analysis.transcript || '', JSON.stringify(analysis), user.id)
         }
 
@@ -113,6 +131,19 @@ export async function analyzeVideoAction(video: any, channel?: any) {
         // Ensure channel exists if provided
         if (channel) {
             await db.ensureChannelExists(channel, user.id)
+        } else if (video.channelId) {
+            // Fallback for missing channel object but present channelId
+            await db.ensureChannelExists({
+                id: video.channelId,
+                name: video.channelName || 'Externo',
+                avatar: video.thumbnail || '',
+                subscribers: 0,
+                totalViews: 0,
+                videoCount: 0,
+                description: '',
+                handle: '',
+                url: '',
+            } as any, user.id);
         }
 
         // Fetch transcript in background (optional — used later for script generation)
@@ -121,8 +152,12 @@ export async function analyzeVideoAction(video: any, channel?: any) {
         // Run full visual analysis via Gemini 2.5 Flash + File API
         const analysis = await VideoAnalysisService.performVisualAnalysis(video.id, geminiApiKey)
 
-        // Save to database
-        await db.updateVideoAnalysis(video, transcript, JSON.stringify(analysis), user.id)
+        // Save to database (parse date first)
+        const videoToSave = {
+            ...video,
+            publishedAt: parseYouTubeDate(video.publishedAt)
+        }
+        await db.updateVideoAnalysis(videoToSave, transcript, JSON.stringify(analysis), user.id)
 
         revalidatePath(`/canal/[id]`, 'layout')
         return { success: true, analysis, transcript }

@@ -45,7 +45,7 @@ export interface YouTubeVideo {
   likes: number
   comments: number
   duration: string
-  publishedAt: string
+  publishedAt?: string | null
   channelId: string
   channelName: string
   description: string

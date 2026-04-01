@@ -55,6 +55,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!user && !isPublic) {
+    // Check if the URL is a static asset that might have been missed by the matcher
+    const isStaticAsset = pathname.startsWith('/static/') || 
+                         pathname.startsWith('/js/') || 
+                         pathname.startsWith('/assets/') || 
+                         pathname === '/robots.txt' ||
+                         pathname === '/sitemap.xml';
+
+    if (isStaticAsset) {
+      return supabaseResponse;
+    }
+
     console.log(`[Middleware] Blocking unauthenticated access to: ${pathname}`)
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -97,6 +108,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Adicionado exclusão de /api/* para não engargalar o middleware de requisições de backend
-  matcher: ['/((?!api|_next/static|_next/image|_vercel|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Excluir explicitamente pastas comuns de assets estáticos e arquivos de sistema
+  matcher: ['/((?!api|_next/static|_next/image|_vercel|static|js|assets|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
