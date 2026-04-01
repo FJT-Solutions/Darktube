@@ -202,10 +202,11 @@ function calculateDarkScore(
       const latestVideo = new Date(sortedVideos[0].publishedAt!)
       const daysSinceLastUpload = (new Date().getTime() - latestVideo.getTime()) / (1000 * 60 * 60 * 24)
 
-    if (daysSinceLastUpload <= 7) score += 20
-    else if (daysSinceLastUpload <= 14) score += 15
-    else if (daysSinceLastUpload <= 30) score += 10
-    else if (daysSinceLastUpload <= 60) score += 5
+      if (daysSinceLastUpload <= 7) score += 20
+      else if (daysSinceLastUpload <= 14) score += 15
+      else if (daysSinceLastUpload <= 30) score += 10
+      else if (daysSinceLastUpload <= 60) score += 5
+    }
   }
 
   // 3. Frequencia de upload (0-25 pontos)
