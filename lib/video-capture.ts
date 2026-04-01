@@ -167,82 +167,8 @@ export const VideoCaptureService = {
      * Download YouTube video via pytubefix (existing flow)
      */
     async downloadVideo(videoId: string): Promise<DownloadResult> {
-        // Enforce absolute path in Docker standalone runner
-        const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
-        const outputDir = path.join(baseTmp, 'videos');
-        const frameDir = path.join(baseTmp, 'frames', videoId);
-
-        if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-        if (!fs.existsSync(frameDir)) fs.mkdirSync(frameDir, { recursive: true });
-
-        const cachedVideo = path.join(outputDir, `${videoId}.mp4`);
-        if (fs.existsSync(cachedVideo) && fs.statSync(cachedVideo).size > 100000) {
-            console.log(`[VideoCaptureService] Using cached video for ${videoId}`);
-            const frames = fs.readdirSync(frameDir)
-                .filter(f => f.endsWith('.jpg'))
-                .map(f => path.join(frameDir, f));
-            return { videoPath: cachedVideo, framePaths: frames, isFallback: false };
-        }
-
-        const script = buildPytubefixScript(videoId, outputDir, frameDir);
-        const scriptPath = path.join(outputDir, `${videoId}_dl.py`);
-        fs.writeFileSync(scriptPath, script);
-        // Ensure the script is readable/executable for the nextjs user
-        fs.chmodSync(scriptPath, 0o777);
-
-        try {
-            console.log(`[VideoCaptureService] Downloading ${videoId} via pytubefix... (from ${scriptPath})`);
-            const { stdout, stderr } = await execFilePromise('python3', [scriptPath], { 
-                timeout: 180000,
-                env: { ...process.env, PYTHONUNBUFFERED: '1' } 
-            });
-            
-            if (stderr) console.warn(`[VideoCaptureService] Python stderr: ${stderr}`);
-
-            const result = JSON.parse(stdout.trim());
-
-            if (result.error) {
-                throw new Error(`pytubefix: ${result.error}`);
-            }
-
-            console.log(`[VideoCaptureService] Success: ${result.framePaths?.length} frames`);
-            return {
-                videoPath: result.videoPath,
-                framePaths: result.framePaths || [],
-                audioPath: result.audioPath || undefined,
-                duration: result.duration || 0,
-                isFallback: false,
-            };
-        } catch (error: any) {
-            const stderrString = error.stderr || '';
-            const stdoutString = error.stdout || '';
-            let realErrorTitle = error.message;
-
-            try {
-                if (stdoutString) {
-                    const parsed = JSON.parse(stdoutString.trim());
-                    if (parsed.error) realErrorTitle = parsed.error;
-                    if (parsed.traceback) console.error(`[VideoCaptureService] Python Traceback: \n${parsed.traceback}`);
-                }
-            } catch (e) {
-                // If stdout isn't valid JSON, fallback to standard message
-            }
-
-            console.error(`[VideoCaptureService] pytubefix failed: ${realErrorTitle}${stderrString ? `\nSTDERR: ${stderrString}` : ''}`);
-            
-            const thumbPath = path.join(frameDir, 'thumb.jpg');
-            try {
-                await execFilePromise('curl', ['-s', '-L', '-o', thumbPath, `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`], { timeout: 10000 });
-                if (fs.existsSync(thumbPath) && fs.statSync(thumbPath).size > 1000) {
-                    console.warn(`[VideoCaptureService] Using thumbnail-only fallback for ${videoId}`);
-                    return { framePaths: [thumbPath], isFallback: true };
-                }
-            } catch {}
-
-            throw new Error(`Não foi possível acessar o vídeo. Verifique se ele é público e não tem restrição de idade. Detalhe: ${realErrorTitle}${stderrString ? ` (stderr: ${stderrString.slice(0, 50)})` : ''}`);
-        } finally {
-            if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
-        }
+        console.log(`[VideoCaptureService] Redirecionando ${videoId} para pipeline universal (yt-dlp)...`);
+        return this.downloadFromUrl(`https://www.youtube.com/watch?v=${videoId}`);
     },
 
     /**
