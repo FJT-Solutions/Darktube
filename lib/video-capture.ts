@@ -110,7 +110,7 @@ os.makedirs(output_dir, exist_ok=True)
 os.makedirs(frame_dir, exist_ok=True)
 
 try:
-    yt = YouTube(url)
+    yt = YouTube(url, client='WEB', use_po_token=True)
     title = yt.title
 
     stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
