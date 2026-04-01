@@ -57,7 +57,7 @@ function calculateGrowthPotential(
   const twentyEightDaysAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
 
   const viewsLast28Days = videos
-    .filter((v) => new Date(v.publishedAt) >= twentyEightDaysAgo)
+    .filter((v) => v.publishedAt && new Date(v.publishedAt) >= twentyEightDaysAgo)
     .reduce((sum, v) => sum + v.views, 0)
 
   if (channel.totalViews === 0) return { growthPotential: 0, viewsLast28Days }
@@ -78,13 +78,15 @@ function calculateUploadFrequency(videos: YouTubeVideo[]): {
     return { frequency: "Indeterminado", uploadsPerMonth: 0 }
   }
 
-  const sortedVideos = [...videos].sort(
+  const sortedVideos = [...videos]
+    .filter(v => v.publishedAt)
+    .sort(
     (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      new Date(b.publishedAt!).getTime() - new Date(a.publishedAt!).getTime()
   )
 
-  const firstDate = new Date(sortedVideos[sortedVideos.length - 1].publishedAt)
-  const lastDate = new Date(sortedVideos[0].publishedAt)
+  const firstDate = new Date(sortedVideos[sortedVideos.length - 1].publishedAt!)
+  const lastDate = new Date(sortedVideos[0].publishedAt!)
   const daysDiff = Math.max(
     1,
     (lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -190,11 +192,15 @@ function calculateDarkScore(
 
   // 2. Recência e Consistência (0-20 pontos)
   if (videos.length > 0) {
-    const sortedVideos = [...videos].sort(
-      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-    )
-    const latestVideo = new Date(sortedVideos[0].publishedAt)
-    const daysSinceLastUpload = (new Date().getTime() - latestVideo.getTime()) / (1000 * 60 * 60 * 24)
+    const sortedVideos = [...videos]
+      .filter(v => v.publishedAt)
+      .sort(
+        (a, b) => new Date(b.publishedAt!).getTime() - new Date(a.publishedAt!).getTime()
+      )
+    
+    if (sortedVideos.length > 0) {
+      const latestVideo = new Date(sortedVideos[0].publishedAt!)
+      const daysSinceLastUpload = (new Date().getTime() - latestVideo.getTime()) / (1000 * 60 * 60 * 24)
 
     if (daysSinceLastUpload <= 7) score += 20
     else if (daysSinceLastUpload <= 14) score += 15
