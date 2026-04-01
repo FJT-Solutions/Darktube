@@ -66,9 +66,15 @@ export function calculateDarkScore(channel: YouTubeChannel, videos: YouTubeVideo
 
     // 2. Consistência (Baseado no histórico recente)
     if (videos.length > 0) {
-        const dates = videos.map(v => new Date(v.publishedAt).getTime()).sort((a, b) => b - a)
-        const recentGap = (Date.now() - dates[0]) / (1000 * 60 * 60 * 24)
-        factors.consistencyScore = Math.max(0, 25 - (recentGap / 7) * 5)
+        const dates = videos
+            .filter(v => v.publishedAt) // Filter out null/undefined
+            .map(v => new Date(v.publishedAt!).getTime())
+            .sort((a, b) => b - a)
+        
+        if (dates.length > 0) {
+            const recentGap = (Date.now() - dates[0]) / (1000 * 60 * 60 * 24)
+            factors.consistencyScore = Math.max(0, 25 - (recentGap / 7) * 5)
+        }
     }
 
     // 3. Viabilidade de Nicho (Baseado no tipo)
