@@ -38,7 +38,9 @@ import {
   Languages,
   Loader2,
   X,
-  Plus
+  Plus,
+  PlayCircle,
+  Clapperboard
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -47,6 +49,50 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+
+function VideoPlayerModal({ videoUrl, title }: { videoUrl: string, title: string }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-500">
+          <PlayCircle className="h-3 w-3" />
+          Ver Vídeo
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none shadow-2xl">
+        <DialogHeader className="p-4 bg-zinc-900/50 backdrop-blur-md border-b border-white/10">
+          <DialogTitle className="text-white flex items-center gap-2">
+            <Clapperboard className="h-4 w-4 text-emerald-500" />
+            Visualização de Produção
+          </DialogTitle>
+        </DialogHeader>
+        <div className="aspect-video w-full bg-black flex items-center justify-center">
+            <video 
+                src={videoUrl} 
+                controls 
+                autoPlay 
+                className="max-h-[70vh] w-full"
+            />
+        </div>
+        <div className="p-4 bg-zinc-900/50 border-t border-white/10 flex justify-end">
+            <Button size="sm" variant="ghost" asChild className="text-white hover:bg-white/10">
+                <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="gap-2">
+                    <ExternalLink className="h-3 w-3" />
+                    Abrir em Nova Aba
+                </a>
+            </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 function TranslatedPrompt({ text, label, icon: Icon, colorClass }: { text: string, label: string, icon: any, colorClass: string }) {
   const [translated, setTranslated] = useState<string | null>(null)
@@ -434,16 +480,30 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
                       history.map((h: any) => (
                         <div key={h.id} className="p-3 rounded-lg border bg-secondary/5 space-y-2">
                           <div className="flex items-center justify-between">
-                            <Badge variant={h.status.includes('auto') ? 'secondary' : 'default'} className="text-[8px] uppercase">
-                              {h.status === 'sent_auto' ? 'Automático' : 'Manual'}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                <Badge variant={h.status.includes('auto') ? 'secondary' : 'default'} className="text-[8px] uppercase">
+                                {h.status === 'sent_auto' ? 'Automático' : 'Manual'}
+                                </Badge>
+                                {h.status === 'completed' && (
+                                    <Badge variant="outline" className="text-[8px] uppercase border-emerald-500 text-emerald-500 bg-emerald-500/5">
+                                        Pronto
+                                    </Badge>
+                                )}
+                            </div>
                             <span className="text-[9px] text-muted-foreground">
                               {new Date(h.dispatched_at).toLocaleString('pt-BR')}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-600 bg-emerald-500/5 p-1.5 rounded border border-emerald-500/10">
-                            <Check className="h-3 w-3" />
-                            Produção Iniciada (+1 Vídeo Unico)
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-600 bg-emerald-500/5 p-1.5 rounded border border-emerald-500/10 flex-1">
+                                <Check className="h-3 w-3" />
+                                {h.status === 'completed' ? 'Produção Finalizada' : 'Produção Iniciada'} (+1 Vídeo Único)
+                            </div>
+                            {h.video_url && (
+                                <div className="ml-2">
+                                    <VideoPlayerModal videoUrl={h.video_url} title={template.name} />
+                                </div>
+                            )}
                           </div>
                         </div>
                       ))

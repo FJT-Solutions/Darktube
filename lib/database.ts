@@ -395,6 +395,7 @@ export interface ProductionHistoryEntity {
     dispatched_at: string;
     payload: any;
     status: string;
+    video_url?: string | null;
 }
 
 export async function saveRemodelingTemplate(
