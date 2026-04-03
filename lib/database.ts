@@ -384,6 +384,8 @@ export interface RemodelingTemplateEntity {
     is_active: boolean;
     target_accounts: string[];
     tags: string[];
+    image_model: string;
+    video_model: string;
     created_at: string;
     updated_at: string;
 }
@@ -415,6 +417,23 @@ export async function saveRemodelingTemplate(
     
     if (error) throw error
     return inserted
+}
+
+export async function updateRemodelingTemplate(
+    templateId: string,
+    data: Partial<Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+): Promise<RemodelingTemplateEntity> {
+    const supabase = await createClient()
+    if (!supabase) throw new Error("Client not available")
+    const { data: updated, error } = await supabase
+        .from('remodeling_templates')
+        .update(data)
+        .eq('id', templateId)
+        .select()
+        .single()
+    
+    if (error) throw error
+    return updated
 }
 
 export async function getRemodelingTemplates(userId: string): Promise<RemodelingTemplateEntity[]> {

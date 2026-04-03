@@ -43,7 +43,9 @@ import {
   Plus,
   Clock,
   X,
-  Languages
+  Languages,
+  DollarSign,
+  Info
 } from "lucide-react"
 import { toast } from "sonner"
 import { getBlotatoAccountsAction, saveRemodelingTemplateAction, translatePromptAction } from "@/app/actions"
@@ -54,6 +56,14 @@ const MINUTE_OPTIONS = Array.from({ length: 1440 }, (_, i) => {
   const m = (i % 60).toString().padStart(2, '0')
   return `${h}h${m}`
 })
+
+const MODEL_PRICES: any = {
+  'flux-pro': { credits: 5, label: 'FLUX.1 Pro', type: 'image' },
+  'flux-max': { credits: 10, label: 'FLUX.1 Max', type: 'image' },
+  'flux-schnell': { credits: 1, label: 'FLUX.1 Schnell', type: 'image' },
+  'kling-v1': { credits: 160, label: 'Kling v1', type: 'video' },
+  'kling-v1.5': { credits: 350, label: 'Kling v1.5', type: 'video' },
+}
 
 function TranslatedPrompt({ text, label, icon: Icon, colorClass }: { text: string, label: string, icon: any, colorClass: string }) {
   const [translated, setTranslated] = useState<string | null>(null)
@@ -120,6 +130,7 @@ interface TemplateConfigDialogProps {
   analysis: any
   script: string
   onSuccess: () => void
+  initialData?: any
 }
 
 export function TemplateConfigDialog({
@@ -129,6 +140,7 @@ export function TemplateConfigDialog({
   analysis,
   script,
   onSuccess,
+  initialData,
 }: TemplateConfigDialogProps) {
   const [loading, setLoading] = useState(false)
   const [accounts, setAccounts] = useState<any[]>([])
@@ -141,32 +153,49 @@ export function TemplateConfigDialog({
   const [hasMusic, setHasMusic] = useState(true)
   const [musicStyle, setMusicStyle] = useState("epic")
   const [voiceType, setVoiceType] = useState("masculine_br")
+  const [imageModel, setImageModel] = useState("flux-pro")
+  const [videoModel, setVideoModel] = useState("kling-v1")
   const [frequency, setFrequency] = useState("daily")
   const [intervalDays, setIntervalDays] = useState(1)
   const [postTimes, setPostTimes] = useState<string[]>([])
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
 
+  const isEdit = !!initialData
   const structuredSegments = analysis?.remodeling_template?.script_base || []
+  const segmentsCount = structuredSegments.length || 1
 
   useEffect(() => {
     if (open) {
-      setName(`Template: ${video.title?.slice(0, 30)}...` || "Novo Template")
-      fetchAccounts()
-      
-      // Auto-configure based on AI analysis
-      if (analysis?.detected_audio_type === 'music_only') {
-        setVoiceType("none")
-      } else if (analysis?.detected_audio_type === 'voice') {
-        setVoiceType("narrator")
-      }
+      if (initialData) {
+        setName(initialData.name)
+        setFormat(initialData.format)
+        setHasMusic(initialData.has_music)
+        setMusicStyle(initialData.music_style)
+        setVoiceType(initialData.voice_type)
+        setImageModel(initialData.image_model || "flux-pro")
+        setVideoModel(initialData.video_model || "kling-v1")
+        setFrequency(initialData.post_frequency)
+        setIntervalDays(initialData.post_interval_days)
+        setPostTimes(initialData.post_times || [])
+        setSelectedAccounts(initialData.target_accounts || [])
+      } else {
+        setName(`Template: ${video?.title?.slice(0, 30)}...` || "Novo Template")
+        
+        if (analysis?.detected_audio_type === 'music_only') {
+          setVoiceType("none")
+        } else if (analysis?.detected_audio_type === 'voice') {
+          setVoiceType("narrator")
+        }
 
-      if (analysis?.remodeling_template?.music_style === 'none' || analysis?.remodeling_template?.music_style === 'Sem música') {
-        setMusicStyle("none")
-      } else if (analysis?.remodeling_template?.music_style) {
-        setMusicStyle("epic")
+        if (analysis?.remodeling_template?.music_style === 'none' || analysis?.remodeling_template?.music_style === 'Sem música') {
+          setMusicStyle("none")
+        } else if (analysis?.remodeling_template?.music_style) {
+          setMusicStyle("epic")
+        }
       }
+      fetchAccounts()
     }
-  }, [open, video, analysis])
+  }, [open, video, analysis, initialData])
 
   async function fetchAccounts() {
     setFetchingAccounts(true)
@@ -174,8 +203,6 @@ export function TemplateConfigDialog({
       const result = await getBlotatoAccountsAction()
       const data = result || []
       setAccounts(data)
-      
-      // Auto-select if there's only one account
       if (data.length === 1 && selectedAccounts.length === 0) {
         setSelectedAccounts([data[0].id])
       }
@@ -186,6 +213,12 @@ export function TemplateConfigDialog({
     }
   }
 
+  const imgCredits = MODEL_PRICES[imageModel]?.credits || 0
+  const vidCredits = MODEL_PRICES[videoModel]?.credits || 0
+  const totalImg = imgCredits * segmentsCount
+  const totalVid = vidCredits * segmentsCount
+  const totalCredits = totalImg + totalVid
+
   async function handleSave() {
     if (!name) {
       toast.error("Por favor, dê um nome ao template.")
@@ -194,7 +227,7 @@ export function TemplateConfigDialog({
 
     setLoading(true)
     try {
-      const result = await saveRemodelingTemplateAction({
+      const templatePayload = {
         video_id: video.id,
         video_title: video.title,
         video_thumbnail: video.thumbnail,
@@ -205,20 +238,26 @@ export function TemplateConfigDialog({
         has_music: hasMusic,
         music_style: musicStyle,
         voice_type: voiceType,
+        image_model: imageModel,
+        video_model: videoModel,
         post_frequency: frequency,
         post_interval_days: intervalDays,
         post_times: postTimes,
         is_active: true,
         target_accounts: selectedAccounts,
         tags: [],
-      })
+      }
+
+      const result = isEdit 
+        ? await (await import("@/app/actions")).updateRemodelingTemplateAction(initialData.id, templatePayload)
+        : await saveRemodelingTemplateAction(templatePayload)
 
       if (result.success) {
-        toast.success("Template salvo com sucesso!")
+        toast.success(isEdit ? "Template atualizado!" : "Template salvo!")
         onSuccess()
         onOpenChange(false)
       } else {
-        toast.error(result.error || "Falha ao salvar template.")
+        toast.error(result.error || "Falha na operação.")
       }
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar template.")
@@ -233,7 +272,7 @@ export function TemplateConfigDialog({
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <LayoutTemplate className="h-5 w-5 text-primary" />
-            Configurar Template de Remodelagem
+            {isEdit ? "Editar Configurações do Template" : "Configurar Template de Remodelagem"}
           </DialogTitle>
         </DialogHeader>
 
@@ -311,8 +350,91 @@ export function TemplateConfigDialog({
                   </div>
                 </div>
 
+                {/* AI Models Selection */}
+                <div className="space-y-3 bg-primary/5 p-4 rounded-xl border border-primary/10">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-primary uppercase flex items-center gap-2">
+                      <Sparkles className="h-3 w-3" />
+                      Modelos de Geração Kie.ai
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px] bg-background">
+                        {segmentsCount} {segmentsCount === 1 ? 'Cena' : 'Cenas'}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] opacity-70">Imagem</Label>
+                      <Select value={imageModel} onValueChange={setImageModel}>
+                        <SelectTrigger className="bg-background h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="flux-pro">
+                             <div className="flex flex-col items-start leading-tight">
+                                <span className="flex items-center gap-1 font-bold text-xs">FLUX.1 Pro <Badge className="text-[8px] h-3 px-1">REC</Badge></span>
+                                <span className="text-[9px] opacity-60">5 créditos p/ img</span>
+                             </div>
+                          </SelectItem>
+                          <SelectItem value="flux-max">
+                             <div className="flex flex-col items-start leading-tight">
+                                <span className="font-bold text-xs">FLUX.1 Max</span>
+                                <span className="text-[9px] opacity-60">10 créditos p/ img</span>
+                             </div>
+                          </SelectItem>
+                          <SelectItem value="flux-schnell">
+                             <div className="flex flex-col items-start leading-tight">
+                                <span className="font-bold text-xs">FLUX.1 Schnell</span>
+                                <span className="text-[9px] opacity-60">1 crédito p/ img</span>
+                             </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[10px] opacity-70">Vídeo (Moov/Cena)</Label>
+                      <Select value={videoModel} onValueChange={setVideoModel}>
+                        <SelectTrigger className="bg-background h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="kling-v1">
+                             <div className="flex flex-col items-start leading-tight">
+                                <span className="flex items-center gap-1 font-bold text-xs">Kling v1 <Badge className="text-[8px] h-3 px-1">REC</Badge></span>
+                                <span className="text-[9px] opacity-60">160 créditos p/ cena</span>
+                             </div>
+                          </SelectItem>
+                          <SelectItem value="kling-v1.5">
+                             <div className="flex flex-col items-start leading-tight">
+                                <span className="font-bold text-xs">Kling v1.5</span>
+                                <span className="text-[9px] opacity-60">350 créditos p/ cena</span>
+                             </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-primary/10 grid grid-cols-3 gap-2">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Imagens</span>
+                      <span className="text-sm font-bold text-primary">{totalImg} <span className="text-[10px] font-normal">créditos</span></span>
+                    </div>
+                    <div className="flex flex-col border-x border-primary/10 px-2">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Cenas Vídeo</span>
+                      <span className="text-sm font-bold text-primary">{totalVid} <span className="text-[10px] font-normal">créditos</span></span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-primary font-bold uppercase">Total Estimado</span>
+                      <span className="text-base font-black text-primary leading-none">{totalCredits} <span className="text-[10px] font-normal">créditos</span></span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-6">
-                  {/* Music */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
                       <Music className="h-3.5 w-3.5 text-muted-foreground" />
@@ -332,7 +454,6 @@ export function TemplateConfigDialog({
                     </Select>
                   </div>
 
-                  {/* Frequency */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -353,15 +474,10 @@ export function TemplateConfigDialog({
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      Horários de Postagem (Minuto a Minuto)
-                    </Label>
-                    <Badge variant="outline" className="text-[9px] uppercase border-emerald-500/30 text-emerald-500">
-                      Prevenção de Duplicatas Ativa
-                    </Badge>
-                  </div>
+                  <Label className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    Horários de Postagem (Sincronização n8n)
+                  </Label>
                   
                   <div className="flex gap-4">
                     <div className="w-1/3 border rounded-xl overflow-hidden bg-secondary/10 flex flex-col h-[200px]">
@@ -422,7 +538,6 @@ export function TemplateConfigDialog({
                   </div>
                 </div>
 
-                {/* Accounts */}
                 <div className="space-y-3">
                   <Label className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-primary" />
@@ -481,7 +596,6 @@ export function TemplateConfigDialog({
                           <span className="text-xs font-mono font-bold text-primary">{seg.timestamp}</span>
                         </div>
                         <div className="p-4 space-y-4">
-                          {/* Voiceover */}
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5">
                               <Mic2 className="h-3 w-3 text-emerald-500" />
@@ -490,7 +604,6 @@ export function TemplateConfigDialog({
                             <p className="text-sm text-foreground/90 leading-relaxed italic">"{seg.voiceover?.text}"</p>
                           </div>
 
-                          {/* Visual */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/50">
                             <TranslatedPrompt 
                               text={seg.visual_content?.image_prompt} 
@@ -531,7 +644,7 @@ export function TemplateConfigDialog({
           </Button>
           <Button onClick={handleSave} disabled={loading} className="gap-2 min-w-[140px]">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar Template
+            {isEdit ? "Atualizar Template" : "Salvar Template"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1127,6 +1127,20 @@ export async function saveRemodelingTemplateAction(data: any) {
     }
 }
 
+export async function updateRemodelingTemplateAction(templateId: string, data: any) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        const result = await db.updateRemodelingTemplate(templateId, data)
+        return { success: true, data: result }
+    } catch (error: any) {
+        console.error("Error in updateRemodelingTemplateAction:", error)
+        return { success: false, error: error.message || "Falha ao atualizar template." }
+    }
+}
+
 export async function getRemodelingTemplatesAction() {
     try {
         const supabase = await createClient()

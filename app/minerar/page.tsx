@@ -63,6 +63,21 @@ export default function MinerarPage() {
   const [recommendedVideos, setRecommendedVideos] = useState<YouTubeVideo[]>([])
   const [loadingRecommended, setLoadingRecommended] = useState(true)
 
+  const refreshRecommendations = useCallback(async () => {
+    setLoadingRecommended(true)
+    setRecommendedVideos([]) // Clear current results for "fresh" feel
+    try {
+      // Small delay to feel the "refresh"
+      await new Promise(resolve => setTimeout(resolve, 600))
+      const vids = await getSmartRecommendationsAction(16)
+      setRecommendedVideos(vids)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingRecommended(false)
+    }
+  }, [])
+
   // Link extraction state (merged into main search)
   const [extractedVideo, setExtractedVideo] = useState<YouTubeVideo | null>(null)
   const [extracting, setExtracting] = useState(false)
@@ -720,9 +735,25 @@ export default function MinerarPage() {
           ) : (
             <div className="flex flex-col py-6 animate-in fade-in duration-500">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-foreground">
-                  🔥 Tendências para Replicar
-                </h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-bold text-foreground">
+                    🔥 Tendências para Replicar
+                  </h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={refreshRecommendations}
+                    disabled={loadingRecommended}
+                    className="h-8 gap-2 rounded-full border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary text-[10px] uppercase font-bold"
+                  >
+                    {loadingRecommended ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3" />
+                    )}
+                    Atualizar
+                  </Button>
+                </div>
                 <p className="text-sm text-muted-foreground hidden sm:block">
                   Novos estilos e vídeos virais para inspiração
                 </p>
