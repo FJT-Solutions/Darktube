@@ -21,10 +21,66 @@ function getYtDlpPath(): string {
     ];
     
     for (const p of possiblePaths) {
-        if (fs.existsSync(p)) return p;
+        if (fs.existsSync(p)) {
+            console.log(`[VideoCaptureService] Encontrado yt-dlp em: ${p}`);
+            return p;
+        }
     }
     
+    console.warn(`[VideoCaptureService] yt-dlp não encontrado em caminhos fixos, usando fallback: 'yt-dlp'`);
     return 'yt-dlp'; // Fallback to system PATH
+}
+
+/**
+ * Get universal arguments for yt-dlp with anti-bot heuristics and cookie support.
+ */
+function getUniversalYtDlpArgs(url: string, cookiesPath?: string): string[] {
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+    const args = [
+        '--no-warnings',
+        '--no-playlist',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ];
+
+    if (isYouTube) {
+        // web_creator and mweb have higher success rate on server IPs in 2026
+        args.push('--extractor-args', 'youtube:player_client=web_creator,mweb,ios,android');
+        
+        if (cookiesPath && fs.existsSync(cookiesPath)) {
+            args.push('--cookies', cookiesPath);
+        }
+    }
+
+    return args;
+}
+
+/**
+ * Manages temporary cookies file from environment variable.
+ */
+function handleYoutubeCookies(): { path: string | null; cleanup: () => void } {
+    const cookiesContent = process.env.YOUTUBE_COOKIES;
+    if (!cookiesContent || cookiesContent.trim().length < 10) {
+        return { path: null, cleanup: () => {} };
+    }
+
+    try {
+        const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
+        if (!fs.existsSync(baseTmp)) fs.mkdirSync(baseTmp, { recursive: true });
+        
+        const cookiesPath = path.join(baseTmp, `cookies_${Date.now()}.txt`);
+        fs.writeFileSync(cookiesPath, cookiesContent);
+        console.log(`[VideoCaptureService] Using provided YouTube cookies from environment variable.`);
+        
+        return { 
+            path: cookiesPath, 
+            cleanup: () => {
+                try { if (fs.existsSync(cookiesPath)) fs.unlinkSync(cookiesPath); } catch {}
+            } 
+        };
+    } catch (err) {
+        console.error(`[VideoCaptureService] Error handling YOUTUBE_COOKIES:`, err);
+        return { path: null, cleanup: () => {} };
+    }
 }
 
 export interface DownloadResult {
@@ -194,14 +250,23 @@ export const VideoCaptureService = {
         // Non-YouTube: use yt-dlp → OpenGraph fallback
         try {
             console.log(`[VideoCaptureService] Extracting metadata from ${source}: ${url}`);
-            // SEC-02 FIX: Use execFile with args array to prevent command injection
-            const { stdout } = await execFilePromise(
-                getYtDlpPath(),
-                ['--dump-json', '--no-download', '--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=ios,tv,android', url],
-                { timeout: 30000 }
-            );
-            
-            const data = JSON.parse(stdout.trim());
+            const { path: cookies, cleanup } = handleYoutubeCookies();
+            let data: any;
+            try {
+                const { stdout } = await execFilePromise(
+                    getYtDlpPath(),
+                    [
+                        ...getUniversalYtDlpArgs(url, cookies),
+                        '--dump-json', 
+                        '--no-download', 
+                        url
+                    ],
+                    { timeout: 30000 }
+                );
+                data = JSON.parse(stdout.trim());
+            } finally {
+                cleanup();
+            }
             
             let uploadDate = '';
             if (data.upload_date) {
@@ -474,12 +539,22 @@ export const VideoCaptureService = {
             console.log(`[VideoCaptureService] Downloading via yt-dlp: ${url}`);
             
             const videoPath = path.join(outputDir, `${fileId}.mp4`);
-            // SEC-02 FIX: Use execFile with args array
-            await execFilePromise(
-                getYtDlpPath(),
-                ['--no-warnings', '--no-playlist', '--extractor-args', 'youtube:player_client=ios,tv,android', '-f', 'worst[ext=mp4]/worst', '-o', videoPath, url],
-                { timeout: 180000 }
-            );
+            const { path: cookies, cleanup } = handleYoutubeCookies();
+            try {
+                // SEC-02 FIX: Use execFile with args array
+                await execFilePromise(
+                    getYtDlpPath(),
+                    [
+                        ...getUniversalYtDlpArgs(url, cookies),
+                        '-f', 'worst[ext=mp4]/worst', 
+                        '-o', videoPath, 
+                        url
+                    ],
+                    { timeout: 180000 }
+                );
+            } finally {
+                cleanup();
+            }
 
             if (!fs.existsSync(videoPath) || fs.statSync(videoPath).size < 10000) {
                 throw new Error('Download produziu arquivo vazio ou muito pequeno');
