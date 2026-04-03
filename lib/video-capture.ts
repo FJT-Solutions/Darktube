@@ -182,10 +182,10 @@ try:
         capture_output=True, text=True
     )
     duration = float(probe.stdout.strip() or 60)
-    intervals = max(1, int(duration / 6))
+    intervals = max(1, int(duration / 15))
 
     frame_paths = []
-    for i in range(6):
+    for i in range(15):
         ts = min(i * intervals, int(duration) - 1)
         fp = os.path.join(frame_dir, f"f_{i:02d}.jpg")
         subprocess.run(
@@ -572,11 +572,11 @@ export const VideoCaptureService = {
                 duration = parseFloat(probeOut.trim()) || 60;
             } catch {}
 
-            const intervals = Math.max(1, Math.floor(duration / 6));
+            const intervals = Math.max(1, Math.floor(duration / 15));
             const framePaths: string[] = [];
 
-            // Extract 6 frames evenly distributed
-            for (let i = 0; i < 6; i++) {
+            // Extract 15 frames evenly distributed
+            for (let i = 0; i < 15; i++) {
                 const ts = Math.min(i * intervals, Math.floor(duration) - 1);
                 const fp = path.join(frameDir, `f_${String(i).padStart(2, '0')}.jpg`);
                 try {

@@ -62,12 +62,10 @@ export const GeminiVisionService = {
         const apiKey = customApiKey || process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
-        // Use v1 (stable) endpoint — same as n8n uses.
-        // v1beta has stricter free_tier_input_token_count quotas causing 429.
         const genAI = new GoogleGenerativeAI(apiKey);
         const modelName = "gemini-2.5-flash";
 
-        console.log(`[GeminiVisionService] Analyzing with ${modelName} (v1 endpoint, Free Tier safe)...`);
+        console.log(`[GeminiVisionService] 💎 Analyzing with ${modelName} (Professional Paid Tier)...`);
 
         const model = genAI.getGenerativeModel(
             { model: modelName },
@@ -83,13 +81,13 @@ export const GeminiVisionService = {
             contentParts.push({ text: `[TRANSCRIÇÃO DO VÍDEO]:\n${params.transcript.slice(0, 8000)}` });
         }
 
-        // 2. Frames inline (base64) — resized to 320x180 to minimize token cost
-        const frames = (params.framePaths ?? []).filter(f => fs.existsSync(f)).slice(0, 3);
+        // 2. Frames inline (base64) — HD (720p) for professional analysis
+        const frames = (params.framePaths ?? []).filter(f => fs.existsSync(f)).slice(0, 15);
         for (const f of frames) {
             const tmpFrame = path.join(os.tmpdir(), `gframe_${Date.now()}_${path.basename(f)}`);
             try {
-                // Resize to 320x180 (very low token cost) before base64 encoding
-                execSync(`ffmpeg -i "${f}" -vf "scale=320:180" -q:v 5 "${tmpFrame}" -y`, { stdio: 'pipe' });
+                // Resize to 1280x720 (HD) — allows reading text and fine details
+                execSync(`ffmpeg -i "${f}" -vf "scale=1280:720" -q:v 3 "${tmpFrame}" -y`, { stdio: 'pipe' });
                 const imageData = fs.existsSync(tmpFrame) ? tmpFrame : f;
                 contentParts.push({
                     inlineData: {
@@ -125,8 +123,8 @@ export const GeminiVisionService = {
             return JSON.parse(jsonStr) as RemodelingTemplate;
         } catch (error: any) {
             if (error?.message?.includes("429")) {
-                console.warn("[GeminiVisionService] 429 received, retrying in 62s...");
-                await new Promise(r => setTimeout(r, 62000));
+                console.warn("[GeminiVisionService] Rate limit hit, retrying in 5s...");
+                await new Promise(r => setTimeout(r, 5000));
                 const retry = await model.generateContent(contentParts);
                 const raw2 = retry.response.text();
                 const json2 = raw2.includes("```json") ? raw2.split("```json")[1].split("```")[0].trim() : raw2.trim();
@@ -137,53 +135,53 @@ export const GeminiVisionService = {
     },
 
     getPrompt(duration?: number) {
-        const durationText = duration ? `O vídeo original tem EXATAMENTE ${Math.round(duration)} segundos.` : 'A duração do vídeo original é curta.';
-        return `Você é um analista de conteúdo de vídeo de elite.
-Sua missão: analisar os FRAMES deste vídeo e criar uma FICHA TÉCNICA de análise visual.
+        const durationText = duration ? `O vídeo original tem EXATAMENTE ${Math.round(duration)} segundos.` : 'Esta é uma análise de estrutura visual completa.';
+        return `Você é um Analista de Conteúdo e Engenheiro de Prompts de elite.
+Sua missão é realizar uma DESCONSTRUÇÃO TOTAL deste vídeo para fins de remodelagem profissional.
 
-VOCÊ NÃO GERA ROTEIRO. Você APENAS analisa o que VÊ e OUVE nos frames.
+Analise cada um dos 15 frames em HD com máxima atenção aos detalhes. 
+Você deve capturar a ALMA do vídeo: imagem, animação, áudio e textos.
 
 ${durationText}
 
-ANÁLISE DE ÁUDIO OBRIGATÓRIA:
-Olhe e ouça os frames com extrema atenção:
-- Se há uma VOZ HUMANA narrando/falando → detected_audio_type = "voice"
-- Se há APENAS música de fundo sem fala humana → detected_audio_type = "music_only"
-- Se NÃO há som algum (silêncio total) → detected_audio_type = "none"
-Descreva o áudio original em "original_audio_description" (ex: "Música orquestral épica sem narração", "Narrador masculino grave com música de suspense", "Silêncio total").
+DIRETRIZES DE ANÁLISE:
+1. TEXTOS NA TELA: Leia e transcreva qualquer texto, logo ou CTA que apareça nos frames.
+2. ESTILO DE ANIMAÇÃO: Identifique o tipo de movimento das imagens (se é zoom suave, cortes frenéticos, transições de glitch, animação de stickers, etc).
+3. ESTRUTURA VISUAL: Descreva a paleta de cores, iluminação e enquadramento predominante.
+4. ÁUDIO & RITMO: Com base na transcrição e no ritmo visual, determine se o áudio original é voz humana, música ou ambos.
 
-CATÁLOGO DE FERRAMENTAS (Use no ai_stack):
+CATÁLOGO DE FERRAMENTAS RECOMENDADAS:
 - Imagem: "Black Forest Labs flux-2 pro", "ideogram v3", "seedream 5.0 Lite".
 - Vídeo: "Kling 3.0", "Open AI sora 2", "wan 2.5", "Runway Gen-3".
 - Voz: "Elevenlabs V3", "Elevenlabs Text to Speech (multilingual v2)".
 - Música: "Suno v3.5".
 
-RESPONDA APENAS COM O JSON:
+RESPONDA EXCLUSIVAMENTE COM ESTE JSON ESTRUTURADO:
 {
   "feasibility": "Alta | Média | Baixa",
-  "style": "descrição do nicho/tipo do conteúdo",
+  "style": "Nicho detalhado do vídeo",
   "visualStyle": "Cinematográfico | Dinâmico | Estoque/IA | Vlog/Real | Misto",
   "pacing": "Lento | Equilibrado | Frenético",
   "productionMethod": "IA Gerativa | Banco de Estoque | Edição Manual | Misto",
-  "confidence": 0.85,
-  "justification": "análise técnica do que foi observado nos frames",
-  "tools": ["ferramentas recomendadas"],
-  "summary": "resumo do conteúdo visual observado",
-  "remodelingTip": "dica estratégica para remodelar este conteúdo",
+  "confidence": 0.98,
+  "justification": "Análise técnica detalhada da estrutura observada nos 15 frames HD.",
+  "tools": ["Lista de ferramentas para recriação"],
+  "summary": "Resumo executivo do conteúdo visual e textual detectado.",
+  "remodelingTip": "A melhor estratégia para superar este vídeo original usando IA.",
   "detected_audio_type": "voice | music_only | none",
-  "has_text_on_screen": true,
-  "original_audio_description": "descrição exata do áudio original",
+  "has_text_on_screen": boolean,
+  "original_audio_description": "Descrição minuciosa do áudio (ex: Narrador energético com música lo-fi beat)",
   "remodeling_template": {
-    "visual_directives": "diretrizes visuais baseadas no que foi observado",
-    "composition_rules": "regras de composição",
-    "thumbnail_prompt": "prompt detalhado para thumbnail com alto CTR",
-    "music_style": "estilo de música que COMBINA com o áudio original",
-    "video_style": "estilo de vídeo observado",
+    "visual_directives": "Instruções exatas de como filmar ou gerar as cenas",
+    "composition_rules": "Regras de posicionamento e iluminação",
+    "thumbnail_prompt": "Prompt de ALTA CONVERSÃO (CTR) para a capa, descrevendo o frame mais impactante em HD",
+    "music_style": "Estilo de trilha sonora que manteria ou elevaria o engajamento",
+    "video_style": "Estilo visual técnico (ex: Cyberpunk, Minimalista, Dark Branding)",
     "ai_stack": { "image": "...", "video": "...", "voice": "...", "music": "..." },
-    "target_audience_psychology": "perfil do público-alvo"
+    "target_audience_psychology": "O gatilho mental que este vídeo ativa (ex: Curiosidade, Medo de perder, Autoridade)"
   }
 }
 
-IMPORTANTE: Seja 100% fiel ao que OBSERVA. Não invente narração se não há voz. Não invente música se há silêncio.`;
+IMPORTANTE: Você deve capturar TUDO. Se houver um texto pequeno no canto da tela, identifique-o. Se houver uma transição de animação específica, descreva-a.`;
     }
 };
