@@ -57,10 +57,10 @@ function getUniversalYtDlpArgs(url: string, cookiesPath?: string): string[] {
 /**
  * Manages temporary cookies file from environment variable.
  */
-function handleYoutubeCookies(): { path: string | null; cleanup: () => void } {
+function handleYoutubeCookies(): { path: string | undefined; cleanup: () => void } {
     const cookiesContent = process.env.YOUTUBE_COOKIES;
     if (!cookiesContent || cookiesContent.trim().length < 10) {
-        return { path: null, cleanup: () => {} };
+        return { path: undefined, cleanup: () => {} };
     }
 
     try {
@@ -79,7 +79,7 @@ function handleYoutubeCookies(): { path: string | null; cleanup: () => void } {
         };
     } catch (err) {
         console.error(`[VideoCaptureService] Error handling YOUTUBE_COOKIES:`, err);
-        return { path: null, cleanup: () => {} };
+        return { path: undefined, cleanup: () => {} };
     }
 }
 
