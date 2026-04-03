@@ -39,7 +39,8 @@ function getUniversalYtDlpArgs(url: string, cookiesPath?: string): string[] {
     const args = [
         '--no-warnings',
         '--no-playlist',
-        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        '--no-check-certificates',
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     ];
 
     if (isYouTube) {
@@ -610,7 +611,39 @@ export const VideoCaptureService = {
         } catch (error: any) {
             console.error(`[VideoCaptureService] yt-dlp download failed: ${error.message}`);
 
-            // Fallback: grab thumbnail via metadata
+            const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+            
+            // ── FALLBACK 1: pytubefix (YouTube only) ──
+            // Uses ANDROID client emulation — different approach than yt-dlp, no cookies needed
+            if (isYouTube) {
+                const videoIdMatch = url.match(/(?:v=|youtu\.be\/|\/shorts\/)([a-zA-Z0-9_-]{11})/);
+                if (videoIdMatch) {
+                    try {
+                        console.log(`[VideoCaptureService] Fallback 1: trying pytubefix for ${videoIdMatch[1]}...`);
+                        const pytubefixResult = await this.downloadViaPytubefix(videoIdMatch[1], outputDir, frameDir);
+                        if (pytubefixResult) {
+                            console.log(`[VideoCaptureService] pytubefix success: ${pytubefixResult.framePaths?.length || 0} frames`);
+                            return pytubefixResult;
+                        }
+                    } catch (pyErr: any) {
+                        console.warn(`[VideoCaptureService] pytubefix fallback failed: ${pyErr.message}`);
+                    }
+
+                    // ── FALLBACK 2: YouTube thumbnails (4 frames) ──
+                    try {
+                        console.log(`[VideoCaptureService] Fallback 2: downloading YouTube thumbnails for ${videoIdMatch[1]}...`);
+                        const thumbResult = await this.downloadYouTubeThumbnails(videoIdMatch[1], frameDir);
+                        if (thumbResult.framePaths && thumbResult.framePaths.length >= 2) {
+                            console.log(`[VideoCaptureService] YouTube thumbnail fallback success: ${thumbResult.framePaths.length} frames`);
+                            return thumbResult;
+                        }
+                    } catch (thumbErr: any) {
+                        console.warn(`[VideoCaptureService] YouTube thumbnail fallback failed: ${thumbErr.message}`);
+                    }
+                }
+            }
+
+            // ── FALLBACK 3: Generic single thumbnail via metadata ──
             try {
                 const meta = await this.extractMetadataFromUrl(url);
                 if (meta?.thumbnail) {
@@ -633,6 +666,117 @@ export const VideoCaptureService = {
                 `Detalhe: ${error.message}`
             );
         }
+    },
+
+    /**
+     * Download YouTube video via pytubefix (ANDROID client).
+     * Used as fallback when yt-dlp fails due to bot detection.
+     * pytubefix uses a different client emulation that often bypasses datacenter IP blocks.
+     */
+    async downloadViaPytubefix(videoId: string, outputDir: string, frameDir: string): Promise<DownloadResult | null> {
+        const script = buildPytubefixScript(videoId, outputDir, frameDir);
+        const scriptPath = path.join(outputDir, `pytubefix_${videoId}.py`);
+        
+        try {
+            fs.writeFileSync(scriptPath, script);
+            
+            const { stdout } = await execFilePromise(
+                'python3',
+                [scriptPath],
+                { timeout: 180000 }
+            );
+
+            // Clean up script file
+            if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+
+            const result = JSON.parse(stdout.trim());
+            
+            if (result.error) {
+                console.warn(`[VideoCaptureService] pytubefix error: ${result.error}`);
+                return null;
+            }
+
+            if (result.success && result.framePaths && result.framePaths.length > 0) {
+                return {
+                    videoPath: result.videoPath,
+                    framePaths: result.framePaths,
+                    audioPath: result.audioPath || undefined,
+                    isFallback: false,
+                };
+            }
+
+            return null;
+        } catch (err: any) {
+            // Clean up script file on error
+            if (fs.existsSync(scriptPath)) fs.unlinkSync(scriptPath);
+            throw err;
+        }
+    },
+
+    /**
+     * Download 4 auto-generated YouTube thumbnails as analysis frames.
+     * YouTube generates thumbnails at indices 0, 1, 2, 3 for every public video.
+     * These are different frames from the video, providing visual diversity.
+     * This method is used as a fallback when yt-dlp fails due to bot detection.
+     */
+    async downloadYouTubeThumbnails(videoId: string, frameDir: string): Promise<DownloadResult> {
+        console.log(`[VideoCaptureService] Downloading YouTube thumbnails for ${videoId}...`);
+        
+        if (!fs.existsSync(frameDir)) fs.mkdirSync(frameDir, { recursive: true });
+        
+        const framePaths: string[] = [];
+        
+        // YouTube auto-generates 4 thumbnails at different timestamps
+        // index 0 = default (chosen by uploader or auto-selected)
+        // index 1, 2, 3 = auto-generated at different points in the video
+        const thumbUrls = [
+            `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+            `https://img.youtube.com/vi/${videoId}/sddefault.jpg`,
+            `https://img.youtube.com/vi/${videoId}/1.jpg`,
+            `https://img.youtube.com/vi/${videoId}/2.jpg`,
+            `https://img.youtube.com/vi/${videoId}/3.jpg`,
+        ];
+        
+        for (let i = 0; i < thumbUrls.length; i++) {
+            const fp = path.join(frameDir, `yt_thumb_${String(i).padStart(2, '0')}.jpg`);
+            try {
+                const response = await fetch(thumbUrls[i], {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                    },
+                    signal: AbortSignal.timeout(10000),
+                });
+                
+                if (!response.ok) {
+                    console.warn(`[VideoCaptureService] Thumbnail ${i} returned ${response.status}, skipping`);
+                    continue;
+                }
+                
+                const buffer = Buffer.from(await response.arrayBuffer());
+                
+                // YouTube returns a small grey placeholder (< 2KB) for non-existent resolutions
+                if (buffer.length < 2000) {
+                    console.warn(`[VideoCaptureService] Thumbnail ${i} too small (${buffer.length}B), skipping`);
+                    continue;
+                }
+                
+                fs.writeFileSync(fp, buffer);
+                framePaths.push(fp);
+                console.log(`[VideoCaptureService] Downloaded thumbnail ${i}: ${buffer.length} bytes`);
+            } catch (err: any) {
+                console.warn(`[VideoCaptureService] Failed to download thumbnail ${i}: ${err.message}`);
+            }
+        }
+        
+        if (framePaths.length === 0) {
+            throw new Error('No YouTube thumbnails could be downloaded');
+        }
+        
+        console.log(`[VideoCaptureService] YouTube thumbnail fallback: ${framePaths.length} frames captured`);
+        return {
+            framePaths,
+            isFallback: false, // Not a degraded fallback — these are valid visual frames
+        };
     },
 
     async cleanupVideo(videoId: string) {

@@ -62,8 +62,8 @@ RUN cp -r public/* .next/standalone/public/ || true
 RUN mkdir -p .next/standalone/.next/static
 RUN cp -r .next/static/* .next/standalone/.next/static/ || true
 
-# Download yt-dlp explicitly to standalone directory
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o .next/standalone/yt-dlp
+# Download yt-dlp NIGHTLY build (latest anti-bot patches for datacenter IPs)
+RUN curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux -o .next/standalone/yt-dlp
 RUN chmod a+rx .next/standalone/yt-dlp
 
 # 3. Production runner
