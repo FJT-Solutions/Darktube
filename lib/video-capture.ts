@@ -546,7 +546,7 @@ export const VideoCaptureService = {
                     getYtDlpPath(),
                     [
                         ...getUniversalYtDlpArgs(url, cookies),
-                        '-f', 'worst[ext=mp4]/worst', 
+                        '-f', 'best[ext=mp4]/best', 
                         '-o', videoPath, 
                         url
                     ],
