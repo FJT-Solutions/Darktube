@@ -4,11 +4,12 @@ import * as db from "@/lib/database"
 import { getNicheIntelligence } from "@/lib/intelligence"
 import { revalidatePath } from "next/cache"
 import { TrackedChannel } from "@/lib/types"
-import { parseYouTubeDate } from "@/lib/utils"
+import { parseYouTubeDate, cn } from "@/lib/utils"
 import { VideoAnalysisService } from "@/lib/video-analysis"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { headers } from "next/headers"
 import { sendAccessGrantedEmail } from "@/lib/email"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 async function assertAdmin(userId: string) {
     const supabase = await createClient()
@@ -1150,7 +1151,92 @@ export async function getRemodelingTemplateByIdAction(id: string) {
         return template
     } catch (error: any) {
         console.error("Error in getRemodelingTemplateByIdAction:", error)
-        return null
+        throw error
+    }
+}
+
+export async function getProductionHistoryAction(templateId: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+        
+        // Ensure template belongs to user
+        const template = await db.getRemodelingTemplateById(templateId)
+        if (template.user_id !== user.id) throw new Error("Acesso negado")
+        
+        return await db.getProductionHistory(templateId)
+    } catch (error) {
+        console.error("Error in getProductionHistoryAction:", error)
+        return []
+    }
+}
+
+export async function sendToN8NAction(templateId: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        // 1. Get Template
+        const template = await db.getRemodelingTemplateById(templateId)
+        if (template.user_id !== user.id) throw new Error("Acesso negado")
+
+        // 2. Prepare Payload
+        const webhookUrl = process.env.N8N_PRODUCTION_WEBHOOK_URL
+        if (!webhookUrl) throw new Error("n8n Webhook URL não configurada.")
+
+        const payload = {
+            message: "Production Request from DarkTube",
+            timestamp: new Date().toISOString(),
+            user_id: user.id,
+            template: {
+                id: template.id,
+                name: template.name,
+                video_url: `https://youtube.com/watch?v=${template.video_id}`,
+                original_video_id: template.video_id,
+                format: template.format,
+                voice: template.voice_type,
+                music: template.music_style,
+                script_segments: template.template_data?.remodeling_template?.script_base || [],
+                transcription: template.generated_script || "",
+                ai_analysis: template.template_data
+            }
+        }
+
+        // 3. Send to n8n
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            throw new Error(`Erro no n8n: ${response.status} - ${errorText}`)
+        }
+
+        // 4. Record in History
+        await db.saveProductionHistory({
+            template_id: templateId,
+            original_video_id: template.video_id,
+            payload,
+            status: 'sent'
+        })
+
+        // 5. Update last dispatched
+        const { error: updateError } = await supabase
+            .from('remodeling_templates')
+            .update({ last_dispatched_at: new Date().toISOString() })
+            .eq('id', templateId)
+        
+        if (updateError) console.error("Failed to update last_dispatched_at:", updateError)
+
+        revalidatePath(`/templates/${templateId}`)
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in sendToN8NAction:", error)
+        return { success: false, error: error.message || "Erro ao disparar produção." }
     }
 }
 
@@ -1320,3 +1406,38 @@ export async function getSmartRecommendationsAction(limit = 12) {
     }
 }
 
+
+export async function translatePromptAction(text: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error("Não autorizado")
+
+        let geminiApiKey: string | undefined = process.env.GEMINI_API_KEY;
+        const { data: userKey } = await supabase.rpc('get_api_key', {
+            p_user_id: user.id,
+            p_provider: 'gemini'
+        })
+        if (userKey) geminiApiKey = userKey;
+
+        if (!geminiApiKey) throw new Error("API Key não encontrada")
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: `Traduza o seguinte prompt técnico de vídeo (instruções de imagem/animação) para Português do Brasil de forma clara e natural para o usuário final. Retorne APENAS a tradução: \n\n${text}`
+                    }]
+                }]
+            })
+        })
+
+        const data = await response.json()
+        return { success: true, translation: data.candidates?.[0]?.content?.parts?.[0]?.text || text }
+    } catch (error) {
+        console.error("Translation error:", error)
+        return { success: false, error: "Erro na tradução" }
+    }
+}

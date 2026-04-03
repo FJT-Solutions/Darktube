@@ -178,10 +178,25 @@ RESPONDA EXCLUSIVAMENTE COM ESTE JSON ESTRUTURADO:
     "music_style": "Estilo de trilha sonora que manteria ou elevaria o engajamento",
     "video_style": "Estilo visual técnico (ex: Cyberpunk, Minimalista, Dark Branding)",
     "ai_stack": { "image": "...", "video": "...", "voice": "...", "music": "..." },
-    "target_audience_psychology": "O gatilho mental que este vídeo ativa (ex: Curiosidade, Medo de perder, Autoridade)"
+    "target_audience_psychology": "O gatilho mental que este vídeo ativa (ex: Curiosidade, Medo de perder, Autoridade)",
+    "script_base": [
+      {
+        "timestamp": "0:00-0:05",
+        "segment_type": "GANCHO | DESENVOLVIMENTO | CTA",
+        "emotion": "Curiosidade | Urgência | Alívio",
+        "voiceover": {
+          "text": "Transcrição sugerida para locução baseada na análise visual e áudio",
+          "style": "Tom de voz e entonação específica"
+        },
+        "visual_content": {
+          "image_prompt": "Prompt técnico para IA gerar uma cena ÚNICA e CRIATIVA (evite repetições)",
+          "animation_instructions": "Como a cena deve se mover de forma dinâmica"
+        }
+      }
+    ]
   }
 }
 
-IMPORTANTE: Você deve capturar TUDO. Se houver um texto pequeno no canto da tela, identifique-o. Se houver uma transição de animação específica, descreva-a.`;
+IMPORTANTE: Você deve capturar TUDO e gerar sugestões de remodelagem que garantam que o novo vídeo seja ÚNICO e NUNCA se repita, mesmo seguindo o escopo do template. Varie os prompts visuais e o tom da narrativa.`;
     }
 };

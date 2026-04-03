@@ -38,10 +38,80 @@ import {
   Video, 
   ImageIcon, 
   Sparkles,
-  Type
+  Type,
+  Check,
+  Plus,
+  Clock,
+  X,
+  Languages
 } from "lucide-react"
 import { toast } from "sonner"
-import { getBlotatoAccountsAction, saveRemodelingTemplateAction } from "@/app/actions"
+import { getBlotatoAccountsAction, saveRemodelingTemplateAction, translatePromptAction } from "@/app/actions"
+import { cn } from "@/lib/utils"
+
+const MINUTE_OPTIONS = Array.from({ length: 1440 }, (_, i) => {
+  const h = Math.floor(i / 60).toString().padStart(2, '0')
+  const m = (i % 60).toString().padStart(2, '0')
+  return `${h}h${m}`
+})
+
+function TranslatedPrompt({ text, label, icon: Icon, colorClass }: { text: string, label: string, icon: any, colorClass: string }) {
+  const [translated, setTranslated] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(true)
+
+  const handleTranslate = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (translated) {
+      setShowOriginal(!showOriginal)
+      return
+    }
+    setLoading(true)
+    try {
+      const { success, translation } = await translatePromptAction(text)
+      if (success) {
+        setTranslated(translation)
+        setShowOriginal(false)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Icon className={cn("h-3 w-3", colorClass)} />
+          <span className={cn("text-[9px] font-bold uppercase", colorClass)}>{label}</span>
+        </div>
+        <button 
+          onClick={handleTranslate}
+          className="text-[9px] flex items-center gap-1 text-primary hover:underline font-bold"
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+          ) : (
+            <>
+              <Languages className="h-2.5 w-2.5" />
+              {translated ? (showOriginal ? "Ver Tradução" : "Ver Original") : "Traduzir"}
+            </>
+          )}
+        </button>
+      </div>
+      <p className={cn(
+        "text-[11px] p-2 rounded transition-all duration-300",
+        showOriginal ? "text-muted-foreground bg-secondary/20" : "text-primary bg-primary/5 border border-primary/20 italic"
+      )}>
+        {showOriginal ? text : translated}
+      </p>
+    </div>
+  )
+}
 
 interface TemplateConfigDialogProps {
   open: boolean
@@ -73,6 +143,7 @@ export function TemplateConfigDialog({
   const [voiceType, setVoiceType] = useState("masculine_br")
   const [frequency, setFrequency] = useState("daily")
   const [intervalDays, setIntervalDays] = useState(1)
+  const [postTimes, setPostTimes] = useState<string[]>([])
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
 
   const structuredSegments = analysis?.remodeling_template?.script_base || []
@@ -136,6 +207,7 @@ export function TemplateConfigDialog({
         voice_type: voiceType,
         post_frequency: frequency,
         post_interval_days: intervalDays,
+        post_times: postTimes,
         is_active: true,
         target_accounts: selectedAccounts,
         tags: [],
@@ -280,6 +352,76 @@ export function TemplateConfigDialog({
                   </div>
                 </div>
 
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      Horários de Postagem (Minuto a Minuto)
+                    </Label>
+                    <Badge variant="outline" className="text-[9px] uppercase border-emerald-500/30 text-emerald-500">
+                      Prevenção de Duplicatas Ativa
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-1/3 border rounded-xl overflow-hidden bg-secondary/10 flex flex-col h-[200px]">
+                      <div className="p-2 bg-secondary/20 text-[10px] uppercase font-bold text-muted-foreground border-b text-center">
+                        Selecione Horários
+                      </div>
+                      <ScrollArea className="flex-1">
+                        <div className="p-1 space-y-1">
+                          {MINUTE_OPTIONS.map((time) => (
+                            <button
+                              key={time}
+                              onClick={() => {
+                                if (postTimes.includes(time)) {
+                                  setPostTimes(postTimes.filter(t => t !== time))
+                                } else {
+                                  setPostTimes([...postTimes, time].sort())
+                                }
+                              }}
+                              className={cn(
+                                "w-full text-left px-3 py-1.5 rounded-md text-xs transition-colors flex items-center justify-between group",
+                                postTimes.includes(time) 
+                                  ? "bg-primary text-primary-foreground font-bold" 
+                                  : "hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                              )}
+                            >
+                              <span>{time}</span>
+                              {postTimes.includes(time) ? (
+                                <Check className="h-3 w-3" />
+                              ) : (
+                                <Plus className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+
+                    <div className="flex-1 border rounded-xl bg-secondary/5 p-4 flex flex-col gap-3 min-h-[200px]">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground">Horários Agendados ({postTimes.length})</Label>
+                      {postTimes.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {postTimes.map(time => (
+                            <Badge key={time} variant="secondary" className="pl-2 pr-1 py-1 gap-1 group bg-background border hover:border-destructive/30 transition-colors">
+                              {time}
+                              <button onClick={() => setPostTimes(postTimes.filter(t => t !== time))} className="p-0.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40">
+                          <Clock className="h-8 w-8 mb-2" />
+                          <p className="text-[10px]">Utilize a lista à esquerda para agendar os envios automáticos para o n8n.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Accounts */}
                 <div className="space-y-3">
                   <Label className="flex items-center gap-2">
@@ -350,20 +492,18 @@ export function TemplateConfigDialog({
 
                           {/* Visual */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/50">
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <ImageIcon className="h-3 w-3 text-blue-500" />
-                                <span className="text-[9px] font-bold text-blue-500 uppercase">Prompt de Imagem</span>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground line-clamp-3 bg-secondary/20 p-2 rounded">{seg.visual_content?.image_prompt}</p>
-                            </div>
-                            <div className="space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <Video className="h-3 w-3 text-purple-500" />
-                                <span className="text-[9px] font-bold text-purple-500 uppercase">Animação / Movimento</span>
-                              </div>
-                              <p className="text-[11px] text-muted-foreground bg-secondary/20 p-2 rounded">{seg.visual_content?.animation_instructions}</p>
-                            </div>
+                            <TranslatedPrompt 
+                              text={seg.visual_content?.image_prompt} 
+                              label="Prompt de Imagem" 
+                              icon={ImageIcon} 
+                              colorClass="text-blue-500" 
+                            />
+                            <TranslatedPrompt 
+                              text={seg.visual_content?.animation_instructions} 
+                              label="Animação / Movimento" 
+                              icon={Video} 
+                              colorClass="text-purple-500" 
+                            />
                           </div>
                         </div>
                       </div>

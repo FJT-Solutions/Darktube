@@ -379,11 +379,22 @@ export interface RemodelingTemplateEntity {
     voice_type?: string;
     post_frequency: string;
     post_interval_days?: number;
+    post_times?: string[];
+    last_dispatched_at?: string;
     is_active: boolean;
     target_accounts: string[];
     tags: string[];
     created_at: string;
     updated_at: string;
+}
+
+export interface ProductionHistoryEntity {
+    id: string;
+    template_id: string;
+    original_video_id: string;
+    dispatched_at: string;
+    payload: any;
+    status: string;
 }
 
 export async function saveRemodelingTemplate(
@@ -481,5 +492,42 @@ export async function getRecentVideos(limit = 12): Promise<YouTubeVideo[]> {
         url: `https://youtube.com/watch?v=${v.id}`,
         description: ''
     }))
+}
+
+export async function saveProductionHistory(data: Omit<ProductionHistoryEntity, 'id' | 'dispatched_at'>) {
+    const supabase = await createClient()
+    const { data: inserted, error } = await supabase
+        .from('remodeling_history')
+        .insert(data)
+        .select()
+        .single()
+    
+    if (error) throw error
+    return inserted
+}
+
+export async function getProductionHistory(templateId: string): Promise<ProductionHistoryEntity[]> {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('remodeling_history')
+        .select('*')
+        .eq('template_id', templateId)
+        .order('dispatched_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+}
+
+export async function getTemplatesScheduledFor(timeStr: string): Promise<RemodelingTemplateEntity[]> {
+    const supabase = await createClient()
+    // Using a JSON query to find the time string in the post_times array
+    const { data, error } = await supabase
+        .from('remodeling_templates')
+        .select('*')
+        .eq('is_active', true)
+        .contains('post_times', [timeStr])
+    
+    if (error) throw error
+    return data || []
 }
 

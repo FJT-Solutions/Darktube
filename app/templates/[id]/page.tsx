@@ -3,7 +3,14 @@
 import { useEffect, useState, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { getRemodelingTemplateByIdAction, deleteRemodelingTemplateAction, getBlotatoAccountsAction } from "@/app/actions"
+import { 
+  getRemodelingTemplateByIdAction, 
+  deleteRemodelingTemplateAction, 
+  getBlotatoAccountsAction,
+  getProductionHistoryAction,
+  sendToN8NAction,
+  translatePromptAction
+} from "@/app/actions"
 import { 
   ChevronLeft, 
   LayoutTemplate, 
@@ -25,7 +32,13 @@ import {
   Instagram,
   Facebook,
   Youtube as YoutubeIcon,
-  Globe
+  Globe,
+  Send,
+  History,
+  Languages,
+  Loader2,
+  X,
+  Plus
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -33,14 +46,75 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+
+function TranslatedPrompt({ text, label, icon: Icon, colorClass }: { text: string, label: string, icon: any, colorClass: string }) {
+  const [translated, setTranslated] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(true)
+
+  const handleTranslate = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (translated) {
+      setShowOriginal(!showOriginal)
+      return
+    }
+    setLoading(true)
+    try {
+      const { success, translation } = await translatePromptAction(text)
+      if (success) {
+        setTranslated(translation)
+        setShowOriginal(false)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-1.5 flex-1">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Icon className={cn("h-3 w-3", colorClass)} />
+          <span className={cn("text-[9px] font-bold uppercase", colorClass)}>{label}</span>
+        </div>
+        <button 
+          onClick={handleTranslate}
+          className="text-[9px] flex items-center gap-1 text-primary hover:underline font-bold"
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+          ) : (
+            <>
+              <Languages className="h-2.5 w-2.5" />
+              {translated ? (showOriginal ? "Ver Tradução" : "Ver Original") : "Traduzir"}
+            </>
+          )}
+        </button>
+      </div>
+      <p className={cn(
+        "text-[11px] p-2 rounded transition-all duration-300",
+        showOriginal ? "text-muted-foreground bg-secondary/10" : "text-primary bg-primary/5 border border-primary/20 italic"
+      )}>
+        {showOriginal ? text : translated}
+      </p>
+    </div>
+  )
+}
 
 export default function TemplateDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
   const [template, setTemplate] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [dispatching, setDispatching] = useState(false)
   const [copied, setCopied] = useState(false)
   const [linkedAccounts, setLinkedAccounts] = useState<any[]>([])
+  const [history, setHistory] = useState<any[]>([])
 
   useEffect(() => {
     fetchTemplate()
@@ -72,10 +146,31 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
         })
         setLinkedAccounts(matched)
       }
+      // Fetch history
+      const histData = await getProductionHistoryAction(id)
+      setHistory(histData)
     } catch (err) {
       toast.error("Erro ao carregar detalhes do template.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleManualDispatch() {
+    if (dispatching) return
+    setDispatching(true)
+    try {
+      const result = await sendToN8NAction(id)
+      if (result.success) {
+        toast.success("Despachado para o n8n com sucesso!")
+        fetchTemplate() // Refresh history
+      } else {
+        toast.error(result.error || "Erro ao despachar.")
+      }
+    } catch (err) {
+      toast.error("Erro na comunicação com o servidor.")
+    } finally {
+      setDispatching(false)
     }
   }
 
@@ -151,9 +246,17 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
           <div className="flex items-center gap-2">
+            <Button 
+                onClick={handleManualDispatch} 
+                disabled={dispatching}
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-lg shadow-emerald-500/20"
+            >
+              {dispatching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {dispatching ? "Despachando..." : "Despachar p/ n8n"}
+            </Button>
             <Button variant="outline" size="sm" onClick={copyToClipboard} className="gap-2">
               {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-              {copied ? "Copiado" : "Copiar Blueprint (n8n)"}
+              {copied ? "Copiado" : "Copiar Blueprint"}
             </Button>
             <Button variant="destructive" size="sm" onClick={handleDelete} className="gap-2">
               <Trash2 className="h-4 w-4" />
@@ -271,6 +374,30 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
                   <p className="font-bold">{template.post_frequency}</p>
                 </div>
                 <div>
+                  <p className="text-[10px] text-muted-foreground uppercase mb-1">Horários Agendados</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {template.post_times && template.post_times.length > 0 ? (
+                      template.post_times.map((t: string) => (
+                        <Badge key={t} variant="outline" className="px-1 text-[9px] bg-background/40">{t}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground italic">Nenhum</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase mb-1">Horários Agendados</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {template.post_times && template.post_times.length > 0 ? (
+                      template.post_times.map((t: string) => (
+                        <Badge key={t} variant="outline" className="px-1 text-[9px] bg-background/40">{t}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground italic">Nenhum</span>
+                    )}
+                  </div>
+                </div>
+                <div>
                   <p className="text-[10px] text-muted-foreground uppercase mb-1">Canais Vinculados</p>
                   <div className="space-y-1.5 mt-1.5">
                     {linkedAccounts.length > 0 ? (
@@ -289,6 +416,45 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
                     )}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Production History */}
+            <Card className="border-emerald-500/10">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <History className="h-4 w-4 text-emerald-500" />
+                  HISTÓRICO DE PRODUÇÃO
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[250px] pr-4">
+                  <div className="space-y-3">
+                    {history.length > 0 ? (
+                      history.map((h: any) => (
+                        <div key={h.id} className="p-3 rounded-lg border bg-secondary/5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Badge variant={h.status.includes('auto') ? 'secondary' : 'default'} className="text-[8px] uppercase">
+                              {h.status === 'sent_auto' ? 'Automático' : 'Manual'}
+                            </Badge>
+                            <span className="text-[9px] text-muted-foreground">
+                              {new Date(h.dispatched_at).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-600 bg-emerald-500/5 p-1.5 rounded border border-emerald-500/10">
+                            <Check className="h-3 w-3" />
+                            Produção Iniciada (+1 Vídeo Unico)
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-10 opacity-30">
+                        <History className="h-8 w-8 mx-auto mb-2" />
+                        <p className="text-[10px]">Nenhum despacho realizado.</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           </div>
@@ -340,41 +506,28 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     {/* Voiceover */}
-                    <div className="space-y-2 bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/10">
-                      <div className="flex items-center gap-2 text-emerald-500">
-                        <Mic2 className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-bold uppercase">LOCUÇÃO & ESTILO ({seg.voiceover?.style})</span>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Mic2 className="h-3 w-3 text-emerald-500" />
+                        <span className="text-[9px] font-bold text-emerald-500 uppercase">Locução ({seg.voiceover?.style})</span>
                       </div>
-                      <p className="text-sm font-medium leading-relaxed italic text-emerald-950 dark:text-emerald-100">
-                        "{seg.voiceover?.text}"
-                      </p>
+                      <p className="text-sm text-foreground/90 leading-relaxed italic">"{seg.voiceover?.text}"</p>
                     </div>
 
-                    {/* Visual Blueprint */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-blue-500">
-                              <ImageIcon className="h-3.5 w-3.5" />
-                              <span className="text-[10px] font-bold uppercase tracking-wider">Visual Concept (Prompt)</span>
-                          </div>
-                          <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                  {seg.visual_content?.image_prompt}
-                              </p>
-                          </div>
-                      </div>
-
-                      <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-purple-500">
-                              <Video className="h-3.5 w-3.5" />
-                              <span className="text-[10px] font-bold uppercase tracking-wider">Engine Motion / Animation</span>
-                          </div>
-                          <div className="bg-purple-500/5 p-3 rounded-xl border border-purple-500/10">
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                  {seg.visual_content?.animation_instructions}
-                              </p>
-                          </div>
-                      </div>
+                    {/* Visual */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/50">
+                      <TranslatedPrompt 
+                        text={seg.visual_content?.image_prompt} 
+                        label="Prompt de Imagem" 
+                        icon={ImageIcon} 
+                        colorClass="text-blue-500" 
+                      />
+                      <TranslatedPrompt 
+                        text={seg.visual_content?.animation_instructions} 
+                        label="Animação / Movimento" 
+                        icon={Video} 
+                        colorClass="text-purple-500" 
+                      />
                     </div>
                   </div>
                 </div>
