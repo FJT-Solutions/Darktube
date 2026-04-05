@@ -212,17 +212,17 @@ export async function generateScriptAction(
             audioRules = `REGRA CRÍTICA DE ÁUDIO: O vídeo original NÃO tem narração/voz humana. Ele tem APENAS música/som de fundo ("${audioDesc}").
 O campo "voiceover" de CADA segmento deve ter:
 - "text": "" (vazio - SEM texto de locução)
-- "style": "Sem narração - apenas música de fundo: ${audioDesc}"
+- "style": "MUST BE IN ENGLISH. No narration - just background music: ${audioDesc}"
 NÃO invente narração. O vídeo remodelado deve ser FIEL ao original: apenas visual + música.`;
         } else if (audioType === 'none') {
             audioRules = `REGRA CRÍTICA DE ÁUDIO: O vídeo original NÃO tem áudio (silêncio total).
 O campo "voiceover" de CADA segmento deve ter:
 - "text": "" (vazio)
-- "style": "Sem áudio - silêncio ou música ambiente sutil"
+- "style": "MUST BE IN ENGLISH. No audio - complete silence or subtle ambient music"
 NÃO invente narração nem música. Mantenha fidelidade ao original.`;
         } else {
             audioRules = `ÁUDIO: O vídeo original TEM narração humana ("${audioDesc}").
-O campo "voiceover" deve conter o texto de locução ORIGINAL remodelado (novo, original, mas com o mesmo tom e estilo) e instruções de estilo detalhadas.`;
+O campo "voiceover" deve conter o texto de locução ORIGINAL remodelado (novo, original, mas com o mesmo tom e estilo) traduzido para INGLÊS. E as instruções de estilo DEVEM SER EM INGLÊS.`;
         }
 
         const systemPrompt = `Você é um roteirista e engenheiro de produção de vídeo especialista em automação via n8n.
@@ -244,29 +244,48 @@ ${transcript?.slice(0, 2000) || 'Não disponível'}
 
 FORMATO DE SAÍDA OBRIGATÓRIO - Responda APENAS com JSON:
 {
+  "detected_voice_type": "masculine_br | feminine_br | narrator | none",
+  "detected_voice_language": "pt-BR | en-US | es-ES | fr-FR | de-DE | ja-JP | zh-CN | auto",
+  "detected_music_style": "epic | lo-fi | ambient | dramatic | electronic | none",
+  "recommended_image_model": "Choose ONE from: flux-kontext-pro, flux-kontext-max, gpt-image-1, gpt-image-1.5, seedream-3.0, seedream-5.0-lite, ideogram-v3-turbo, ideogram-v3-balanced, ideogram-v3-quality, recraft-v3, grok-imagine, imagen-4, wan-2.7-image. Pick based on visual style: photorealistic→flux-kontext-pro, artistic/illustration→ideogram-v3-balanced, text-heavy→recraft-v3, budget→seedream-3.0",
+  "recommended_video_model": "Choose ONE from: seedance-2-fast-720p, seedance-2-720p, kling-2.6-10s, kling-2.6-5s, wan-2.6-i2v-5s-720p, wan-2.6-v2v-10s-720p, sora-2, veo-3.1-fast, hailuo-2.3, grok-extend-10s-720p. Pick based on motion needs: high motion→kling-2.6-10s, cinematic→sora-2, budget→seedance-2-fast-720p, long scenes→wan-2.6-v2v-10s-720p",
+  "music_prompt": "MUST BE IN ENGLISH. A detailed prompt for AI music generation (Suno/Udio). Describe genre, mood, tempo, instruments. Example: Epic orchestral cinematic score, building tension with strings and brass, 120 BPM, dramatic crescendo, Hans Zimmer inspired, dark atmospheric undertones",
+  "sfx_prompt": "MUST BE IN ENGLISH. Global sound design direction. Describe the overall ambient soundscape and key sound effects. Example: Industrial construction site ambience, metal clanging, heavy machinery rumble, power tools buzzing, distant hammering, with occasional birds and tropical wind",
   "script_base": [
     {
       "timestamp": "0:00-0:05",
       "segment_type": "GANCHO | DESENVOLVIMENTO_N | CLÍMAX | CALL_TO_ACTION",
       "voiceover": {
-        "text": "texto da locução (ou vazio se sem voz)",
-        "style": "instruções de tom, ritmo, entonação"
+        "text": "MUST BE IN ENGLISH. The exact spoken text (or empty if no narration)",
+        "style": "MUST BE IN ENGLISH. Tone, pacing, and intonation instructions"
       },
       "visual_content": {
-        "image_prompt": "Prompt DETALHADO em inglês para gerar a imagem com Flux/Midjourney. Descreva iluminação, composição, estilo, cores, objetos.",
-        "animation_instructions": "Instruções EXATAS de movimento para Kling/Runway: tipo de câmera (zoom, pan, tilt, dolly), velocidade, efeitos de partículas, transições."
+        "image_prompt": "MUST BE IN ENGLISH. Example: Cinematic wide shot of a vast ocean at golden hour, deep blue water reflecting warm orange light, dramatic clouds on the horizon, photorealistic style, 8K, natural lighting, shot on ARRI Alexa",
+        "animation_instructions": "MUST BE IN ENGLISH. Example: Slow dolly forward with gentle tilt up, camera speed 0.3x, subtle lens flare from sun position, smooth parallax effect on foreground waves"
       },
+      "voice_direction": "MUST BE IN ENGLISH. TTS direction for this segment. Example: Deep masculine voice, slow pace, contemplative tone, slight reverb, whispered emphasis on key words",
+      "sound_design": "MUST BE IN ENGLISH. Sound effects and ambience for THIS specific segment. Example: Heavy crane movement, metallic creaking, welding sparks sizzling, distant tropical birds chirping, light wind through palm trees",
       "emotion": "emoção alvo"
     }
   ]
 }
 
-REGRAS:
+REGRAS CRÍTICAS:
 1. Os timestamps DEVEM cobrir a duração total do vídeo sem lacunas.
 2. Cada image_prompt deve ser autossuficiente e gerar uma imagem COERENTE com os outros segmentos.
 3. As animation_instructions devem ser TÉCNICAS e executáveis por IA de vídeo.
 4. Crie entre 4 a 8 segmentos dependendo da duração.
-5. Os prompts de imagem devem ser em INGLÊS (padrão Flux/MJ). O resto em português.`;
+5. "detected_voice_type": analise o áudio original para sugerir o tipo de voz ideal. Use "none" se o vídeo original não tem narração (ex: time-lapse, construção, natureza).
+6. "detected_voice_language": idioma detectado ou sugerido para a locução. Analise o áudio e transcrição do vídeo original.
+7. "detected_music_style": analise o áudio original para sugerir o estilo musical ideal.
+8. "music_prompt": prompt completo em INGLÊS para geração de música com Suno/Udio.
+9. "sfx_prompt": prompt de design sonoro global em INGLÊS. SEMPRE gere este campo — mesmo vídeos sem narração têm sons ambiente importantes (construção, natureza, máquinas, etc.).
+10. "sound_design": POR SEGMENTO, prompt de efeitos sonoros específicos em INGLÊS. Descreva sons que sincronizam com a cena visual daquele segmento.
+11. "voice_direction": prompt de direção de voz em INGLÊS para TTS (ElevenLabs).
+12. CRITICAL — LANGUAGE RULES:
+   - "image_prompt", "animation_instructions", "music_prompt", "sfx_prompt", "sound_design", "voice_direction" → MUST be in ENGLISH. NEVER Portuguese.
+   - "voiceover.text", "voiceover.style", "emotion" → Portuguese (PT-BR).
+13. Se qualquer campo English-only estiver em português, a resposta será REJEITADA.`;
 
         let scriptText = '';
 
@@ -331,17 +350,18 @@ REGRAS:
 
         // Parse structured segments from the response
         let scriptSegments: any[] = [];
+        let parsedData: any = {};
         try {
             const cleanJson = scriptText.includes('```json')
                 ? scriptText.split('```json')[1].split('```')[0].trim()
                 : scriptText.trim();
-            const parsed = JSON.parse(cleanJson);
-            scriptSegments = parsed.script_base || parsed.segments || [];
+            parsedData = JSON.parse(cleanJson);
+            scriptSegments = parsedData.script_base || parsedData.segments || [];
         } catch (parseErr) {
             console.warn("[generateScriptAction] Could not parse structured JSON, returning raw text:", parseErr);
         }
 
-        return { success: true, script: scriptText, scriptSegments }
+        return { success: true, script: scriptText, scriptSegments, parsedData }
     } catch (error) {
         console.error("generateScriptAction error:", error)
         return { success: false, error: (error as Error).message }
@@ -1442,7 +1462,13 @@ export async function translatePromptAction(text: string) {
             body: JSON.stringify({
                 contents: [{
                     parts: [{
-                        text: `Traduza o seguinte prompt técnico de vídeo (instruções de imagem/animação) para Português do Brasil de forma clara e natural para o usuário final. Retorne APENAS a tradução: \n\n${text}`
+                        text: `Atue como um tradutor especialista nativo em português do Brasil. O usuário enviou um texto em inglês e você DEVE retornar a tradução correta, clara e fluida em Português do Brasil.
+A sua resposta DEVE conter APENAS o texto traduzido, sem aspas, sem explicações extras, e em hipótese alguma responda em inglês.
+
+TEXTO EM INGLÊS:
+${text}
+
+TRADUÇÃO (PT-BR):`
                     }]
                 }]
             })

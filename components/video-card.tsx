@@ -8,7 +8,7 @@ import { analyzeVideoAction, analyzeExternalVideoAction, generateScriptAction, t
 import {
   Eye, Clock, Calendar, DollarSign, Sparkles, Wand2, Loader2, CheckCircle2,
   Zap, Wrench, Info, X, Download, CloudUpload, Brain, BookText, Save, ChevronDown,
-  LayoutTemplate, Mic2, ImageIcon, Video, AlertTriangle,
+  LayoutTemplate, Mic2, ImageIcon, Video, AlertTriangle, Music, Waves, Volume2,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { TemplateConfigDialog } from "./template-config-dialog"
+import { TemplateConfigDialog, TranslatedPrompt } from "./template-config-dialog"
 import { toast } from "sonner"
 
 function formatDate(iso: string): string {
@@ -69,6 +69,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
   const [scriptSegments, setScriptSegments] = useState<any[]>([])
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [scriptError, setScriptError] = useState<string>('')
+  const [parsedScriptData, setParsedScriptData] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'analysis' | 'script'>('analysis')
   const [scriptProvider, setScriptProvider] = useState<ScriptProvider>('openai')
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
@@ -141,6 +142,9 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
         if (scriptResult.scriptSegments?.length) {
           setScriptSegments(scriptResult.scriptSegments)
         }
+        if (scriptResult.parsedData) {
+          setParsedScriptData(scriptResult.parsedData)
+        }
       }
 
       setStep('done')
@@ -160,6 +164,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
     if (r.success && r.script) {
       setScript(r.script)
       if (r.scriptSegments?.length) setScriptSegments(r.scriptSegments)
+      if (r.parsedData) setParsedScriptData(r.parsedData)
     } else {
       setScriptError(r.error || 'Erro ao gerar o roteiro.')
     }
@@ -411,9 +416,27 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                   )}
 
                   {!isGeneratingScript && scriptSegments.length > 0 ? (
-                    <div className="space-y-0 rounded-lg border overflow-hidden max-h-[400px] overflow-y-auto">
-                      {scriptSegments.map((seg: any, idx: number) => (
-                        <div key={idx} className="border-b last:border-0 p-3 hover:bg-secondary/20 transition-colors">
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                      {/* Global AI Prompts */}
+                      {(parsedScriptData?.sfx_prompt || parsedScriptData?.music_prompt) && (
+                        <div className="space-y-2 mb-2 p-3 bg-secondary/20 rounded-lg border">
+                          <p className="text-[10px] font-bold text-primary uppercase">Prompts Globais</p>
+                          {parsedScriptData?.sfx_prompt && (
+                            <div className="mb-2">
+                              <TranslatedPrompt text={parsedScriptData.sfx_prompt} label="SFX Global" icon={Waves} colorClass="text-cyan-500" />
+                            </div>
+                          )}
+                          {parsedScriptData?.music_prompt && (
+                            <div className="mb-2">
+                              <TranslatedPrompt text={parsedScriptData.music_prompt} label="Música" icon={Music} colorClass="text-amber-500" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-0 rounded-lg border overflow-hidden">
+                        {scriptSegments.map((seg: any, idx: number) => (
+                          <div key={idx} className="border-b last:border-0 p-3 hover:bg-secondary/20 transition-colors">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">{seg.timestamp}</span>
@@ -424,35 +447,38 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
 
                           {/* Voiceover */}
                           {seg.voiceover?.text && (
-                            <div className="mb-2 bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/10">
-                              <div className="flex items-center gap-1 text-emerald-600 mb-1">
-                                <Mic2 className="h-3 w-3" />
-                                <span className="text-[8px] font-bold uppercase">Locução ({seg.voiceover.style?.slice(0, 40)}...)</span>
-                              </div>
-                              <p className="text-[11px] leading-relaxed italic">"{seg.voiceover.text}"</p>
+                            <div className="mb-2">
+                              <TranslatedPrompt text={seg.voiceover.text} label={`Locução (${seg.voiceover.style?.slice(0, 40) || ''}...)`} icon={Mic2} colorClass="text-emerald-600" />
+                            </div>
+                          )}
+
+                          {/* Voice Direction */}
+                          {seg.voice_direction && (
+                            <div className="mb-2">
+                              <TranslatedPrompt text={seg.voice_direction} label="Direção de Voz" icon={Volume2} colorClass="text-emerald-600" />
+                            </div>
+                          )}
+
+                          {/* Sound Design */}
+                          {seg.sound_design && (
+                            <div className="mb-2">
+                              <TranslatedPrompt text={seg.sound_design} label="Sound Design (Cena)" icon={Waves} colorClass="text-cyan-600" />
                             </div>
                           )}
 
                           {/* Visual */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-blue-500/5 p-2 rounded-lg border border-blue-500/10">
-                              <div className="flex items-center gap-1 text-blue-500 mb-1">
-                                <ImageIcon className="h-3 w-3" />
-                                <span className="text-[8px] font-bold uppercase">Imagem</span>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-3">{seg.visual_content?.image_prompt}</p>
-                            </div>
-                            <div className="bg-purple-500/5 p-2 rounded-lg border border-purple-500/10">
-                              <div className="flex items-center gap-1 text-purple-500 mb-1">
-                                <Video className="h-3 w-3" />
-                                <span className="text-[8px] font-bold uppercase">Animação</span>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-3">{seg.visual_content?.animation_instructions}</p>
-                            </div>
+                          <div className="space-y-2 mt-2">
+                            {seg.visual_content?.image_prompt && (
+                              <TranslatedPrompt text={seg.visual_content.image_prompt} label="Imagem" icon={ImageIcon} colorClass="text-blue-500" />
+                            )}
+                            {seg.visual_content?.animation_instructions && (
+                              <TranslatedPrompt text={seg.visual_content.animation_instructions} label="Animação" icon={Video} colorClass="text-purple-500" />
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
+                  </div>
                   ) : !isGeneratingScript && (
                     <div className="text-center text-xs text-muted-foreground py-6">
                       Selecione o provider e clique em "Gerar" para criar o roteiro de produção.
