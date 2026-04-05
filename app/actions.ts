@@ -1447,54 +1447,48 @@ export async function translatePromptAction(text: string) {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) throw new Error("Não autorizado")
 
-        let geminiApiKey: string | undefined = process.env.GEMINI_API_KEY;
-        const { data: userKey } = await supabase.rpc('get_api_key', {
+        // Get OpenAI key (same pattern as generateScriptAction)
+        const { data: apiKey } = await supabase.rpc('get_api_key', {
             p_user_id: user.id,
-            p_provider: 'gemini'
+            p_provider: 'openai'
         })
-        if (userKey) geminiApiKey = userKey;
 
-        if (!geminiApiKey) throw new Error("API Key não encontrada")
+        if (!apiKey) {
+            return { success: false, error: "Chave OpenAI não encontrada. Adicione em Credenciais." }
+        }
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `# INSTRUCTION: YOU ARE A TRANSLATOR. TRANSLATE THE FOLLOWING TEXT TO BRAZILIAN PORTUGUESE.
-# RULES:
-# 1. OUTPUT ONLY THE TRANSLATED TEXT.
-# 2. DO NOT USE ENGLISH IN THE OUTPUT.
-# 3. DO NOT PROVIDE EXPLANATIONS OR COMMENTS.
-# 4. MAINTAIN THE SAME TONE AND FORMAT.
-
-INPUT TEXT:
-"${text}"
-
-TRANSLATION (PORTUGUÊS DO BRASIL):`
-                    }]
-                }]
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: 'You are a professional translator. Translate the user input from English to Brazilian Portuguese. Output ONLY the translated text, nothing else.' },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0.3,
             })
         })
 
         if (!response.ok) {
-            const errorBody = await response.text()
-            console.error("Gemini API error:", errorBody)
-            throw new Error(`API error: ${response.status}`)
+            const errorBody = await response.json().catch(() => ({}))
+            console.error("OpenAI translation error:", errorBody)
+            return { success: false, error: `Erro OpenAI: ${errorBody?.error?.message || response.statusText}` }
         }
 
         const data = await response.json()
-        const translation = data.candidates?.[0]?.content?.parts?.[0]?.text
+        const translation = data?.choices?.[0]?.message?.content?.trim()
 
         if (!translation) {
-            console.warn("No translation candidate found, returning original text. Data:", JSON.stringify(data))
             return { success: false, error: "Tradução indisponível" }
         }
 
         return { success: true, translation }
     } catch (error) {
-        console.error("Translation logic error:", error)
+        console.error("Translation error:", error)
         return { success: false, error: "Erro na tradução" }
     }
 }
