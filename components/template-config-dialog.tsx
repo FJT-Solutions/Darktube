@@ -769,13 +769,6 @@ export function TemplateConfigDialog({
                         <span className="text-sm font-mono font-bold text-primary">{seg.timestamp}</span>
                       </div>
                       <div className="p-4 space-y-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Mic2 className="h-4 w-4 text-emerald-500" />
-                            <span className="text-xs font-bold text-emerald-500 uppercase">Locução ({seg.voiceover?.style})</span>
-                          </div>
-                          <p className="text-sm text-foreground/90 leading-relaxed italic p-3 bg-secondary/20 rounded-lg">&ldquo;{seg.voiceover?.text}&rdquo;</p>
-                        </div>
                         {/* Voice direction */}
                         {seg.voice_direction && (
                           <TranslatedPrompt text={seg.voice_direction} label="Direção de Voz (TTS)" icon={Volume2} colorClass="text-emerald-500" />
