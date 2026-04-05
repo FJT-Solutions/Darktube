@@ -145,9 +145,17 @@ export function TranslatedPrompt({ text, label, icon: Icon, colorClass }: { text
     if (translated) { setShowTranslation(!showTranslation); return }
     setLoading(true)
     try {
-      const { success, translation } = await translatePromptAction(text)
-      if (success) { setTranslated(translation || text); setShowTranslation(true) }
-    } catch (err) { console.error(err) }
+      const { success, translation, error } = await translatePromptAction(text)
+      if (success && translation) { 
+        setTranslated(translation); 
+        setShowTranslation(true) 
+      } else {
+        toast.error(error || "Erro ao traduzir")
+      }
+    } catch (err) { 
+      console.error(err)
+      toast.error("Erro na comunicação com a API")
+    }
     finally { setLoading(false) }
   }
 

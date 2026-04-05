@@ -46,10 +46,10 @@ function getUniversalYtDlpArgs(url: string, cookiesPath?: string): string[] {
     if (isYouTube) {
         // web_creator and mweb have higher success rate on server IPs in 2026
         args.push('--extractor-args', 'youtube:player_client=web_creator,mweb,ios,android');
-    }
-
-    if (cookiesPath && fs.existsSync(cookiesPath)) {
-        args.push('--cookies', cookiesPath);
+        
+        if (cookiesPath && fs.existsSync(cookiesPath)) {
+            args.push('--cookies', cookiesPath);
+        }
     }
 
     return args;
@@ -58,8 +58,8 @@ function getUniversalYtDlpArgs(url: string, cookiesPath?: string): string[] {
 /**
  * Manages temporary cookies file from environment variable.
  */
-function handleVideoCaptureCookies(): { path: string | undefined; cleanup: () => void } {
-    const cookiesContent = process.env.YOUTUBE_COOKIES || process.env.EXTRA_COOKIES;
+function handleYoutubeCookies(): { path: string | undefined; cleanup: () => void } {
+    const cookiesContent = process.env.YOUTUBE_COOKIES;
     if (!cookiesContent || cookiesContent.trim().length < 10) {
         return { path: undefined, cleanup: () => {} };
     }
@@ -251,7 +251,7 @@ export const VideoCaptureService = {
         // Non-YouTube: use yt-dlp → OpenGraph fallback
         try {
             console.log(`[VideoCaptureService] Extracting metadata from ${source}: ${url}`);
-            const { path: cookies, cleanup } = handleVideoCaptureCookies();
+            const { path: cookies, cleanup } = handleYoutubeCookies();
             let data: any;
             try {
                 const { stdout } = await execFilePromise(
@@ -291,11 +291,7 @@ export const VideoCaptureService = {
                 description: decodeHtmlEntities((data.description || '').slice(0, 500)),
             };
         } catch (error: any) {
-            if (error.message.includes('login.php') || error.message.includes('Unsupported URL')) {
-                console.warn(`[VideoCaptureService] Detected login wall or invalid link for ${source}: ${url}`);
-            } else {
-                console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
-            }
+            console.warn(`[VideoCaptureService] yt-dlp metadata failed: ${error.message}`);
             return this.extractOpenGraphMetadata(url, source);
         }
     },
@@ -544,7 +540,7 @@ export const VideoCaptureService = {
             console.log(`[VideoCaptureService] Downloading via yt-dlp: ${url}`);
             
             const videoPath = path.join(outputDir, `${fileId}.mp4`);
-            const { path: cookies, cleanup } = handleVideoCaptureCookies();
+            const { path: cookies, cleanup } = handleYoutubeCookies();
             try {
                 // SEC-02 FIX: Use execFile with args array
                 await execFilePromise(

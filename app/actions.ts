@@ -1462,22 +1462,39 @@ export async function translatePromptAction(text: string) {
             body: JSON.stringify({
                 contents: [{
                     parts: [{
-                        text: `Atue como um tradutor especialista nativo em português do Brasil. O usuário enviou um texto em inglês e você DEVE retornar a tradução correta, clara e fluida em Português do Brasil.
-A sua resposta DEVE conter APENAS o texto traduzido, sem aspas, sem explicações extras, e em hipótese alguma responda em inglês.
+                        text: `# INSTRUCTION: YOU ARE A TRANSLATOR. TRANSLATE THE FOLLOWING TEXT TO BRAZILIAN PORTUGUESE.
+# RULES:
+# 1. OUTPUT ONLY THE TRANSLATED TEXT.
+# 2. DO NOT USE ENGLISH IN THE OUTPUT.
+# 3. DO NOT PROVIDE EXPLANATIONS OR COMMENTS.
+# 4. MAINTAIN THE SAME TONE AND FORMAT.
 
-TEXTO EM INGLÊS:
-${text}
+INPUT TEXT:
+"${text}"
 
-TRADUÇÃO (PT-BR):`
+TRANSLATION (PORTUGUÊS DO BRASIL):`
                     }]
                 }]
             })
         })
 
+        if (!response.ok) {
+            const errorBody = await response.text()
+            console.error("Gemini API error:", errorBody)
+            throw new Error(`API error: ${response.status}`)
+        }
+
         const data = await response.json()
-        return { success: true, translation: data.candidates?.[0]?.content?.parts?.[0]?.text || text }
+        const translation = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+        if (!translation) {
+            console.warn("No translation candidate found, returning original text. Data:", JSON.stringify(data))
+            return { success: false, error: "Tradução indisponível" }
+        }
+
+        return { success: true, translation }
     } catch (error) {
-        console.error("Translation error:", error)
+        console.error("Translation logic error:", error)
         return { success: false, error: "Erro na tradução" }
     }
 }
