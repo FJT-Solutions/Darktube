@@ -9,6 +9,12 @@ export async function GET() {
 
   const { error } = await supabase.rpc('admin_run_sql', {
     sql: `
+      -- Fix remodeling_templates
+      ALTER TABLE public.remodeling_templates 
+      ADD COLUMN IF NOT EXISTS music_model text,
+      ADD COLUMN IF NOT EXISTS voice_model text,
+      ADD COLUMN IF NOT EXISTS voice_language text;
+
       CREATE TABLE IF NOT EXISTS public.remodeling_history (
         id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
         template_id uuid REFERENCES public.remodeling_templates(id) ON DELETE CASCADE,

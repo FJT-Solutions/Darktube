@@ -386,6 +386,9 @@ export interface RemodelingTemplateEntity {
     tags: string[];
     image_model: string;
     video_model: string;
+    music_model?: string;
+    voice_model?: string;
+    voice_language?: string;
     created_at: string;
     updated_at: string;
 }
