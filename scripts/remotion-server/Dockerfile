@@ -21,12 +21,11 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
-# Copiar package.json do projeto
-COPY package.json package-lock.json ./
-RUN npm install --omit=dev
-
-# Copiar arquivos do projeto e composições Remotion
+# Copiar arquivos do projeto
 COPY . .
+
+# Instalar dependências do Node.js
+RUN npm install --omit=dev
 
 EXPOSE 3001
 
