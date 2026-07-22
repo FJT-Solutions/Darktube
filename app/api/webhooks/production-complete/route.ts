@@ -1,36 +1,50 @@
-import { createClient } from "@/lib/supabase/server"
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server';
+import { pool } from '@/lib/db-client';
 
-export async function POST(req: Request) {
-    try {
-        const payload = await req.json()
-        const { history_id, video_url } = payload
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { historyId, status, videoUrl, error } = body;
 
-        if (!history_id || !video_url) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-        }
-
-        const supabase = await createClient()
-        if (!supabase) throw new Error("Database connection failed")
-
-        const { data, error } = await supabase
-            .from("remodeling_history")
-            .update({ 
-                status: "completed", 
-                video_url: video_url 
-            })
-            .eq("id", history_id)
-            .select()
-            .single()
-
-        if (error) {
-            console.error("Error updating production history:", error)
-            return NextResponse.json({ error: error.message }, { status: 500 })
-        }
-
-        return NextResponse.json({ success: true, data })
-    } catch (err) {
-        console.error("Webhook processing error:", err)
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+    if (!historyId || !status) {
+      return NextResponse.json(
+        { error: 'historyId e status são obrigatórios' },
+        { status: 400 }
+      );
     }
+
+    if (status === 'completed') {
+      const { rows } = await pool.query(
+        `
+          UPDATE public.remodeling_history
+          SET status = $1, video_url = $2
+          WHERE id = $3
+          RETURNING *
+        `,
+        ['completed', videoUrl, historyId]
+      );
+
+      console.log(`[Remotion Webhook] Vídeo renderizado com sucesso. History ID: ${historyId}`);
+      return NextResponse.json({ success: true, updated: rows[0] });
+    } else {
+      const { rows } = await pool.query(
+        `
+          UPDATE public.remodeling_history
+          SET status = $1
+          WHERE id = $2
+          RETURNING *
+        `,
+        ['failed', historyId]
+      );
+
+      console.error(`[Remotion Webhook] Renderização falhou para History ID: ${historyId}. Erro: ${error}`);
+      return NextResponse.json({ success: true, updated: rows[0] });
+    }
+  } catch (error: any) {
+    console.error('Erro ao processar webhook de conclusão de produção:', error);
+    return NextResponse.json(
+      { error: 'Erro interno ao atualizar histórico de produção' },
+      { status: 500 }
+    );
+  }
 }

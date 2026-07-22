@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { detectPlatform } from '@/lib/utils';
-import type { VideoSource } from '@/lib/types';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth-helpers';
 
 /**
  * POST /api/video/extract
@@ -15,8 +14,7 @@ import { createClient } from '@/lib/supabase/server';
 export async function POST(request: Request) {
     try {
         // SEC-04 FIX: Require authentication
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
         }

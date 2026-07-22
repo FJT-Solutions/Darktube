@@ -43,3 +43,38 @@ export async function sendAccessGrantedEmail(email: string, name: string, setupL
         return { success: false, error }
     }
 }
+
+export async function sendPasswordResetEmail(email: string, name: string, resetLink: string) {
+    const mailOptions = {
+        from: `"DARKTUBE" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: '🔒 Redefinição de senha - DARKTUBE',
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #141417;">
+                <h1 style="color: #ef4444;">Redefina sua Senha</h1>
+                <p>Olá, ${name}!</p>
+                <p>Recebemos uma solicitação para redefinir a senha da sua conta no DARKTUBE.</p>
+                
+                <div style="margin: 30px 0; text-align: center;">
+                    <a href="${resetLink}" style="background-color: #ef4444; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                        Redefinir Senha
+                    </a>
+                </div>
+                
+                <p style="font-size: 13px; color: #666;">Se você não solicitou essa alteração, pode ignorar este e-mail com segurança.</p>
+                
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+                <p style="font-size: 11px; color: #999;">Esta é uma ferramenta exclusiva. Por favor, não compartilhe seus dados de acesso.</p>
+            </div>
+        `,
+    }
+
+    try {
+        await transporter.sendMail(mailOptions)
+        return { success: true }
+    } catch (error) {
+        console.error('Error sending password reset email:', error)
+        return { success: false, error }
+    }
+}
+

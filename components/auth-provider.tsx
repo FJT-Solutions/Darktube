@@ -1,14 +1,34 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { User, Session, AuthChangeEvent } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
+import { getCurrentUserAction, logoutAction } from "@/app/actions"
+
+type AuthUser = {
+    id: string
+    email: string
+    role: 'admin' | 'user'
+    status: 'pending' | 'approved' | 'rejected' | 'blocked'
+    full_name?: string
+    avatar_url?: string
+}
+
+type AuthSession = {
+    user: {
+        id: string
+        email: string
+        user_metadata: {
+            full_name: string
+            avatar_url: string
+            picture: string
+        }
+    }
+}
 
 type AuthContextType = {
-    user: User | null
-    session: Session | null
-    profile: any | null
+    user: AuthUser | null
+    session: AuthSession | null
+    profile: AuthUser | null
     loading: boolean
     signOut: () => Promise<void>
 }
@@ -22,60 +42,68 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null)
-    const [session, setSession] = useState<Session | null>(null)
-    const [profile, setProfile] = useState<any | null>(null)
+    const [user, setUser] = useState<AuthUser | null>(null)
+    const [session, setSession] = useState<AuthSession | null>(null)
+    const [profile, setProfile] = useState<AuthUser | null>(null)
     const [loading, setLoading] = useState(true)
-    const supabase = createClient()
     const router = useRouter()
 
+    const fetchUser = async () => {
+        try {
+            const currentUser = await getCurrentUserAction() as AuthUser | null
+            if (currentUser) {
+                setUser(currentUser)
+                setProfile(currentUser)
+                setSession({
+                    user: {
+                        id: currentUser.id,
+                        email: currentUser.email,
+                        user_metadata: {
+                            full_name: currentUser.full_name || '',
+                            avatar_url: currentUser.avatar_url || '',
+                            picture: currentUser.avatar_url || '',
+                        }
+                    }
+                })
+            } else {
+                setUser(null)
+                setProfile(null)
+                setSession(null)
+            }
+        } catch (error) {
+            console.error("Error fetching current user in AuthProvider:", error)
+            setUser(null)
+            setProfile(null)
+            setSession(null)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     useEffect(() => {
-        const fetchProfile = async (userId: string) => {
-            const { data } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single()
-            setProfile(data)
-        }
-
-        const setData = async () => {
-            const { data: { session }, error } = await supabase.auth.getSession()
-            if (error) throw error
-            setSession(session)
-            setUser(session?.user ?? null)
-            
-            if (session?.user) {
-                await fetchProfile(session.user.id)
-            } else {
-                setProfile(null)
+        fetchUser()
+        
+        // Listen to window focus/visibility events to keep session in sync
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchUser()
             }
-            
-            setLoading(false)
         }
-
-        setData()
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-            setSession(session)
-            setUser(session?.user ?? null)
-            
-            if (session?.user) {
-                fetchProfile(session.user.id)
-            } else {
-                setProfile(null)
-            }
-            
-            setLoading(false)
-        })
-
+        
+        window.addEventListener('focus', fetchUser)
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        
         return () => {
-            subscription.unsubscribe()
+            window.removeEventListener('focus', fetchUser)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
-    }, [supabase])
+    }, [])
 
     const signOut = async () => {
-        await supabase.auth.signOut()
+        await logoutAction()
+        setUser(null)
+        setProfile(null)
+        setSession(null)
         router.push('/login')
     }
 

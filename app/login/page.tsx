@@ -2,12 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
-import { Youtube, Mail, Loader2, AlertCircle, ArrowRight, ShieldAlert, Search } from "lucide-react"
-import { checkUserAccessAction } from "@/app/actions"
+import { Youtube, Mail, Loader2, AlertCircle, ArrowRight, Search } from "lucide-react"
+import { loginAction, resetPasswordAction } from "@/app/actions"
 
 export default function LoginPage() {
     const [mode, setMode] = useState<'login' | 'reset'>('login')
@@ -15,7 +13,6 @@ export default function LoginPage() {
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-    const supabase = createClient()
     const router = useRouter()
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -23,42 +20,27 @@ export default function LoginPage() {
         setLoading(true)
         setMessage(null)
 
-        const access = await checkUserAccessAction(email)
+        const result = await loginAction(email, password)
 
-        if (access.status === 'no_access') {
-            setMessage({ 
-                type: 'error', 
-                text: "Você ainda não possui acesso ou convite aprovado. Por favor, solicite seu acesso." 
-            })
-            setLoading(false)
-            return
-        }
-
-        if (access.status === 'pending_invite') {
-            setMessage({ 
-                type: 'error', 
-                text: "Sua solicitação de acesso ainda está em análise. Avisaremos por e-mail quando for aprovada." 
-            })
-            setLoading(false)
-            return
-        }
-
-        if (access.status === 'blocked') {
-            setMessage({ 
-                type: 'error', 
-                text: "Seu acesso foi suspenso. Entre em contato com o suporte." 
-            })
-            setLoading(false)
-            return
-        }
-
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
-
-        if (error) {
-            setMessage({ type: 'error', text: "E-mail ou senha incorretos. Verifique suas credenciais." })
+        if (!result.success) {
+            if (result.error === 'PENDING_APPROVAL') {
+                setMessage({ 
+                    type: 'error', 
+                    text: "Sua solicitação de acesso ainda está em análise. Avisaremos por e-mail quando for aprovada." 
+                })
+            } else if (result.error === 'BLOCKED') {
+                setMessage({ 
+                    type: 'error', 
+                    text: "Seu acesso foi suspenso. Entre em contato com o suporte." 
+                })
+            } else if (result.error === 'PASSWORD_NOT_SET') {
+                setMessage({
+                    type: 'error',
+                    text: "Sua senha ainda não foi configurada. Por favor, utilize o link de boas-vindas enviado por e-mail."
+                })
+            } else {
+                setMessage({ type: 'error', text: result.error || "E-mail ou senha incorretos. Verifique suas credenciais." })
+            }
         } else {
             router.push('/dashboard')
         }
@@ -70,23 +52,10 @@ export default function LoginPage() {
         setLoading(true)
         setMessage(null)
 
-        const access = await checkUserAccessAction(email)
+        const result = await resetPasswordAction(email)
 
-        if (access.status === 'no_access' || access.status === 'pending_invite') {
-            setMessage({ 
-                type: 'error', 
-                text: "Não encontramos uma conta aprovada para este e-mail. Solicite seu acesso primeiro." 
-            })
-            setLoading(false)
-            return
-        }
-
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/setup-password`,
-        })
-
-        if (error) {
-            setMessage({ type: 'error', text: error.message })
+        if (!result.success) {
+            setMessage({ type: 'error', text: result.error || "Não encontramos uma conta aprovada para este e-mail." })
         } else {
             setMessage({ type: 'success', text: "Link de recuperação enviado para seu e-mail!" })
         }
@@ -104,7 +73,7 @@ export default function LoginPage() {
                 </Link>
             </header>
 
-        <main className="flex flex-1 flex-col items-center justify-center p-4">
+            <main className="flex flex-1 flex-col items-center justify-center p-4">
                 <div className="w-full max-w-md space-y-8 rounded-none border-0 bg-transparent p-6 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-8 sm:shadow-xl sm:shadow-black/20">
                     <div className="space-y-2 text-center">
                         <h1 className="text-2xl font-bold tracking-tight text-foreground">

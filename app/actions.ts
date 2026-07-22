@@ -6,23 +6,20 @@ import { revalidatePath } from "next/cache"
 import { TrackedChannel } from "@/lib/types"
 import { parseYouTubeDate, cn } from "@/lib/utils"
 import { VideoAnalysisService } from "@/lib/video-analysis"
-import { createClient, createAdminClient } from "@/lib/supabase/server"
+import { getCurrentUser, createSession, deleteSession } from "@/lib/auth-helpers"
+import { hashPassword, verifyPassword, verifyJWT, signJWT } from "@/lib/crypto"
 import { headers } from "next/headers"
-import { sendAccessGrantedEmail } from "@/lib/email"
+import { sendAccessGrantedEmail, sendPasswordResetEmail } from "@/lib/email"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 async function assertAdmin(userId: string) {
-    const supabase = await createClient()
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single()
+    const profile = await db.getProfileById(userId)
     
     if (profile?.role !== 'admin') {
         throw new Error('Não autorizado')
     }
 }
+
 
 /**
  * Analyze a video from any external URL (TikTok, Instagram, Vimeo, etc.)
@@ -30,8 +27,7 @@ async function assertAdmin(userId: string) {
  */
 export async function analyzeExternalVideoAction(url: string, videoMetadata?: any) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
 
         if (!user) {
             return { success: false, error: "Você precisa estar logado para analisar vídeos." }
@@ -39,10 +35,7 @@ export async function analyzeExternalVideoAction(url: string, videoMetadata?: an
 
         // Fetch Gemini API key
         let geminiApiKey: string | undefined = process.env.GEMINI_API_KEY;
-        const { data: userKey } = await supabase.rpc('get_api_key', {
-            p_user_id: user.id,
-            p_provider: 'gemini'
-        })
+        const userKey = await db.getUserApiKey(user.id, 'gemini')
         if (userKey) geminiApiKey = userKey;
 
         if (!geminiApiKey) {
@@ -100,15 +93,13 @@ export async function analyzeExternalVideoAction(url: string, videoMetadata?: an
 
 
 export async function getTrackedChannelsAction() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
     return await db.getTrackedChannels(user?.id)
 }
 
 export async function analyzeVideoAction(video: any, channel?: any) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
 
         if (!user) {
             return { success: false, error: "Você precisa estar logado para analisar vídeos." }
@@ -116,10 +107,7 @@ export async function analyzeVideoAction(video: any, channel?: any) {
 
         // Fetch Gemini API key (required for visual analysis)
         let geminiApiKey: string | undefined = process.env.GEMINI_API_KEY;
-        const { data: userKey } = await supabase.rpc('get_api_key', {
-            p_user_id: user.id,
-            p_provider: 'gemini'
-        })
+        const userKey = await db.getUserApiKey(user.id, 'gemini')
         if (userKey) geminiApiKey = userKey;
 
         if (!geminiApiKey) {
@@ -179,17 +167,13 @@ export async function generateScriptAction(
     videoDuration?: number
 ) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
 
         if (!user) return { success: false, error: "Não autorizado." }
 
         // Retrieve the chosen provider's API key
         let providerData: string | undefined;
-        const { data: apiKey } = await supabase.rpc('get_api_key', {
-            p_user_id: user.id,
-            p_provider: provider
-        })
+        const apiKey = await db.getUserApiKey(user.id, provider)
         providerData = apiKey || (provider === 'gemini' ? process.env.GEMINI_API_KEY : undefined);
 
         if (!providerData) {
@@ -375,8 +359,7 @@ export async function getNicheIntelligenceAction(nicheId: string) {
 
 export async function saveTrackedChannelAction(channel: TrackedChannel) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         await db.saveTrackedChannel(channel, user?.id)
         revalidatePath("/")
         revalidatePath("/tracker")
@@ -388,9 +371,7 @@ export async function saveTrackedChannelAction(channel: TrackedChannel) {
 }
 
 export async function removeTrackedChannelAction(channelId: string) {
-    // BUG-01 FIX: Verify ownership via RLS (user_id filter happens via Supabase RLS)
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getCurrentUser()
     if (!user) throw new Error('Não autorizado')
 
     await db.removeTrackedChannel(channelId)
@@ -401,8 +382,7 @@ export async function removeTrackedChannelAction(channelId: string) {
 
 export async function isChannelTrackedAction(channelId: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         return await db.isChannelTracked(channelId, user?.id)
     } catch (error) {
         console.error("Error in isChannelTrackedAction:", error)
@@ -422,8 +402,7 @@ export async function updateChannelTagsAction(channelId: string, tags: string[])
 
 export async function updateSettingsAction(data: { geminiApiKey?: string }) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autorizado" }
 
         if (data.geminiApiKey) {
@@ -439,8 +418,7 @@ export async function updateSettingsAction(data: { geminiApiKey?: string }) {
 
 export async function getSettingsAction() {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) return null
 
         const geminiKey = await db.getUserApiKey(user.id, 'gemini')
@@ -453,133 +431,51 @@ export async function getSettingsAction() {
 
 export async function getPendingInvitesAction() {
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        if (!adminSupabase) throw new Error("Erro de configuração do servidor")
-
-        // 1. Fetch pending invites using Admin Client to bypass any broken RLS policies
-        // such as those referencing non-existent columns like 'requested_at'
-        const { data: invites, error } = await adminSupabase
-            .from('invites')
-            .select('*')
-            .eq('status', 'pending')
-            .order('created_at', { ascending: false })
-        
-        console.log(`[Invites] Fetch pending result:`, { count: invites?.length, error: error?.message || 'none' })
-
-        if (!invites || invites.length === 0) return []
-
-        // 2. Filter out emails that already have a profile (are already approved/blocked)
-        // This handles cases where deletion of the invite failed previously
-        const emails = invites.map((i: any) => i.email.toLowerCase().trim())
-        const { data: existingProfiles, error: profErr } = await adminSupabase
-            .from('profiles')
-            .select('email')
-        
-        if (profErr) console.error("[Invites] Profile check error:", profErr)
-        
-        const existingEmails = (existingProfiles || []).map((p: any) => p.email.toLowerCase().trim())
-        console.log(`[Invites] Profiles found in DB:`, existingEmails)
-        
-        const activeEmails = new Set(existingEmails)
-        const filteredInvites = invites.filter((i: any) => !activeEmails.has(i.email.toLowerCase().trim()))
-
-        console.log(`[Invites] Found ${invites.length} in table, ${filteredInvites.length} after profile filtering. Emails filtered out:`, 
-            invites.map((i: any) => i.email).filter(e => activeEmails.has(e.toLowerCase().trim())))
-        
-        return filteredInvites
+        const invites = await db.getPendingInvites()
+        return invites
     } catch (error) {
         console.error("Error in getPendingInvitesAction:", error)
         return []
     }
 }
 
-
-
 export async function approveInviteAction(inviteId: string) {
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        
-        if (!adminSupabase) throw new Error("Configuração de Admin ausente (SERVICE_ROLE_KEY)")
-
         // 1. Get invite details
-        const { data: invite, error: fetchError } = await supabase
-            .from('invites')
-            .select('*')
-            .eq('id', inviteId)
-            .single()
-        
-        if (fetchError || !invite) throw new Error("Convite não encontrado")
+        const invite = await db.getInviteById(inviteId)
+        if (!invite) throw new Error("Convite não encontrado")
 
-        // 2. Create the Auth User (Generate Invite Link)
+        // 2. Create token link for password setup
         const heads = await headers()
         const host = heads.get('x-forwarded-host') || heads.get('host')
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
-        console.log(`[Admin] Generating link. Host: ${host}, Protocol: ${protocol}`)
-
         let siteUrl = 'https://darktube.fjt-solutions.com'
-        
-        // Only use localhost/detect automatically if we are VERY sure it's local dev
         if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
             siteUrl = `${protocol}://${host}`
         }
         
-        console.log(`[Admin] Using siteUrl: ${siteUrl}`)
+        // Generate setup token (JWT valid for 3 days)
+        const setupToken = await signJWT({ email: invite.email, purpose: 'setup-password' }, 72 * 3600)
+        const actionLink = `${siteUrl}/setup-password?token=${setupToken}`
 
-        let { data, error: authError } = await adminSupabase.auth.admin.generateLink({
-            type: 'invite',
-            email: invite.email,
-            options: {
-                data: { full_name: invite.name },
-                redirectTo: `${siteUrl}/setup-password`
-            }
-        })
-
-        // If user already exists, try magiclink instead
-        if (authError?.message?.includes('already been registered') || (authError as any)?.code === 'email_exists') {
-            const magicRes = await adminSupabase.auth.admin.generateLink({
-                type: 'magiclink',
-                email: invite.email,
-                options: {
-                    redirectTo: `${siteUrl}/setup-password`
-                }
-            })
-            data = magicRes.data
-            authError = magicRes.error
+        // 3. Create profile/user record in postgres with status = 'approved'
+        const existingProfile = await db.getProfileByEmail(invite.email)
+        if (!existingProfile) {
+            await db.createUser(invite.email, '', invite.name, 'user', 'approved')
+        } else {
+            await db.updateProfileStatus(invite.email, 'approved')
         }
-
-        if (authError || !data?.properties?.action_link) {
-            throw new Error("Falha ao gerar o link: " + (authError?.message || "Erro desconhecido"))
-        }
-
-        // 3. Update Profile Status
-        await db.updateProfileStatus(invite.email, 'approved')
 
         // 4. Send Custom Email
         console.log(`[Admin] Sending welcome email to ${invite.email}`)
-        const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, data.properties.action_link)
+        const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, actionLink)
         if (!emailResult.success) {
              console.warn("[Admin] Email failed but proceeding:", emailResult.error)
         }
 
-        // 5. Cleanup Invite - Update to 'approved' instead of delete to keep record
-        // but hide from pending list. This helps with visibility in DB.
-        console.log(`[Admin] Attempting update for invite ID: ${inviteId}`)
-        const { data: updRes, error: updateInvErr } = await adminSupabase
-            .from('invites')
-            .update({ status: 'approved', reviewed_at: new Date().toISOString() })
-            .eq('id', inviteId)
-            .select()
-        
-        console.log(`[Admin] Update result for ID ${inviteId}:`, { success: !!updRes, error: updateInvErr?.message || 'none', data: updRes })
-
-        if (updateInvErr || !updRes || updRes.length === 0) {
-            console.warn("[Admin] Update failed/no rows, trying delete fallback")
-            await adminSupabase.from('invites').delete().eq('id', inviteId)
-            await supabase.from('invites').delete().eq('id', inviteId)
-        }
+        // 5. Cleanup Invite - Update to 'approved'
+        await db.updateInviteStatus(inviteId, 'approved')
 
         revalidatePath("/admin/invites")
         return { success: true }
@@ -591,50 +487,19 @@ export async function approveInviteAction(inviteId: string) {
 
 export async function declineInviteAction(inviteId: string) {
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        if (!adminSupabase) throw new Error("Configuração de Admin ausente (SERVICE_ROLE_KEY)")
-
-        // 1. Get invite details
-        const { data: invite } = await supabase
-            .from('invites')
-            .select('email')
-            .eq('id', inviteId)
-            .single()
-
+        const invite = await db.getInviteById(inviteId)
         if (!invite) throw new Error("Convite não encontrado")
 
         const email = invite.email
 
-        // 2. Find and Delete Profile (if exists)
-        const { data: profile } = await adminSupabase
-            .from('profiles')
-            .select('id')
-            .eq('email', email)
-            .single()
-
+        // Find and Delete Profile (if exists)
+        const profile = await db.getProfileByEmail(email)
         if (profile) {
-            // Delete profile
-            await adminSupabase.from('profiles').delete().eq('id', profile.id)
-            
-            // Delete Auth User
-            const { error: authError } = await adminSupabase.auth.admin.deleteUser(profile.id)
-            if (authError) {
-                console.warn("[Admin] Could not delete auth user (might not exist):", authError.message)
-            }
-        } else {
-            // If no profile, try to find by email in auth anyway to be safe
-            const { data: { users }, error: listError } = await adminSupabase.auth.admin.listUsers()
-            if (!listError) {
-                const userToDelete = users.find(u => u.email === email)
-                if (userToDelete) {
-                    await adminSupabase.auth.admin.deleteUser(userToDelete.id)
-                }
-            }
+            await db.deleteProfile(profile.id)
         }
 
-        // 3. Delete ALL invites for this email
-        await adminSupabase.from('invites').delete().eq('email', email)
+        // Delete invite
+        await db.deleteInviteById(inviteId)
 
         revalidatePath("/admin/invites")
         return { success: true }
@@ -646,46 +511,22 @@ export async function declineInviteAction(inviteId: string) {
 
 export async function getAllProfilesAction() {
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user || !adminSupabase) return []
+        const user = await getCurrentUser()
+        if (!user) return []
 
         await assertAdmin(user.id)
 
         const profiles = await db.getAllProfiles()
-        const { data: { users: authUsers }, error: authError } = await adminSupabase.auth.admin.listUsers()
-        
-        if (authError) console.error("Error listing auth users:", authError)
-
-        // Enrich profiles with auth info
-        const mergedUsers = authUsers.map(authUser => {
-            const profile = profiles.find((p: any) => p.email === authUser.email)
-            return {
-                id: profile?.id || authUser.id,
-                email: authUser.email || profile?.email,
-                full_name: profile?.full_name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Membro Externo',
-                role: profile?.role || 'user',
-                status: profile?.status || 'approved',
-                isRegistered: authUser.user_metadata?.password_set === true,
-                lastSignIn: authUser.last_sign_in_at,
-                isAuthOnly: !profile
-            }
-        })
-
-        // Also add profiles that might not have an auth user yet (pending invites)
-        profiles.forEach((p: any) => {
-            if (!mergedUsers.find(u => u.email === p.email)) {
-                mergedUsers.push({
-                    ...p,
-                    isRegistered: false,
-                    lastSignIn: null,
-                    isAuthOnly: false
-                })
-            }
-        })
-
-        return mergedUsers
+        return profiles.map((p: any) => ({
+            id: p.id,
+            email: p.email,
+            full_name: p.full_name || 'Membro Externo',
+            role: p.role || 'user',
+            status: p.status || 'approved',
+            isRegistered: !!p.password_hash,
+            lastSignIn: null,
+            isAuthOnly: false
+        }))
     } catch (error) {
         console.error("Error in getAllProfilesAction:", error)
         return []
@@ -694,11 +535,8 @@ export async function getAllProfilesAction() {
 
 export async function resendAccessAction(email: string, name: string) {
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (!user || !adminSupabase) throw new Error("Não autorizado")
+        const user = await getCurrentUser()
+        if (!user) throw new Error("Não autorizado")
 
         await assertAdmin(user.id)
 
@@ -707,28 +545,14 @@ export async function resendAccessAction(email: string, name: string) {
         const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
         
         let siteUrl = 'https://darktube.fjt-solutions.com'
-        
         if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
             siteUrl = `${protocol}://${host}`
         }
         
-        console.log(`[Admin] Resending access. Host: ${host}, Using siteUrl: ${siteUrl}`)
-        
+        const setupToken = await signJWT({ email, purpose: 'setup-password' }, 72 * 3600)
+        const actionLink = `${siteUrl}/setup-password?token=${setupToken}`
 
-        // Generate magic link (works for existing users)
-        const { data, error: authError } = await adminSupabase.auth.admin.generateLink({
-            type: 'magiclink',
-            email: email,
-            options: {
-                redirectTo: `${siteUrl}/setup-password`
-            }
-        })
-
-        if (authError || !data?.properties?.action_link) {
-            throw new Error("Falha ao gerar link: " + (authError?.message || "Erro desconhecido"))
-        }
-
-        const result = await sendAccessGrantedEmail(email, name, data.properties.action_link)
+        const result = await sendAccessGrantedEmail(email, name, actionLink)
         return result
     } catch (error: any) {
         console.error("Error in resendAccessAction:", error)
@@ -738,8 +562,7 @@ export async function resendAccessAction(email: string, name: string) {
 
 export async function updateUserRoleAction(userId: string, role: 'admin' | 'user') {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autenticado")
 
         await assertAdmin(user.id)
@@ -755,14 +578,12 @@ export async function updateUserRoleAction(userId: string, role: 'admin' | 'user
 
 export async function updateUserStatusAction(userId: string, status: 'approved' | 'blocked') {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autenticado")
 
         await assertAdmin(user.id)
 
-        // We need to find the email of the target user
-        const { data: target } = await supabase.from('profiles').select('email').eq('id', userId).single()
+        const target = await db.getProfileById(userId)
         if (!target) throw new Error("Usuário não encontrado")
 
         const result = await db.updateProfileStatus(target.email, status)
@@ -776,59 +597,24 @@ export async function updateUserStatusAction(userId: string, status: 'approved' 
 
 export async function deleteUserAction(userId: string, email?: string) {
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (!user || !adminSupabase) throw new Error("Não autorizado ou configuração ausente")
+        const user = await getCurrentUser()
+        if (!user) throw new Error("Não autorizado ou configuração ausente")
 
         await assertAdmin(user.id)
 
-        // 0. Determine email for invite cleanup
         let targetEmail = email?.trim().toLowerCase()
         if (!targetEmail) {
-            const { data: authUser } = await adminSupabase.auth.admin.getUserById(userId)
-            targetEmail = authUser?.user?.email
-            
-            if (!targetEmail) {
-                // Fallback to auth client to find email
-                const { data: p } = await supabase.from('profiles').select('email').eq('id', userId).maybeSingle()
-                targetEmail = p?.email
-            }
+            const target = await db.getProfileById(userId)
+            targetEmail = target?.email
         }
 
-        // 1. Delete from App DB (Profiles etc)
-        // Try with admin client, then auth client fallback
-        const { error: profileError } = await adminSupabase.from('profiles').delete().eq('id', userId)
-        if (profileError) {
-             console.warn("[Admin] Profile delete via admin failed, trying auth client:", profileError.message)
-             await supabase.from('profiles').delete().eq('id', userId)
-        }
+        // Delete from App DB
+        await db.deleteProfile(userId)
         
-        // 2. Delete any matching invites (to allow re-requestinging)
+        // Delete any matching invites
         if (targetEmail) {
-            const cleanEmail = targetEmail.trim().toLowerCase()
-            console.log(`[Admin] Cleaning up invites for ${cleanEmail}`)
-            
-            // Try to find by email first to get ID
-            const { data: list } = await adminSupabase.from('invites').select('id').eq('email', cleanEmail)
-            const ids = (list || []).map((i: any) => i.id)
-
-            if (ids.length > 0) {
-                 await adminSupabase.from('invites').delete().in('id', ids)
-            }
-            
-            // Blanket delete as fallback
-            const { error: invErr } = await adminSupabase.from('invites').delete().eq('email', cleanEmail)
-            if (invErr) {
-                 console.warn("[Admin] Invite delete failed, trying auth client fallback:", invErr.message)
-                 await supabase.from('invites').delete().eq('email', cleanEmail)
-            }
+            await db.deleteInviteByEmail(targetEmail)
         }
-        
-        // 3. Delete from Auth (requires Admin Client)
-        const { error: authError } = await adminSupabase.auth.admin.deleteUser(userId)
-        if (authError) console.warn("Auth deletion failed:", authError)
 
         revalidatePath("/admin/users")
         revalidatePath("/settings")
@@ -842,85 +628,28 @@ export async function deleteUserAction(userId: string, email?: string) {
 export async function requestInviteAction(email: string, name: string) {
     const cleanEmail = email.trim().toLowerCase()
     try {
-        const supabase = await createClient()
-        const adminSupabase = await createAdminClient()
-        if (!adminSupabase) throw new Error("Erro de configuração do servidor")
-
         // 1. Check Profiles (Approved users always have a profile)
-        const { data: profile } = await adminSupabase
-            .from('profiles')
-            .select('id, status')
-            .ilike('email', cleanEmail)
-            .maybeSingle()
-
+        const profile = await db.getProfileByEmail(cleanEmail)
         if (profile) {
-            // If they have an active profile, they don't need a new invite
             if (profile.status !== 'rejected') {
                 return { success: false, error: "ESTE_EMAIL_JA_SOLICITOU" }
             }
         }
 
-        // 2. Check if an invite already exists
-        const { data: existingInvite } = await adminSupabase
-            .from('invites')
-            .select('id, status')
-            .ilike('email', cleanEmail)
-            .maybeSingle()
-
+        // 2. Check if invite already exists
+        const existingInvite = await db.getInviteByEmail(cleanEmail)
         if (existingInvite) {
-            // If it's pending, just update it to bring to top
             if (existingInvite.status === 'pending') {
-                const { error: updateError } = await adminSupabase
-                    .from('invites')
-                    .update({ 
-                        name, 
-                        created_at: new Date().toISOString() 
-                    })
-                    .eq('id', existingInvite.id)
-                
-                if (updateError) {
-                    console.warn("[Invite] Admin update failed, trying auth client:", updateError.message)
-                    await supabase
-                        .from('invites')
-                        .update({ name, created_at: new Date().toISOString() })
-                        .eq('id', existingInvite.id)
-                }
+                await db.createInvite(cleanEmail, name, 'pending')
                 return { success: true }
             }
-            
-            // If it's already approved but no profile exists (cleanup failed), 
-            // allow a new invite request to proceed by cleaning up the old one
-            if (existingInvite.status === 'approved') {
-                console.log(`[Invite] Found stale 'approved' invite for ${email}, cleaning up...`)
-                await adminSupabase.from('invites').delete().eq('id', existingInvite.id)
-                // proceed to insert/upsert below
-            }
-            
-            // If it's rejected/expired, delete and allow new request
-            else if (existingInvite.status === 'rejected' || existingInvite.status === 'expired') {
-                await adminSupabase.from('invites').delete().eq('id', existingInvite.id)
+            if (existingInvite.status === 'approved' || existingInvite.status === 'rejected' || existingInvite.status === 'expired') {
+                await db.deleteInviteByEmail(cleanEmail)
             }
         }
 
-        // 2. Insert new invite (bypass RLS check by using admin then auth fallback)
-        // Use an upsert-like logic: delete then insert, or just use upsert
-        // but invites table might not have email as unique but the logic expects it.
-        const { error: finalErr } = await adminSupabase
-            .from('invites')
-            .upsert({ email: cleanEmail, name, status: 'pending', created_at: new Date().toISOString() }, { onConflict: 'email' })
-
-        if (finalErr) {
-            console.warn("[Invite] Upsert via admin failed, falling back to insert:", finalErr.message)
-            const { error: insertErr } = await supabase
-                .from('invites')
-                .insert({ email: cleanEmail, name })
-
-            if (insertErr) {
-                if (insertErr.code === '23505') return { success: false, error: "ESTE_EMAIL_JA_SOLICITOU" }
-                throw insertErr
-            }
-        }
-
+        // 3. Create new invite
+        await db.createInvite(cleanEmail, name, 'pending')
         return { success: true }
     } catch (error: any) {
         console.error("Error in requestInviteAction:", error)
@@ -930,8 +659,7 @@ export async function requestInviteAction(email: string, name: string) {
 
 export async function getCredentialsAction() {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         const providers = [
@@ -954,8 +682,7 @@ export async function getCredentialsAction() {
 
 export async function updateCredentialsAction(provider: string, key: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) return { success: false, error: "Não autorizado" }
 
         await db.upsertUserApiKey(user.id, provider, key)
@@ -970,8 +697,7 @@ export async function updateCredentialsAction(provider: string, key: string) {
 
 export async function addBlotatoAccountAction(platform: string, accountId: string, label?: string, pageId?: string, pageName?: string, avatarUrl?: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         return await db.addBlotatoAccount(user.id, platform, accountId, label, pageId, pageName, avatarUrl)
@@ -983,8 +709,7 @@ export async function addBlotatoAccountAction(platform: string, accountId: strin
 
 export async function fetchBlotatoAccountsFromAPIAction() {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         const apiKey = await db.getUserApiKey(user.id, 'blotato')
@@ -1053,18 +778,12 @@ export async function fetchBlotatoAccountsFromAPIAction() {
 
 export async function removeBlotatoAccountAction(id: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
-        // BUG-02 FIX: Verify ownership before deleting
-        const { data: account } = await supabase
-            .from('blotato_accounts')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', user.id)
-            .single()
-        if (!account) throw new Error("Conta não encontrada ou não pertence a você.")
+        // Verify ownership before deleting
+        const account = await db.getBlotatoAccountById(id)
+        if (!account || account.user_id !== user.id) throw new Error("Conta não encontrada ou não pertence a você.")
 
         return await db.removeBlotatoAccount(id)
     } catch (error: any) {
@@ -1074,44 +793,18 @@ export async function removeBlotatoAccountAction(id: string) {
 }
 export async function checkUserAccessAction(email: string) {
     try {
-        const adminSupabase = await createAdminClient()
-        if (!adminSupabase) throw new Error("Erro de configuração do servidor")
-
+        const cleanEmail = email.trim().toLowerCase()
         // 1. Check Profiles (Approved users)
-        const { data: profile } = await adminSupabase
-            .from('profiles')
-            .select('id, status')
-            .eq('email', email)
-            .maybeSingle()
-
+        const profile = await db.getProfileByEmail(cleanEmail)
         if (profile) {
             if (profile.status === 'blocked') return { status: 'blocked' }
             return { status: 'has_access' }
         }
 
         // 2. Check Invites (Pending users)
-        const { data: invite } = await adminSupabase
-            .from('invites')
-            .select('id, status')
-            .eq('email', email)
-            .maybeSingle()
-
+        const invite = await db.getInviteByEmail(cleanEmail)
         if (invite) {
             return { status: 'pending_invite' }
-        }
-
-        // SEC-05 FIX: Only fetch first page and check instead of loading ALL users
-        // 3. Final Check: if in Auth but no profile/invite, they have access
-        try {
-            const { data: { users }, error: authErr } = await adminSupabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
-            if (!authErr && users) {
-                const isAuthUser = users.some((u: any) => u.email === email)
-                if (isAuthUser) {
-                    return { status: 'has_access' }
-                }
-            }
-        } catch {
-            // Auth check failed, continue to no_access
         }
 
         return { status: 'no_access' }
@@ -1123,8 +816,7 @@ export async function checkUserAccessAction(email: string) {
 
 export async function getBlotatoAccountsAction() {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) return []
         return await db.getBlotatoAccounts(user.id)
     } catch (error) {
@@ -1135,8 +827,7 @@ export async function getBlotatoAccountsAction() {
 
 export async function saveRemodelingTemplateAction(data: any) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         const result = await db.saveRemodelingTemplate(user.id, data)
@@ -1149,8 +840,7 @@ export async function saveRemodelingTemplateAction(data: any) {
 
 export async function updateRemodelingTemplateAction(templateId: string, data: any) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         const result = await db.updateRemodelingTemplate(templateId, data)
@@ -1163,8 +853,7 @@ export async function updateRemodelingTemplateAction(templateId: string, data: a
 
 export async function getRemodelingTemplatesAction() {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) return []
         return await db.getRemodelingTemplates(user.id)
     } catch (error) {
@@ -1175,8 +864,7 @@ export async function getRemodelingTemplatesAction() {
 
 export async function getRemodelingTemplateByIdAction(id: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
         
         const template = await db.getRemodelingTemplateById(id)
@@ -1191,8 +879,7 @@ export async function getRemodelingTemplateByIdAction(id: string) {
 
 export async function getProductionHistoryAction(templateId: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
         
         // Ensure template belongs to user
@@ -1208,8 +895,7 @@ export async function getProductionHistoryAction(templateId: string) {
 
 export async function sendToN8NAction(templateId: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         // 1. Get Template
@@ -1259,12 +945,7 @@ export async function sendToN8NAction(templateId: string) {
         })
 
         // 5. Update last dispatched
-        const { error: updateError } = await supabase
-            .from('remodeling_templates')
-            .update({ last_dispatched_at: new Date().toISOString() })
-            .eq('id', templateId)
-        
-        if (updateError) console.error("Failed to update last_dispatched_at:", updateError)
+        await db.updateRemodelingTemplate(templateId, { last_dispatched_at: new Date().toISOString() })
 
         revalidatePath(`/templates/${templateId}`)
         return { success: true }
@@ -1276,18 +957,12 @@ export async function sendToN8NAction(templateId: string) {
 
 export async function deleteRemodelingTemplateAction(id: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
-        // BUG-03 FIX: Verify ownership before deleting
-        const { data: template } = await supabase
-            .from('remodeling_templates')
-            .select('id')
-            .eq('id', id)
-            .eq('user_id', user.id)
-            .single()
-        if (!template) throw new Error("Template não encontrado ou não pertence a você.")
+        // Verify ownership before deleting
+        const template = await db.getRemodelingTemplateById(id)
+        if (!template || template.user_id !== user.id) throw new Error("Template não encontrado ou não pertence a você.")
 
         return await db.deleteRemodelingTemplate(id)
     } catch (error: any) {
@@ -1298,8 +973,7 @@ export async function deleteRemodelingTemplateAction(id: string) {
 
 export async function updateTemplateStatusAction(id: string, isActive: boolean) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
         return await db.updateRemodelingTemplateStatus(id, isActive)
     } catch (error: any) {
@@ -1310,9 +984,7 @@ export async function updateTemplateStatusAction(id: string, isActive: boolean) 
 
 export async function getRecentVideosAction(limit = 12) {
     try {
-        // Optional auth check (we might want everyone logged in to see them)
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) return []
         
         return await db.getRecentVideos(limit)
@@ -1373,17 +1045,11 @@ export async function getSmartRecommendationsAction(limit = 12) {
         let queryWords: string[] = []
         
         try {
-            const supabase = await createClient()
-            const { data: { user } } = await supabase.auth.getUser()
+            const user = await getCurrentUser()
             
             if (user) {
                 // Busca canais rastreados para contexto
-                const { data: trackedData } = await supabase
-                    .from("tracked_channels")
-                    .select("name, tags")
-                    .eq("user_id", user.id)
-                    .order("tracked_at", { ascending: false })
-                    .limit(5)
+                const trackedData = await db.getTrackedChannels(user.id)
 
                 if (trackedData && trackedData.length > 0) {
                     trackedData.forEach((c: any) => {
@@ -1393,12 +1059,7 @@ export async function getSmartRecommendationsAction(limit = 12) {
                 }
 
                 // Busca vídeos já analisados para mais contexto
-                const { data: analyzedData } = await supabase
-                    .from("videos")
-                    .select("title")
-                    .eq("user_id", user.id)
-                    .order("created_at", { ascending: false })
-                    .limit(3)
+                const analyzedData = await db.getRecentUserVideos(user.id, 3)
 
                 if (analyzedData && analyzedData.length > 0) {
                     analyzedData.forEach((v: any) => {
@@ -1431,7 +1092,6 @@ export async function getSmartRecommendationsAction(limit = 12) {
         return await searchYouTube("trending videos viral 2024", limit)
     } catch (error: any) {
         console.error("[SmartRecommendations] Erro total:", error)
-        // 5. Fallback absoluto: tenta Supabase
         try {
             return await db.getRecentVideos(limit)
         } catch {
@@ -1440,18 +1100,13 @@ export async function getSmartRecommendationsAction(limit = 12) {
     }
 }
 
-
 export async function translatePromptAction(text: string) {
     try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const user = await getCurrentUser()
         if (!user) throw new Error("Não autorizado")
 
         // Get OpenAI key (same pattern as generateScriptAction)
-        const { data: apiKey } = await supabase.rpc('get_api_key', {
-            p_user_id: user.id,
-            p_provider: 'openai'
-        })
+        const apiKey = await db.getUserApiKey(user.id, 'openai')
 
         if (!apiKey) {
             return { success: false, error: "Chave OpenAI não encontrada. Adicione em Credenciais." }
@@ -1490,5 +1145,163 @@ export async function translatePromptAction(text: string) {
     } catch (error) {
         console.error("Translation error:", error)
         return { success: false, error: "Erro na tradução" }
+    }
+}
+
+export async function loginAction(email: string, password: string) {
+    try {
+        const cleanEmail = email.trim().toLowerCase()
+        const user = await db.getProfileByEmail(cleanEmail)
+        
+        if (!user) {
+            return { success: false, error: "E-mail ou senha incorretos." }
+        }
+
+        if (user.status === 'pending') {
+            return { success: false, error: "PENDING_APPROVAL" }
+        }
+
+        if (user.status === 'blocked') {
+            return { success: false, error: "BLOCKED" }
+        }
+
+        // Verify password hash
+        if (!user.password_hash) {
+            return { success: false, error: "PASSWORD_NOT_SET" }
+        }
+
+        const isPasswordCorrect = await verifyPassword(password, user.password_hash)
+        if (!isPasswordCorrect) {
+            return { success: false, error: "E-mail ou senha incorretos." }
+        }
+
+        // Successful login! Create session cookie
+        await createSession({
+            id: user.id,
+            email: user.email,
+            role: user.role || 'user',
+            status: user.status || 'approved',
+            full_name: user.full_name || ''
+        })
+
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in loginAction:", error)
+        return { success: false, error: error.message || "Erro desconhecido durante o login." }
+    }
+}
+
+export async function logoutAction() {
+    try {
+        await deleteSession()
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in logoutAction:", error)
+        return { success: false, error: error.message || "Erro ao fazer logout." }
+    }
+}
+
+export async function resetPasswordAction(email: string) {
+    try {
+        const cleanEmail = email.trim().toLowerCase()
+        const user = await db.getProfileByEmail(cleanEmail)
+
+        if (!user) {
+            return { success: false, error: "Não encontramos uma conta aprovada para este e-mail." }
+        }
+
+        if (user.status === 'pending') {
+            return { success: false, error: "Sua solicitação de acesso ainda está em análise." }
+        }
+
+        if (user.status === 'blocked') {
+            return { success: false, error: "Seu acesso foi suspenso. Entre em contato com o suporte." }
+        }
+
+        const heads = await headers()
+        const host = heads.get('x-forwarded-host') || heads.get('host')
+        const protocol = heads.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
+        
+        let siteUrl = 'https://darktube.fjt-solutions.com'
+        if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
+            siteUrl = `${protocol}://${host}`
+        }
+
+        // Generate reset token (JWT valid for 2 hours)
+        const resetToken = await signJWT({ email: user.email, purpose: 'reset-password' }, 2 * 3600)
+        const actionLink = `${siteUrl}/setup-password?token=${resetToken}`
+
+        console.log(`[Auth] Sending password reset email to ${user.email}`)
+        const emailResult = await sendPasswordResetEmail(user.email, user.full_name || 'Usuário', actionLink)
+        
+        if (!emailResult.success) {
+            throw new Error("Falha ao enviar e-mail. Verifique as configurações de SMTP.")
+        }
+
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in resetPasswordAction:", error)
+        return { success: false, error: error.message || "Erro desconhecido." }
+    }
+}
+
+export async function verifySetupTokenAction(token: string) {
+    try {
+        const payload = await verifyJWT(token)
+        if (!payload || !payload.email || (payload.purpose !== 'setup-password' && payload.purpose !== 'reset-password')) {
+            return { success: false, error: "Link inválido ou expirado." }
+        }
+
+        const user = await db.getProfileByEmail(payload.email)
+        if (!user) {
+            return { success: false, error: "Usuário não encontrado." }
+        }
+
+        return { success: true, email: user.email }
+    } catch (error: any) {
+        console.error("Error verifying setup token:", error)
+        return { success: false, error: "Token inválido ou expirado." }
+    }
+}
+
+export async function setupPasswordAction(token: string, password: string) {
+    try {
+        const payload = await verifyJWT(token)
+        if (!payload || !payload.email || (payload.purpose !== 'setup-password' && payload.purpose !== 'reset-password')) {
+            return { success: false, error: "Link inválido ou expirado." }
+        }
+
+        const user = await db.getProfileByEmail(payload.email)
+        if (!user) {
+            return { success: false, error: "Usuário não encontrado." }
+        }
+
+        // Hash and update password
+        const passwordHash = await hashPassword(password)
+        await db.updateUserPassword(user.email, passwordHash)
+
+        // Establish session cookie immediately
+        await createSession({
+            id: user.id,
+            email: user.email,
+            role: user.role || 'user',
+            status: 'approved',
+            full_name: user.full_name || ''
+        })
+
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in setupPasswordAction:", error)
+        return { success: false, error: error.message || "Erro desconhecido." }
+    }
+}
+
+export async function getCurrentUserAction() {
+    try {
+        const user = await getCurrentUser()
+        return user
+    } catch (error) {
+        console.error("Error in getCurrentUserAction:", error)
+        return null
     }
 }

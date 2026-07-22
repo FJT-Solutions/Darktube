@@ -1,51 +1,28 @@
-import { createClient as createServerClient } from "./supabase/server"
-import { createClient as createBrowserClient } from "./supabase/client"
-
-// Helper to get the correct client based on environment
-async function getSupabase() {
-  if (typeof window === "undefined") {
-    return await createServerClient()
-  }
-  return createBrowserClient()
-}
+// lib/storage.ts
+import { pool } from "./db-client"
 
 export async function uploadThumbnail(buffer: Buffer, filename: string) {
-  const supabase = await getSupabase()
-  const { data, error } = await supabase.storage
-    .from('thumbnails')
-    .upload(filename, buffer, {
-      contentType: 'image/jpeg',
-      upsert: true
-    })
-  
-  if (error) throw error
+  await pool.query(`
+    INSERT INTO public.storage_files (filename, mime_type, content)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (filename)
+    DO UPDATE SET content = EXCLUDED.content
+  `, [filename, 'image/jpeg', buffer])
 
-  const { data: { publicUrl } } = supabase.storage
-    .from('thumbnails')
-    .getPublicUrl(filename)
-
-  return publicUrl
+  return `/api/storage/${filename}`
 }
 
 export async function uploadFrame(buffer: Buffer, filename: string) {
-  const supabase = await getSupabase()
-  const { data, error } = await supabase.storage
-    .from('frames')
-    .upload(filename, buffer, {
-      contentType: 'image/jpeg',
-      upsert: true
-    })
-  
-  if (error) throw error
-  return data.path
+  await pool.query(`
+    INSERT INTO public.storage_files (filename, mime_type, content)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (filename)
+    DO UPDATE SET content = EXCLUDED.content
+  `, [filename, 'image/jpeg', buffer])
+
+  return filename
 }
 
 export async function getFrameUrl(path: string) {
-  const supabase = await getSupabase()
-  const { data, error } = await supabase.storage
-    .from('frames')
-    .createSignedUrl(path, 3600) // 1 hour
-  
-  if (error) throw error
-  return data.signedUrl
+  return `/api/storage/${path}`
 }

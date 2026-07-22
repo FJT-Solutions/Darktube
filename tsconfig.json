@@ -37,6 +37,7 @@
   ],
   "exclude": [
     "node_modules",
+    "scripts",
     "v0-mineracao-de-canais-you-tube",
     "provision_user.ts",
     "tmp_check_user.ts",

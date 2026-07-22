@@ -1,4 +1,4 @@
-import { createClient, createAdminClient } from "./supabase/server"
+import { pool } from "./db-client"
 import type { TrackedChannel, YouTubeChannel, YouTubeVideo, BlotatoAccount } from "./types"
 
 /**
@@ -26,29 +26,32 @@ function fromSnakeCase(obj: any) {
  * CHANNELS
  */
 export async function getTrackedChannels(userId?: string): Promise<TrackedChannel[]> {
-    const supabase = await createClient()
-    let query = supabase
-        .from('channels')
-        .select(`
-            *,
-            metrics:channel_metrics_history (
-                *
-            )
-        `)
-        .order('tracked_at', { ascending: false })
+    let queryText = `
+        SELECT 
+            c.*,
+            m.avg_views_per_video,
+            m.estimated_monthly_views,
+            m.estimated_revenue,
+            m.dark_score
+        FROM public.channels c
+        LEFT JOIN (
+            SELECT DISTINCT ON (channel_id) *
+            FROM public.channel_metrics_history
+            ORDER BY channel_id, created_at DESC
+        ) m ON c.id = m.channel_id
+    `
+    const params: any[] = []
     
-    if (userId) query = query.eq('user_id', userId)
-
-    const { data, error } = await query
-    if (error) {
-        if (error.code === '42501') {
-            console.warn("[Database] RLS Permission error fetching channels - returning empty list")
-            return []
-        }
-        throw error
+    if (userId) {
+        queryText += ` WHERE c.user_id = $1`
+        params.push(userId)
     }
-
-    return (data || []).map((c: any) => ({
+    
+    queryText += ` ORDER BY c.tracked_at DESC`
+    
+    const { rows } = await pool.query(queryText, params)
+    
+    return rows.map((c: any) => ({
         id: c.id,
         name: c.name,
         handle: c.handle,
@@ -67,297 +70,314 @@ export async function getTrackedChannels(userId?: string): Promise<TrackedChanne
         notes: c.notes || "",
         tags: c.tags || [],
         trackedAt: c.tracked_at,
-        metrics: c.metrics && c.metrics[0] ? {
-            avgViewsPerVideo: c.metrics[0].avg_views_per_video || 0,
+        metrics: c.avg_views_per_video !== null ? {
+            avgViewsPerVideo: Number(c.avg_views_per_video || 0),
             uploadFrequency: "",
             uploadsPerMonth: 0,
             engagementRate: 0,
-            estimatedRevenue: c.metrics[0].estimated_revenue || 0,
+            estimatedRevenue: Number(c.estimated_revenue || 0),
             estimatedMonthlyRevenue: 0,
-            darkScore: c.metrics[0].dark_score || 0,
+            darkScore: Number(c.dark_score || 0),
             cpm: 0,
             growthPotential: 0,
-            estimatedMonthlyViews: Number(c.metrics[0].estimated_monthly_views || 0)
+            estimatedMonthlyViews: Number(c.estimated_monthly_views || 0)
         } : undefined
     }))
 }
 
 export async function ensureChannelExists(channel: YouTubeChannel, userId?: string): Promise<void> {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('channels')
-        .upsert({
-            id: channel.id,
-            name: channel.name,
-            handle: channel.handle,
-            avatar_url: channel.avatar,
-            banner_url: channel.banner,
-            subscribers: channel.subscribers,
-            total_views: channel.totalViews,
-            video_count: channel.videoCount,
-            description: channel.description,
-            joined_date: channel.joinedDate || null,
-            country: channel.country,
-            url: channel.url,
-            topic_categories: channel.topicCategories || [],
-            user_id: userId || null
-        })
-    
-    if (error) throw error
+    await pool.query(`
+        INSERT INTO public.channels (
+            id, name, handle, avatar_url, banner_url, subscribers, total_views, video_count, 
+            description, joined_date, country, url, topic_categories, user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            handle = EXCLUDED.handle,
+            avatar_url = EXCLUDED.avatar_url,
+            banner_url = EXCLUDED.banner_url,
+            subscribers = EXCLUDED.subscribers,
+            total_views = EXCLUDED.total_views,
+            video_count = EXCLUDED.video_count,
+            description = EXCLUDED.description,
+            joined_date = EXCLUDED.joined_date,
+            country = EXCLUDED.country,
+            url = EXCLUDED.url,
+            topic_categories = EXCLUDED.topic_categories
+    `, [
+        channel.id, channel.name, channel.handle, channel.avatar, channel.banner || null,
+        channel.subscribers, channel.totalViews, channel.videoCount, channel.description || null,
+        channel.joinedDate || null, channel.country || null, channel.url || null,
+        channel.topicCategories || [], userId || null
+    ])
 }
 
 export async function saveTrackedChannel(channel: TrackedChannel, userId?: string): Promise<void> {
-    const supabase = await createClient()
-    
     // 1. Upsert Channel
-    const { error: channelError } = await supabase
-        .from('channels')
-        .upsert({
-            id: channel.id,
-            name: channel.name,
-            handle: channel.handle,
-            avatar_url: channel.avatar,
-            banner_url: channel.banner,
-            subscribers: channel.subscribers,
-            total_views: channel.totalViews,
-            video_count: channel.videoCount,
-            description: channel.description,
-            joined_date: channel.joinedDate || null,
-            country: channel.country,
-            url: channel.url,
-            verified: channel.verified,
-            topic_categories: channel.topicCategories || [],
-            dark_type: channel.darkType,
-            notes: channel.notes,
-            tags: channel.tags || [],
-            user_id: userId || null
-        })
-
-    if (channelError) throw channelError
+    await pool.query(`
+        INSERT INTO public.channels (
+            id, name, handle, avatar_url, banner_url, subscribers, total_views, video_count, 
+            description, joined_date, country, url, verified, topic_categories, dark_type, notes, tags, user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            handle = EXCLUDED.handle,
+            avatar_url = EXCLUDED.avatar_url,
+            banner_url = EXCLUDED.banner_url,
+            subscribers = EXCLUDED.subscribers,
+            total_views = EXCLUDED.total_views,
+            video_count = EXCLUDED.video_count,
+            description = EXCLUDED.description,
+            joined_date = EXCLUDED.joined_date,
+            country = EXCLUDED.country,
+            url = EXCLUDED.url,
+            verified = EXCLUDED.verified,
+            topic_categories = EXCLUDED.topic_categories,
+            dark_type = EXCLUDED.dark_type,
+            notes = EXCLUDED.notes,
+            tags = EXCLUDED.tags
+    `, [
+        channel.id, channel.name, channel.handle, channel.avatar, channel.banner || null,
+        channel.subscribers, channel.totalViews, channel.videoCount, channel.description || null,
+        channel.joinedDate || null, channel.country || null, channel.url || null,
+        channel.verified || false, channel.topicCategories || [], channel.darkType || null,
+        channel.notes || null, channel.tags || [], userId || null
+    ])
 
     // 2. Save Metrics History
     if (channel.metrics) {
-        const { error: metricsError } = await supabase
-            .from('channel_metrics_history')
-            .insert({
-                channel_id: channel.id,
-                subscribers: channel.subscribers,
-                total_views: channel.totalViews,
-                avg_views_per_video: channel.metrics.avgViewsPerVideo,
-                estimated_monthly_views: channel.metrics.estimatedMonthlyViews || 0,
-                estimated_revenue: channel.metrics.estimatedRevenue,
-                dark_score: channel.metrics.darkScore,
-            })
-        
-        if (metricsError) throw metricsError
+        await pool.query(`
+            INSERT INTO public.channel_metrics_history (
+                channel_id, subscribers, total_views, avg_views_per_video, 
+                estimated_monthly_views, estimated_revenue, dark_score
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+            channel.id, channel.subscribers, channel.totalViews, channel.metrics.avgViewsPerVideo,
+            channel.metrics.estimatedMonthlyViews || 0, channel.metrics.estimatedRevenue, channel.metrics.darkScore
+        ])
     }
 }
 
 export async function removeTrackedChannel(channelId: string): Promise<void> {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('channels')
-        .delete()
-        .eq('id', channelId)
-    
-    if (error) throw error
+    await pool.query('DELETE FROM public.channels WHERE id = $1', [channelId])
 }
 
 export async function isChannelTracked(channelId: string, userId?: string): Promise<boolean> {
-    const supabase = await createClient()
-    let query = supabase
-        .from('channels')
-        .select('id', { count: 'exact', head: true })
-        .eq('id', channelId)
+    let queryText = 'SELECT 1 FROM public.channels WHERE id = $1'
+    const params: any[] = [channelId]
     
-    if (userId) query = query.eq('user_id', userId)
-
-    const { count, error } = await query
-    if (error) {
-        if (error.code === '42501') {
-            // Se der erro de permissão, significa que o canal não pertence ao usuário (ou não está rastreado)
-            // Retornamos false em vez de estourar erro 500
-            return false
-        }
-        throw error
+    if (userId) {
+        queryText += ' AND user_id = $2'
+        params.push(userId)
     }
-    return (count || 0) > 0
+    
+    const { rows } = await pool.query(queryText, params)
+    return rows.length > 0
 }
 
 export async function updateChannelNotes(channelId: string, notes: string): Promise<void> {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('channels')
-        .update({ notes })
-        .eq('id', channelId)
-    
-    if (error) throw error
+    await pool.query('UPDATE public.channels SET notes = $1 WHERE id = $2', [notes, channelId])
 }
 
 export async function updateChannelTags(channelId: string, tags: string[]): Promise<void> {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('channels')
-        .update({ tags })
-        .eq('id', channelId)
-    
-    if (error) throw error
+    await pool.query('UPDATE public.channels SET tags = $1 WHERE id = $2', [tags, channelId])
 }
 
 /**
  * VIDEOS
  */
 export async function updateVideoAnalysis(video: YouTubeVideo, transcript: string, aiAnalysis: string, userId?: string): Promise<void> {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('videos')
-        .upsert({
-            id: video.id,
-            channel_id: video.channelId || null,
-            title: video.title,
-            thumbnail_url: video.thumbnail,
-            views: video.views,
-            duration: video.duration,
-            published_at: video.publishedAt || null,
-            transcript,
-            ai_analysis: aiAnalysis ? JSON.parse(aiAnalysis) : null,
-            user_id: userId || null
-        })
-    
-    if (error) throw error
+    await pool.query(`
+        INSERT INTO public.videos (
+            id, channel_id, title, thumbnail_url, views, duration, published_at, transcript, ai_analysis, user_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ON CONFLICT (id) DO UPDATE SET
+            channel_id = EXCLUDED.channel_id,
+            title = EXCLUDED.title,
+            thumbnail_url = EXCLUDED.thumbnail_url,
+            views = EXCLUDED.views,
+            duration = EXCLUDED.duration,
+            published_at = EXCLUDED.published_at,
+            transcript = EXCLUDED.transcript,
+            ai_analysis = EXCLUDED.ai_analysis
+    `, [
+        video.id, video.channelId || null, video.title, video.thumbnail, video.views || 0,
+        video.duration, video.publishedAt || null, transcript, aiAnalysis ? JSON.parse(aiAnalysis) : null, userId || null
+    ])
 }
 
 /**
- * SETTINGS & API KEYS (Using the new secure RPCs)
+ * SETTINGS & API KEYS (Substitui os RPCs do Supabase)
  */
 export async function upsertUserApiKey(userId: string, provider: string, key: string) {
-    const supabase = await createClient()
-    const { error } = await supabase.rpc('upsert_api_key', {
-        p_user_id: userId,
-        p_provider: provider,
-        p_key: key
-    })
-    if (error) throw error
+    await pool.query(`
+        INSERT INTO public.user_api_keys (user_id, provider, key)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (user_id, provider)
+        DO UPDATE SET key = EXCLUDED.key, updated_at = NOW()
+    `, [userId, provider, key])
 }
 
-export async function getUserApiKey(userId: string, provider: string) {
-    const supabase = await createClient()
-    const { data, error } = await supabase.rpc('get_api_key', {
-        p_user_id: userId,
-        p_provider: provider
-    })
-    if (error) throw error
-    return data as string
+export async function getUserApiKey(userId: string, provider: string): Promise<string> {
+    const { rows } = await pool.query(
+        'SELECT key FROM public.user_api_keys WHERE user_id = $1 AND provider = $2',
+        [userId, provider]
+    )
+    return rows[0]?.key || ''
 }
 
 /**
- * NICHES (Extended intelligence)
+ * NICHES
  */
 export async function getDetailedNiches() {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('niches')
-        .select('*')
-        .order('label')
-    
-    if (error) throw error
-    return data
+    const { rows } = await pool.query('SELECT * FROM public.niches ORDER BY label')
+    return rows
 }
+
+/**
+ * PROFILES (Atualiza a tabela users unificada)
+ */
 export async function updateProfileStatus(email: string, status: 'pending' | 'approved' | 'rejected' | 'blocked') {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('profiles')
-        .update({ status })
-        .eq('email', email)
-    
-    if (error) throw error
+    await pool.query('UPDATE public.users SET status = $1 WHERE email = $2', [status, email])
     return { success: true }
 }
 
 export async function deleteProfile(userId: string) {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId)
-    
-    if (error) throw error
+    await pool.query('DELETE FROM public.users WHERE id = $1', [userId])
     return { success: true }
 }
 
 export async function getAllProfiles() {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return data
+    const { rows } = await pool.query('SELECT * FROM public.users ORDER BY created_at DESC')
+    return rows
 }
 
 export async function updateProfileRole(userId: string, role: 'admin' | 'user') {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('profiles')
-        .update({ role })
-        .eq('id', userId)
-    
-    if (error) throw error
+    await pool.query('UPDATE public.users SET role = $1 WHERE id = $2', [role, userId])
     return { success: true }
 }
+
+export async function getProfileById(userId: string) {
+    const { rows } = await pool.query('SELECT * FROM public.users WHERE id = $1', [userId])
+    return rows[0] || null
+}
+
+export async function getProfileByEmail(email: string) {
+    const { rows } = await pool.query('SELECT * FROM public.users WHERE email = $1', [email])
+    return rows[0] || null
+}
+
+export async function createUser(email: string, passwordHash: string, fullName: string, role: string = 'user', status: string = 'pending') {
+    const { rows } = await pool.query(
+        `INSERT INTO public.users (email, password_hash, full_name, role, status)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [email, passwordHash, fullName, role, status]
+    )
+    return rows[0]
+}
+
+export async function updateUserPassword(email: string, passwordHash: string) {
+    const { rows } = await pool.query(
+        `UPDATE public.users SET password_hash = $1 WHERE email = $2 RETURNING *`,
+        [passwordHash, email]
+    )
+    return rows[0] || null
+}
+
+/**
+ * INVITES
+ */
+export async function getInviteById(inviteId: string) {
+    const { rows } = await pool.query('SELECT * FROM public.invites WHERE id = $1', [inviteId])
+    return rows[0] || null
+}
+
+export async function getInviteByEmail(email: string) {
+    const { rows } = await pool.query('SELECT * FROM public.invites WHERE email = $1', [email])
+    return rows[0] || null
+}
+
+export async function createInvite(email: string, name: string, status: string = 'pending') {
+    const { rows } = await pool.query(
+        `INSERT INTO public.invites (email, name, status)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (email) DO UPDATE SET
+            name = EXCLUDED.name,
+            status = EXCLUDED.status,
+            created_at = NOW()
+         RETURNING *`,
+        [email, name, status]
+    )
+    return rows[0]
+}
+
+export async function updateInviteStatus(inviteId: string, status: string) {
+    const { rows } = await pool.query(
+        `UPDATE public.invites SET status = $1, reviewed_at = NOW() WHERE id = $2 RETURNING *`,
+        [status, inviteId]
+    )
+    return rows[0] || null
+}
+
+export async function deleteInviteByEmail(email: string) {
+    await pool.query('DELETE FROM public.invites WHERE email = $1', [email])
+}
+
+export async function deleteInviteById(id: string) {
+    await pool.query('DELETE FROM public.invites WHERE id = $1', [id])
+}
+
+export async function getPendingInvites() {
+    const { rows } = await pool.query("SELECT * FROM public.invites WHERE status = 'pending' ORDER BY created_at DESC")
+    return rows
+}
+
 
 /**
  * BLOTATO ACCOUNTS
  */
 export async function getBlotatoAccounts(userId: string): Promise<BlotatoAccount[]> {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('blotato_accounts')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+    const { rows } = await pool.query(
+        'SELECT * FROM public.blotato_accounts WHERE user_id = $1 ORDER BY created_at DESC',
+        [userId]
+    )
+    return rows
 }
 
-export async function addBlotatoAccount(userId: string, platform: string, accountId: string, label?: string, pageId?: string, pageName?: string, avatarUrl?: string): Promise<BlotatoAccount> {
-    const supabase = await createClient()
+export async function addBlotatoAccount(
+    userId: string,
+    platform: string,
+    accountId: string,
+    label?: string,
+    pageId?: string,
+    pageName?: string,
+    avatarUrl?: string
+): Promise<BlotatoAccount> {
+    const { rows } = await pool.query(`
+        INSERT INTO public.blotato_accounts (
+            user_id, platform, account_id, label, page_id, page_name, avatar_url
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (user_id, platform, account_id, page_id)
+        DO UPDATE SET
+            label = COALESCE(EXCLUDED.label, blotato_accounts.label),
+            page_name = COALESCE(EXCLUDED.page_name, blotato_accounts.page_name),
+            avatar_url = COALESCE(EXCLUDED.avatar_url, blotato_accounts.avatar_url)
+        RETURNING *
+    `, [
+        userId, platform, accountId.toString(), label || null, pageId?.toString() || '', pageName || null, avatarUrl || null
+    ])
     
-    // We use upsert to avoid Unique Violation (23505) and update existing records
-    // Assuming conflict on user_id, platform, account_id, and page_id after SQL fix
-    const { data, error } = await supabase
-        .from('blotato_accounts')
-        .upsert({
-            user_id: userId,
-            platform,
-            account_id: accountId.toString(),
-            label,
-            page_id: pageId?.toString() || '',
-            page_name: pageName || null,
-            avatar_url: avatarUrl || null,
-        }, {
-            onConflict: 'user_id,platform,account_id,page_id'
-        })
-        .select()
-    
-    if (error) {
-        console.error("Supabase upsert error:", error)
-        throw error
-    }
-    
-    return data && data.length > 0 ? data[0] : null as any
+    return rows[0]
+}
+
+export async function getBlotatoAccountById(id: string): Promise<BlotatoAccount | null> {
+    const { rows } = await pool.query('SELECT * FROM public.blotato_accounts WHERE id = $1', [id])
+    return rows[0] || null
 }
 
 export async function removeBlotatoAccount(id: string) {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('blotato_accounts')
-        .delete()
-        .eq('id', id)
-    
-    if (error) throw error
+    await pool.query('DELETE FROM public.blotato_accounts WHERE id = $1', [id])
     return { success: true }
 }
 
@@ -407,150 +427,137 @@ export async function saveRemodelingTemplate(
     userId: string,
     data: Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<RemodelingTemplateEntity> {
-    const supabase = await createClient()
-    if (!supabase) throw new Error("Client not available")
-    const { data: inserted, error } = await supabase
-        .from('remodeling_templates')
-        .insert({
-            user_id: userId,
-            ...data
-        })
-        .select()
-        .single()
+    const { rows } = await pool.query(`
+        INSERT INTO public.remodeling_templates (
+            user_id, video_id, video_title, video_thumbnail, name, template_data, generated_script,
+            format, has_music, music_style, voice_type, post_frequency, post_interval_days,
+            post_times, is_active, target_accounts, tags, image_model, video_model,
+            music_model, voice_model, voice_language
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        RETURNING *
+    `, [
+        userId, data.video_id, data.video_title || null, data.video_thumbnail || null, data.name,
+        data.template_data, data.generated_script || null, data.format, data.has_music || false,
+        data.music_style || null, data.voice_type || null, data.post_frequency, data.post_interval_days || null,
+        data.post_times || [], data.is_active !== false, data.target_accounts || [], data.tags || [],
+        data.image_model, data.video_model, data.music_model || null, data.voice_model || null, data.voice_language || null
+    ])
     
-    if (error) throw error
-    return inserted
+    return rows[0]
 }
 
 export async function updateRemodelingTemplate(
     templateId: string,
     data: Partial<Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
 ): Promise<RemodelingTemplateEntity> {
-    const supabase = await createClient()
-    if (!supabase) throw new Error("Client not available")
-    const { data: updated, error } = await supabase
-        .from('remodeling_templates')
-        .update(data)
-        .eq('id', templateId)
-        .select()
-        .single()
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+        const { rows } = await pool.query('SELECT * FROM public.remodeling_templates WHERE id = $1', [templateId])
+        return rows[0]
+    }
     
-    if (error) throw error
-    return updated
+    const setClauses = keys.map((key, i) => `"${key}" = $${i + 2}`);
+    const values = keys.map(key => (data as any)[key]);
+    
+    const { rows } = await pool.query(`
+        UPDATE public.remodeling_templates
+        SET ${setClauses.join(', ')}, updated_at = NOW()
+        WHERE id = $1
+        RETURNING *
+    `, [templateId, ...values])
+    
+    return rows[0]
 }
 
 export async function getRemodelingTemplates(userId: string): Promise<RemodelingTemplateEntity[]> {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('remodeling_templates')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+    const { rows } = await pool.query(
+        'SELECT * FROM public.remodeling_templates WHERE user_id = $1 ORDER BY created_at DESC',
+        [userId]
+    )
+    return rows
 }
 
 export async function getRemodelingTemplateById(id: string): Promise<RemodelingTemplateEntity> {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('remodeling_templates')
-        .select('*')
-        .eq('id', id)
-        .single()
-    
-    if (error) throw error
-    return data
+    const { rows } = await pool.query('SELECT * FROM public.remodeling_templates WHERE id = $1', [id])
+    if (rows.length === 0) throw new Error('Template not found')
+    return rows[0]
 }
 
 export async function deleteRemodelingTemplate(id: string) {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('remodeling_templates')
-        .delete()
-        .eq('id', id)
-    
-    if (error) throw error
+    await pool.query('DELETE FROM public.remodeling_templates WHERE id = $1', [id])
     return { success: true }
 }
 
 export async function updateRemodelingTemplateStatus(id: string, isActive: boolean) {
-    const supabase = await createClient()
-    const { error } = await supabase
-        .from('remodeling_templates')
-        .update({ is_active: isActive })
-        .eq('id', id)
-    
-    if (error) throw error
+    await pool.query('UPDATE public.remodeling_templates SET is_active = $1 WHERE id = $2', [isActive, id])
     return { success: true }
 }
 
 export async function getRecentVideos(limit = 12): Promise<YouTubeVideo[]> {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('videos')
-        .select(`
-            id, title, views, published_at, duration, thumbnail_url, channel_id
-        `)
-        .order('created_at', { ascending: false })
-        .limit(limit)
+    const { rows } = await pool.query(
+        'SELECT id, title, views, published_at, duration, thumbnail_url, channel_id FROM public.videos ORDER BY created_at DESC LIMIT $1',
+        [limit]
+    )
 
-    if (error) {
-        console.error('Error fetching recent videos:', error)
-        return []
-    }
-
-    return data.map((v: any) => ({
+    return rows.map((v: any) => ({
         id: v.id,
         title: v.title,
-        views: v.views || 0,
+        views: Number(v.views || 0),
         likes: 0,
         comments: 0,
         publishedAt: v.published_at,
         duration: v.duration,
         thumbnail: v.thumbnail_url,
         channelId: v.channel_id || '',
-        channelName: 'Externo', // Defaulting to 'Externo', we could join channels table if needed
+        channelName: 'Externo',
         source: 'youtube',
         url: `https://youtube.com/watch?v=${v.id}`,
         description: ''
     }))
 }
 
+export async function getRecentUserVideos(userId: string, limit = 3) {
+    const { rows } = await pool.query(
+        'SELECT title FROM public.videos WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+        [userId, limit]
+    )
+    return rows
+}
+
+
 export async function saveProductionHistory(data: Omit<ProductionHistoryEntity, 'id' | 'dispatched_at'>) {
-    const supabase = await createClient()
-    const { data: inserted, error } = await supabase
-        .from('remodeling_history')
-        .insert(data)
-        .select()
-        .single()
+    const { rows } = await pool.query(`
+        INSERT INTO public.remodeling_history (template_id, original_video_id, payload, status, video_url)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+    `, [data.template_id, data.original_video_id, data.payload, data.status, data.video_url || null])
     
-    if (error) throw error
-    return inserted
+    return rows[0]
 }
 
 export async function getProductionHistory(templateId: string): Promise<ProductionHistoryEntity[]> {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('remodeling_history')
-        .select('*')
-        .eq('template_id', templateId)
-        .order('dispatched_at', { ascending: false })
-    
-    if (error) throw error
-    return data || []
+    const { rows } = await pool.query(
+        'SELECT * FROM public.remodeling_history WHERE template_id = $1 ORDER BY dispatched_at DESC',
+        [templateId]
+    )
+    return rows
+}
+
+export async function updateProductionHistory(id: string, status: 'completed' | 'failed', videoUrl: string) {
+    const { rows } = await pool.query(
+        `UPDATE public.remodeling_history 
+         SET status = $1, video_url = $2
+         WHERE id = $3
+         RETURNING *`,
+        [status, videoUrl, id]
+    )
+    return rows[0] || null
 }
 
 export async function getTemplatesScheduledFor(timeStr: string): Promise<RemodelingTemplateEntity[]> {
-    const supabase = await createClient()
-    // Using a JSON query to find the time string in the post_times array
-    const { data, error } = await supabase
-        .from('remodeling_templates')
-        .select('*')
-        .eq('is_active', true)
-        .contains('post_times', [timeStr])
-    
-    if (error) throw error
-    return data || []
+    const { rows } = await pool.query(
+        'SELECT * FROM public.remodeling_templates WHERE is_active = true AND $1 = ANY(post_times)',
+        [timeStr]
+    )
+    return rows
 }
-

@@ -1,4 +1,4 @@
-import { createClient } from "./supabase/server"
+import { pool } from "./db-client"
 import type { YouTubeChannel, TrackedChannel } from "./types"
 import { NICHES } from "./constants"
 
@@ -34,51 +34,77 @@ export function calculateRemodelingScore(channel: YouTubeChannel | TrackedChanne
 }
 
 /**
- * Gets insights about a specific niche based on tracked data in Supabase.
+ * Gets insights about a specific niche based on tracked data in PostgreSQL.
  */
 export async function getNicheIntelligence(nicheId: string) {
-    const supabase = await createClient()
-    const { data: trackedChannels, error } = await supabase
-        .from('channels')
-        .select(`
-            *,
-            videos ( * ),
-            metrics:channel_metrics_history ( * )
-        `)
-        .eq('dark_type', nicheId)
+    try {
+        const queryText = `
+            SELECT 
+                c.*,
+                m.avg_views_per_video,
+                m.estimated_monthly_views,
+                m.estimated_revenue,
+                m.dark_score
+            FROM public.channels c
+            LEFT JOIN (
+                SELECT DISTINCT ON (channel_id) *
+                FROM public.channel_metrics_history
+                ORDER BY channel_id, created_at DESC
+            ) m ON c.id = m.channel_id
+            WHERE c.dark_type = $1
+        `
+        const { rows } = await pool.query(queryText, [nicheId])
 
-    if (error || !trackedChannels || trackedChannels.length === 0) return null
+        if (!rows || rows.length === 0) return null
 
-    const totalSubs = trackedChannels.reduce((acc: number, ch: any) => acc + Number(ch.subscribers || 0), 0)
-    const avgSubs = totalSubs / trackedChannels.length
+        const totalSubs = rows.reduce((acc: number, ch: any) => acc + Number(ch.subscribers || 0), 0)
+        const avgSubs = totalSubs / rows.length
 
-    // Find common tags/keywords
-    const allTags = trackedChannels.flatMap((ch: any) => ch.tags || [])
-    const tagFrequency = allTags.reduce((acc: Record<string, number>, tag: string) => {
-        acc[tag] = (acc[tag] || 0) + 1
-        return acc
-    }, {})
+        // Find common tags/keywords
+        const allTags = rows.flatMap((ch: any) => ch.tags || [])
+        const tagFrequency = allTags.reduce((acc: Record<string, number>, tag: string) => {
+            acc[tag] = (acc[tag] || 0) + 1
+            return acc
+        }, {})
 
-    const topStyles = Object.entries(tagFrequency)
-        .sort(([, a], [, b]) => (b as number) - (a as number))
-        .slice(0, 5)
-        .map(([tag]) => tag)
+        const topStyles = Object.entries(tagFrequency)
+            .sort(([, a], [, b]) => (b as number) - (a as number))
+            .slice(0, 5)
+            .map(([tag]) => tag)
 
-    return {
-        trackedCount: trackedChannels.length,
-        averageSubscribers: Math.round(avgSubs),
-        recommendedStyles: topStyles,
-        remodelingGems: trackedChannels
-            .map((ch: any) => ({
-                id: ch.id as string,
-                name: ch.name as string,
-                score: calculateRemodelingScore({
-                    ...ch,
-                    metrics: ch.metrics?.[0]
-                } as any)
-            }))
-            .sort((a: any, b: any) => b.score - a.score)
-            .slice(0, 3)
+        return {
+            trackedCount: rows.length,
+            averageSubscribers: Math.round(avgSubs),
+            recommendedStyles: topStyles,
+            remodelingGems: rows
+                .map((ch: any) => {
+                    const metricsObj = ch.avg_views_per_video !== null ? {
+                        avgViewsPerVideo: Number(ch.avg_views_per_video || 0),
+                        estimatedRevenue: Number(ch.estimated_revenue || 0),
+                        darkScore: Number(ch.dark_score || 0),
+                        estimatedMonthlyViews: Number(ch.estimated_monthly_views || 0)
+                    } : undefined;
+
+                    return {
+                        id: ch.id as string,
+                        name: ch.name as string,
+                        score: calculateRemodelingScore({
+                            id: ch.id,
+                            name: ch.name,
+                            subscribers: Number(ch.subscribers || 0),
+                            totalViews: Number(ch.total_views || 0),
+                            verified: ch.verified,
+                            darkType: ch.dark_type as any,
+                            metrics: metricsObj
+                        } as any)
+                    }
+                })
+                .sort((a: any, b: any) => b.score - a.score)
+                .slice(0, 3)
+        }
+    } catch (error) {
+        console.error("Error in getNicheIntelligence:", error)
+        return null
     }
 }
 

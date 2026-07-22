@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 
 export default function InvitePage() {
     const [email, setEmail] = useState("")
@@ -13,7 +12,6 @@ export default function InvitePage() {
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
     const router = useRouter()
-    const supabase = createClient()
 
     const handleInviteRequest = async (e: React.FormEvent) => {
         e.preventDefault()

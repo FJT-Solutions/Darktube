@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { Youtube, Lock, Loader2, AlertCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { verifySetupTokenAction, setupPasswordAction } from "@/app/actions"
 
 export default function SetupPasswordPage() {
     const [password, setPassword] = useState("")
@@ -14,62 +14,39 @@ export default function SetupPasswordPage() {
     const [sessionReady, setSessionReady] = useState(false)
     const [userEmail, setUserEmail] = useState<string | null>(null)
     const [status, setStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-    const supabase = createClient()
     const router = useRouter()
 
     useEffect(() => {
-        // Parse the hash fragment from the URL to get the auth tokens
-        const hash = window.location.hash
-        
-        if (!hash) {
+        const params = new URLSearchParams(window.location.search)
+        const token = params.get('token')
+
+        if (!token) {
             setStatus({ type: 'error', text: "Link inválido. Por favor, solicite um novo link de acesso." })
             return
         }
 
-        const params = new URLSearchParams(hash.substring(1))
-        const accessToken = params.get('access_token')
-        const refreshToken = params.get('refresh_token')
-        const errorCode = params.get('error_code')
-
-        if (errorCode) {
-            setStatus({ type: 'error', text: "Este link de acesso expirou ou já foi utilizado. Por favor, solicite um novo." })
-            return
-        }
-
-        if (!accessToken || !refreshToken) {
-            setStatus({ type: 'error', text: "Link inválido. Tokens de autenticação não encontrados." })
-            return
-        }
-
-        // Exchange the tokens to establish the INVITED USER's session
-        // This is critical — it prevents modifying the admin's session
         const establishSession = async () => {
-            const { data, error } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken
-            })
+            const result = await verifySetupTokenAction(token)
 
-            if (error || !data.session) {
-                setStatus({ type: 'error', text: "Não foi possível validar seu link. Solicite um novo convite." })
+            if (!result.success || !result.email) {
+                setStatus({ type: 'error', text: result.error || "Não foi possível validar seu link. Solicite um novo convite." })
                 return
             }
 
-            // Session established for the INVITED USER
-            setUserEmail(data.session.user.email ?? null)
+            setUserEmail(result.email)
             setSessionReady(true)
-            
-            // Clear the hash from URL to prevent re-use issues
-            window.history.replaceState(null, '', window.location.pathname)
         }
 
         establishSession()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const handleSetupPassword = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!sessionReady) {
+        const params = new URLSearchParams(window.location.search)
+        const token = params.get('token')
+
+        if (!token || !sessionReady) {
             setStatus({ type: 'error', text: "Sessão não estabelecida. Recarregue a página." })
             return
         }
@@ -87,13 +64,10 @@ export default function SetupPasswordPage() {
         setLoading(true)
         setStatus(null)
 
-        const { error } = await supabase.auth.updateUser({
-            password: password,
-            data: { password_set: true }
-        })
+        const result = await setupPasswordAction(token, password)
 
-        if (error) {
-            setStatus({ type: 'error', text: error.message })
+        if (!result.success) {
+            setStatus({ type: 'error', text: result.error || "Ocorreu um erro ao definir sua senha." })
         } else {
             setStatus({ type: 'success', text: "Senha criada com sucesso! Redirecionando..." })
             setTimeout(() => {
