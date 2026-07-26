@@ -404,11 +404,15 @@ export interface RemodelingTemplateEntity {
     is_active: boolean;
     target_accounts: string[];
     tags: string[];
+    engine_mode?: 'local' | 'kie' | 'manual';
     image_model: string;
+    thumbnail_model?: string;
     video_model: string;
     music_model?: string;
     voice_model?: string;
+    render_model?: string;
     voice_language?: string;
+    post_days?: string[];
     created_at: string;
     updated_at: string;
 }
@@ -427,20 +431,22 @@ export async function saveRemodelingTemplate(
     userId: string,
     data: Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<RemodelingTemplateEntity> {
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS thumbnail_model TEXT;`);
     const { rows } = await pool.query(`
         INSERT INTO public.remodeling_templates (
             user_id, video_id, video_title, video_thumbnail, name, template_data, generated_script,
             format, has_music, music_style, voice_type, post_frequency, post_interval_days,
             post_times, is_active, target_accounts, tags, image_model, video_model,
-            music_model, voice_model, voice_language
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+            music_model, voice_model, voice_language, thumbnail_model
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
         RETURNING *
     `, [
         userId, data.video_id, data.video_title || null, data.video_thumbnail || null, data.name,
         data.template_data, data.generated_script || null, data.format, data.has_music || false,
         data.music_style || null, data.voice_type || null, data.post_frequency, data.post_interval_days || null,
         data.post_times || [], data.is_active !== false, data.target_accounts || [], data.tags || [],
-        data.image_model, data.video_model, data.music_model || null, data.voice_model || null, data.voice_language || null
+        data.image_model, data.video_model, data.music_model || null, data.voice_model || null, data.voice_language || null,
+        data.thumbnail_model || data.image_model || null
     ])
     
     return rows[0]
@@ -560,4 +566,87 @@ export async function getTemplatesScheduledFor(timeStr: string): Promise<Remodel
         [timeStr]
     )
     return rows
+}
+
+// ─── SYSTEM PROMPTS (ADMIN) ──────────────────────────────────────
+import { DEFAULT_SYSTEM_PROMPTS, type SystemPromptItem } from "./default-prompts"
+
+export async function ensureSystemPromptsTableExists() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS public.system_prompts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            target_model TEXT,
+            content TEXT NOT NULL,
+            default_content TEXT NOT NULL,
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_by TEXT
+        );
+    `)
+}
+
+export async function getSystemPrompts(): Promise<SystemPromptItem[]> {
+    await ensureSystemPromptsTableExists()
+    const { rows } = await pool.query('SELECT * FROM public.system_prompts ORDER BY id ASC')
+    
+    const dbPromptsMap = new Map(rows.map((r: any) => [r.id, r]))
+    const result: SystemPromptItem[] = []
+
+    for (const key of Object.keys(DEFAULT_SYSTEM_PROMPTS)) {
+        const defaultPrompt = DEFAULT_SYSTEM_PROMPTS[key]
+        const dbRow = dbPromptsMap.get(key)
+
+        if (dbRow) {
+            result.push({
+                ...defaultPrompt,
+                content: dbRow.content,
+                isCustomized: dbRow.content.trim() !== defaultPrompt.defaultContent.trim(),
+                updatedAt: dbRow.updated_at,
+                updatedBy: dbRow.updated_by || 'Admin'
+            })
+        } else {
+            result.push({
+                ...defaultPrompt,
+                isCustomized: false
+            })
+        }
+    }
+    return result
+}
+
+export async function getSystemPromptContent(id: string): Promise<string> {
+    try {
+        await ensureSystemPromptsTableExists()
+        const { rows } = await pool.query('SELECT content FROM public.system_prompts WHERE id = $1', [id])
+        if (rows.length > 0 && rows[0].content) {
+            return rows[0].content
+        }
+    } catch (e) {
+        console.warn(`[getSystemPromptContent] Could not fetch ${id} from DB, using fallback:`, e)
+    }
+    return DEFAULT_SYSTEM_PROMPTS[id]?.content || ""
+}
+
+export async function saveSystemPrompt(id: string, content: string, updatedBy = 'Admin'): Promise<boolean> {
+    await ensureSystemPromptsTableExists()
+    const defaultItem = DEFAULT_SYSTEM_PROMPTS[id]
+    if (!defaultItem) return false
+
+    await pool.query(`
+        INSERT INTO public.system_prompts (id, name, description, target_model, content, default_content, updated_at, updated_by)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7)
+        ON CONFLICT (id) DO UPDATE SET
+            content = EXCLUDED.content,
+            updated_at = NOW(),
+            updated_by = EXCLUDED.updated_by
+    `, [id, defaultItem.name, defaultItem.description, defaultItem.targetModel, content, defaultItem.defaultContent, updatedBy])
+
+    return true
+}
+
+export async function resetSystemPrompt(id: string): Promise<boolean> {
+    await ensureSystemPromptsTableExists()
+    await pool.query('DELETE FROM public.system_prompts WHERE id = $1', [id])
+    return true
 }

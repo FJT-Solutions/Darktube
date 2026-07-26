@@ -31,6 +31,8 @@ export default function CredentialsPage() {
         claude: "",
         openrouter: "",
         kie_ai: "",
+        n8n_webhook: "https://n8n.fjt-solutions.com/webhook/darktube_producao",
+        remotion_url: "http://remotion-service:3001/render",
         meta_app_id: "",
         meta_app_secret: "",
         meta_client_token: "",
@@ -517,10 +519,12 @@ export default function CredentialsPage() {
                                 {[
                                     { id: 'gemini', label: 'Google Gemini', color: 'bg-blue-500/10 text-blue-400', desc: 'Análise visual avançada.' },
                                     { id: 'openai', label: 'OpenAI (GPT)', color: 'bg-emerald-500/10 text-emerald-400', desc: 'Textos e transcrições.' },
+                                    { id: 'n8n_webhook', label: 'Webhook n8n Produção', color: 'bg-red-500/10 text-red-400', desc: 'URL do disparo de automação no n8n.' },
+                                    { id: 'remotion_url', label: 'Servidor Remotion', color: 'bg-cyan-500/10 text-cyan-400', desc: 'URL de renderização via Docker/VPS.' },
                                     { id: 'elevenlabs', label: 'ElevenLabs', color: 'bg-orange-500/10 text-orange-400', desc: 'Dublagem e vozes.' },
                                     { id: 'claude', label: 'Anthropic Claude', color: 'bg-amber-500/10 text-amber-400', desc: 'Análise de roteiro.' },
                                     { id: 'openrouter', label: 'OpenRouter', color: 'bg-indigo-500/10 text-indigo-400', desc: 'Acesso multimodelo.' },
-                                    { id: 'kie_ai', label: 'Kie.AI', color: 'bg-pink-500/10 text-pink-400', desc: 'Modelos de nicho.' },
+                                    { id: 'kie_ai', label: 'Kie.AI', color: 'bg-pink-500/10 text-pink-400', desc: 'Modelos de nicho (Opcional).' },
                                 ].map((ai) => (
                                     <Card key={ai.id} className="border-primary/5 bg-card/30 backdrop-blur-sm overflow-hidden group">
                                         <CardHeader className="p-4 pb-2">

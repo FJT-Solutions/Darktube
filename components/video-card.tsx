@@ -8,7 +8,7 @@ import { analyzeVideoAction, analyzeExternalVideoAction, generateScriptAction, t
 import {
   Eye, Clock, Calendar, DollarSign, Sparkles, Wand2, Loader2, CheckCircle2,
   Zap, Wrench, Info, X, Download, CloudUpload, Brain, BookText, Save, ChevronDown,
-  LayoutTemplate, Mic2, ImageIcon, Video, AlertTriangle, Music, Waves, Volume2,
+  LayoutTemplate, Mic2, ImageIcon, Video, AlertTriangle, Music, Waves, Volume2, Copy, Check,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import {
@@ -169,6 +169,18 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
       setScriptError(r.error || 'Erro ao gerar o roteiro.')
     }
     setIsGeneratingScript(false)
+  }
+
+
+
+  function copyAllPrompts() {
+    if (!scriptSegments.length) return
+    const allPrompts = scriptSegments
+      .map((seg, i) => `[CENA ${i + 1} - ${seg.segment_type || 'SLIDE'}]:\n${seg.visual_content?.image_prompt || ''}`)
+      .filter(Boolean)
+      .join('\n\n')
+    navigator.clipboard.writeText(allPrompts)
+    toast.success("Todos os prompts visuais do roteiro foram copiados!")
   }
 
   const currentStepIndex = STEPS.findIndex(s => s.key === step)
@@ -417,6 +429,21 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
 
                   {!isGeneratingScript && scriptSegments.length > 0 ? (
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                      {/* Top Action Bar */}
+                      <div className="flex items-center justify-between bg-primary/5 p-2 rounded-lg border border-primary/20">
+                        <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                          <BookText className="h-3.5 w-3.5" />
+                          {scriptSegments.length} Cenas Geradas
+                        </span>
+                        <button
+                          onClick={copyAllPrompts}
+                          className="text-[10px] font-bold px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1 shadow-sm"
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar Todos os Prompts
+                        </button>
+                      </div>
+
                       {/* Global AI Prompts */}
                       {(parsedScriptData?.sfx_prompt || parsedScriptData?.music_prompt) && (
                         <div className="space-y-2 mb-2 p-3 bg-secondary/20 rounded-lg border">
@@ -434,51 +461,50 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                         </div>
                       )}
 
-                      <div className="space-y-0 rounded-lg border overflow-hidden">
+                      <div className="space-y-3 rounded-lg border overflow-hidden p-1 bg-secondary/10">
                         {scriptSegments.map((seg: any, idx: number) => (
-                          <div key={idx} className="border-b last:border-0 p-3 hover:bg-secondary/20 transition-colors">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">{seg.timestamp}</span>
-                              <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{seg.segment_type}</span>
+                          <div key={idx} className="border bg-card rounded-lg p-3 hover:border-primary/30 transition-colors space-y-3">
+                            <div className="flex items-center justify-between border-b pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{seg.timestamp || `Cena ${idx + 1}`}</span>
+                                <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{seg.segment_type || 'SLIDE'}</span>
+                              </div>
+                              {seg.custom_media_url ? (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                                  <Check className="h-2.5 w-2.5" /> Mídia Manual
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-medium text-muted-foreground bg-secondary px-2 py-0.5 rounded">⚡ IA Automática</span>
+                              )}
                             </div>
-                            {seg.emotion && <span className="text-[8px] italic text-muted-foreground">{seg.emotion}</span>}
-                          </div>
 
-                          {/* Voiceover */}
-                          {seg.voiceover?.text && (
-                            <div className="mb-2">
-                              <TranslatedPrompt text={seg.voiceover.text} label={`Locução (${seg.voiceover.style?.slice(0, 40) || ''}...)`} icon={Mic2} colorClass="text-emerald-600" />
-                            </div>
-                          )}
-
-                          {/* Voice Direction */}
-                          {seg.voice_direction && (
-                            <div className="mb-2">
-                              <TranslatedPrompt text={seg.voice_direction} label="Direção de Voz" icon={Volume2} colorClass="text-emerald-600" />
-                            </div>
-                          )}
-
-                          {/* Sound Design */}
-                          {seg.sound_design && (
-                            <div className="mb-2">
-                              <TranslatedPrompt text={seg.sound_design} label="Sound Design (Cena)" icon={Waves} colorClass="text-cyan-600" />
-                            </div>
-                          )}
-
-                          {/* Visual */}
-                          <div className="space-y-2 mt-2">
-                            {seg.visual_content?.image_prompt && (
-                              <TranslatedPrompt text={seg.visual_content.image_prompt} label="Imagem" icon={ImageIcon} colorClass="text-blue-500" />
+                            {/* Voiceover */}
+                            {seg.voiceover?.text && (
+                              <div className="mb-2">
+                                <TranslatedPrompt text={seg.voiceover.text} label={`Locução (${seg.voiceover.style?.slice(0, 40) || ''}...)`} icon={Mic2} colorClass="text-emerald-600" />
+                              </div>
                             )}
-                            {seg.visual_content?.animation_instructions && (
-                              <TranslatedPrompt text={seg.visual_content.animation_instructions} label="Animação" icon={Video} colorClass="text-purple-500" />
+
+                            {/* Voice Direction */}
+                            {seg.voice_direction && (
+                              <div className="mb-2">
+                                <TranslatedPrompt text={seg.voice_direction} label="Direção de Voz" icon={Volume2} colorClass="text-emerald-600" />
+                              </div>
                             )}
-                          </div>
-                        </div>
-                      ))}
+
+                              {/* Visual Prompts */}
+                              <div className="space-y-2">
+                                {seg.visual_content?.image_prompt && (
+                                  <TranslatedPrompt text={seg.visual_content.image_prompt} label="Prompt de Imagem" icon={ImageIcon} colorClass="text-blue-500" isImagePrompt />
+                                )}
+                                {seg.visual_content?.animation_instructions && (
+                                  <TranslatedPrompt text={seg.visual_content.animation_instructions} label="Instrução de Animação / Vídeo" icon={Video} colorClass="text-purple-500" />
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  </div>
                   ) : !isGeneratingScript && (
                     <div className="text-center text-xs text-muted-foreground py-6">
                       Selecione o provider e clique em "Gerar" para criar o roteiro de produção.

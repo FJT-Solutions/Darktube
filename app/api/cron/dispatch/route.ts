@@ -43,6 +43,18 @@ export async function GET(request: Request) {
                 continue
             }
 
+            let parsedScript: any = {}
+            try {
+                if (template.generated_script) {
+                    const cleanJson = template.generated_script.includes('```json') 
+                        ? template.generated_script.split('```json')[1].split('```')[0].trim() 
+                        : template.generated_script.trim()
+                    parsedScript = JSON.parse(cleanJson)
+                }
+            } catch (e) {
+                console.warn("Could not parse script for payload enrichment")
+            }
+
             // 4. Prepare Payload
             const payload = {
                 message: "Automatic Production Request",
@@ -53,11 +65,29 @@ export async function GET(request: Request) {
                     name: template.name,
                     video_url: `https://youtube.com/watch?v=${template.video_id}`,
                     original_video_id: template.video_id,
+                    video_title: template.video_title,
+                    video_thumbnail: template.video_thumbnail,
                     format: template.format,
+                    engine_mode: template.engine_mode || 'local',
+                    image_model: template.image_model || 'gemini-2.5-flash-image',
+                    thumbnail_model: template.thumbnail_model || template.image_model || 'gemini-2.5-flash-image',
+                    video_model: template.video_model || 'gemini-veo-3.1-fast-1080p',
+                    voice_model: template.voice_model || 'edge-tts-docker',
+                    music_model: template.music_model || 'suno-v4',
+                    render_model: template.render_model || 'remotion-engine',
                     voice: template.voice_type,
-                    music: template.music_style,
-                    script_segments: template.template_data?.remodeling_template?.script_base || [],
-                    transcription: template.generated_script || "",
+                    voice_language: template.voice_language || 'pt-BR',
+                    has_music: template.has_music,
+                    music_style: template.music_style,
+                    post_frequency: template.post_frequency,
+                    post_days: template.post_days || [],
+                    post_times: template.post_times || [],
+                    target_accounts: template.target_accounts || [],
+                    thumbnail_prompt: template.template_data?.remodeling_template?.thumbnail_prompt || "",
+                    music_prompt: parsedScript.music_prompt || "",
+                    sfx_prompt: parsedScript.sfx_prompt || "",
+                    script_segments: parsedScript.script_base || template.template_data?.remodeling_template?.script_base || [],
+                    generated_script: template.generated_script || "",
                     ai_analysis: template.template_data
                 }
             }

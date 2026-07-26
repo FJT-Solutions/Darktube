@@ -11,14 +11,37 @@ export interface AIAnalysisResult extends RemodelingTemplate {
 
 export const VideoAnalysisService = {
     async getTranscript(videoId: string): Promise<string> {
-        try {
-            const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'pt' })
-                .catch(() => YoutubeTranscript.fetchTranscript(videoId));
-            return items.map(i => i.text).join(' ');
-        } catch (error) {
-            console.warn(`[VideoAnalysisService] No transcript for ${videoId}`);
-            return '';
+        // Try multiple language codes to maximize transcript retrieval
+        const langsToTry = ['pt-BR', 'pt', 'en', 'es'];
+        for (const lang of langsToTry) {
+            try {
+                const items = await YoutubeTranscript.fetchTranscript(videoId, { lang });
+                if (items && items.length > 0) {
+                    const text = items.map(i => i.text).join(' ').trim();
+                    if (text.length > 10) {
+                        console.log(`[VideoAnalysisService] Transcript found for ${videoId} (lang: ${lang}, ${text.length} chars)`);
+                        return text;
+                    }
+                }
+            } catch {
+                // try next language
+            }
         }
+        // Fallback: fetch without specifying language
+        try {
+            const items = await YoutubeTranscript.fetchTranscript(videoId);
+            if (items && items.length > 0) {
+                const text = items.map(i => i.text).join(' ').trim();
+                if (text.length > 10) {
+                    console.log(`[VideoAnalysisService] Transcript found for ${videoId} (auto, ${text.length} chars)`);
+                    return text;
+                }
+            }
+        } catch {
+            // no transcript available
+        }
+        console.warn(`[VideoAnalysisService] No transcript for ${videoId}`);
+        return '';
     },
 
     async performVisualAnalysis(videoId: string, apiKey?: string): Promise<AIAnalysisResult> {

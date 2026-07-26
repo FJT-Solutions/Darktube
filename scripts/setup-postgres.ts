@@ -186,7 +186,7 @@ async function setup() {
   console.log("🚀 Conectando ao banco de dados PostgreSQL...")
   const client = new Client({
     connectionString,
-    ssl: connectionString!.includes('localhost') || connectionString!.includes('127.0.0.1') ? undefined : { rejectUnauthorized: false }
+    ssl: connectionString!.includes('supabase') || connectionString!.includes('neon') || connectionString!.includes('render') ? { rejectUnauthorized: false } : undefined
   })
 
   try {

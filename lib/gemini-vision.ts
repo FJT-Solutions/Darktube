@@ -19,6 +19,8 @@ export interface ScriptSegment {
     emotion: string;
 }
 
+import { getSystemPromptContent } from './database';
+
 export interface RemodelingTemplate {
     feasibility: 'Alta' | 'Média' | 'Baixa';
     style: string;
@@ -59,20 +61,15 @@ export const GeminiVisionService = {
         params: { videoPath?: string; audioPath?: string; framePaths?: string[]; transcript?: string; duration?: number },
         customApiKey?: string
     ): Promise<RemodelingTemplate> {
-        const apiKey = customApiKey || process.env.GEMINI_API_KEY;
+        const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_CLIENT_SECRET;
         if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
 
         const genAI = new GoogleGenerativeAI(apiKey);
         const modelName = "gemini-2.5-flash";
 
-        console.log(`[GeminiVisionService] 💎 Analyzing with ${modelName} (Professional Paid Tier)...`);
+        console.log(`[GeminiVisionService] 💎 Analyzing with ${modelName}...`);
 
-        const model = genAI.getGenerativeModel(
-            { model: modelName },
-            { apiVersion: "v1" }
-        );
-
-
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const contentParts: any[] = [];
 
@@ -108,11 +105,11 @@ export const GeminiVisionService = {
             }
         }
 
-        if (contentParts.length === 0) {
-            throw new Error("Nenhuma mídia disponível para análise (sem frames nem transcrição).");
+        if (params.transcript) {
+            contentParts.push({ text: `TRANSCRIÇÃO DO ÁUDIO ORIGINAL DO VÍDEO:\n"${params.transcript.slice(0, 3000)}"` });
         }
 
-        contentParts.push({ text: this.getPrompt(params.duration) });
+        contentParts.push({ text: await this.getPrompt(params.duration) });
 
         try {
             const result = await model.generateContent(contentParts);
@@ -134,69 +131,9 @@ export const GeminiVisionService = {
         }
     },
 
-    getPrompt(duration?: number) {
+    async getPrompt(duration?: number) {
         const durationText = duration ? `O vídeo original tem EXATAMENTE ${Math.round(duration)} segundos.` : 'Esta é uma análise de estrutura visual completa.';
-        return `Você é um Analista de Conteúdo e Engenheiro de Prompts de elite.
-Sua missão é realizar uma DESCONSTRUÇÃO TOTAL deste vídeo para fins de remodelagem profissional.
-
-Analise cada um dos 15 frames em HD com máxima atenção aos detalhes. 
-Você deve capturar a ALMA do vídeo: imagem, animação, áudio e textos.
-
-${durationText}
-
-DIRETRIZES DE ANÁLISE:
-1. TEXTOS NA TELA: Leia e transcreva qualquer texto, logo ou CTA que apareça nos frames.
-2. ESTILO DE ANIMAÇÃO: Identifique o tipo de movimento das imagens (se é zoom suave, cortes frenéticos, transições de glitch, animação de stickers, etc).
-3. ESTRUTURA VISUAL: Descreva a paleta de cores, iluminação e enquadramento predominante.
-4. ÁUDIO & RITMO: Com base na transcrição e no ritmo visual, determine se o áudio original é voz humana, música ou ambos.
-
-CATÁLOGO DE FERRAMENTAS RECOMENDADAS:
-- Imagem: "Black Forest Labs flux-2 pro", "ideogram v3", "seedream 5.0 Lite".
-- Vídeo: "Kling 3.0", "Open AI sora 2", "wan 2.5", "Runway Gen-3".
-- Voz: "Elevenlabs V3", "Elevenlabs Text to Speech (multilingual v2)".
-- Música: "Suno v3.5".
-
-RESPONDA EXCLUSIVAMENTE COM ESTE JSON ESTRUTURADO:
-{
-  "feasibility": "Alta | Média | Baixa",
-  "style": "Nicho detalhado do vídeo",
-  "visualStyle": "Cinematográfico | Dinâmico | Estoque/IA | Vlog/Real | Misto",
-  "pacing": "Lento | Equilibrado | Frenético",
-  "productionMethod": "IA Gerativa | Banco de Estoque | Edição Manual | Misto",
-  "confidence": 0.98,
-  "justification": "Análise técnica detalhada da estrutura observada nos 15 frames HD.",
-  "tools": ["Lista de ferramentas para recriação"],
-  "summary": "Resumo executivo do conteúdo visual e textual detectado.",
-  "remodelingTip": "A melhor estratégia para superar este vídeo original usando IA.",
-  "detected_audio_type": "voice | music_only | none",
-  "has_text_on_screen": boolean,
-  "original_audio_description": "Descrição minuciosa do áudio (ex: Narrador energético com música lo-fi beat)",
-  "remodeling_template": {
-    "visual_directives": "Instruções exatas de como filmar ou gerar as cenas",
-    "composition_rules": "Regras de posicionamento e iluminação",
-    "thumbnail_prompt": "Prompt de ALTA CONVERSÃO (CTR) para a capa, descrevendo o frame mais impactante em HD",
-    "music_style": "Estilo de trilha sonora que manteria ou elevaria o engajamento",
-    "video_style": "Estilo visual técnico (ex: Cyberpunk, Minimalista, Dark Branding)",
-    "ai_stack": { "image": "...", "video": "...", "voice": "...", "music": "..." },
-    "target_audience_psychology": "O gatilho mental que este vídeo ativa (ex: Curiosidade, Medo de perder, Autoridade)",
-    "script_base": [
-      {
-        "timestamp": "0:00-0:05",
-        "segment_type": "GANCHO | DESENVOLVIMENTO | CTA",
-        "emotion": "Curiosidade | Urgência | Alívio",
-        "voiceover": {
-          "text": "Transcrição sugerida para locução baseada na análise visual e áudio",
-          "style": "Tom de voz e entonação específica"
-        },
-        "visual_content": {
-          "image_prompt": "Prompt técnico para IA gerar uma cena ÚNICA e CRIATIVA (evite repetições)",
-          "animation_instructions": "Como a cena deve se mover de forma dinâmica"
-        }
-      }
-    ]
-  }
-}
-
-IMPORTANTE: Você deve capturar TUDO e gerar sugestões de remodelagem que garantam que o novo vídeo seja ÚNICO e NUNCA se repita, mesmo seguindo o escopo do template. Varie os prompts visuais e o tom da narrativa.`;
+        const rawTemplate = await getSystemPromptContent('gemini_vision');
+        return rawTemplate.replace('{durationText}', durationText);
     }
 };

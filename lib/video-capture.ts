@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { execFile, exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -127,11 +128,18 @@ function decodeHtmlEntities(text: string | null | undefined): string {
 
 
 
+
+
 /**
  * Generate a safe filesystem ID from a URL
  */
 function urlToId(url: string): string {
-    const hash = Buffer.from(url).toString('base64url').replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
+    if (!url) return `ext_${Date.now()}`;
+    const ytMatch = url.match(/(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (ytMatch && ytMatch[1]) {
+        return ytMatch[1];
+    }
+    const hash = crypto.createHash('md5').update(url).digest('hex');
     return `ext_${hash}`;
 }
 

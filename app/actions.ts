@@ -11,6 +11,7 @@ import { hashPassword, verifyPassword, verifyJWT, signJWT } from "@/lib/crypto"
 import { headers } from "next/headers"
 import { sendAccessGrantedEmail, sendPasswordResetEmail } from "@/lib/email"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { pool } from "@/lib/db-client"
 
 async function assertAdmin(userId: string) {
     const profile = await db.getProfileById(userId)
@@ -196,80 +197,31 @@ export async function generateScriptAction(
             audioRules = `REGRA CRÍTICA DE ÁUDIO: O vídeo original NÃO tem narração/voz humana. Ele tem APENAS música/som de fundo ("${audioDesc}").
 O campo "voiceover" de CADA segmento deve ter:
 - "text": "" (vazio - SEM texto de locução)
-- "style": "MUST BE IN ENGLISH. No narration - just background music: ${audioDesc}"
+- "style": "No narration - music only: ${audioDesc}"
 NÃO invente narração. O vídeo remodelado deve ser FIEL ao original: apenas visual + música.`;
         } else if (audioType === 'none') {
             audioRules = `REGRA CRÍTICA DE ÁUDIO: O vídeo original NÃO tem áudio (silêncio total).
 O campo "voiceover" de CADA segmento deve ter:
 - "text": "" (vazio)
-- "style": "MUST BE IN ENGLISH. No audio - complete silence or subtle ambient music"
+- "style": "No audio - complete silence or subtle ambient music"
 NÃO invente narração nem música. Mantenha fidelidade ao original.`;
         } else {
             audioRules = `ÁUDIO: O vídeo original TEM narração humana ("${audioDesc}").
-O campo "voiceover" deve conter o texto de locução ORIGINAL remodelado (novo, original, mas com o mesmo tom e estilo) traduzido para INGLÊS. E as instruções de estilo DEVEM SER EM INGLÊS.`;
+O campo "voiceover" DEVE conter texto de locução remodelado em Português (PT-BR), com o mesmo tom e estilo do original. NUNCA deixe o campo "voiceover.text" vazio quando o vídeo original tem narração.`;
         }
 
-        const systemPrompt = `Você é um roteirista e engenheiro de produção de vídeo especialista em automação via n8n.
-Sua tarefa: criar um ROTEIRO DE PRODUÇÃO ESTRUTURADO em JSON para remodelar o vídeo "${videoTitle}".
-
-${durationText}
-${audioRules}
-
-ANÁLISE VISUAL DO GEMINI (referência):
-- Estilo: ${analysis?.style || 'Informativo'}
-- Diretrizes visuais: ${template?.visual_directives || 'Manter coerência visual'}
-- Estilo de vídeo: ${template?.video_style || 'Cinematográfico'}
-- Composição: ${template?.composition_rules || 'Regra dos terços'}
-- Música sugerida: ${template?.music_style || 'Épica'}
-- AI Stack: ${JSON.stringify(template?.ai_stack || {})}
-
-TRANSCRIÇÃO (referência de tópicos apenas):
-${transcript?.slice(0, 2000) || 'Não disponível'}
-
-FORMATO DE SAÍDA OBRIGATÓRIO - Responda APENAS com JSON:
-{
-  "detected_voice_type": "masculine_br | feminine_br | narrator | none",
-  "detected_voice_language": "pt-BR | en-US | es-ES | fr-FR | de-DE | ja-JP | zh-CN | auto",
-  "detected_music_style": "epic | lo-fi | ambient | dramatic | electronic | none",
-  "recommended_image_model": "Choose ONE from: flux-kontext-pro, flux-kontext-max, gpt-image-1, gpt-image-1.5, seedream-3.0, seedream-5.0-lite, ideogram-v3-turbo, ideogram-v3-balanced, ideogram-v3-quality, recraft-v3, grok-imagine, imagen-4, wan-2.7-image. Pick based on visual style: photorealistic→flux-kontext-pro, artistic/illustration→ideogram-v3-balanced, text-heavy→recraft-v3, budget→seedream-3.0",
-  "recommended_video_model": "Choose ONE from: seedance-2-fast-720p, seedance-2-720p, kling-2.6-10s, kling-2.6-5s, wan-2.6-i2v-5s-720p, wan-2.6-v2v-10s-720p, sora-2, veo-3.1-fast, hailuo-2.3, grok-extend-10s-720p. Pick based on motion needs: high motion→kling-2.6-10s, cinematic→sora-2, budget→seedance-2-fast-720p, long scenes→wan-2.6-v2v-10s-720p",
-  "music_prompt": "MUST BE IN ENGLISH. A detailed prompt for AI music generation (Suno/Udio). Describe genre, mood, tempo, instruments. Example: Epic orchestral cinematic score, building tension with strings and brass, 120 BPM, dramatic crescendo, Hans Zimmer inspired, dark atmospheric undertones",
-  "sfx_prompt": "MUST BE IN ENGLISH. Global sound design direction. Describe the overall ambient soundscape and key sound effects. Example: Industrial construction site ambience, metal clanging, heavy machinery rumble, power tools buzzing, distant hammering, with occasional birds and tropical wind",
-  "script_base": [
-    {
-      "timestamp": "0:00-0:05",
-      "segment_type": "GANCHO | DESENVOLVIMENTO_N | CLÍMAX | CALL_TO_ACTION",
-      "voiceover": {
-        "text": "MUST BE IN ENGLISH. The exact spoken text (or empty if no narration)",
-        "style": "MUST BE IN ENGLISH. Tone, pacing, and intonation instructions"
-      },
-      "visual_content": {
-        "image_prompt": "MUST BE IN ENGLISH. Example: Cinematic wide shot of a vast ocean at golden hour, deep blue water reflecting warm orange light, dramatic clouds on the horizon, photorealistic style, 8K, natural lighting, shot on ARRI Alexa",
-        "animation_instructions": "MUST BE IN ENGLISH. Example: Slow dolly forward with gentle tilt up, camera speed 0.3x, subtle lens flare from sun position, smooth parallax effect on foreground waves"
-      },
-      "voice_direction": "MUST BE IN ENGLISH. TTS direction for this segment. Example: Deep masculine voice, slow pace, contemplative tone, slight reverb, whispered emphasis on key words",
-      "sound_design": "MUST BE IN ENGLISH. Sound effects and ambience for THIS specific segment. Example: Heavy crane movement, metallic creaking, welding sparks sizzling, distant tropical birds chirping, light wind through palm trees",
-      "emotion": "emoção alvo"
-    }
-  ]
-}
-
-REGRAS CRÍTICAS:
-1. Os timestamps DEVEM cobrir a duração total do vídeo sem lacunas.
-2. Cada image_prompt deve ser autossuficiente e gerar uma imagem COERENTE com os outros segmentos.
-3. As animation_instructions devem ser TÉCNICAS e executáveis por IA de vídeo.
-4. Crie entre 4 a 8 segmentos dependendo da duração.
-5. "detected_voice_type": analise o áudio original para sugerir o tipo de voz ideal. Use "none" se o vídeo original não tem narração (ex: time-lapse, construção, natureza).
-6. "detected_voice_language": idioma detectado ou sugerido para a locução. Analise o áudio e transcrição do vídeo original.
-7. "detected_music_style": analise o áudio original para sugerir o estilo musical ideal.
-8. "music_prompt": prompt completo em INGLÊS para geração de música com Suno/Udio.
-9. "sfx_prompt": prompt de design sonoro global em INGLÊS. SEMPRE gere este campo — mesmo vídeos sem narração têm sons ambiente importantes (construção, natureza, máquinas, etc.).
-10. "sound_design": POR SEGMENTO, prompt de efeitos sonoros específicos em INGLÊS. Descreva sons que sincronizam com a cena visual daquele segmento.
-11. "voice_direction": prompt de direção de voz em INGLÊS para TTS (ElevenLabs).
-12. CRITICAL — LANGUAGE RULES:
-   - "image_prompt", "animation_instructions", "music_prompt", "sfx_prompt", "sound_design", "voice_direction" → MUST be in ENGLISH. NEVER Portuguese.
-   - "voiceover.text", "voiceover.style", "emotion" → Portuguese (PT-BR).
-13. Se qualquer campo English-only estiver em português, a resposta será REJEITADA.`;
+        const rawScriptPrompt = await db.getSystemPromptContent('script_generator')
+        const systemPrompt = rawScriptPrompt
+            .replace('{videoTitle}', videoTitle)
+            .replace('{durationText}', durationText)
+            .replace('{audioRules}', audioRules)
+            .replace('{analysisStyle}', analysis?.style || 'Informativo')
+            .replace('{visualDirectives}', template?.visual_directives || 'Manter coerência visual')
+            .replace('{videoStyle}', template?.video_style || 'Cinematográfico')
+            .replace('{compositionRules}', template?.composition_rules || 'Regra dos terços')
+            .replace('{musicStyle}', template?.music_style || 'Épica')
+            .replace('{aiStack}', JSON.stringify(template?.ai_stack || {}))
+            .replace('{transcript}', transcript?.slice(0, 2000) || 'Não disponível')
 
         let scriptText = '';
 
@@ -903,8 +855,21 @@ export async function sendToN8NAction(templateId: string) {
         if (template.user_id !== user.id) throw new Error("Acesso negado")
 
         // 2. Prepare Payload
-        const webhookUrl = process.env.N8N_PRODUCTION_WEBHOOK_URL
+        let webhookUrl = await db.getUserApiKey(user.id, 'n8n_webhook')
+        if (!webhookUrl) webhookUrl = process.env.N8N_PRODUCTION_WEBHOOK_URL || 'https://n8n.fjt-solutions.com/webhook/darktube_producao'
         if (!webhookUrl) throw new Error("n8n Webhook URL não configurada.")
+
+        let parsedScript: any = {}
+        try {
+            if (template.generated_script) {
+                const cleanJson = template.generated_script.includes('```json') 
+                    ? template.generated_script.split('```json')[1].split('```')[0].trim() 
+                    : template.generated_script.trim()
+                parsedScript = JSON.parse(cleanJson)
+            }
+        } catch (e) {
+            console.warn("Could not parse script for payload enrichment")
+        }
 
         const payload = {
             message: "Production Request from DarkTube",
@@ -915,11 +880,29 @@ export async function sendToN8NAction(templateId: string) {
                 name: template.name,
                 video_url: `https://youtube.com/watch?v=${template.video_id}`,
                 original_video_id: template.video_id,
+                video_title: template.video_title,
+                video_thumbnail: template.video_thumbnail,
                 format: template.format,
+                engine_mode: template.engine_mode || 'local',
+                image_model: template.image_model || 'gemini-2.5-flash-image',
+                thumbnail_model: template.thumbnail_model || template.image_model || 'gemini-2.5-flash-image',
+                video_model: template.video_model || 'gemini-veo-3.1-fast-1080p',
+                voice_model: template.voice_model || 'edge-tts-docker',
+                music_model: template.music_model || 'suno-v4',
+                render_model: template.render_model || 'remotion-engine',
                 voice: template.voice_type,
-                music: template.music_style,
-                script_segments: template.template_data?.remodeling_template?.script_base || [],
-                transcription: template.generated_script || "",
+                voice_language: template.voice_language || 'pt-BR',
+                has_music: template.has_music,
+                music_style: template.music_style,
+                post_frequency: template.post_frequency,
+                post_days: template.post_days || [],
+                post_times: template.post_times || [],
+                target_accounts: template.target_accounts || [],
+                thumbnail_prompt: template.template_data?.remodeling_template?.thumbnail_prompt || "",
+                music_prompt: parsedScript.music_prompt || "",
+                sfx_prompt: parsedScript.sfx_prompt || "",
+                script_segments: parsedScript.script_base || template.template_data?.remodeling_template?.script_base || [],
+                generated_script: template.generated_script || "",
                 ai_analysis: template.template_data
             }
         }
@@ -1112,6 +1095,8 @@ export async function translatePromptAction(text: string) {
             return { success: false, error: "Chave OpenAI não encontrada. Adicione em Credenciais." }
         }
 
+        const systemPrompt = await db.getSystemPromptContent('prompt_translator')
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -1121,7 +1106,7 @@ export async function translatePromptAction(text: string) {
             body: JSON.stringify({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'system', content: 'You are a professional translator. Translate the user input from English to Brazilian Portuguese. Output ONLY the translated text, nothing else.' },
+                    { role: 'system', content: systemPrompt },
                     { role: 'user', content: text }
                 ],
                 temperature: 0.3,
@@ -1145,6 +1130,40 @@ export async function translatePromptAction(text: string) {
     } catch (error) {
         console.error("Translation error:", error)
         return { success: false, error: "Erro na tradução" }
+    }
+}
+
+// ─── ADMIN SYSTEM PROMPTS ACTIONS ───────────────────────────────
+export async function getSystemPromptsAction() {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autorizado." }
+        const prompts = await db.getSystemPrompts()
+        return { success: true, prompts }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
+export async function saveSystemPromptAction(id: string, content: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autorizado." }
+        await db.saveSystemPrompt(id, content, user.email || 'Admin')
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
+export async function resetSystemPromptAction(id: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autorizado." }
+        await db.resetSystemPrompt(id)
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message }
     }
 }
 
@@ -1305,3 +1324,34 @@ export async function getCurrentUserAction() {
         return null
     }
 }
+
+export async function uploadUserMediaAction(formData: FormData) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return { success: false, error: "Não autorizado." }
+
+        const file = formData.get("file") as File
+        if (!file) return { success: false, error: "Nenhum arquivo enviado." }
+
+        const bytes = await file.arrayBuffer()
+        const buffer = Buffer.from(bytes)
+
+        const ext = file.name.split('.').pop() || 'png'
+        const filename = `manual_media_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+        const mimeType = file.type || 'image/png'
+
+        await pool.query(`
+            INSERT INTO public.storage_files (filename, mime_type, content)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (filename)
+            DO UPDATE SET content = EXCLUDED.content
+        `, [filename, mimeType, buffer])
+
+        const publicUrl = `/api/storage/${filename}`
+        return { success: true, url: publicUrl, filename }
+    } catch (error: any) {
+        console.error("Error in uploadUserMediaAction:", error)
+        return { success: false, error: error?.message || "Erro ao fazer upload do arquivo." }
+    }
+}
+

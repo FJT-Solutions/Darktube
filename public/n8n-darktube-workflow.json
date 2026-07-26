@@ -1,0 +1,285 @@
+{
+  "name": "Darktube Automatic Video Production & Auto-Posting",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "darktube_producao",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Webhook Darktube",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.body.template.engine_mode }}",
+                    "value2": "local"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Direct API (Local)"
+            },
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.body.template.engine_mode }}",
+                    "value2": "kie"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Kie.ai (Créditos)"
+            },
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.body.template.engine_mode }}",
+                    "value2": "manual"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Manual (Upload Fora)"
+            }
+          ]
+        }
+      },
+      "name": "Switch Engine Mode",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/images/generations",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"{{ $json.body.template.thumbnail_prompt }}\",\n  \"model\": \"{{ $json.body.template.thumbnail_model }}\",\n  \"aspect_ratio\": \"{{ $json.body.template.format === 'vertical' ? '9:16' : '16:9' }}\"\n}",
+        "options": {}
+      },
+      "name": "Kie.ai Generate Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        800,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Split Script Segments",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        800,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/images/generations",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"{{ $json.image_prompt }}\",\n  \"model\": \"{{ $('Webhook Darktube').item.json.body.template.image_model }}\",\n  \"aspect_ratio\": \"{{ $('Webhook Darktube').item.json.body.template.format === 'vertical' ? '9:16' : '16:9' }}\"\n}",
+        "options": {}
+      },
+      "name": "Generate Scene Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1050,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://edge-tts.fjt-solutions.com/v1/audio/speech",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.voiceover.text }}\",\n  \"voice\": \"{{ $('Webhook Darktube').item.json.body.template.voice === 'feminine_br' ? 'pt-BR-FranciscaNeural' : 'pt-BR-AntonioNeural' }}\"\n}",
+        "options": {}
+      },
+      "name": "Generate Narration TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1300,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3000/api/remotion/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"templateId\": \"{{ $('Webhook Darktube').item.json.body.template.id }}\",\n  \"format\": \"{{ $('Webhook Darktube').item.json.body.template.format }}\",\n  \"segments\": \"{{ $items('Generate Scene Image') }}\",\n  \"thumbnailUrl\": \"{{ $('Kie.ai Generate Thumbnail').item.json.image_url }}\"\n}",
+        "options": {}
+      },
+      "name": "Remotion Engine Render MP4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://backend.blotato.com/api/v1/posts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"accountIds\": {{ $('Webhook Darktube').item.json.body.template.target_accounts }},\n  \"videoUrl\": \"{{ $json.rendered_video_url }}\",\n  \"thumbnailUrl\": \"{{ $('Kie.ai Generate Thumbnail').item.json.image_url }}\",\n  \"caption\": \"{{ $('Webhook Darktube').item.json.body.template.name }}\"\n}",
+        "options": {}
+      },
+      "name": "Auto-Post Video + Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:3000/api/webhooks/production-complete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"template_id\": \"{{ $('Webhook Darktube').item.json.body.template.id }}\",\n  \"video_url\": \"{{ $('Remotion Engine Render MP4').item.json.rendered_video_url }}\",\n  \"thumbnail_url\": \"{{ $('Kie.ai Generate Thumbnail').item.json.image_url }}\",\n  \"status\": \"completed\"\n}",
+        "options": {}
+      },
+      "name": "Callback Darktube Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2050,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Darktube": {
+      "main": [
+        [
+          {
+            "node": "Switch Engine Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Engine Mode": {
+      "main": [
+        [
+          {
+            "node": "Kie.ai Generate Thumbnail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Script Segments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Kie.ai Generate Thumbnail",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Script Segments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Script Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Script Segments": {
+      "main": [
+        [
+          {
+            "node": "Generate Scene Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Scene Image": {
+      "main": [
+        [
+          {
+            "node": "Generate Narration TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Narration TTS": {
+      "main": [
+        [
+          {
+            "node": "Remotion Engine Render MP4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remotion Engine Render MP4": {
+      "main": [
+        [
+          {
+            "node": "Auto-Post Video + Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-Post Video + Thumbnail": {
+      "main": [
+        [
+          {
+            "node": "Callback Darktube Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

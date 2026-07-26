@@ -15,6 +15,7 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
   narrationAudioUrl,
   backgroundMusicUrl,
   backgroundImages = [],
+  scenes = [],
   subtitles = [],
   primaryColor = '#EAB308', // Gold/Yellow viral style
   accentColor = '#FFFFFF',
@@ -25,8 +26,12 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
 
-  // Calculate slide duration per background image
-  const imageCount = backgroundImages.length || 1;
+  // Extract media list from custom scenes (if provided) or backgroundImages
+  const sceneMediaUrls = scenes.map((s) => s.mediaUrl).filter(Boolean) as string[];
+  const mediaList = sceneMediaUrls.length > 0 ? sceneMediaUrls : backgroundImages;
+
+  // Calculate slide duration per background image/video
+  const imageCount = mediaList.length || 1;
   const framesPerImage = Math.max(1, Math.floor(durationInFrames / imageCount));
 
   // Current subtitle word calculation
@@ -40,8 +45,8 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000', fontFamily: 'Inter, sans-serif' }}>
       {/* Background Images with Ken Burns Zoom Effect */}
-      {backgroundImages.length > 0 ? (
-        backgroundImages.map((imgUrl, index) => {
+      {mediaList.length > 0 ? (
+        mediaList.map((imgUrl, index) => {
           const startFrame = index * framesPerImage;
           return (
             <Sequence

@@ -18,6 +18,8 @@ import {
   Key,
   Youtube,
   LayoutTemplate,
+  Clapperboard,
+  Terminal,
 } from "lucide-react"
 
 const navItems = [
@@ -26,6 +28,7 @@ const navItems = [
   { href: "/tracker", label: "Tracker", icon: Bookmark },
   { href: "/credentials", label: "Credenciais", icon: Key },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },
+  { href: "/criacao", label: "Criação", icon: Clapperboard },
   { href: "/settings", label: "Configurações", icon: Settings },
 ]
 
@@ -135,6 +138,20 @@ export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
                   Administração
                 </p>
               )}
+              <Link
+                href="/admin/prompts"
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname === "/admin/prompts"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  collapsed && "justify-center px-0"
+                )}
+              >
+                <Terminal className={cn("h-[18px] w-[18px] shrink-0", pathname === "/admin/prompts" ? "text-primary" : "")} />
+                {!collapsed && "Prompts"}
+              </Link>
               <Link
                 href="/admin/invites"
                 onClick={onClose}
