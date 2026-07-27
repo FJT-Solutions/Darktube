@@ -223,7 +223,9 @@ return [{
       "parameters": {
         "jsCode": """// ── Monta SceneSegment completo ──
 const segment = $('Generate Scene Image').item.json;
-const ttsRes  = $('Generate TTS').item.json;
+const idx     = parseInt(segment.index !== undefined ? segment.index : 0);
+const ttsNode = $('Generate TTS');
+const ttsItem = ttsNode.item || ttsNode.all()[idx] || {};
 const wRes    = $('Whisper Word Timestamps').item.json;
 
 const voiceover = segment.voiceover || {};
@@ -236,10 +238,13 @@ const imageUrl = segment.image_url
   || '';
 
 let audioUrl = segment.audio_url || '';
-if (!audioUrl && ttsItem && ttsItem.binary && ttsItem.binary.data) {
-  const mimeType = ttsItem.binary.data.mimeType || 'audio/mp3';
-  const base64Data = ttsItem.binary.data.data;
-  audioUrl = `data:${mimeType};base64,${base64Data}`;
+if (!audioUrl && ttsItem && ttsItem.binary) {
+  const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';
+  const binaryObj = ttsItem.binary[binaryKey];
+  if (binaryObj && binaryObj.data) {
+    const mimeType = binaryObj.mimeType || 'audio/mp3';
+    audioUrl = `data:${mimeType};base64,${binaryObj.data}`;
+  }
 }
 const captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';
 
