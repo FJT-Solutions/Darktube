@@ -266,13 +266,17 @@ async function mixAudioTracks(silentVideoPath, payload, outputPath) {
 // ──────────────────────────────────────────────
 async function sendCallback(url, body) {
   try {
+    let targetUrl = url || '';
+    if (targetUrl.includes('localhost:5678')) {
+      targetUrl = targetUrl.replace('http://localhost:5678', 'https://n8n.fjt-solutions.com');
+    }
     const fetch = (await import('node-fetch')).default;
-    await fetch(url, {
+    await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    console.log(`[HyperFrames] Callback enviado para: ${url}`);
+    console.log(`[HyperFrames] Callback enviado para: ${targetUrl}`);
   } catch (err) {
     console.error('[HyperFrames] Erro ao enviar callback:', err.message);
   }

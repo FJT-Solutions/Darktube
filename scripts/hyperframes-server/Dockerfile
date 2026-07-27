@@ -5,6 +5,7 @@ FROM node:22-slim
 # Chromium headless para o Hyperframes + FFmpeg para mixagem de áudio
 RUN apt-get update && apt-get install -y \
     chromium \
+    unzip \
     ffmpeg \
     fonts-liberation \
     fonts-noto \
@@ -34,7 +35,7 @@ WORKDIR /app
 # ─── Copiar manifesto e instalar dependências ───
 COPY package*.json ./
 
-RUN npm install --omit=dev
+RUN npm install --omit=dev && npx hyperframes browser ensure || true
 
 # ─── Copiar código do servidor ───
 COPY server.js ./
