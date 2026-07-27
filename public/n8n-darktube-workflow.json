@@ -81,7 +81,7 @@
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
-          "parameters": [
+          "parameter": [
             {
               "name": "file",
               "value": "={{ $json.data }}",
