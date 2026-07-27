@@ -7,13 +7,14 @@ wf = {
       "parameters": {
         "httpMethod": "POST",
         "path": "darktube_producao",
-        "responseMode": "onReceived",
         "options": {}
       },
       "name": "Webhook Darktube",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [240, 360]
+      "position": [208, 1968],
+      "id": "8ccccbd5-e9b1-4e54-b0f3-f20e291ab6b5",
+      "webhookId": "7b04b8bf-2535-478f-b156-f3bd7209d180"
     },
     {
       "parameters": {
@@ -55,23 +56,24 @@ return [{
       "name": "Normalize + Auto Engine",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [480, 360]
+      "position": [432, 1968],
+      "id": "2d97433c-075d-4dda-a781-392be0202aa6"
     },
     {
       "parameters": {
-        "batchSize": 1,
         "options": {}
       },
-      "name": "Split Segments",
+      "name": "Loop Over Items",
       "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 1,
-      "position": [720, 360]
+      "typeVersion": 3,
+      "position": [656, 1968],
+      "id": "2d8fbf12-aa7c-48b2-aa62-0358dbb50c1d"
     },
     {
       "parameters": {
         "jsCode": """// ── Geração / Resolução de Imagem da Cena ──
 const norm    = $('Normalize + Auto Engine').item.json;
-const segment = $('Split Segments').item.json;
+const segment = $('Loop Over Items').item.json;
 const tpl     = norm.tpl || {};
 
 // 1. Se o segmento possui imagem própria enviada pelo usuário (Upload Manual)
@@ -95,7 +97,8 @@ return [{ json: { image_url: defaultImg, source: 'ai_fallback' } }];""",
       "name": "Generate Scene Image",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [960, 260]
+      "position": [880, 1968],
+      "id": "8e123f64-6335-4b57-bdc5-8986e8308ae9"
     },
     {
       "parameters": {
@@ -115,7 +118,8 @@ return [{ json: { image_url: defaultImg, source: 'ai_fallback' } }];""",
       "name": "Generate TTS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1200, 260]
+      "position": [1104, 1968],
+      "id": "e8e1106b-ba75-46b9-83f3-dc52709218c9"
     },
     {
       "parameters": {
@@ -153,13 +157,14 @@ return [{ json: { image_url: defaultImg, source: 'ai_fallback' } }];""",
       "name": "Whisper Word Timestamps",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 260]
+      "position": [1328, 1968],
+      "id": "b1d7578e-7a54-4cb8-8d82-87897fe321ef"
     },
     {
       "parameters": {
         "jsCode": """// ── Monta SceneSegment completo ──
 const norm    = $('Normalize + Auto Engine').item.json;
-const segment = $('Split Segments').item.json;
+const segment = $('Loop Over Items').item.json;
 const imgRes  = $('Generate Scene Image').item.json;
 const ttsRes  = $('Generate TTS').item.json;
 const wRes    = $('Whisper Word Timestamps').item.json;
@@ -216,7 +221,8 @@ return [{
       "name": "Build Scene",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1680, 260]
+      "position": [1552, 2048],
+      "id": "b7fa4bb7-8ade-4420-a197-917d2a377895"
     },
     {
       "parameters": {
@@ -255,7 +261,25 @@ return [{
       "name": "Aggregate Scenes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [960, 520]
+      "position": [880, 1680],
+      "id": "d6c6475c-de83-4484-bf2d-d6b758e35fab"
+    },
+    {
+      "parameters": {
+        "jsCode": """// ── Geração da Capa / Thumbnail HD ──
+const norm = $('Normalize + Auto Engine').first().json;
+const tpl  = norm.tpl || {};
+
+const thumbUrl = tpl.thumbnail_url || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
+
+return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
+        "options": {}
+      },
+      "name": "Generate Thumbnail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1104, 1776],
+      "id": "74cbe82e-5654-477e-b903-e04e6bf844a2"
     },
     {
       "parameters": {
@@ -312,7 +336,8 @@ return [{
       "name": "Route to Engine",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1200, 520]
+      "position": [1104, 1584],
+      "id": "25195eee-1ac3-49df-b913-1b371cf620e9"
     },
     {
       "parameters": {
@@ -330,7 +355,8 @@ return [{
       "name": "Remotion Render",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 440]
+      "position": [1328, 1488],
+      "id": "4304c962-a6d1-430d-a579-acfbfb7c2fb8"
     },
     {
       "parameters": {
@@ -348,23 +374,8 @@ return [{
       "name": "Hyperframes Render",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 620]
-    },
-    {
-      "parameters": {
-        "jsCode": """// ── Geração da Capa / Thumbnail HD ──
-const norm = $('Normalize + Auto Engine').first().json;
-const tpl  = norm.tpl || {};
-
-const thumbUrl = tpl.thumbnail_url || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-
-return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
-        "options": {}
-      },
-      "name": "Generate Thumbnail",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1440, 800]
+      "position": [1328, 1680],
+      "id": "f5927597-f655-4104-8f40-861b39295e9f"
     },
     {
       "parameters": {
@@ -376,8 +387,9 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
       "name": "Wait Render",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1680, 520],
-      "webhookId": "darktube-render-complete"
+      "position": [1552, 1584],
+      "webhookId": "darktube-render-complete",
+      "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94"
     },
     {
       "parameters": {
@@ -397,7 +409,8 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
       "name": "Auto-Post Blotato",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1920, 520]
+      "position": [1776, 1584],
+      "id": "db564ca1-8553-468f-bfe5-7f18068aac4e"
     },
     {
       "parameters": {
@@ -417,7 +430,8 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
       "name": "Callback DarkTube",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [2160, 520]
+      "position": [2000, 1584],
+      "id": "a1b6073b-5541-47dd-a0a6-26773d95773a"
     }
   ],
   "connections": {
@@ -425,12 +439,12 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
       "main": [[{"node": "Normalize + Auto Engine", "type": "main", "index": 0}]]
     },
     "Normalize + Auto Engine": {
-      "main": [[{"node": "Split Segments", "type": "main", "index": 0}]]
+      "main": [[{"node": "Loop Over Items", "type": "main", "index": 0}]]
     },
-    "Split Segments": {
+    "Loop Over Items": {
       "main": [
-        [{"node": "Generate Scene Image", "type": "main", "index": 0}],
-        [{"node": "Aggregate Scenes", "type": "main", "index": 0}]
+        [{"node": "Aggregate Scenes", "type": "main", "index": 0}],
+        [{"node": "Generate Scene Image", "type": "main", "index": 0}]
       ]
     },
     "Generate Scene Image": {
@@ -443,7 +457,7 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
       "main": [[{"node": "Build Scene", "type": "main", "index": 0}]]
     },
     "Build Scene": {
-      "main": [[{"node": "Split Segments", "type": "main", "index": 0}]]
+      "main": [[{"node": "Loop Over Items", "type": "main", "index": 0}]]
     },
     "Aggregate Scenes": {
       "main": [
@@ -480,4 +494,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json successfully!')
+print('Updated public/n8n-darktube-workflow.json with perfect syntax!')
