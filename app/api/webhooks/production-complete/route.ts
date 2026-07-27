@@ -4,7 +4,10 @@ import { pool } from '@/lib/db-client';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { historyId, status, videoUrl, error } = body;
+    const historyId = body.historyId || body.session_id || body.history_id;
+    const status = body.status || 'completed';
+    const videoUrl = body.videoUrl || body.video_url || '';
+    const error = body.error || '';
 
     if (!historyId || !status) {
       return NextResponse.json(

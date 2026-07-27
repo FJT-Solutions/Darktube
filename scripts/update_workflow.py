@@ -474,10 +474,13 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
-  "template_id":   "{{ $('Normalize + Auto Engine').first().json.tpl.id }}",
+  "historyId":     "{{ $('Normalize + Auto Engine').first().json.session_id }}",
   "session_id":    "{{ $('Normalize + Auto Engine').first().json.session_id }}",
+  "template_id":   "{{ $('Normalize + Auto Engine').first().json.tpl.id }}",
   "render_engine": "{{ $('Normalize + Auto Engine').first().json.render_engine }}",
+  "videoUrl":      "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}",
   "video_url":     "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}",
+  "thumbnailUrl":  "{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}",
   "thumbnail_url": "{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}",
   "status":        "completed"
 }""",

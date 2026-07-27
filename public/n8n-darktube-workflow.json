@@ -288,7 +288,7 @@
         "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').first().json.render_engine }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}\",\n  \"thumbnail_url\": \"{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}\",\n  \"status\":        \"completed\"\n}",
+        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').first().json.render_engine }}\",\n  \"videoUrl\":      \"{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}\",\n  \"thumbnailUrl\":  \"{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}\",\n  \"thumbnail_url\": \"{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}\",\n  \"status\":        \"completed\"\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
