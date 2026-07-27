@@ -22,6 +22,7 @@ import {
   ImageIcon,
   History,
   Check,
+  AlertCircle,
   ChevronRight,
   BrainCircuit,
   PlayCircle,
@@ -171,6 +172,13 @@ export default function CriacaoPage() {
 
   useEffect(() => {
     fetchAll()
+
+    const handleUpdate = () => fetchAll()
+    window.addEventListener("production-status-changed", handleUpdate)
+
+    return () => {
+      window.removeEventListener("production-status-changed", handleUpdate)
+    }
   }, [])
 
   async function fetchAll() {
@@ -678,16 +686,28 @@ export default function CriacaoPage() {
                   recentHistory.map((h: any) => (
                     <div key={h.id} className="flex items-center justify-between p-3 rounded-lg border bg-secondary/5 gap-3 flex-wrap">
                       <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-emerald-600 bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10 shrink-0">
-                          <Check className="h-3 w-3" />
-                          {h.status === "completed" ? "Finalizado" : "Iniciado"}
-                        </div>
+                        {h.status === "completed" ? (
+                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 shrink-0">
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span>Concluído</span>
+                          </div>
+                        ) : h.status === "failed" ? (
+                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20 shrink-0">
+                            <AlertCircle className="h-3 w-3 text-rose-400" />
+                            <span>Falhou</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 shrink-0 animate-pulse">
+                            <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                            <span>Processando...</span>
+                          </div>
+                        )}
                         <span className="text-[10px] text-muted-foreground">
                           {new Date(h.dispatched_at).toLocaleString("pt-BR")}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant={h.status.includes("auto") ? "secondary" : "default"} className="text-[8px] uppercase">
+                        <Badge variant={h.status?.includes("auto") ? "secondary" : "default"} className="text-[8px] uppercase">
                           {h.status === "sent_auto" ? "Auto" : "Manual"}
                         </Badge>
                         {h.video_url && <VideoPlayerModal videoUrl={h.video_url} title="Produção" />}

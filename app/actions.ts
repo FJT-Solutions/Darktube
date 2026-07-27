@@ -845,6 +845,17 @@ export async function getProductionHistoryAction(templateId: string) {
     }
 }
 
+export async function getAllRecentProductionHistoryAction(limit: number = 20) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) return []
+        return await db.getAllRecentProductionHistory(limit)
+    } catch (error) {
+        console.error("Error in getAllRecentProductionHistoryAction:", error)
+        return []
+    }
+}
+
 export async function sendToN8NAction(templateId: string) {
     try {
         const user = await getCurrentUser()

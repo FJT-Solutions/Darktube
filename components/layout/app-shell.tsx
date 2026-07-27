@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar"
 import { cn } from "@/lib/utils"
 import { getTrackedChannelsAction } from "@/app/actions"
 import { usePathname } from "next/navigation"
+import { ProductionNotifier } from "@/components/production-notifier"
 
 interface AppShellContextType {
   sidebarOpen: boolean
@@ -85,6 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             isAuthPage ? "w-full" : "overflow-y-auto"
           )}
         >
+          {!isAuthPage && <ProductionNotifier />}
           {children}
         </main>
       </div>

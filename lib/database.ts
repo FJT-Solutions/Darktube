@@ -568,6 +568,14 @@ export async function getProductionHistory(templateId: string): Promise<Producti
     return rows
 }
 
+export async function getAllRecentProductionHistory(limit: number = 20): Promise<ProductionHistoryEntity[]> {
+    const { rows } = await pool.query(
+        'SELECT * FROM public.remodeling_history ORDER BY dispatched_at DESC LIMIT $1',
+        [limit]
+    )
+    return rows
+}
+
 export async function updateProductionHistory(id: string, status: 'completed' | 'failed', videoUrl: string) {
     const { rows } = await pool.query(
         `UPDATE public.remodeling_history 
