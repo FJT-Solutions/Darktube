@@ -251,7 +251,7 @@ const scenes = $input.all()
   .map(item => item.json)
   .sort((a, b) => a.index - b.index);
 
-const baseCallback = `https://darktube.fjt-solutions.com/api/webhooks/render-complete`;
+const baseCallback = $execution.resumeUrl || `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`;
 
 const composition = {
   scenes,
@@ -445,7 +445,7 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
   "template_id":   "{{ $('Normalize + Auto Engine').first().json.tpl.id }}",
   "session_id":    "{{ $('Normalize + Auto Engine').first().json.session_id }}",
   "render_engine": "{{ $('Normalize + Auto Engine').first().json.render_engine }}",
-  "video_url":     "{{ $('Wait Render').first().json.video_url }}",
+  "video_url":     "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}",
   "thumbnail_url": "{{ $('Generate Thumbnail').first().json.image_url || '' }}",
   "status":        "completed"
 }""",
@@ -520,4 +520,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with direct internal container endpoints!')
+print('Updated public/n8n-darktube-workflow.json with resumeUrl callback!')

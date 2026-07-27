@@ -140,7 +140,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Agrega todas as cenas geradas pelo loop \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst baseCallback = `https://darktube.fjt-solutions.com/api/webhooks/render-complete`;\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     true,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];",
+        "jsCode": "// \u2500\u2500 Agrega todas as cenas geradas pelo loop \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst baseCallback = $execution.resumeUrl || `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`;\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     true,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];",
         "options": {}
       },
       "name": "Aggregate Scenes",
@@ -304,7 +304,7 @@
         "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').first().json.render_engine }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.video_url }}\",\n  \"thumbnail_url\": \"{{ $('Generate Thumbnail').first().json.image_url || '' }}\",\n  \"status\":        \"completed\"\n}",
+        "jsonBody": "={\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').first().json.render_engine }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}\",\n  \"thumbnail_url\": \"{{ $('Generate Thumbnail').first().json.image_url || '' }}\",\n  \"status\":        \"completed\"\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
