@@ -446,7 +446,7 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
   "session_id":    "{{ $('Normalize + Auto Engine').first().json.session_id }}",
   "render_engine": "{{ $('Normalize + Auto Engine').first().json.render_engine }}",
   "video_url":     "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}",
-  "thumbnail_url": "{{ $('Generate Thumbnail').first().json.image_url || '' }}",
+  "thumbnail_url": "{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}",
   "status":        "completed"
 }""",
         "options": {
