@@ -71,7 +71,7 @@ app.post('/thumbnail', async (req, res) => {
     // Renderizar apenas frame 0 como PNG
     const silentVideo = path.join(workDir, 'silent.mp4');
     execSync(
-      `${path.join(__dirname, 'node_modules/.bin/hyperframes')} render ${path.join(workDir, 'index.html')} --output ${silentVideo}`,
+      `${path.join(__dirname, 'node_modules/.bin/hyperframes')} render ${workDir} --output ${silentVideo}`,
       { timeout: 120000, stdio: 'pipe' }
     );
 
@@ -124,7 +124,7 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
     // 3. Render visual (sem áudio) via Hyperframes CLI
     console.log(`[HyperFrames] Renderizando vídeo visual: ${historyId}`);
     execSync(
-      `${path.join(__dirname, 'node_modules/.bin/hyperframes')} render ${path.join(workDir, 'index.html')} --output ${silentPath}`,
+      `${path.join(__dirname, 'node_modules/.bin/hyperframes')} render ${workDir} --output ${silentPath}`,
       { timeout: 600000, stdio: 'pipe' } // 10 minutos max
     );
     console.log(`[HyperFrames] Vídeo visual renderizado: ${historyId}`);
