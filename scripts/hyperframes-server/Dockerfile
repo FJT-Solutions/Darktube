@@ -32,14 +32,13 @@ ENV CHROME_PATH=/usr/bin/chromium
 WORKDIR /app
 
 # ─── Copiar manifesto e instalar dependências ───
-# (apenas os arquivos do servidor — não o projeto inteiro)
-COPY scripts/hyperframes-server/package.json ./
+COPY package*.json ./
 
 RUN npm install --omit=dev
 
 # ─── Copiar código do servidor ───
-COPY scripts/hyperframes-server/server.js ./
-COPY scripts/hyperframes-server/template-generator.js ./
+COPY server.js ./
+COPY template-generator.js ./
 
 # ─── Criar diretório de output ───
 RUN mkdir -p /app/output
