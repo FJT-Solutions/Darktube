@@ -233,7 +233,7 @@
         "url": "http://n8n-remotionservice-ry6eh9:3001/render",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $execution.resumeUrl }}\",\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
+        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
@@ -253,7 +253,7 @@
         "url": "http://n8n-hyperframesservice-sruzdk:3002/render",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $execution.resumeUrl }}\",\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
+        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
@@ -271,7 +271,9 @@
       "parameters": {
         "resume": "webhook",
         "httpMethod": "POST",
-        "options": {}
+        "options": {
+          "webhookSuffix": "darktube-render-complete"
+        }
       },
       "name": "Wait Render",
       "type": "n8n-nodes-base.wait",
@@ -280,6 +282,7 @@
         1552,
         1584
       ],
+      "webhookId": "darktube-render-complete",
       "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94"
     },
     {

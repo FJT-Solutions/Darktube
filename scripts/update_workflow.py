@@ -365,9 +365,9 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
-  "historyId":   "{{ $json.session_id }}",
-  "templateId":  "{{ $json.template_id }}",
-  "callbackUrl": "{{ $execution.resumeUrl }}",
+  "historyId":   {{ JSON.stringify($json.session_id) }},
+  "templateId":  {{ JSON.stringify($json.template_id) }},
+  "callbackUrl": {{ JSON.stringify($execution.resumeUrl) }},
   "composition": {{ JSON.stringify($json.composition) }}
 }""",
         "options": {
@@ -387,9 +387,9 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
-  "historyId":   "{{ $json.session_id }}",
-  "templateId":  "{{ $json.template_id }}",
-  "callbackUrl": "{{ $execution.resumeUrl }}",
+  "historyId":   {{ JSON.stringify($json.session_id) }},
+  "templateId":  {{ JSON.stringify($json.template_id) }},
+  "callbackUrl": {{ JSON.stringify($execution.resumeUrl) }},
   "payload":     {{ JSON.stringify($json.composition) }}
 }""",
         "options": {
