@@ -129,7 +129,9 @@ return [{
   "speed": 1.0,
   "response_format": "mp3"
 }""",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": True
+        }
       },
       "name": "Generate TTS",
       "type": "n8n-nodes-base.httpRequest",
@@ -169,7 +171,9 @@ return [{
             }
           ]
         },
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": True
+        }
       },
       "name": "Whisper Word Timestamps",
       "type": "n8n-nodes-base.httpRequest",
@@ -364,7 +368,9 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
   "callbackUrl": "{{ $json.callback_url }}",
   "composition": {{ JSON.stringify($json.composition) }}
 }""",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": True
+        }
       },
       "name": "Remotion Render",
       "type": "n8n-nodes-base.httpRequest",
@@ -384,7 +390,9 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
   "callbackUrl": "{{ $json.callback_url }}",
   "payload":     {{ JSON.stringify($json.composition) }}
 }""",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": True
+        }
       },
       "name": "Hyperframes Render",
       "type": "n8n-nodes-base.httpRequest",
@@ -441,7 +449,9 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
   "thumbnail_url": "{{ $('Generate Thumbnail').first().json.image_url || '' }}",
   "status":        "completed"
 }""",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": True
+        }
       },
       "name": "Callback DarkTube",
       "type": "n8n-nodes-base.httpRequest",
@@ -510,4 +520,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with segment item splitting!')
+print('Updated public/n8n-darktube-workflow.json with allowUnauthorizedCerts on all HTTP Request nodes!')

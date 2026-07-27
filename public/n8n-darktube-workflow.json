@@ -66,7 +66,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.voiceover?.text || $json.voiceover_text || $json.voiceoverText || $json.text }}\",\n  \"voice\": \"{{ $json.voice }}\",\n  \"language\": \"{{ $json.language }}\",\n  \"speed\": 1.0,\n  \"response_format\": \"mp3\"\n}",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       },
       "name": "Generate TTS",
       "type": "n8n-nodes-base.httpRequest",
@@ -109,7 +111,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       },
       "name": "Whisper Word Timestamps",
       "type": "n8n-nodes-base.httpRequest",
@@ -230,7 +234,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       },
       "name": "Remotion Render",
       "type": "n8n-nodes-base.httpRequest",
@@ -248,7 +254,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       },
       "name": "Hyperframes Render",
       "type": "n8n-nodes-base.httpRequest",
@@ -297,7 +305,9 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').first().json.render_engine }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.video_url }}\",\n  \"thumbnail_url\": \"{{ $('Generate Thumbnail').first().json.image_url || '' }}\",\n  \"status\":        \"completed\"\n}",
-        "options": {}
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
       },
       "name": "Callback DarkTube",
       "type": "n8n-nodes-base.httpRequest",
