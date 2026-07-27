@@ -1,5 +1,5 @@
 {
-  "name": "Darktube Automatic Video Production & Auto-Posting",
+  "name": "Darktube — Dual Engine Video Production v2",
   "nodes": [
     {
       "parameters": {
@@ -11,275 +11,274 @@
       "name": "Webhook Darktube",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [
-        250,
-        300
-      ]
+      "position": [240, 360]
     },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Normaliza payload e DECIDE o motor automaticamente ──\n//\n// Regra de decisão:\n//   caption_style = 'pop' ou 'karaoke'\n//     → REMOTION  (spring word-by-word com timestamps Whisper)\n//   caption_style = 'subtitle' ou não definido\n//     → HYPERFRAMES (GSAP cinematic, mais riqueza visual por cena)\n//\n// Ambos recebem os mesmos dados — só o render final muda.\n\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst voice        = tpl.voice        || 'pt-BR-FranciscaNeural';\nconst format       = tpl.format       || 'vertical';\n\n// Decisão automática do motor\nconst renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')\n  ? 'remotion'\n  : 'hyperframes';\n\nreturn [{\n  json: {\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    script_segments: tpl.script_segments || [],\n    tpl\n  }\n}];"
+      },
+      "name": "Normalize + Auto Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 360],
+      "notes": "Decide engine: pop/karaoke → Remotion | subtitle → Hyperframes"
+    },
+
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Split Segments",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [720, 360]
+    },
+
+    {
+      "parameters": {
+        "url": "={{ $('Normalize + Auto Engine').item.json.tpl.engine_mode === 'kie' ? 'https://api.kie.ai/images/generations' : 'http://10.0.0.2:3003/generate-image' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"{{ $json.image_prompt }}\",\n  \"model\": \"{{ $('Normalize + Auto Engine').item.json.tpl.image_model }}\",\n  \"aspect_ratio\": \"{{ $('Normalize + Auto Engine').item.json.format === 'vertical' ? '9:16' : '16:9' }}\"\n}",
+        "options": {}
+      },
+      "name": "Generate Scene Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [960, 260]
+    },
+
+    {
+      "parameters": {
+        "url": "https://edge-tts.fjt-solutions.com/v1/audio/speech",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.voiceover_text || $json.voiceoverText || $json.text }}\",\n  \"voice\": \"{{ $('Normalize + Auto Engine').item.json.voice }}\",\n  \"language\": \"{{ $('Normalize + Auto Engine').item.json.language }}\",\n  \"speed\": 1.0,\n  \"response_format\": \"mp3\"\n}",
+        "options": {}
+      },
+      "name": "Generate TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1200, 260]
+    },
+
+    {
+      "parameters": {
+        "url": "https://whisper.fjt-solutions.com/v1/audio/transcriptions",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "file",                      "value": "={{ $json.data }}", "parameterType": "formBinaryData" },
+            { "name": "model",                     "value": "Systran/faster-whisper-small" },
+            { "name": "response_format",           "value": "verbose_json" },
+            { "name": "timestamp_granularities[]", "value": "word" },
+            { "name": "language",                  "value": "={{ $('Normalize + Auto Engine').item.json.language }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Whisper Word Timestamps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1440, 260],
+      "notes": "Retorna timestamps palavra-a-palavra para pop/karaoke"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Monta SceneSegment completo ──\nconst norm    = $('Normalize + Auto Engine').item.json;\nconst segment = $('Split Segments').item.json;\nconst imgRes  = $('Generate Scene Image').item.json;\nconst ttsRes  = $('Generate TTS').item.json;\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst imageUrl = imgRes.image_url || imgRes.url || imgRes.data?.[0]?.url || '';\nconst audioUrl = ttsRes.audio_url || ttsRes.url || '';\n\n// Palavras com timestamps do Whisper (relativo ao início da cena)\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\n// Duração real da narração (Whisper é mais preciso que timestamp do script)\nconst duration = wRes.duration\n  || (() => {\n    const ts = segment.timestamp || '';\n    const parts = ts.split('-');\n    const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n    return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n  })();\n\n// Selecionar animationStyle baseado no animation_mix e índice da cena\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nconst idx = parseInt(segment.index || segment.id || 0);\nlet animationStyle;\nif (norm.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (norm.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length]; // varied\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText:    segment.voiceover_text || segment.voiceoverText || segment.text || '',\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade'\n  }\n}];"
+      },
+      "name": "Build Scene",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 260]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Agrega todas as cenas geradas pelo loop ──\n// Recebe todos os itens acumulados do splitInBatches\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl;\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst baseCallback = `https://darktube.fjt-solutions.com/api/webhooks/render-complete`;\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     true,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];"
+      },
+      "name": "Aggregate Scenes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 520]
+    },
+
     {
       "parameters": {
         "rules": {
           "values": [
             {
               "conditions": {
-                "string": [
-                  {
-                    "value1": "={{ $json.body.template.engine_mode }}",
-                    "value2": "local"
-                  }
-                ]
+                "string": [{ "value1": "={{ $json.render_engine }}", "value2": "remotion" }]
               },
               "renameOutput": true,
-              "outputKey": "Direct API (Local)"
+              "outputKey": "Remotion"
             },
             {
               "conditions": {
-                "string": [
-                  {
-                    "value1": "={{ $json.body.template.engine_mode }}",
-                    "value2": "kie"
-                  }
-                ]
+                "string": [{ "value1": "={{ $json.render_engine }}", "value2": "hyperframes" }]
               },
               "renameOutput": true,
-              "outputKey": "Kie.ai (Créditos)"
-            },
-            {
-              "conditions": {
-                "string": [
-                  {
-                    "value1": "={{ $json.body.template.engine_mode }}",
-                    "value2": "manual"
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "Manual (Upload Fora)"
+              "outputKey": "Hyperframes"
             }
           ]
         }
       },
-      "name": "Switch Engine Mode",
+      "name": "Route to Engine",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
-      "position": [
-        500,
-        300
-      ]
+      "position": [1200, 520],
+      "notes": "Roteia para o engine decidido automaticamente pelo Normalize"
     },
+
     {
       "parameters": {
-        "url": "https://api.kie.ai/images/generations",
+        "url": "https://remotion.fjt-solutions.com/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
+        "options": {}
+      },
+      "name": "Remotion Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1440, 440],
+      "notes": "POST /render → 202 imediato, server renderiza async e callback"
+    },
+
+    {
+      "parameters": {
+        "url": "https://hyperframes.fjt-solutions.com/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
+        "options": {}
+      },
+      "name": "Hyperframes Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1440, 620],
+      "notes": "POST /render → 202 imediato, server renderiza async e callback"
+    },
+
+    {
+      "parameters": {
+        "url": "={{ $('Normalize + Auto Engine').item.json.tpl.engine_mode === 'kie' ? 'https://api.kie.ai/images/generations' : 'http://10.0.0.2:3003/generate-image' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"prompt\": \"{{ $('Normalize + Auto Engine').item.json.tpl.thumbnail_prompt }}\",\n  \"model\":  \"{{ $('Normalize + Auto Engine').item.json.tpl.thumbnail_model }}\",\n  \"aspect_ratio\": \"{{ $('Normalize + Auto Engine').item.json.format === 'vertical' ? '9:16' : '16:9' }}\"\n}",
+        "options": {}
+      },
+      "name": "Generate Thumbnail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1440, 800]
+    },
+
+    {
+      "parameters": {
+        "resume": "webhook",
+        "webhookSuffix": "/render-complete"
+      },
+      "name": "Wait Render",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1680, 520],
+      "webhookId": "darktube-render-complete",
+      "notes": "Aguarda POST de callback do remotion-server ou hyperframes-server com { status, video_url }"
+    },
+
+    {
+      "parameters": {
+        "url": "https://backend.blotato.com/api/v1/posts",
         "authentication": "genericCredentialType",
         "genericCredentialType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"prompt\": \"{{ $json.body.template.thumbnail_prompt }}\",\n  \"model\": \"{{ $json.body.template.thumbnail_model }}\",\n  \"aspect_ratio\": \"{{ $json.body.template.format === 'vertical' ? '9:16' : '16:9' }}\"\n}",
+        "jsonBody": "={\n  \"accountIds\":   {{ JSON.stringify($('Normalize + Auto Engine').item.json.tpl.target_accounts) }},\n  \"videoUrl\":     \"{{ $json.video_url }}\",\n  \"thumbnailUrl\": \"{{ $('Generate Thumbnail').item.json.image_url || $('Generate Thumbnail').item.json.url || '' }}\",\n  \"caption\":      \"{{ $('Normalize + Auto Engine').item.json.tpl.name }}\"\n}",
         "options": {}
       },
-      "name": "Kie.ai Generate Thumbnail",
+      "name": "Auto-Post Blotato",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [
-        800,
-        200
-      ]
+      "position": [1920, 520]
     },
+
     {
       "parameters": {
-        "batchSize": 1,
-        "options": {}
-      },
-      "name": "Split Script Segments",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 1,
-      "position": [
-        800,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "url": "https://api.kie.ai/images/generations",
+        "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"prompt\": \"{{ $json.image_prompt }}\",\n  \"model\": \"{{ $('Webhook Darktube').item.json.body.template.image_model }}\",\n  \"aspect_ratio\": \"{{ $('Webhook Darktube').item.json.body.template.format === 'vertical' ? '9:16' : '16:9' }}\"\n}",
+        "jsonBody": "={\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').item.json.tpl.id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').item.json.session_id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').item.json.render_engine }}\",\n  \"video_url\":     \"{{ $('Wait Render').item.json.video_url }}\",\n  \"thumbnail_url\": \"{{ $('Generate Thumbnail').item.json.image_url || '' }}\",\n  \"status\":        \"completed\"\n}",
         "options": {}
       },
-      "name": "Generate Scene Image",
+      "name": "Callback DarkTube",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [
-        1050,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "url": "https://edge-tts.fjt-solutions.com/v1/audio/speech",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.voiceover.text }}\",\n  \"voice\": \"{{ $('Webhook Darktube').item.json.body.template.voice === 'feminine_br' ? 'pt-BR-FranciscaNeural' : 'pt-BR-AntonioNeural' }}\"\n}",
-        "options": {}
-      },
-      "name": "Generate Narration TTS",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [
-        1300,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "url": "http://localhost:3000/api/remotion/render",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"templateId\": \"{{ $('Webhook Darktube').item.json.body.template.id }}\",\n  \"format\": \"{{ $('Webhook Darktube').item.json.body.template.format }}\",\n  \"segments\": \"{{ $items('Generate Scene Image') }}\",\n  \"thumbnailUrl\": \"{{ $('Kie.ai Generate Thumbnail').item.json.image_url }}\"\n}",
-        "options": {}
-      },
-      "name": "Remotion Engine Render MP4",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [
-        1550,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "url": "https://backend.blotato.com/api/v1/posts",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"accountIds\": {{ $('Webhook Darktube').item.json.body.template.target_accounts }},\n  \"videoUrl\": \"{{ $json.rendered_video_url }}\",\n  \"thumbnailUrl\": \"{{ $('Kie.ai Generate Thumbnail').item.json.image_url }}\",\n  \"caption\": \"{{ $('Webhook Darktube').item.json.body.template.name }}\"\n}",
-        "options": {}
-      },
-      "name": "Auto-Post Video + Thumbnail",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [
-        1800,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "url": "http://localhost:3000/api/webhooks/production-complete",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"template_id\": \"{{ $('Webhook Darktube').item.json.body.template.id }}\",\n  \"video_url\": \"{{ $('Remotion Engine Render MP4').item.json.rendered_video_url }}\",\n  \"thumbnail_url\": \"{{ $('Kie.ai Generate Thumbnail').item.json.image_url }}\",\n  \"status\": \"completed\"\n}",
-        "options": {}
-      },
-      "name": "Callback Darktube Complete",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [
-        2050,
-        300
-      ]
+      "position": [2160, 520]
     }
   ],
+
   "connections": {
     "Webhook Darktube": {
-      "main": [
-        [
-          {
-            "node": "Switch Engine Mode",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Normalize + Auto Engine", "type": "main", "index": 0 }]]
     },
-    "Switch Engine Mode": {
-      "main": [
-        [
-          {
-            "node": "Kie.ai Generate Thumbnail",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Split Script Segments",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Kie.ai Generate Thumbnail",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Split Script Segments",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Split Script Segments",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Normalize + Auto Engine": {
+      "main": [[{ "node": "Split Segments", "type": "main", "index": 0 }]]
     },
-    "Split Script Segments": {
+    "Split Segments": {
       "main": [
-        [
-          {
-            "node": "Generate Scene Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Generate Scene Image", "type": "main", "index": 0 }],
+        [{ "node": "Aggregate Scenes",     "type": "main", "index": 0 }]
       ]
     },
     "Generate Scene Image": {
+      "main": [[{ "node": "Generate TTS", "type": "main", "index": 0 }]]
+    },
+    "Generate TTS": {
+      "main": [[{ "node": "Whisper Word Timestamps", "type": "main", "index": 0 }]]
+    },
+    "Whisper Word Timestamps": {
+      "main": [[{ "node": "Build Scene", "type": "main", "index": 0 }]]
+    },
+    "Build Scene": {
+      "main": [[{ "node": "Split Segments", "type": "main", "index": 0 }]]
+    },
+    "Aggregate Scenes": {
+      "main": [[
+        { "node": "Route to Engine",   "type": "main", "index": 0 },
+        { "node": "Generate Thumbnail","type": "main", "index": 0 }
+      ]]
+    },
+    "Route to Engine": {
       "main": [
-        [
-          {
-            "node": "Generate Narration TTS",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Remotion Render",    "type": "main", "index": 0 }],
+        [{ "node": "Hyperframes Render", "type": "main", "index": 0 }]
       ]
     },
-    "Generate Narration TTS": {
-      "main": [
-        [
-          {
-            "node": "Remotion Engine Render MP4",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Remotion Render": {
+      "main": [[{ "node": "Wait Render", "type": "main", "index": 0 }]]
     },
-    "Remotion Engine Render MP4": {
-      "main": [
-        [
-          {
-            "node": "Auto-Post Video + Thumbnail",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Hyperframes Render": {
+      "main": [[{ "node": "Wait Render", "type": "main", "index": 0 }]]
     },
-    "Auto-Post Video + Thumbnail": {
-      "main": [
-        [
-          {
-            "node": "Callback Darktube Complete",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Wait Render": {
+      "main": [[{ "node": "Auto-Post Blotato", "type": "main", "index": 0 }]]
+    },
+    "Auto-Post Blotato": {
+      "main": [[{ "node": "Callback DarkTube", "type": "main", "index": 0 }]]
     }
+  },
+
+  "settings": { "executionOrder": "v1" },
+
+  "_meta": {
+    "version": "2.1.0",
+    "engine_decision": "caption_style=pop|karaoke → Remotion | subtitle → Hyperframes",
+    "flow": "Webhook → Normalize(auto-engine) → SplitBatches[Image→TTS→Whisper→BuildScene loop] → Aggregate → RouteEngine → Remotion|Hyperframes → WaitCallback → Blotato → DarkTube"
   }
 }

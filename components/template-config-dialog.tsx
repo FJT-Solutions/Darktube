@@ -356,6 +356,12 @@ export function TemplateConfigDialog({
   const [postDays, setPostDays] = useState<string[]>(['mon', 'wed', 'fri'])
   const [postTimes, setPostTimes] = useState<string[]>([])
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+  // ── Dual-Engine fields ──
+  const [captionStyle, setCaptionStyle] = useState<'pop' | 'karaoke' | 'subtitle'>('pop')
+  const [animationMix, setAnimationMix] = useState<'varied' | 'kenburns' | 'zoom-punch'>('varied')
+  const [transitionStyle, setTransitionStyle] = useState<'fade' | 'slide-up' | 'zoom-in'>('fade')
+  const [language, setLanguage] = useState('pt')
+  const [voice, setVoice] = useState('pt-BR-FranciscaNeural')
 
   const isEdit = !!initialData
   const tpl = analysis?.remodeling_template || {}
@@ -409,6 +415,12 @@ export function TemplateConfigDialog({
         setPostDays(initialData.post_days || ['mon', 'wed', 'fri'])
         setPostTimes(initialData.post_times || [])
         setSelectedAccounts(initialData.target_accounts || [])
+        // Dual-Engine
+        setCaptionStyle(initialData.caption_style || 'pop')
+        setAnimationMix(initialData.animation_mix || 'varied')
+        setTransitionStyle(initialData.transition_style || 'fade')
+        setLanguage(initialData.language || 'pt')
+        setVoice(initialData.voice || 'pt-BR-FranciscaNeural')
       } else {
         setName(`Template: ${video?.title?.slice(0, 30)}...` || "Novo Template")
         setEngineMode('local')
@@ -532,6 +544,12 @@ export function TemplateConfigDialog({
         render_model: renderModel,
         post_frequency: frequency, post_days: postDays, post_interval_days: 1,
         post_times: postTimes, is_active: true, target_accounts: selectedAccounts, tags: [],
+        // Dual-Engine (render_engine is auto-decided by n8n)
+        caption_style: captionStyle,
+        animation_mix: animationMix,
+        transition_style: transitionStyle,
+        language,
+        voice,
       }
       const result = isEdit
         ? await (await import("@/app/actions")).updateRemodelingTemplateAction(initialData.id, payload)
@@ -694,6 +712,130 @@ export function TemplateConfigDialog({
                 <p className="text-sm text-muted-foreground">
                   Escolha entre o servidor local (APIs Diretas + Remotion VPS) ou a API do Kie.ai.
                 </p>
+              </div>
+
+              {/* ── CAPTION & ANIMATION SECTION ── */}
+              <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 mb-4">
+                <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
+                  <span className="text-base">🎞️</span> Estilo Visual
+                  <span className="text-xs font-normal text-muted-foreground ml-1">(o motor é escolhido automaticamente)</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Estilo de Legenda</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([
+                        { value: 'pop', label: 'Pop', desc: 'MrBeast style' },
+                        { value: 'karaoke', label: 'Karaoke', desc: 'Ilumina palavra' },
+                        { value: 'subtitle', label: 'Legenda', desc: 'Linha clássica' },
+                      ] as const).map(opt => (
+                        <button key={opt.value} type="button"
+                          onClick={() => setCaptionStyle(opt.value)}
+                          className={cn(
+                            "p-2 rounded-lg text-xs font-bold transition-all border flex flex-col items-center gap-0.5",
+                            captionStyle === opt.value
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border/50 text-muted-foreground hover:bg-secondary/60"
+                          )}
+                        >
+                          <span>{opt.label}</span>
+                          <span className="font-normal opacity-70 text-[10px]">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Animação de Imagem</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([
+                        { value: 'varied', label: 'Variado', desc: 'Recomendado' },
+                        { value: 'kenburns', label: 'Ken Burns', desc: 'Zoom suave' },
+                        { value: 'zoom-punch', label: 'Zoom', desc: 'Dramático' },
+                      ] as const).map(opt => (
+                        <button key={opt.value} type="button"
+                          onClick={() => setAnimationMix(opt.value)}
+                          className={cn(
+                            "p-2 rounded-lg text-xs font-bold transition-all border flex flex-col items-center gap-0.5",
+                            animationMix === opt.value
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "border-border/50 text-muted-foreground hover:bg-secondary/60"
+                          )}
+                        >
+                          <span>{opt.label}</span>
+                          <span className="font-normal opacity-70 text-[10px]">{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Language + Voice */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Idioma do Vídeo</label>
+                    <select
+                      value={language}
+                      onChange={e => {
+                        const lang = e.target.value
+                        setLanguage(lang)
+                        const defaults: Record<string, string> = {
+                          'pt': 'pt-BR-FranciscaNeural',
+                          'en': 'en-US-JennyNeural',
+                          'es': 'es-ES-ElviraNeural',
+                          'de': 'de-DE-KatjaNeural',
+                          'fr': 'fr-FR-DeniseNeural',
+                          'ja': 'ja-JP-NanamiNeural',
+                        }
+                        if (defaults[lang]) setVoice(defaults[lang])
+                      }}
+                      className="w-full h-9 rounded-lg border border-border/60 bg-background px-3 text-sm"
+                    >
+                      <option value="pt">🇧🇷 Português (BR)</option>
+                      <option value="en">🇺🇸 English (US)</option>
+                      <option value="es">🇪🇸 Español</option>
+                      <option value="de">🇩🇪 Deutsch</option>
+                      <option value="fr">🇫🇷 Français</option>
+                      <option value="ja">🇯🇵 日本語</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Voz (Edge-TTS)</label>
+                    <select
+                      value={voice}
+                      onChange={e => setVoice(e.target.value)}
+                      className="w-full h-9 rounded-lg border border-border/60 bg-background px-3 text-sm"
+                    >
+                      {language === 'pt' && (<>
+                        <option value="pt-BR-FranciscaNeural">Francisca (Feminina)</option>
+                        <option value="pt-BR-AntonioNeural">Antonio (Masculino)</option>
+                        <option value="pt-PT-DuarteNeural">Duarte PT (Masculino)</option>
+                      </>)}
+                      {language === 'en' && (<>
+                        <option value="en-US-JennyNeural">Jenny (Feminina)</option>
+                        <option value="en-US-GuyNeural">Guy (Masculino)</option>
+                        <option value="en-GB-SoniaNeural">Sonia GB (Feminina)</option>
+                      </>)}
+                      {language === 'es' && (<>
+                        <option value="es-ES-ElviraNeural">Elvira (Feminina)</option>
+                        <option value="es-ES-AlvaroNeural">Álvaro (Masculino)</option>
+                      </>)}
+                      {language === 'de' && (<>
+                        <option value="de-DE-KatjaNeural">Katja (Feminina)</option>
+                        <option value="de-DE-ConradNeural">Conrad (Masculino)</option>
+                      </>)}
+                      {language === 'fr' && (<>
+                        <option value="fr-FR-DeniseNeural">Denise (Feminina)</option>
+                        <option value="fr-FR-HenriNeural">Henri (Masculino)</option>
+                      </>)}
+                      {language === 'ja' && (<>
+                        <option value="ja-JP-NanamiNeural">Nanami (Feminina)</option>
+                        <option value="ja-JP-KeitaNeural">Keita (Masculino)</option>
+                      </>)}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Mode Selector Toggle */}

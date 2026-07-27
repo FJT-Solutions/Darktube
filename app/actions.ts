@@ -890,8 +890,15 @@ export async function sendToN8NAction(templateId: string) {
                 voice_model: template.voice_model || 'edge-tts-docker',
                 music_model: template.music_model || 'suno-v4',
                 render_model: template.render_model || 'remotion-engine',
-                voice: template.voice_type,
-                voice_language: template.voice_language || 'pt-BR',
+                // ── Dual-Engine ──
+                render_engine: template.render_engine || 'remotion',
+                caption_style: template.caption_style || 'pop',
+                animation_mix: template.animation_mix || 'varied',
+                transition_style: template.transition_style || 'fade',
+                language: template.language || 'pt',
+                voice: template.voice || template.voice_type || 'pt-BR-FranciscaNeural',
+                voice_language: template.voice_language || template.language || 'pt-BR',
+                // ──
                 has_music: template.has_music,
                 music_style: template.music_style,
                 post_frequency: template.post_frequency,

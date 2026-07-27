@@ -1,0 +1,17 @@
+{
+  "name": "hyperframes-service",
+  "version": "1.0.0",
+  "description": "HyperFrames cinematic video rendering service for Darktube",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "hyperframes": "latest"
+  }
+}

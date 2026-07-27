@@ -415,6 +415,13 @@ export interface RemodelingTemplateEntity {
     post_days?: string[];
     created_at: string;
     updated_at: string;
+    // ── Dual-Engine fields ──
+    render_engine?: 'remotion' | 'hyperframes' | 'auto';
+    caption_style?: 'pop' | 'karaoke' | 'subtitle';
+    animation_mix?: 'varied' | 'kenburns' | 'zoom-punch';
+    transition_style?: 'fade' | 'slide-up' | 'zoom-in';
+    language?: string;        // 'pt', 'en', 'es', etc.
+    voice?: string;           // Edge-TTS voice, e.g. 'pt-BR-FranciscaNeural'
 }
 
 export interface ProductionHistoryEntity {
@@ -431,22 +438,34 @@ export async function saveRemodelingTemplate(
     userId: string,
     data: Omit<RemodelingTemplateEntity, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<RemodelingTemplateEntity> {
+    // Garantir colunas existem (idempotente)
     await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS thumbnail_model TEXT;`);
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS render_engine TEXT DEFAULT 'remotion';`);
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS caption_style TEXT DEFAULT 'pop';`);
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS animation_mix TEXT DEFAULT 'varied';`);
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS transition_style TEXT DEFAULT 'fade';`);
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'pt';`);
+    await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS voice TEXT;`);
+
     const { rows } = await pool.query(`
         INSERT INTO public.remodeling_templates (
             user_id, video_id, video_title, video_thumbnail, name, template_data, generated_script,
             format, has_music, music_style, voice_type, post_frequency, post_interval_days,
             post_times, is_active, target_accounts, tags, image_model, video_model,
-            music_model, voice_model, voice_language, thumbnail_model
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+            music_model, voice_model, voice_language, thumbnail_model,
+            render_engine, caption_style, animation_mix, transition_style, language, voice
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
         RETURNING *
     `, [
         userId, data.video_id, data.video_title || null, data.video_thumbnail || null, data.name,
         data.template_data, data.generated_script || null, data.format, data.has_music || false,
         data.music_style || null, data.voice_type || null, data.post_frequency, data.post_interval_days || null,
         data.post_times || [], data.is_active !== false, data.target_accounts || [], data.tags || [],
-        data.image_model, data.video_model, data.music_model || null, data.voice_model || null, data.voice_language || null,
-        data.thumbnail_model || data.image_model || null
+        data.image_model, data.video_model, data.music_model || null, data.voice_model || null,
+        data.voice_language || null, data.thumbnail_model || data.image_model || null,
+        data.render_engine || 'remotion', data.caption_style || 'pop',
+        data.animation_mix || 'varied', data.transition_style || 'fade',
+        data.language || 'pt', data.voice || null
     ])
     
     return rows[0]
