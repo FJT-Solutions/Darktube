@@ -18,7 +18,7 @@ wf = {
     },
     {
       "parameters": {
-        "jsCode": """// ── Normaliza payload e DECIDE o motor automaticamente ──
+        "jsCode": """// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──
 const body = $input.item.json.body || $input.item.json;
 const tpl  = body.template || {};
 
@@ -29,13 +29,21 @@ const language     = tpl.language     || 'pt';
 const voice        = tpl.voice        || 'pt-BR-FranciscaNeural';
 const format       = tpl.format       || 'vertical';
 
-// Decisão automática do motor
 const renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')
   ? 'remotion'
   : 'hyperframes';
 
-return [{
+const rawSegments = tpl.script_segments || body.script_segments || [];
+const segments = rawSegments.length > 0 ? rawSegments : [{
+  index: 0,
+  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },
+  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }
+}];
+
+return segments.map((seg, idx) => ({
   json: {
+    ...seg,
+    index: seg.index !== undefined ? seg.index : idx,
     session_id:     sessionId,
     render_engine:  renderEngine,
     caption_style:  captionStyle,
@@ -47,10 +55,9 @@ return [{
     primary_color:  tpl.primary_color  || '#EAB308',
     accent_color:   tpl.accent_color   || '#FFFFFF',
     watermark_text: tpl.watermark_text || 'DarkTube AI',
-    script_segments: tpl.script_segments || [],
     tpl
   }
-}];""",
+}));""",
         "options": {}
       },
       "name": "Normalize + Auto Engine",
@@ -73,13 +80,11 @@ return [{
     {
       "parameters": {
         "jsCode": """// ── Geração / Resolução de Imagem da Cena ──
-const norm    = $('Normalize + Auto Engine').item.json;
-const segment = $('Loop Over Items').item.json;
-const tpl     = norm.tpl || {};
+const norm = $json;
+const tpl  = norm.tpl || {};
 
-// 1. Se o segmento possui imagem própria enviada pelo usuário (Upload Manual)
-const visual = segment.visual_content || {};
-const providedUrl = segment.image_url || segment.media_url || segment.custom_image || visual.image_url;
+const visual = norm.visual_content || {};
+const providedUrl = norm.image_url || norm.media_url || norm.custom_image || visual.image_url;
 
 let imageUrl;
 let source;
@@ -97,7 +102,7 @@ if (providedUrl) {
 
 return [{
   json: {
-    ...segment,
+    ...norm,
     image_url: imageUrl,
     source: source
   }
@@ -118,9 +123,9 @@ return [{
         "specifyBody": "json",
         "jsonBody": """={
   "model": "tts-1",
-  "input": "{{ $('Loop Over Items').item.json.voiceover?.text || $('Loop Over Items').item.json.voiceover_text || $('Loop Over Items').item.json.voiceoverText || $('Loop Over Items').item.json.text || $json.voiceover?.text || $json.voiceover_text || $json.text }}",
-  "voice": "{{ $('Normalize + Auto Engine').item.json.voice }}",
-  "language": "{{ $('Normalize + Auto Engine').item.json.language }}",
+  "input": "{{ $json.voiceover?.text || $json.voiceover_text || $json.voiceoverText || $json.text }}",
+  "voice": "{{ $json.voice }}",
+  "language": "{{ $json.language }}",
   "speed": 1.0,
   "response_format": "mp3"
 }""",
@@ -160,7 +165,7 @@ return [{
             },
             {
               "name": "language",
-              "value": "={{ $('Normalize + Auto Engine').item.json.language }}"
+              "value": "={{ $('Normalize + Auto Engine').first().json.language }}"
             }
           ]
         },
@@ -175,9 +180,7 @@ return [{
     {
       "parameters": {
         "jsCode": """// ── Monta SceneSegment completo ──
-const norm    = $('Normalize + Auto Engine').item.json;
-const segment = $('Loop Over Items').item.json;
-const imgRes  = $('Generate Scene Image').item.json;
+const segment = $('Generate Scene Image').item.json;
 const ttsRes  = $('Generate TTS').item.json;
 const wRes    = $('Whisper Word Timestamps').item.json;
 
@@ -187,9 +190,7 @@ const visual    = segment.visual_content || {};
 const imageUrl = segment.image_url
   || segment.media_url
   || visual.image_url
-  || imgRes.image_url
-  || imgRes.url
-  || norm.tpl.video_thumbnail
+  || segment.tpl?.video_thumbnail
   || '';
 
 const audioUrl = segment.audio_url || ttsRes.audio_url || ttsRes.url || '';
@@ -210,10 +211,10 @@ const duration = wRes.duration
   })();
 
 const ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];
-const idx = parseInt(segment.index || segment.id || 0);
+const idx = parseInt(segment.index || 0);
 let animationStyle;
-if (norm.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';
-else if (norm.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';
+if (segment.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';
+else if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';
 else animationStyle = ALL_STYLES[idx % ALL_STYLES.length];
 
 return [{
@@ -240,7 +241,7 @@ return [{
       "parameters": {
         "jsCode": """// ── Agrega todas as cenas geradas pelo loop ──
 const norm = $('Normalize + Auto Engine').first().json;
-const tpl  = norm.tpl;
+const tpl  = norm.tpl || {};
 
 const scenes = $input.all()
   .map(item => item.json)
@@ -433,11 +434,11 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
-  "template_id":   "{{ $('Normalize + Auto Engine').item.json.tpl.id }}",
-  "session_id":    "{{ $('Normalize + Auto Engine').item.json.session_id }}",
-  "render_engine": "{{ $('Normalize + Auto Engine').item.json.render_engine }}",
-  "video_url":     "{{ $('Wait Render').item.json.video_url }}",
-  "thumbnail_url": "{{ $('Generate Thumbnail').item.json.image_url || '' }}",
+  "template_id":   "{{ $('Normalize + Auto Engine').first().json.tpl.id }}",
+  "session_id":    "{{ $('Normalize + Auto Engine').first().json.session_id }}",
+  "render_engine": "{{ $('Normalize + Auto Engine').first().json.render_engine }}",
+  "video_url":     "{{ $('Wait Render').first().json.video_url }}",
+  "thumbnail_url": "{{ $('Generate Thumbnail').first().json.image_url || '' }}",
   "status":        "completed"
 }""",
         "options": {}
@@ -509,4 +510,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with method POST and preserved segment properties!')
+print('Updated public/n8n-darktube-workflow.json with segment item splitting!')
