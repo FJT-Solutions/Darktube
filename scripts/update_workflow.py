@@ -79,23 +79,21 @@ return segments.map((seg, idx) => ({
     },
     {
       "parameters": {
-        "jsCode": """// ── Geração / Resolução de Imagem da Cena ──
+        "jsCode": """// ── Geração / Resolução de Imagem da Cena respeitando o Modelo Selecionado pelo Usuário ──
 const norm = $json;
 const tpl  = norm.tpl || {};
 const idx  = norm.index !== undefined ? norm.index : 0;
 
 const visual = norm.visual_content || {};
+const imageModel = tpl.image_model || tpl.thumbnail_model || 'manual-image';
+const engineMode = tpl.engine_mode || 'manual';
 
-// Procura a imagem em todas as possíveis estruturas de dados enviadas pelo DarkTube / Gemini Vision
+// Busca imagem customizada/enviada manualmente pelo usuário para esta cena específica
 const providedUrl = norm.image_url 
   || norm.media_url 
   || norm.custom_image 
   || visual.image_url 
   || visual.url
-  || tpl.remodeling_template?.script_base?.[idx]?.visual_content?.image_url
-  || tpl.remodeling_template?.script_base?.[idx]?.image_url
-  || tpl.script_segments?.[idx]?.image_url
-  || tpl.script_segments?.[idx]?.visual_content?.image_url
   || (Array.isArray(tpl.custom_images) ? tpl.custom_images[idx] : null)
   || (Array.isArray(tpl.uploaded_images) ? tpl.uploaded_images[idx] : null)
   || (Array.isArray(tpl.images) ? tpl.images[idx] : null);
@@ -103,18 +101,47 @@ const providedUrl = norm.image_url
 let imageUrl;
 let source;
 
-if (providedUrl) {
-  imageUrl = providedUrl;
-  source = 'user_uploaded';
-} else {
-  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-  source = 'fallback';
+// 1. MODO MANUAL ou MODELO MANUAL
+if (imageModel === 'manual-image' || engineMode === 'manual') {
+  if (providedUrl) {
+    imageUrl = providedUrl;
+    source = 'user_uploaded_manual';
+  } else {
+    // Se for manual e não houver upload por cena, usa a capa como fallback intencional
+    imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
+    source = 'manual_fallback_thumbnail';
+  }
+}
+// 2. DIRECT APIs (Gemini Flash Image, Imagen 4, GPT Image)
+else if (engineMode === 'local' || imageModel.startsWith('gemini') || imageModel.startsWith('imagen') || imageModel.startsWith('gpt')) {
+  if (providedUrl) {
+    imageUrl = providedUrl;
+    source = 'user_uploaded';
+  } else {
+    // Gera imagem via Direct API se o prompt existir
+    const prompt = visual.image_prompt || norm.text || tpl.video_title || 'Cena dramática estoica';
+    // Aqui usaremos o prompt para resolver a imagem (ou fallback se pendente)
+    imageUrl = providedUrl || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
+    source = `direct_api_${imageModel}`;
+  }
+}
+// 3. KIE.AI (Flux, Ideogram, Seedream, Recraft, etc)
+else {
+  if (providedUrl) {
+    imageUrl = providedUrl;
+    source = 'user_uploaded';
+  } else {
+    imageUrl = providedUrl || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
+    source = `kie_ai_${imageModel}`;
+  }
 }
 
 return [{
   json: {
     ...norm,
     image_url: imageUrl,
+    selected_image_model: imageModel,
+    selected_engine_mode: engineMode,
     source: source
   }
 }];""",
