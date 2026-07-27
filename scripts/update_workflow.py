@@ -82,9 +82,23 @@ return segments.map((seg, idx) => ({
         "jsCode": """// ── Geração / Resolução de Imagem da Cena ──
 const norm = $json;
 const tpl  = norm.tpl || {};
+const idx  = norm.index !== undefined ? norm.index : 0;
 
 const visual = norm.visual_content || {};
-const providedUrl = norm.image_url || norm.media_url || norm.custom_image || visual.image_url;
+
+// Procura a imagem em todas as possíveis estruturas de dados enviadas pelo DarkTube / Gemini Vision
+const providedUrl = norm.image_url 
+  || norm.media_url 
+  || norm.custom_image 
+  || visual.image_url 
+  || visual.url
+  || tpl.remodeling_template?.script_base?.[idx]?.visual_content?.image_url
+  || tpl.remodeling_template?.script_base?.[idx]?.image_url
+  || tpl.script_segments?.[idx]?.image_url
+  || tpl.script_segments?.[idx]?.visual_content?.image_url
+  || (Array.isArray(tpl.custom_images) ? tpl.custom_images[idx] : null)
+  || (Array.isArray(tpl.uploaded_images) ? tpl.uploaded_images[idx] : null)
+  || (Array.isArray(tpl.images) ? tpl.images[idx] : null);
 
 let imageUrl;
 let source;
@@ -92,12 +106,9 @@ let source;
 if (providedUrl) {
   imageUrl = providedUrl;
   source = 'user_uploaded';
-} else if (tpl.engine_mode === 'manual' || tpl.image_model === 'manual-image') {
-  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-  source = 'manual_fallback';
 } else {
   imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-  source = 'ai_fallback';
+  source = 'fallback';
 }
 
 return [{
@@ -283,23 +294,7 @@ return [{
       "position": [880, 1680],
       "id": "d6c6475c-de83-4484-bf2d-d6b758e35fab"
     },
-    {
-      "parameters": {
-        "jsCode": """// ── Geração da Capa / Thumbnail HD ──
-const norm = $('Normalize + Auto Engine').first().json;
-const tpl  = norm.tpl || {};
 
-const thumbUrl = tpl.thumbnail_url || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-
-return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
-        "options": {}
-      },
-      "name": "Generate Thumbnail",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1104, 1776],
-      "id": "74cbe82e-5654-477e-b903-e04e6bf844a2"
-    },
     {
       "parameters": {
         "rules": {
@@ -488,8 +483,7 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
     "Aggregate Scenes": {
       "main": [
         [
-          {"node": "Route to Engine", "type": "main", "index": 0},
-          {"node": "Generate Thumbnail", "type": "main", "index": 0}
+          {"node": "Route to Engine", "type": "main", "index": 0}
         ]
       ]
     },

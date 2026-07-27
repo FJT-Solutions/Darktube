@@ -47,7 +47,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Gera\u00e7\u00e3o / Resolu\u00e7\u00e3o de Imagem da Cena \u2500\u2500\nconst norm = $json;\nconst tpl  = norm.tpl || {};\n\nconst visual = norm.visual_content || {};\nconst providedUrl = norm.image_url || norm.media_url || norm.custom_image || visual.image_url;\n\nlet imageUrl;\nlet source;\n\nif (providedUrl) {\n  imageUrl = providedUrl;\n  source = 'user_uploaded';\n} else if (tpl.engine_mode === 'manual' || tpl.image_model === 'manual-image') {\n  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';\n  source = 'manual_fallback';\n} else {\n  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';\n  source = 'ai_fallback';\n}\n\nreturn [{\n  json: {\n    ...norm,\n    image_url: imageUrl,\n    source: source\n  }\n}];",
+        "jsCode": "// \u2500\u2500 Gera\u00e7\u00e3o / Resolu\u00e7\u00e3o de Imagem da Cena \u2500\u2500\nconst norm = $json;\nconst tpl  = norm.tpl || {};\nconst idx  = norm.index !== undefined ? norm.index : 0;\n\nconst visual = norm.visual_content || {};\n\n// Procura a imagem em todas as poss\u00edveis estruturas de dados enviadas pelo DarkTube / Gemini Vision\nconst providedUrl = norm.image_url \n  || norm.media_url \n  || norm.custom_image \n  || visual.image_url \n  || visual.url\n  || tpl.remodeling_template?.script_base?.[idx]?.visual_content?.image_url\n  || tpl.remodeling_template?.script_base?.[idx]?.image_url\n  || tpl.script_segments?.[idx]?.image_url\n  || tpl.script_segments?.[idx]?.visual_content?.image_url\n  || (Array.isArray(tpl.custom_images) ? tpl.custom_images[idx] : null)\n  || (Array.isArray(tpl.uploaded_images) ? tpl.uploaded_images[idx] : null)\n  || (Array.isArray(tpl.images) ? tpl.images[idx] : null);\n\nlet imageUrl;\nlet source;\n\nif (providedUrl) {\n  imageUrl = providedUrl;\n  source = 'user_uploaded';\n} else {\n  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';\n  source = 'fallback';\n}\n\nreturn [{\n  json: {\n    ...norm,\n    image_url: imageUrl,\n    source: source\n  }\n}];",
         "options": {}
       },
       "name": "Generate Scene Image",
@@ -151,20 +151,6 @@
         1680
       ],
       "id": "d6c6475c-de83-4484-bf2d-d6b758e35fab"
-    },
-    {
-      "parameters": {
-        "jsCode": "// \u2500\u2500 Gera\u00e7\u00e3o da Capa / Thumbnail HD \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst thumbUrl = tpl.thumbnail_url || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';\n\nreturn [{ json: { image_url: thumbUrl, url: thumbUrl } }];",
-        "options": {}
-      },
-      "name": "Generate Thumbnail",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1104,
-        1776
-      ],
-      "id": "74cbe82e-5654-477e-b903-e04e6bf844a2"
     },
     {
       "parameters": {
@@ -407,11 +393,6 @@
         [
           {
             "node": "Route to Engine",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Generate Thumbnail",
             "type": "main",
             "index": 0
           }
