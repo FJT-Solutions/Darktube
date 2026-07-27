@@ -569,13 +569,13 @@ export async function getProductionHistory(templateId: string): Promise<Producti
 }
 
 export async function getAllRecentProductionHistory(limit: number = 20): Promise<ProductionHistoryEntity[]> {
-    // Auto-cleanup items stuck in pending status for over 15 minutes
+    // Auto-cleanup items stuck in pending status for over 2 hours (120 min) as a safety net
     try {
         await pool.query(
             `UPDATE public.remodeling_history
              SET status = 'failed'
              WHERE status IN ('sent', 'sent_auto', 'processing', 'rendering')
-               AND dispatched_at < NOW() - INTERVAL '15 minutes'`
+               AND dispatched_at < NOW() - INTERVAL '2 hours'`
         )
     } catch (e) {
         console.warn("Could not auto-cleanup stuck productions:", e)
