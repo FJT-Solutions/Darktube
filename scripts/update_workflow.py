@@ -403,6 +403,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
     {
       "parameters": {
         "resume": "webhook",
+        "httpMethod": "POST",
         "options": {
           "webhookSuffix": "darktube-render-complete"
         }
@@ -423,10 +424,10 @@ const waitRes = $('Wait Render').first().json;
 
 const accounts = tpl.target_accounts || [];
 if (accounts.length === 0) {
-  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || '' } }];
+  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || waitRes.videoUrl || '' } }];
 }
 
-return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || '' } }];""",
+return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || waitRes.videoUrl || '' } }];""",
         "options": {}
       },
       "name": "Auto-Post Blotato",
@@ -520,4 +521,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with n8n webhook-waiting callback URL!')
+print('Updated public/n8n-darktube-workflow.json with httpMethod POST on Wait Render!')

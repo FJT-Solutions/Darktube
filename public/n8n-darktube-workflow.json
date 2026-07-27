@@ -270,6 +270,7 @@
     {
       "parameters": {
         "resume": "webhook",
+        "httpMethod": "POST",
         "options": {
           "webhookSuffix": "darktube-render-complete"
         }
@@ -286,7 +287,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Auto-Post Blotato (Publica\u00e7\u00e3o Social) \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\nconst waitRes = $('Wait Render').first().json;\n\nconst accounts = tpl.target_accounts || [];\nif (accounts.length === 0) {\n  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || '' } }];\n}\n\nreturn [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || '' } }];",
+        "jsCode": "// \u2500\u2500 Auto-Post Blotato (Publica\u00e7\u00e3o Social) \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\nconst waitRes = $('Wait Render').first().json;\n\nconst accounts = tpl.target_accounts || [];\nif (accounts.length === 0) {\n  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || waitRes.videoUrl || '' } }];\n}\n\nreturn [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || waitRes.videoUrl || '' } }];",
         "options": {}
       },
       "name": "Auto-Post Blotato",
