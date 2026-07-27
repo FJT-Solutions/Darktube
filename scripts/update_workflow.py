@@ -1,7 +1,7 @@
 import json
 
 wf = {
-  "name": "Darktube — Dual Engine Video Production v2",
+  "name": "Darktube",
   "nodes": [
     {
       "parameters": {
@@ -61,6 +61,7 @@ return [{
     },
     {
       "parameters": {
+        "batchSize": 1,
         "options": {}
       },
       "name": "Loop Over Items",
@@ -79,19 +80,28 @@ const tpl     = norm.tpl || {};
 // 1. Se o segmento possui imagem própria enviada pelo usuário (Upload Manual)
 const visual = segment.visual_content || {};
 const providedUrl = segment.image_url || segment.media_url || segment.custom_image || visual.image_url;
+
+let imageUrl;
+let source;
+
 if (providedUrl) {
-  return [{ json: { image_url: providedUrl, source: 'user_uploaded' } }];
+  imageUrl = providedUrl;
+  source = 'user_uploaded';
+} else if (tpl.engine_mode === 'manual' || tpl.image_model === 'manual-image') {
+  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
+  source = 'manual_fallback';
+} else {
+  imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
+  source = 'ai_fallback';
 }
 
-// 2. Se for modo manual ou modelo manual
-if (tpl.engine_mode === 'manual' || tpl.image_model === 'manual-image') {
-  const fallbackUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-  return [{ json: { image_url: fallbackUrl, source: 'manual_fallback' } }];
-}
-
-// 3. Fallback de segurança para imagem
-const defaultImg = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-return [{ json: { image_url: defaultImg, source: 'ai_fallback' } }];""",
+return [{
+  json: {
+    ...segment,
+    image_url: imageUrl,
+    source: source
+  }
+}];""",
         "options": {}
       },
       "name": "Generate Scene Image",
@@ -102,12 +112,13 @@ return [{ json: { image_url: defaultImg, source: 'ai_fallback' } }];""",
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://edge-tts.fjt-solutions.com/v1/audio/speech",
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
   "model": "tts-1",
-  "input": "{{ $json.voiceover?.text || $json.voiceover_text || $json.voiceoverText || $json.text }}",
+  "input": "{{ $('Loop Over Items').item.json.voiceover?.text || $('Loop Over Items').item.json.voiceover_text || $('Loop Over Items').item.json.voiceoverText || $('Loop Over Items').item.json.text || $json.voiceover?.text || $json.voiceover_text || $json.text }}",
   "voice": "{{ $('Normalize + Auto Engine').item.json.voice }}",
   "language": "{{ $('Normalize + Auto Engine').item.json.language }}",
   "speed": 1.0,
@@ -123,11 +134,12 @@ return [{ json: { image_url: defaultImg, source: 'ai_fallback' } }];""",
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://whisper.fjt-solutions.com/v1/audio/transcriptions",
         "sendBody": True,
         "contentType": "multipart-form-data",
         "bodyParameters": {
-          "parameter": [
+          "parameters": [
             {
               "name": "file",
               "value": "={{ $json.data }}",
@@ -341,6 +353,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://remotion.fjt-solutions.com/render",
         "sendBody": True,
         "specifyBody": "json",
@@ -360,6 +373,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://hyperframes.fjt-solutions.com/render",
         "sendBody": True,
         "specifyBody": "json",
@@ -414,6 +428,7 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
         "sendBody": True,
         "specifyBody": "json",
@@ -494,4 +509,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with perfect syntax!')
+print('Updated public/n8n-darktube-workflow.json with method POST and preserved segment properties!')
