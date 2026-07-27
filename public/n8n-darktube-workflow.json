@@ -1,6 +1,6 @@
 {
   "id": "darktube-dual-engine-v2",
-  "name": "Darktube — Dual Engine Video Production v2",
+  "name": "Darktube \u2014 Dual Engine Video Production v2",
   "nodes": [
     {
       "parameters": {
@@ -12,16 +12,23 @@
       "name": "Webhook Darktube",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [240, 360]
+      "position": [
+        240,
+        360
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// ── Normaliza payload e DECIDE o motor automaticamente ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst voice        = tpl.voice        || 'pt-BR-FranciscaNeural';\nconst format       = tpl.format       || 'vertical';\n\n// Decisão automática do motor\nconst renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')\n  ? 'remotion'\n  : 'hyperframes';\n\nreturn [{\n  json: {\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    script_segments: tpl.script_segments || [],\n    tpl\n  }\n}];"
+        "jsCode": "// \u2500\u2500 Normaliza payload e DECIDE o motor automaticamente \u2500\u2500\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst voice        = tpl.voice        || 'pt-BR-FranciscaNeural';\nconst format       = tpl.format       || 'vertical';\n\n// Decis\u00e3o autom\u00e1tica do motor\nconst renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')\n  ? 'remotion'\n  : 'hyperframes';\n\nreturn [{\n  json: {\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    script_segments: tpl.script_segments || [],\n    tpl\n  }\n}];",
+        "options": {}
       },
       "name": "Normalize + Auto Engine",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [480, 360]
+      "position": [
+        480,
+        360
+      ]
     },
     {
       "parameters": {
@@ -31,7 +38,10 @@
       "name": "Split Segments",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 1,
-      "position": [720, 360]
+      "position": [
+        720,
+        360
+      ]
     },
     {
       "parameters": {
@@ -44,7 +54,10 @@
       "name": "Generate Scene Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [960, 260]
+      "position": [
+        960,
+        260
+      ]
     },
     {
       "parameters": {
@@ -57,7 +70,10 @@
       "name": "Generate TTS",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1200, 260]
+      "position": [
+        1200,
+        260
+      ]
     },
     {
       "parameters": {
@@ -66,11 +82,27 @@
         "contentType": "multipart-form-data",
         "bodyParameters": {
           "parameters": [
-            { "name": "file",                      "value": "={{ $json.data }}", "parameterType": "formBinaryData" },
-            { "name": "model",                     "value": "Systran/faster-whisper-small" },
-            { "name": "response_format",           "value": "verbose_json" },
-            { "name": "timestamp_granularities[]", "value": "word" },
-            { "name": "language",                  "value": "={{ $('Normalize + Auto Engine').item.json.language }}" }
+            {
+              "name": "file",
+              "value": "={{ $json.data }}",
+              "parameterType": "formBinaryData"
+            },
+            {
+              "name": "model",
+              "value": "Systran/faster-whisper-small"
+            },
+            {
+              "name": "response_format",
+              "value": "verbose_json"
+            },
+            {
+              "name": "timestamp_granularities[]",
+              "value": "word"
+            },
+            {
+              "name": "language",
+              "value": "={{ $('Normalize + Auto Engine').item.json.language }}"
+            }
           ]
         },
         "options": {}
@@ -78,25 +110,36 @@
       "name": "Whisper Word Timestamps",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 260]
+      "position": [
+        1440,
+        260
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// ── Monta SceneSegment completo ──\nconst norm    = $('Normalize + Auto Engine').item.json;\nconst segment = $('Split Segments').item.json;\nconst imgRes  = $('Generate Scene Image').item.json;\nconst ttsRes  = $('Generate TTS').item.json;\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst imageUrl = imgRes.image_url || imgRes.url || imgRes.data?.[0]?.url || '';\nconst audioUrl = ttsRes.audio_url || ttsRes.url || '';\n\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\nconst duration = wRes.duration\n  || (() => {\n    const ts = segment.timestamp || '';\n    const parts = ts.split('-');\n    const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n    return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n  })();\n\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nconst idx = parseInt(segment.index || segment.id || 0);\nlet animationStyle;\nif (norm.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (norm.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText:    segment.voiceover_text || segment.voiceoverText || segment.text || '',\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade'\n  }\n}];"
+        "jsCode": "// \u2500\u2500 Monta SceneSegment completo \u2500\u2500\nconst norm    = $('Normalize + Auto Engine').item.json;\nconst segment = $('Split Segments').item.json;\nconst imgRes  = $('Generate Scene Image').item.json;\nconst ttsRes  = $('Generate TTS').item.json;\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst imageUrl = imgRes.image_url || imgRes.url || imgRes.data?.[0]?.url || '';\nconst audioUrl = ttsRes.audio_url || ttsRes.url || '';\n\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\nconst duration = wRes.duration\n  || (() => {\n    const ts = segment.timestamp || '';\n    const parts = ts.split('-');\n    const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n    return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n  })();\n\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nconst idx = parseInt(segment.index || segment.id || 0);\nlet animationStyle;\nif (norm.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (norm.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText:    segment.voiceover_text || segment.voiceoverText || segment.text || '',\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade'\n  }\n}];",
+        "options": {}
       },
       "name": "Build Scene",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1680, 260]
+      "position": [
+        1680,
+        260
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// ── Agrega todas as cenas geradas pelo loop ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl;\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst baseCallback = `https://darktube.fjt-solutions.com/api/webhooks/render-complete`;\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     true,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];"
+        "jsCode": "// \u2500\u2500 Agrega todas as cenas geradas pelo loop \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl;\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst baseCallback = `https://darktube.fjt-solutions.com/api/webhooks/render-complete`;\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     true,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];",
+        "options": {}
       },
       "name": "Aggregate Scenes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [960, 520]
+      "position": [
+        960,
+        520
+      ]
     },
     {
       "parameters": {
@@ -129,12 +172,16 @@
               "outputKey": "Hyperframes"
             }
           ]
-        }
+        },
+        "options": {}
       },
       "name": "Route to Engine",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 1,
-      "position": [1200, 520]
+      "position": [
+        1200,
+        520
+      ]
     },
     {
       "parameters": {
@@ -147,7 +194,10 @@
       "name": "Remotion Render",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 440]
+      "position": [
+        1440,
+        440
+      ]
     },
     {
       "parameters": {
@@ -160,7 +210,10 @@
       "name": "Hyperframes Render",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 620]
+      "position": [
+        1440,
+        620
+      ]
     },
     {
       "parameters": {
@@ -173,7 +226,10 @@
       "name": "Generate Thumbnail",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1440, 800]
+      "position": [
+        1440,
+        800
+      ]
     },
     {
       "parameters": {
@@ -185,7 +241,10 @@
       "name": "Wait Render",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1680, 520],
+      "position": [
+        1680,
+        520
+      ],
       "webhookId": "darktube-render-complete"
     },
     {
@@ -201,7 +260,10 @@
       "name": "Auto-Post Blotato",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [1920, 520]
+      "position": [
+        1920,
+        520
+      ]
     },
     {
       "parameters": {
@@ -214,60 +276,177 @@
       "name": "Callback DarkTube",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
-      "position": [2160, 520]
+      "position": [
+        2160,
+        520
+      ]
     }
   ],
-
   "connections": {
     "Webhook Darktube": {
-      "main": [[{ "node": "Normalize + Auto Engine", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Normalize + Auto Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Normalize + Auto Engine": {
-      "main": [[{ "node": "Split Segments", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Segments": {
       "main": [
-        [{ "node": "Generate Scene Image", "type": "main", "index": 0 }],
-        [{ "node": "Aggregate Scenes",     "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Generate Scene Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Generate Scene Image": {
-      "main": [[{ "node": "Generate TTS", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Generate TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Generate TTS": {
-      "main": [[{ "node": "Whisper Word Timestamps", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Whisper Word Timestamps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Whisper Word Timestamps": {
-      "main": [[{ "node": "Build Scene", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Scene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Scene": {
-      "main": [[{ "node": "Split Segments", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate Scenes": {
-      "main": [[
-        { "node": "Route to Engine",   "type": "main", "index": 0 },
-        { "node": "Generate Thumbnail","type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Route to Engine",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Route to Engine": {
       "main": [
-        [{ "node": "Remotion Render",    "type": "main", "index": 0 }],
-        [{ "node": "Hyperframes Render", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Remotion Render",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hyperframes Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Remotion Render": {
-      "main": [[{ "node": "Wait Render", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Hyperframes Render": {
-      "main": [[{ "node": "Wait Render", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait Render": {
-      "main": [[{ "node": "Auto-Post Blotato", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Auto-Post Blotato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Auto-Post Blotato": {
-      "main": [[{ "node": "Callback DarkTube", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Callback DarkTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
