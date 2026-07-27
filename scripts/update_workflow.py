@@ -359,7 +359,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
     {
       "parameters": {
         "method": "POST",
-        "url": "https://remotion.fjt-solutions.com/render",
+        "url": "http://n8n-remotionservice-ry6eh9:3001/render",
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
@@ -381,7 +381,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
     {
       "parameters": {
         "method": "POST",
-        "url": "https://hyperframes.fjt-solutions.com/render",
+        "url": "http://n8n-hyperframesservice-sruzdk:3002/render",
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
@@ -520,4 +520,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with allowUnauthorizedCerts on all HTTP Request nodes!')
+print('Updated public/n8n-darktube-workflow.json with direct internal container endpoints!')

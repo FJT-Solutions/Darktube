@@ -230,7 +230,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://remotion.fjt-solutions.com/render",
+        "url": "http://n8n-remotionservice-ry6eh9:3001/render",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
@@ -250,7 +250,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://hyperframes.fjt-solutions.com/render",
+        "url": "http://n8n-hyperframesservice-sruzdk:3002/render",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
