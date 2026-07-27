@@ -251,7 +251,7 @@ const scenes = $input.all()
   .map(item => item.json)
   .sort((a, b) => a.index - b.index);
 
-const baseCallback = $execution.resumeUrl || `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`;
+const baseCallback = `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`;
 
 const composition = {
   scenes,
@@ -520,4 +520,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with resumeUrl callback!')
+print('Updated public/n8n-darktube-workflow.json with n8n webhook-waiting callback URL!')
