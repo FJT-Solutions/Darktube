@@ -367,7 +367,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
         "jsonBody": """={
   "historyId":   "{{ $json.session_id }}",
   "templateId":  "{{ $json.template_id }}",
-  "callbackUrl": "{{ $json.callback_url }}",
+  "callbackUrl": "{{ $execution.resumeUrl }}",
   "composition": {{ JSON.stringify($json.composition) }}
 }""",
         "options": {
@@ -389,7 +389,7 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
         "jsonBody": """={
   "historyId":   "{{ $json.session_id }}",
   "templateId":  "{{ $json.template_id }}",
-  "callbackUrl": "{{ $json.callback_url }}",
+  "callbackUrl": "{{ $execution.resumeUrl }}",
   "payload":     {{ JSON.stringify($json.composition) }}
 }""",
         "options": {
@@ -523,4 +523,4 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
 with open('public/n8n-darktube-workflow.json', 'w') as f:
     json.dump(wf, f, indent=2)
 
-print('Updated public/n8n-darktube-workflow.json with executionId dynamic resume URL!')
+print('Updated: Render nodes now use $execution.resumeUrl as callbackUrl!')

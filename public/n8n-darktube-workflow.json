@@ -233,7 +233,7 @@
         "url": "http://n8n-remotionservice-ry6eh9:3001/render",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
+        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $execution.resumeUrl }}\",\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
@@ -253,7 +253,7 @@
         "url": "http://n8n-hyperframesservice-sruzdk:3002/render",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $json.callback_url }}\",\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
+        "jsonBody": "={\n  \"historyId\":   \"{{ $json.session_id }}\",\n  \"templateId\":  \"{{ $json.template_id }}\",\n  \"callbackUrl\": \"{{ $execution.resumeUrl }}\",\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
