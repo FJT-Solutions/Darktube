@@ -406,15 +406,12 @@ return [{ json: { image_url: thumbUrl, url: thumbUrl } }];""",
       "parameters": {
         "resume": "webhook",
         "httpMethod": "POST",
-        "options": {
-          "webhookSuffix": "darktube-render-complete"
-        }
+        "options": {}
       },
       "name": "Wait Render",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
       "position": [1552, 1584],
-      "webhookId": "darktube-render-complete",
       "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94"
     },
     {
