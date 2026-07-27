@@ -100,6 +100,7 @@ const MODEL_PRICES: Record<string, ModelEntry> = {
   'gpt-image-1.5':               { label: 'GPT Image 1.5 (Standard)',      credits: 0, usd: 0.03,  type: 'image', billing: 'per_image', brand: 'OpenAI Direct API', detail: 'Equilibrado e versátil', isLocal: true },
   'gpt-image-2':                 { label: 'GPT Image 2 (Premium)',         credits: 0, usd: 0.04,  type: 'image', billing: 'per_image', brand: 'OpenAI Direct API', recommended: true, detail: 'Alta consistência estilística', isLocal: true },
   
+  'none-video':                  { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion/Hyperframes)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Remotion / Hyperframes (VPS)', recommended: true, detail: 'Economiza custo · Animação de imagens via código', isLocal: true },
   'gemini-veo-3.1-lite-1080p':   { label: 'Gemini Veo 3.1 Lite (1080p)',   credits: 0, usd: 0.08,  type: 'video', billing: 'per_second', brand: 'Google Direct API', detail: 'Geração econômica 1080p', isLocal: true },
   'gemini-veo-3.1-fast-1080p':   { label: 'Gemini Veo 3.1 Fast (1080p)',   credits: 0, usd: 0.12,  type: 'video', billing: 'per_second', brand: 'Google Direct API', recommended: true, detail: 'Geração veloz 1080p', isLocal: true },
   'gemini-veo-3.1-standard-1080p': { label: 'Gemini Veo 3.1 Standard (1080p)', credits: 0, usd: 0.40,  type: 'video', billing: 'per_second', brand: 'Google Direct API', detail: 'Cinematográfico padrão', isLocal: true },
@@ -126,6 +127,7 @@ const MODEL_PRICES: Record<string, ModelEntry> = {
   'grok-imagine':            { label: 'Grok Imagine',           credits: 12,   usd: 0.06,   type: 'image', billing: 'per_image', brand: 'xAI (Grok)' },
   'wan-2.7-image':           { label: 'Wan 2.7 Image',          credits: 6,    usd: 0.03,   type: 'image', billing: 'per_image', brand: 'Wan (Alibaba)' },
   // ── VIDEO ─────────────────────────────────────────────────────
+  'none-video-kie':              { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion/Hyperframes)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Remotion / Hyperframes (VPS)', recommended: true, detail: 'Economiza créditos · Animação de imagens via código' },
   'seedance-2-fast-720p':        { label: 'Seedance-2 Fast 720p',         credits: 33,    usd: 0.165,  type: 'video', billing: 'per_video',  brand: 'ByteDance',         detail: 'Sem input vídeo' },
   'seedance-2-fast-720p-input':  { label: 'Seedance-2 Fast 720p +Input',  credits: 20,    usd: 0.10,   type: 'video', billing: 'per_second', brand: 'ByteDance',         detail: 'Com input vídeo' },
   'seedance-2-fast-480p':        { label: 'Seedance-2 Fast 480p',         credits: 15.5,  usd: 0.0775, type: 'video', billing: 'per_second', brand: 'ByteDance',         detail: 'Sem input vídeo' },
@@ -163,9 +165,11 @@ const MODEL_PRICES: Record<string, ModelEntry> = {
   'fish-audio-v1':               { label: 'Fish Audio V1',                 credits: 6,     usd: 0.03,   type: 'voice', billing: 'per_1k_chars', brand: 'Fish Audio' },
   // ── MANUAL (LLMS EXTERNAS) ───────────────────────────────────
   'manual-image':                { label: 'Geração Manual (Midjourney / ChatGPT / Leonardo AI)', credits: 0, usd: 0, type: 'image', billing: 'per_image', brand: 'Manual (LLM Externa)', detail: 'Geração por fora usando sua assinatura', isLocal: true },
-  'manual-video':                { label: 'Geração Manual (Sora / Kling Web / Runway Web)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Manual (LLM Externa)', detail: 'Geração por fora usando sua assinatura', isLocal: true },
+  'manual-video':                { label: 'Geração Manual de Vídeo (Sora / Kling Web / Runway Web)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Manual (LLM Externa)', detail: 'Geração de vídeo por fora usando sua assinatura', isLocal: true },
+  'manual-none-video':           { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion/Hyperframes)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Manual (LLM Externa)', recommended: true, detail: 'Economiza tempo — Animação de imagens via código', isLocal: true },
   'manual-voice':                { label: 'Geração Manual (ElevenLabs Web / Gravador)', credits: 0, usd: 0, type: 'voice', billing: 'per_1k_chars', brand: 'Manual (LLM Externa)', detail: 'Voz gerada por fora pelo usuário', isLocal: true },
   'manual-music':                { label: 'Geração Manual (Suno Web / Udio Web / Royalty Free)', credits: 0, usd: 0, type: 'music', billing: 'per_track', brand: 'Manual (LLM Externa)', detail: 'Música gerada por fora pelo usuário', isLocal: true },
+
 }
 
 function getGroupedModels(type: 'image' | 'video' | 'music' | 'voice' | 'editor', engineMode: 'local' | 'kie' | 'manual' = 'local') {
@@ -716,18 +720,20 @@ export function TemplateConfigDialog({
 
               {/* ── CAPTION & ANIMATION SECTION ── */}
               <div className="p-4 rounded-xl border border-border/60 bg-secondary/20 mb-4">
-                <h4 className="text-sm font-bold mb-3 flex items-center gap-2">
-                  <span className="text-base">🎞️</span> Estilo Visual
-                  <span className="text-xs font-normal text-muted-foreground ml-1">(o motor é escolhido automaticamente)</span>
+                <h4 className="text-sm font-bold mb-1 flex items-center gap-2">
+                  <span className="text-base">🎞️</span> Estilo da Animação do Vídeo
                 </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Defina o estilo das legendas e a movimentação visual. O sistema seleciona o motor ideal (Remotion / Hyperframes) automaticamente.
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Estilo de Legenda</label>
+                    <label className="text-xs font-semibold text-muted-foreground">Estilo das Legendas</label>
                     <div className="grid grid-cols-3 gap-1.5">
                       {([
-                        { value: 'pop', label: 'Pop', desc: 'MrBeast style' },
-                        { value: 'karaoke', label: 'Karaoke', desc: 'Ilumina palavra' },
-                        { value: 'subtitle', label: 'Legenda', desc: 'Linha clássica' },
+                        { value: 'pop', label: 'Pop Dinâmica', desc: 'MrBeast Style' },
+                        { value: 'karaoke', label: 'Iluminada', desc: 'Sincronizada' },
+                        { value: 'subtitle', label: 'Clássica', desc: 'Rodapé tradicional' },
                       ] as const).map(opt => (
                         <button key={opt.value} type="button"
                           onClick={() => setCaptionStyle(opt.value)}
@@ -738,20 +744,20 @@ export function TemplateConfigDialog({
                               : "border-border/50 text-muted-foreground hover:bg-secondary/60"
                           )}
                         >
-                          <span>{opt.label}</span>
-                          <span className="font-normal opacity-70 text-[10px]">{opt.desc}</span>
+                          <span className="truncate w-full text-center">{opt.label}</span>
+                          <span className="font-normal opacity-70 text-[10px] truncate w-full text-center">{opt.desc}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Animação de Imagem</label>
+                    <label className="text-xs font-semibold text-muted-foreground">Movimento da Câmera</label>
                     <div className="grid grid-cols-3 gap-1.5">
                       {([
-                        { value: 'varied', label: 'Variado', desc: 'Recomendado' },
-                        { value: 'kenburns', label: 'Ken Burns', desc: 'Zoom suave' },
-                        { value: 'zoom-punch', label: 'Zoom', desc: 'Dramático' },
+                        { value: 'varied', label: 'Dinamismo Variado', desc: 'Recomendado' },
+                        { value: 'kenburns', label: 'Zoom Suave', desc: 'Ken Burns' },
+                        { value: 'zoom-punch', label: 'Zoom Impacto', desc: 'Dramático' },
                       ] as const).map(opt => (
                         <button key={opt.value} type="button"
                           onClick={() => setAnimationMix(opt.value)}
@@ -762,8 +768,8 @@ export function TemplateConfigDialog({
                               : "border-border/50 text-muted-foreground hover:bg-secondary/60"
                           )}
                         >
-                          <span>{opt.label}</span>
-                          <span className="font-normal opacity-70 text-[10px]">{opt.desc}</span>
+                          <span className="truncate w-full text-center">{opt.label}</span>
+                          <span className="font-normal opacity-70 text-[10px] truncate w-full text-center">{opt.desc}</span>
                         </button>
                       ))}
                     </div>
@@ -1073,7 +1079,7 @@ export function TemplateConfigDialog({
                   <div className="space-y-2 max-w-full overflow-hidden">
                     <Label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-500">
                       <Volume2 className="h-4 w-4 shrink-0" />
-                      <span>3. Geração de Voz (Escolha o Método)</span>
+                      <span>4. Geração de Voz (Escolha o Método)</span>
                     </Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
@@ -1106,7 +1112,7 @@ export function TemplateConfigDialog({
                     </div>
                   </div>
 
-                  <ModelSelector type="editor" value={renderModel} onChange={setRenderModel} engineMode={engineMode} label="4. Edição & Renderização Final (n8n / Remotion VPS)" icon={LayoutTemplate} iconColor="text-cyan-400" />
+                  <ModelSelector type="editor" value={renderModel} onChange={setRenderModel} engineMode={engineMode} label="5. Edição & Renderização Final (n8n / Remotion VPS)" icon={LayoutTemplate} iconColor="text-cyan-400" />
 
                   <div className="bg-amber-500/10 rounded-xl p-4 sm:p-5 border border-amber-500/20 space-y-3 max-w-full overflow-hidden">
                     <div className="flex items-center gap-2">
@@ -1324,7 +1330,7 @@ export function TemplateConfigDialog({
                   <SummaryCard label="Capa / Thumbnail" value={thumbEntry?.label || thumbnailModel} sub={`${thumbEntry?.credits || 0} cr/capa`} />
                   <SummaryCard label="Vídeo" value={vidEntry?.label || videoModel} sub={formatBilling(vidEntry!)} />
                   {hasVoice && <SummaryCard label="Voz (TTS)" value={voiEntry?.label || voiceModel} sub={formatBilling(voiEntry!)} />}
-                  {hasMusic && <SummaryCard label="Música" value={musEntry?.label || musicModel} sub={formatBilling(musEntry!)} />}
+                  {hasMusic && musicModel !== 'none' && musEntry && <SummaryCard label="Música" value={musEntry?.label || musicModel} sub={formatBilling(musEntry!)} />}
                 </div>
               </div>
 
