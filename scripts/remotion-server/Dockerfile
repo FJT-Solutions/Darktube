@@ -29,4 +29,4 @@ RUN npm install --omit=dev
 
 EXPOSE 3001
 
-CMD ["node", "scripts/remotion-server/server.js"]
+CMD ["node", "server.js"]
