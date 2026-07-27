@@ -854,6 +854,7 @@ export function TemplateConfigDialog({
                     setThumbnailModel('gemini-2.5-flash-image')
                     setVideoModel('gemini-veo-3.1-fast-1080p')
                     setVoiceModel('edge-tts-docker')
+                    setMusicModel(hasMusic ? 'suno-v4' : 'none')
                     setRenderModel('remotion-engine')
                   }}
                   className={cn(
@@ -876,7 +877,7 @@ export function TemplateConfigDialog({
                     setThumbnailModel('flux-kontext-pro')
                     setVideoModel('seedance-2-720p')
                     setVoiceModel('elevenlabs-turbo')
-                    setMusicModel('suno-v4')
+                    setMusicModel(hasMusic ? 'suno-v4' : 'none')
                     setRenderModel('remotion-engine')
                   }}
                   className={cn(
@@ -898,6 +899,7 @@ export function TemplateConfigDialog({
                     setThumbnailModel('manual-image')
                     setVideoModel('manual-video')
                     setVoiceModel('edge-tts-docker')
+                    setMusicModel(hasMusic ? 'manual-music' : 'none')
                     setRenderModel('remotion-engine')
                   }}
                   className={cn(
