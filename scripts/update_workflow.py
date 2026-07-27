@@ -235,7 +235,12 @@ const imageUrl = segment.image_url
   || segment.tpl?.video_thumbnail
   || '';
 
-const audioUrl = segment.audio_url || ttsRes.audio_url || ttsRes.url || '';
+let audioUrl = segment.audio_url || '';
+if (!audioUrl && ttsItem && ttsItem.binary && ttsItem.binary.data) {
+  const mimeType = ttsItem.binary.data.mimeType || 'audio/mp3';
+  const base64Data = ttsItem.binary.data.data;
+  audioUrl = `data:${mimeType};base64,${base64Data}`;
+}
 const captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';
 
 const words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({
