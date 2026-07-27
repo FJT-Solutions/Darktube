@@ -569,11 +569,31 @@ export async function getProductionHistory(templateId: string): Promise<Producti
 }
 
 export async function getAllRecentProductionHistory(limit: number = 20): Promise<ProductionHistoryEntity[]> {
+    // Auto-cleanup items stuck in pending status for over 15 minutes
+    try {
+        await pool.query(
+            `UPDATE public.remodeling_history
+             SET status = 'failed'
+             WHERE status IN ('sent', 'sent_auto', 'processing', 'rendering')
+               AND dispatched_at < NOW() - INTERVAL '15 minutes'`
+        )
+    } catch (e) {
+        console.warn("Could not auto-cleanup stuck productions:", e)
+    }
+
     const { rows } = await pool.query(
         'SELECT * FROM public.remodeling_history ORDER BY dispatched_at DESC LIMIT $1',
         [limit]
     )
     return rows
+}
+
+export async function deleteProductionHistory(id: string) {
+    const { rows } = await pool.query(
+        'DELETE FROM public.remodeling_history WHERE id = $1 RETURNING *',
+        [id]
+    )
+    return rows[0] || null
 }
 
 export async function updateProductionHistory(id: string, status: 'completed' | 'failed', videoUrl: string) {

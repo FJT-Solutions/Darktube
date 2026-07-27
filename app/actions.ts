@@ -856,6 +856,18 @@ export async function getAllRecentProductionHistoryAction(limit: number = 20) {
     }
 }
 
+export async function deleteProductionHistoryAction(id: string) {
+    try {
+        const user = await getCurrentUser()
+        if (!user) throw new Error("Não autorizado")
+        await db.deleteProductionHistory(id)
+        return { success: true }
+    } catch (error: any) {
+        console.error("Error in deleteProductionHistoryAction:", error)
+        return { success: false, error: error.message || "Erro ao excluir histórico." }
+    }
+}
+
 export async function sendToN8NAction(templateId: string) {
     try {
         const user = await getCurrentUser()

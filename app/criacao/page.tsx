@@ -10,6 +10,7 @@ import {
   uploadUserMediaAction,
   saveRemodelingTemplateAction,
   translatePromptAction,
+  deleteProductionHistoryAction,
 } from "@/app/actions"
 import {
   Clapperboard,
@@ -30,6 +31,7 @@ import {
   Languages,
   Video,
   Code,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -197,6 +199,20 @@ export default function CriacaoPage() {
       toast.error("Erro ao carregar dados de criação.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDeleteHistory(id: string) {
+    try {
+      const res = await deleteProductionHistoryAction(id)
+      if (res.success) {
+        toast.success("Registro removido do histórico.")
+        setRecentHistory((prev) => prev.filter((h) => h.id !== id))
+      } else {
+        toast.error(res.error || "Erro ao remover.")
+      }
+    } catch {
+      toast.error("Erro ao excluir histórico.")
     }
   }
 
@@ -711,6 +727,15 @@ export default function CriacaoPage() {
                           {h.status === "sent_auto" ? "Auto" : "Manual"}
                         </Badge>
                         {h.video_url && <VideoPlayerModal videoUrl={h.video_url} title="Produção" />}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-rose-400 opacity-70 hover:opacity-100"
+                          onClick={() => handleDeleteHistory(h.id)}
+                          title="Excluir do histórico"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
                   ))
