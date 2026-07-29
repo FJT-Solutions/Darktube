@@ -263,7 +263,6 @@ const duration = wRes.duration
   })();
 
 const ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];
-const idx = parseInt(segment.index || 0);
 let animationStyle;
 if (segment.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';
 else if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';
