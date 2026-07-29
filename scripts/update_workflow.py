@@ -492,6 +492,36 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
       "typeVersion": 3,
       "position": [2000, 1584],
       "id": "a1b6073b-5541-47dd-a0a6-26773d95773a"
+    },
+    {
+      "parameters": {},
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [656, 2240],
+      "id": "e8e1106b-error-trigger-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
+        "sendBody": True,
+        "specifyBody": "json",
+        "jsonBody": """={
+  "historyId":     "{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : '' }}",
+  "session_id":    "{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : '' }}",
+  "status":        "failed",
+  "error":         "{{ $json.execution?.error?.message || 'Erro durante execução no n8n' }}"
+}""",
+        "options": {
+          "allowUnauthorizedCerts": True
+        }
+      },
+      "name": "Callback Error DarkTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [900, 2240],
+      "id": "a1b6073b-error-callback-002"
     }
   ],
   "connections": {
@@ -543,6 +573,9 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
     },
     "Auto-Post Blotato": {
       "main": [[{"node": "Callback DarkTube", "type": "main", "index": 0}]]
+    },
+    "Error Trigger": {
+      "main": [[{"node": "Callback Error DarkTube", "type": "main", "index": 0}]]
     }
   },
   "settings": {
