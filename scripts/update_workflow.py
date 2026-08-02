@@ -240,10 +240,25 @@ const imageUrl = segment.image_url
 let audioUrl = segment.audio_url || '';
 if (!audioUrl && ttsItem && ttsItem.binary) {
   const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';
-  const binaryObj = ttsItem.binary[binaryKey];
-  if (binaryObj && binaryObj.data) {
-    const mimeType = binaryObj.mimeType || 'audio/mp3';
-    audioUrl = `data:${mimeType};base64,${binaryObj.data}`;
+  let base64Data = '';
+  try {
+    const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);
+    if (getHelper) {
+      const buf = await getHelper.call(this, idx, binaryKey);
+      if (buf && buf.length > 0) base64Data = buf.toString('base64');
+    }
+  } catch (_) {}
+
+  if (!base64Data) {
+    const binaryObj = ttsItem.binary[binaryKey];
+    if (binaryObj && binaryObj.data && binaryObj.data !== 'database') {
+      base64Data = binaryObj.data;
+    }
+  }
+
+  if (base64Data) {
+    const mimeType = ttsItem.binary[binaryKey]?.mimeType || 'audio/mp3';
+    audioUrl = `data:${mimeType};base64,${base64Data}`;
   }
 }
 const captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';
@@ -477,11 +492,12 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
   "session_id":    "{{ $('Normalize + Auto Engine').first().json.session_id }}",
   "template_id":   "{{ $('Normalize + Auto Engine').first().json.tpl.id }}",
   "render_engine": "{{ $('Normalize + Auto Engine').first().json.render_engine }}",
-  "videoUrl":      "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}",
-  "video_url":     "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url }}",
+  "videoUrl":      "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}",
+  "video_url":     "{{ $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}",
   "thumbnailUrl":  "{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}",
   "thumbnail_url": "{{ $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}",
-  "status":        "completed"
+  "status":        "{{ $('Wait Render').first().json.status || 'completed' }}",
+  "error":         "{{ $('Wait Render').first().json.error || '' }}"
 }""",
         "options": {
           "allowUnauthorizedCerts": True
@@ -508,8 +524,8 @@ return [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_ur
         "sendBody": True,
         "specifyBody": "json",
         "jsonBody": """={
-  "historyId":     "{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : '' }}",
-  "session_id":    "{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : '' }}",
+  "historyId":     "{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}",
+  "session_id":    "{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}",
   "status":        "failed",
   "error":         "{{ $json.execution?.error?.message || 'Erro durante execução no n8n' }}"
 }""",
