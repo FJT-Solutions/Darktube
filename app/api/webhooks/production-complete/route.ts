@@ -4,49 +4,58 @@ import { pool } from '@/lib/db-client';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const historyId = body.historyId || body.session_id || body.history_id;
+    const historyId = body.historyId || body.session_id || body.history_id || '';
+    const templateId = body.template_id || body.templateId || '';
     const status = body.status || 'completed';
-    const videoUrl = body.videoUrl || body.video_url || '';
-    const error = body.error || '';
+    const videoUrl = body.videoUrl || body.video_url || body.body?.videoUrl || body.body?.video_url || '';
+    const error = body.error || body.body?.error || '';
 
-    if (!historyId || !status) {
-      return NextResponse.json(
-        { error: 'historyId e status são obrigatórios' },
-        { status: 400 }
-      );
-    }
+    const isValidUuid = (str: string) =>
+      typeof str === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+    let query = '';
+    let queryParams: any[] = [];
 
     if (status === 'completed') {
-      const { rows } = await pool.query(
-        `
-          UPDATE public.remodeling_history
-          SET status = $1, video_url = $2
-          WHERE id = $3
-          RETURNING *
-        `,
-        ['completed', videoUrl, historyId]
-      );
-
-      console.log(`[Remotion Webhook] Vídeo renderizado com sucesso. History ID: ${historyId}`);
-      return NextResponse.json({ success: true, updated: rows[0] });
+      if (isValidUuid(historyId)) {
+        query = `UPDATE public.remodeling_history SET status = $1, video_url = $2 WHERE id = $3 RETURNING *`;
+        queryParams = ['completed', videoUrl, historyId];
+      } else if (isValidUuid(templateId)) {
+        query = `UPDATE public.remodeling_history SET status = $1, video_url = $2 WHERE id = (
+          SELECT id FROM public.remodeling_history WHERE template_id = $3 ORDER BY dispatched_at DESC LIMIT 1
+        ) RETURNING *`;
+        queryParams = ['completed', videoUrl, templateId];
+      } else {
+        query = `UPDATE public.remodeling_history SET status = $1, video_url = $2 WHERE id = (
+          SELECT id FROM public.remodeling_history ORDER BY dispatched_at DESC LIMIT 1
+        ) RETURNING *`;
+        queryParams = ['completed', videoUrl];
+      }
     } else {
-      const { rows } = await pool.query(
-        `
-          UPDATE public.remodeling_history
-          SET status = $1
-          WHERE id = $2
-          RETURNING *
-        `,
-        ['failed', historyId]
-      );
-
-      console.error(`[Remotion Webhook] Renderização falhou para History ID: ${historyId}. Erro: ${error}`);
-      return NextResponse.json({ success: true, updated: rows[0] });
+      if (isValidUuid(historyId)) {
+        query = `UPDATE public.remodeling_history SET status = $1, error_message = $2 WHERE id = $3 RETURNING *`;
+        queryParams = ['failed', error, historyId];
+      } else if (isValidUuid(templateId)) {
+        query = `UPDATE public.remodeling_history SET status = $1, error_message = $2 WHERE id = (
+          SELECT id FROM public.remodeling_history WHERE template_id = $3 ORDER BY dispatched_at DESC LIMIT 1
+        ) RETURNING *`;
+        queryParams = ['failed', error, templateId];
+      } else {
+        query = `UPDATE public.remodeling_history SET status = $1, error_message = $2 WHERE id = (
+          SELECT id FROM public.remodeling_history ORDER BY dispatched_at DESC LIMIT 1
+        ) RETURNING *`;
+        queryParams = ['failed', error];
+      }
     }
+
+    const { rows } = await pool.query(query, queryParams);
+    console.log(`[Production Webhook] Histórico atualizado com sucesso (${status}).`);
+    return NextResponse.json({ success: true, updated: rows[0] || null });
   } catch (error: any) {
     console.error('Erro ao processar webhook de conclusão de produção:', error);
     return NextResponse.json(
-      { error: 'Erro interno ao atualizar histórico de produção' },
+      { error: 'Erro interno ao atualizar histórico de produção: ' + error.message },
       { status: 500 }
     );
   }
