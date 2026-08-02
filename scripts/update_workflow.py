@@ -238,18 +238,22 @@ const imageUrl = segment.image_url
   || '';
 
 let audioUrl = segment.audio_url || '';
-if (!audioUrl && ttsItem && ttsItem.binary) {
-  const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';
+if (!audioUrl) {
   let base64Data = '';
   try {
     const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);
     if (getHelper) {
-      const buf = await getHelper.call(this, idx, binaryKey);
-      if (buf && buf.length > 0) base64Data = buf.toString('base64');
+      const buf = await getHelper.call(this, idx, 'data', 'Generate TTS');
+      if (buf && buf.length > 0) {
+        base64Data = buf.toString('base64');
+      }
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error('Error fetching TTS binary buffer:', err.message);
+  }
 
-  if (!base64Data) {
+  if (!base64Data && ttsItem && ttsItem.binary) {
+    const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';
     const binaryObj = ttsItem.binary[binaryKey];
     if (binaryObj && binaryObj.data && binaryObj.data !== 'database') {
       base64Data = binaryObj.data;
@@ -257,8 +261,7 @@ if (!audioUrl && ttsItem && ttsItem.binary) {
   }
 
   if (base64Data) {
-    const mimeType = ttsItem.binary[binaryKey]?.mimeType || 'audio/mp3';
-    audioUrl = `data:${mimeType};base64,${base64Data}`;
+    audioUrl = `data:audio/mp3;base64,${base64Data}`;
   }
 }
 const captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';
