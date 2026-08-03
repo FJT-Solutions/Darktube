@@ -447,6 +447,7 @@ export async function saveRemodelingTemplate(
     await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'pt';`);
     await pool.query(`ALTER TABLE public.remodeling_templates ADD COLUMN IF NOT EXISTS voice TEXT;`);
 
+    const videoId = data.video_id || `custom_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     const { rows } = await pool.query(`
         INSERT INTO public.remodeling_templates (
             user_id, video_id, video_title, video_thumbnail, name, template_data, generated_script,
@@ -457,7 +458,7 @@ export async function saveRemodelingTemplate(
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
         RETURNING *
     `, [
-        userId, data.video_id, data.video_title || null, data.video_thumbnail || null, data.name,
+        userId, videoId, data.video_title || null, data.video_thumbnail || null, data.name,
         data.template_data, data.generated_script || null, data.format, data.has_music || false,
         data.music_style || null, data.voice_type || null, data.post_frequency, data.post_interval_days || null,
         data.post_times || [], data.is_active !== false, data.target_accounts || [], data.tags || [],

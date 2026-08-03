@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react"
 import { toast } from "sonner"
-import { getAllRecentProductionHistoryAction } from "@/app/actions"
 
 export function ProductionNotifier() {
   const activeIdsRef = useRef<Set<string>>(new Set())
@@ -13,8 +12,11 @@ export function ProductionNotifier() {
 
     async function checkStatus() {
       try {
-        const history = await getAllRecentProductionHistoryAction(20)
-        if (!history || history.length === 0) return
+        const res = await fetch("/api/productions/recent").catch(() => null)
+        if (!res || !res.ok) return
+        const data = await res.json()
+        const history = data.history || []
+        if (history.length === 0) return
 
         history.forEach((item: any) => {
           const isPending =
