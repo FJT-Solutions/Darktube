@@ -52,6 +52,7 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
               primaryColor={primaryColor}
               accentColor={accentColor}
               fps={fps}
+              format={format}
             />
           </Sequence>
         );
