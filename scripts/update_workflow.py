@@ -33,12 +33,25 @@ const renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')
   ? 'remotion'
   : 'hyperframes';
 
+// ── Imagens enviadas pelo usuário (upload manual) ──
+const userMedia = tpl.user_media
+  || tpl.uploaded_images
+  || tpl.images
+  || [];
+const hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;
+
 const rawSegments = tpl.script_segments || body.script_segments || [];
-const segments = rawSegments.length > 0 ? rawSegments : [{
+let segments = rawSegments.length > 0 ? rawSegments : [{
   index: 0,
   voiceover: { text: tpl.video_title || 'Vídeo sem narração' },
   visual_content: { image_prompt: tpl.video_title || 'Cena principal' }
 }];
+
+// ── CORREÇÃO: Se o usuário enviou imagens, limitar as cenas
+//    ao exato número de imagens enviadas — sem cenas extras ──
+if (hasUserMedia && userMedia.length < segments.length) {
+  segments = segments.slice(0, userMedia.length);
+}
 
 return segments.map((seg, idx) => ({
   json: {
@@ -55,6 +68,7 @@ return segments.map((seg, idx) => ({
     primary_color:  tpl.primary_color  || '#EAB308',
     accent_color:   tpl.accent_color   || '#FFFFFF',
     watermark_text: tpl.watermark_text || 'DarkTube AI',
+    user_media:     userMedia,
     tpl
   }
 }));""",
