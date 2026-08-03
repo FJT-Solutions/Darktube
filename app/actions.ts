@@ -933,7 +933,17 @@ export async function sendToN8NAction(templateId: string) {
                 sfx_prompt: parsedScript.sfx_prompt || "",
                 script_segments: parsedScript.script_base || template.template_data?.remodeling_template?.script_base || [],
                 generated_script: template.generated_script || "",
-                ai_analysis: template.template_data
+                ai_analysis: template.template_data,
+                // ── Mídias enviadas pelo usuário (imagens manuais por cena) ──
+                user_media: (() => {
+                    const td = template.template_data as any
+                    const remodeling = td?.remodeling_template || td
+                    const scriptBase = remodeling?.script_base || parsedScript.script_base || []
+                    return scriptBase.map((seg: any) => ({
+                        file_url: seg.custom_media_url || seg.image_url || null,
+                        prompt: seg.visual_content?.image_prompt || ''
+                    })).filter((m: any) => m.file_url)
+                })()
             }
         }
 
