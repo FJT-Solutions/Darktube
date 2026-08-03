@@ -129,6 +129,18 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
     );
     console.log(`[HyperFrames] Vídeo visual renderizado: ${historyId}`);
 
+    // 3.5. Corrigir vídeo invertido (bug do Hyperframes CLI com viewport vertical)
+    const correctedPath = path.join(workDir, 'corrected.mp4');
+    const format = payload.format || 'vertical';
+    if (format === 'vertical') {
+      execSync(
+        `ffmpeg -y -i "${silentPath}" -vf "vflip" -c:v libx264 -preset fast -crf 18 -c:a copy "${correctedPath}"`,
+        { timeout: 120000, stdio: 'pipe' }
+      );
+      fs.renameSync(correctedPath, silentPath);
+      console.log(`[HyperFrames] Correção de orientação aplicada: ${historyId}`);
+    }
+
     // 4. Extrair thumbnail (frame em 1s)
     execSync(
       `ffmpeg -y -i "${silentPath}" -ss 00:00:01 -vframes 1 -q:v 2 "${thumbPath}"`,
