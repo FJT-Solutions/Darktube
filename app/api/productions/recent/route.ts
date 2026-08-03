@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/crypto';
-import { db } from '@/lib/database';
+import { getCurrentUser } from '@/lib/auth-helpers';
+import { getAllRecentProductionHistory } from '@/lib/database';
 
 export async function GET() {
   try {
@@ -9,7 +9,7 @@ export async function GET() {
       return NextResponse.json({ history: [] });
     }
 
-    const history = await db.getAllRecentProductionHistory(user.id, 20);
+    const history = await getAllRecentProductionHistory(20);
     return NextResponse.json({ history });
   } catch (error: any) {
     console.error('Error in GET /api/productions/recent:', error);
