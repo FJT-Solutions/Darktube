@@ -79,46 +79,31 @@ return segments.map((seg, idx) => ({
     },
     {
       "parameters": {
-        "jsCode": """// Seleciona Imagem da Cena com Fallbacks Inteligentes
+        "jsCode": """// Seleciona Imagem da Cena - estritamente 1-para-1 com a imagem enviada
 const norm        = $json;
 const idx         = parseInt(norm.index !== undefined ? norm.index : 0);
 const tpl         = norm.tpl || {};
 const visual      = norm.visual_content || {};
-const userMedia   = norm.user_media || [];
 
-let providedUrl = norm.image_url || norm.media_url || visual.image_url || '';
+const userMedia   = norm.user_media 
+  || tpl.user_media 
+  || tpl.uploaded_images 
+  || tpl.images 
+  || [];
 
-if (!providedUrl && Array.isArray(userMedia) && userMedia.length > 0) {
-  providedUrl = userMedia[idx % userMedia.length]?.file_url || '';
-}
+let providedUrl = norm.image_url 
+  || norm.media_url 
+  || visual.image_url 
+  || (Array.isArray(userMedia) && userMedia[idx] ? (userMedia[idx].file_url || userMedia[idx]) : '') 
+  || '';
 
-const engineMode = norm.selected_engine_mode || tpl.engine_mode || 'local';
-const imageModel = norm.selected_image_model || tpl.image_model || 'gemini-2.5-flash-image';
-
-let imageUrl = '';
-let source = '';
-
-if (providedUrl) {
-  imageUrl = providedUrl;
-  source = 'user_uploaded';
-} else {
-  const dynamicStock = [
-    'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1080&q=80',
-    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&q=80',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1080&q=80',
-    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1080&q=80',
-    'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1080&q=80'
-  ];
-  imageUrl = dynamicStock[idx % dynamicStock.length];
-  source = `cinematic_dynamic_scene_${idx}`;
-}
+let imageUrl = providedUrl || tpl.video_thumbnail || '';
+let source   = providedUrl ? 'user_uploaded_image' : 'template_thumbnail';
 
 return [{
   json: {
     ...norm,
     image_url: imageUrl,
-    selected_image_model: imageModel,
-    selected_engine_mode: engineMode,
     source: source
   }
 }];""",
