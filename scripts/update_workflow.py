@@ -79,61 +79,38 @@ return segments.map((seg, idx) => ({
     },
     {
       "parameters": {
-        "jsCode": """// ── Geração / Resolução de Imagem da Cena respeitando o Modelo Selecionado pelo Usuário ──
-const norm = $json;
-const tpl  = norm.tpl || {};
-const idx  = norm.index !== undefined ? norm.index : 0;
+        "jsCode": """// Seleciona Imagem da Cena com Fallbacks Inteligentes
+const norm        = $json;
+const idx         = parseInt(norm.index !== undefined ? norm.index : 0);
+const tpl         = norm.tpl || {};
+const visual      = norm.visual_content || {};
+const userMedia   = norm.user_media || [];
 
-const visual = norm.visual_content || {};
-const imageModel = tpl.image_model || tpl.thumbnail_model || 'manual-image';
-const engineMode = tpl.engine_mode || 'manual';
+let providedUrl = norm.image_url || norm.media_url || visual.image_url || '';
 
-// Busca imagem customizada/enviada manualmente pelo usuário para esta cena específica
-const providedUrl = norm.image_url 
-  || norm.media_url 
-  || norm.custom_image 
-  || visual.image_url 
-  || visual.url
-  || (Array.isArray(tpl.custom_images) ? tpl.custom_images[idx] : null)
-  || (Array.isArray(tpl.uploaded_images) ? tpl.uploaded_images[idx] : null)
-  || (Array.isArray(tpl.images) ? tpl.images[idx] : null);
-
-let imageUrl;
-let source;
-
-// 1. MODO MANUAL ou MODELO MANUAL
-if (imageModel === 'manual-image' || engineMode === 'manual') {
-  if (providedUrl) {
-    imageUrl = providedUrl;
-    source = 'user_uploaded_manual';
-  } else {
-    // Se for manual e não houver upload por cena, usa a capa como fallback intencional
-    imageUrl = tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-    source = 'manual_fallback_thumbnail';
-  }
+if (!providedUrl && Array.isArray(userMedia) && userMedia.length > 0) {
+  providedUrl = userMedia[idx % userMedia.length]?.file_url || '';
 }
-// 2. DIRECT APIs (Gemini Flash Image, Imagen 4, GPT Image)
-else if (engineMode === 'local' || imageModel.startsWith('gemini') || imageModel.startsWith('imagen') || imageModel.startsWith('gpt')) {
-  if (providedUrl) {
-    imageUrl = providedUrl;
-    source = 'user_uploaded';
-  } else {
-    // Gera imagem via Direct API se o prompt existir
-    const prompt = visual.image_prompt || norm.text || tpl.video_title || 'Cena dramática estoica';
-    // Aqui usaremos o prompt para resolver a imagem (ou fallback se pendente)
-    imageUrl = providedUrl || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-    source = `direct_api_${imageModel}`;
-  }
-}
-// 3. KIE.AI (Flux, Ideogram, Seedream, Recraft, etc)
-else {
-  if (providedUrl) {
-    imageUrl = providedUrl;
-    source = 'user_uploaded';
-  } else {
-    imageUrl = providedUrl || tpl.video_thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1080';
-    source = `kie_ai_${imageModel}`;
-  }
+
+const engineMode = norm.selected_engine_mode || tpl.engine_mode || 'local';
+const imageModel = norm.selected_image_model || tpl.image_model || 'gemini-2.5-flash-image';
+
+let imageUrl = '';
+let source = '';
+
+if (providedUrl) {
+  imageUrl = providedUrl;
+  source = 'user_uploaded';
+} else {
+  const dynamicStock = [
+    'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1080&q=80',
+    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&q=80',
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1080&q=80',
+    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1080&q=80',
+    'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1080&q=80'
+  ];
+  imageUrl = dynamicStock[idx % dynamicStock.length];
+  source = `cinematic_dynamic_scene_${idx}`;
 }
 
 return [{
