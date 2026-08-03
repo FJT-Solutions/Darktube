@@ -288,7 +288,7 @@ const composition = {
   captionStyle:      norm.caption_style,
   primaryColor:      norm.primary_color,
   accentColor:       norm.accent_color,
-  showWatermark:     true,
+  showWatermark:     false,
   watermarkText:     norm.watermark_text,
   backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''
 };
