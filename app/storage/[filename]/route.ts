@@ -11,20 +11,28 @@ export async function GET(
       return new NextResponse('Filename is required', { status: 400 });
     }
 
-    // Proxy stream to Hyperframes service (3002) or Remotion service (3001) on VPS
     const rangeHeader = request.headers.get('range') || '';
-    const hyperframesUrl = `http://localhost:3002/storage/${filename}`;
-    const remotionUrl = `http://localhost:3001/storage/${filename}`;
+    const fetchHeaders: Record<string, string> = {};
+    if (rangeHeader) fetchHeaders['range'] = rangeHeader;
 
-    let fetchHeaders: Record<string, string> = {};
-    if (rangeHeader) {
-      fetchHeaders['range'] = rangeHeader;
-    }
+    const urls = [
+      `http://n8n-hyperframesservice-sruzdk:3002/storage/${filename}`,
+      `http://n8n-remotionservice-ry6eh9:3001/storage/${filename}`,
+      `http://localhost:3002/storage/${filename}`,
+      `http://localhost:3001/storage/${filename}`
+    ];
 
-    let response = await fetch(hyperframesUrl, { headers: fetchHeaders }).catch(() => null);
-
-    if (!response || !response.ok) {
-      response = await fetch(remotionUrl, { headers: fetchHeaders }).catch(() => null);
+    let response: Response | null = null;
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { headers: fetchHeaders });
+        if (res.ok) {
+          response = res;
+          break;
+        }
+      } catch (e) {
+        // continue
+      }
     }
 
     if (!response || !response.ok) {
