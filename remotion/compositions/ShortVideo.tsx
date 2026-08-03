@@ -82,7 +82,8 @@ const SceneLayer: React.FC<{
   primaryColor: string;
   accentColor: string;
   fps: number;
-}> = ({ scene, sceneIndex, durationFrames, captionStyle, primaryColor, accentColor, fps }) => {
+  format: string;
+}> = ({ scene, sceneIndex, durationFrames, captionStyle, primaryColor, accentColor, fps, format }) => {
   const frame = useCurrentFrame();
 
   // Fade-in da cena
@@ -134,6 +135,7 @@ const SceneLayer: React.FC<{
         accentColor={accentColor}
         durationFrames={durationFrames}
         fps={fps}
+        format={format}
       />
 
       {/* Áudio da narração desta cena */}
@@ -212,9 +214,12 @@ const CaptionLayer: React.FC<{
   accentColor: string;
   durationFrames: number;
   fps: number;
-}> = ({ scene, captionStyle, primaryColor, accentColor, durationFrames, fps }) => {
+  format: string;
+}> = ({ scene, captionStyle, primaryColor, accentColor, durationFrames, fps, format }) => {
   const frame = useCurrentFrame();
   const currentTimeInScene = frame / fps;
+
+  const isVertical = format === 'vertical';
 
   const words = scene.words || [];
   const captionText = scene.captionText || '';
@@ -236,7 +241,7 @@ const CaptionLayer: React.FC<{
           pointerEvents: 'none',
         }}
       >
-        <PopWord word={currentWord.word} primaryColor={primaryColor} fps={fps} />
+        <PopWord word={currentWord.word} primaryColor={primaryColor} fps={fps} isVertical={isVertical} />
       </AbsoluteFill>
     );
   }
@@ -279,6 +284,7 @@ const CaptionLayer: React.FC<{
                 primaryColor={primaryColor}
                 accentColor={accentColor}
                 fps={fps}
+                isVertical={isVertical}
               />
             );
           })}
@@ -298,9 +304,9 @@ const CaptionLayer: React.FC<{
       style={{
         justifyContent: 'flex-end',
         alignItems: 'center',
-        paddingBottom: '12%',
-        paddingLeft: '6%',
-        paddingRight: '6%',
+        paddingBottom: isVertical ? '20%' : '12%',
+        paddingLeft: '5%',
+        paddingRight: '5%',
         pointerEvents: 'none',
       }}
     >
@@ -313,9 +319,10 @@ const CaptionLayer: React.FC<{
           padding: '20px 32px',
           border: '1px solid rgba(255,255,255,0.08)',
           textAlign: 'center',
-          fontSize: '52px',
-          fontWeight: 800,
           color: accentColor,
+          fontFamily: 'Montserrat',
+          fontSize: isVertical ? '70px' : '55px',
+          fontWeight: 800,
           lineHeight: 1.3,
           textShadow: '0 2px 8px rgba(0,0,0,0.9)',
           maxWidth: '100%',
@@ -330,34 +337,46 @@ const CaptionLayer: React.FC<{
 // ─────────────────────────────────────────────
 // POP WORD — spring bounce por palavra
 // ─────────────────────────────────────────────
-const PopWord: React.FC<{ word: string; primaryColor: string; fps: number }> = ({
-  word, primaryColor, fps,
+const PopWord: React.FC<{ word: string; primaryColor: string; fps: number; isVertical: boolean }> = ({
+  word, primaryColor, fps, isVertical
 }) => {
   const frame = useCurrentFrame();
 
-  const pop = spring({
+  // Premium Spring physics
+  const scale = spring({
     frame,
     fps,
-    config: { damping: 10, stiffness: 250, mass: 0.6 },
+    config: { damping: 12, stiffness: 220, mass: 0.8 },
+  });
+  
+  const translateY = interpolate(scale, [0, 1], [40, 0], {
+    extrapolateRight: "clamp",
+  });
+  
+  const rotation = spring({
+    frame,
+    fps,
+    config: { damping: 10, stiffness: 180 },
+    from: -8,
+    to: 0,
   });
 
   return (
     <div
       style={{
-        transform: `scale(${pop})`,
+        transform: `scale(${scale}) rotate(${rotation}deg) translateY(${translateY}px)`,
         color: '#ffffff',
-        fontSize: '80px',
+        fontSize: isVertical ? '110px' : '85px',
         fontWeight: 900,
         textTransform: 'uppercase',
         textAlign: 'center',
         padding: '14px 32px',
-        background: `linear-gradient(135deg, ${primaryColor}dd, ${primaryColor}88)`,
-        borderRadius: '20px',
-        boxShadow: `0 8px 32px rgba(0,0,0,0.8), 0 0 20px ${primaryColor}44`,
-        letterSpacing: '2px',
-        textShadow: '0 3px 12px rgba(0,0,0,0.9)',
-        maxWidth: '90%',
-        wordBreak: 'break-word',
+        backgroundColor: primaryColor,
+        borderRadius: '16px',
+        boxShadow: `0 15px 30px rgba(0,0,0,0.5), inset 0 -4px 0 rgba(0,0,0,0.2), 0 0 40px ${primaryColor}66`,
+        border: '3px solid #000',
+        transformOrigin: 'center center',
+        willChange: 'transform',
       }}
     >
       {word}
@@ -375,22 +394,34 @@ const KaraokeWord: React.FC<{
   primaryColor: string;
   accentColor: string;
   fps: number;
-}> = ({ word, isActive, isPast, primaryColor, accentColor }) => {
+  isVertical: boolean;
+}> = ({ word, isActive, isPast, primaryColor, accentColor, fps, isVertical }) => {
+  const frame = useCurrentFrame();
+
+  const scale = isActive ? spring({
+    frame: frame % 15, // re-trigger para garantir que está ativo
+    fps,
+    config: { damping: 14, stiffness: 200 },
+    from: 1,
+    to: 1.15,
+  }) : 1;
+
+  const translateY = isActive ? interpolate(scale as number, [1, 1.15], [0, -8]) : 0;
+
   return (
     <span
       style={{
-        display: 'inline-block',
-        fontSize: '68px',
+        fontFamily: 'Montserrat',
+        fontSize: isVertical ? '80px' : '65px',
         fontWeight: 900,
         textTransform: 'uppercase',
-        letterSpacing: '1px',
-        transition: 'all 0.1s ease',
-        color: isActive ? primaryColor : isPast ? `${accentColor}99` : `${accentColor}55`,
-        transform: isActive ? 'scale(1.12)' : 'scale(1)',
-        textShadow: isActive
-          ? `0 0 20px ${primaryColor}88, 0 3px 12px rgba(0,0,0,0.9)`
-          : '0 2px 6px rgba(0,0,0,0.8)',
-        filter: isActive ? 'brightness(1.2)' : 'none',
+        WebkitTextStroke: '3px black',
+        color: isActive ? primaryColor : isPast ? accentColor : '#AAAAAA',
+        textShadow: isActive ? `0 0 15px ${primaryColor}, 4px 4px 0px #000` : '4px 4px 0px #000',
+        transform: `scale(${scale}) translateY(${translateY}px)`,
+        display: 'inline-block',
+        willChange: 'transform',
+        transition: 'color 0.1s ease',
       }}
     >
       {word}
