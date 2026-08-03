@@ -4,11 +4,11 @@ import { verifyJWT } from '@/lib/crypto'
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
-  const publicRoutes = ['/login', '/invite', '/auth/callback', '/pending', '/setup-password', '/api/storage']
+  const publicRoutes = ['/login', '/invite', '/auth/callback', '/pending', '/setup-password', '/api/storage', '/storage']
   const isPublic = pathname === '/' || publicRoutes.some(r => pathname.startsWith(r))
 
-  // Permitir assets estáticos
-  if (pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico)$/)) {
+  // Permitir assets estáticos e arquivos de mídia em /storage/ ou com extensões de vídeo
+  if (pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|mp4|webm|m4a|mp3|wav)$/i) || pathname.startsWith('/storage/')) {
     return NextResponse.next()
   }
 
