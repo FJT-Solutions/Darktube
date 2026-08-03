@@ -211,7 +211,17 @@ async function mixAudioTracks(silentVideoPath, payload, outputPath) {
         return;
       }
 
-      inputs.push(`-i "${scene.audioUrl}"`);
+      let audioInput = scene.audioUrl;
+      if (audioInput.startsWith('data:')) {
+        const base64Data = audioInput.split(',')[1];
+        if (base64Data) {
+          const localAudioPath = path.join(path.dirname(silentVideoPath), `audio_scene_${i}.mp3`);
+          fs.writeFileSync(localAudioPath, Buffer.from(base64Data, 'base64'));
+          audioInput = localAudioPath;
+        }
+      }
+
+      inputs.push(`-i "${audioInput}"`);
       const idx = audioInputIdx++;
       const delay = Math.round(timeOffset * 1000); // ms
 
