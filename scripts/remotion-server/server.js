@@ -166,15 +166,34 @@ async function renderAsync(historyId, composition, callbackUrl) {
 }
 
 async function sendCallback(url, body) {
-  try {
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch (err) {
-    console.error('[Remotion] Erro ao enviar callback:', err.message);
+  // n8n gera resumeUrl com localhost:5678, que não funciona entre containers Docker
+  const N8N_EXTERNAL = process.env.N8N_EXTERNAL_URL || 'https://n8n.fjt-solutions.com';
+  let fixedUrl = url;
+  if (fixedUrl.includes('localhost:5678') || fixedUrl.includes('127.0.0.1:5678')) {
+    fixedUrl = fixedUrl
+      .replace('http://localhost:5678', N8N_EXTERNAL)
+      .replace('http://127.0.0.1:5678', N8N_EXTERNAL);
+    console.log(`[Remotion Callback] URL corrigida: ${fixedUrl}`);
   }
+
+  const attempts = [fixedUrl];
+  // Se a URL original era diferente, tentar também a original como fallback
+  if (fixedUrl !== url) attempts.push(url);
+
+  for (const tryUrl of attempts) {
+    try {
+      const resp = await fetch(tryUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      console.log(`[Remotion Callback] Enviado com sucesso para ${tryUrl} (HTTP ${resp.status})`);
+      return;
+    } catch (err) {
+      console.error(`[Remotion Callback] Falha em ${tryUrl}: ${err.message}`);
+    }
+  }
+  console.error('[Remotion Callback] Todas as tentativas de callback falharam.');
 }
 
 // ──────────────────────────────────────────────
