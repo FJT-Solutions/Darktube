@@ -47,6 +47,7 @@
     "@remotion/media-utils": "^4.0.496",
     "@remotion/player": "^4.0.496",
     "@remotion/renderer": "^4.0.496",
+    "@remotion/transitions": "^4.0.507",
     "@types/request": "^2.48.13",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
