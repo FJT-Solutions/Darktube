@@ -192,7 +192,7 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
 // Suporta: data:audio/mp3;base64,... | http(s):// | caminho local
 // ──────────────────────────────────────────────
 async function resolveAudioToLocalPath(audioUrl, localPath) {
-  if (!audioUrl) return null;
+  if (!audioUrl || typeof audioUrl !== 'string') return null;
 
   // data: URI — decodificar base64
   if (audioUrl.startsWith('data:')) {

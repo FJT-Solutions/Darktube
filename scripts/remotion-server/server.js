@@ -22,7 +22,9 @@ if (!fs.existsSync(OUTPUT_DIR)) {
 async function initBundle() {
   console.log('[Remotion Service] Compilando bundle...');
   try {
-    const entryPoint = path.join(__dirname, '../../remotion/index.tsx');
+    const candidate1 = path.join(__dirname, '../../remotion/index.tsx');
+    const candidate2 = path.join(__dirname, 'remotion/index.tsx');
+    const entryPoint = fs.existsSync(candidate1) ? candidate1 : candidate2;
     bundledLocation = await bundle({ entryPoint });
     console.log('[Remotion Service] Bundle pronto:', bundledLocation);
   } catch (err) {
