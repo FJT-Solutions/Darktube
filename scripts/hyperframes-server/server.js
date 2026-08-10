@@ -129,17 +129,16 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
     );
     console.log(`[HyperFrames] Vídeo visual renderizado: ${historyId}`);
 
-    // 3.5. Corrigir vídeo invertido (bug do Hyperframes CLI com viewport vertical)
+    // 3.5. Corrigir vídeo invertido (bug do Headless Chromium — eixo Y invertido no captura)
+    // O Puppeteer/Chromium em modo headless captura frames com o eixo Y espelhado.
+    // A correção correta é rotacionar 180° (não apenas vflip que só espelha 1 eixo).
     const correctedPath = path.join(workDir, 'corrected.mp4');
-    const format = payload.format || 'vertical';
-    if (format === 'vertical') {
-      execSync(
-        `ffmpeg -y -i "${silentPath}" -vf "vflip" -c:v libx264 -preset fast -crf 18 -c:a copy "${correctedPath}"`,
-        { timeout: 120000, stdio: 'pipe' }
-      );
-      fs.renameSync(correctedPath, silentPath);
-      console.log(`[HyperFrames] Correção de orientação aplicada: ${historyId}`);
-    }
+    execSync(
+      `ffmpeg -y -i "${silentPath}" -vf "rotate=PI" -c:v libx264 -preset fast -crf 18 -c:a copy "${correctedPath}"`,
+      { timeout: 120000, stdio: 'pipe' }
+    );
+    fs.renameSync(correctedPath, silentPath);
+    console.log(`[HyperFrames] Correção de orientação (rotate=PI) aplicada: ${historyId}`);
 
     // 4. Extrair thumbnail (frame em 1s)
     execSync(
@@ -189,68 +188,115 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
 }
 
 // ──────────────────────────────────────────────
+// HELPER — Resolver audioUrl para path local
+// Suporta: data:audio/mp3;base64,... | http(s):// | caminho local
+// ──────────────────────────────────────────────
+async function resolveAudioToLocalPath(audioUrl, localPath) {
+  if (!audioUrl) return null;
+
+  // data: URI — decodificar base64
+  if (audioUrl.startsWith('data:')) {
+    const commaIdx = audioUrl.indexOf(',');
+    if (commaIdx === -1) return null;
+    const base64Data = audioUrl.slice(commaIdx + 1);
+    fs.writeFileSync(localPath, Buffer.from(base64Data, 'base64'));
+    return localPath;
+  }
+
+  // URL HTTP/HTTPS — baixar para arquivo local
+  if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+    const fetch = (await import('node-fetch')).default;
+    const resp = await fetch(audioUrl);
+    if (!resp.ok) {
+      throw new Error(`Falha ao baixar áudio ${audioUrl}: HTTP ${resp.status}`);
+    }
+    const buffer = await resp.buffer();
+    fs.writeFileSync(localPath, buffer);
+    return localPath;
+  }
+
+  // Caminho local já existente
+  if (fs.existsSync(audioUrl)) return audioUrl;
+
+  return null;
+}
+
+// ──────────────────────────────────────────────
 // MIXAR ÁUDIO COM FFMPEG
 // Combina: narração por cena + música de fundo
 // ──────────────────────────────────────────────
 async function mixAudioTracks(silentVideoPath, payload, outputPath) {
   const { scenes = [], backgroundMusicUrl } = payload;
+  const workDir = path.dirname(silentVideoPath);
 
-  // Coletar URLs de narração únicas por cena
-  const narrationUrls = scenes
-    .map(s => s.audioUrl)
-    .filter(Boolean);
+  // Resolver todos os audioUrls para paths locais em paralelo
+  const resolvedAudios = await Promise.all(
+    scenes.map(async (scene, i) => {
+      if (!scene.audioUrl) return null;
+      const localPath = path.join(workDir, `audio_scene_${i}.mp3`);
+      try {
+        return await resolveAudioToLocalPath(scene.audioUrl, localPath);
+      } catch (err) {
+        console.error(`[HyperFrames] Erro ao resolver áudio da cena ${i}:`, err.message);
+        return null;
+      }
+    })
+  );
 
-  // Se não há narração nem música, apenas copia o vídeo
-  if (narrationUrls.length === 0 && !backgroundMusicUrl) {
+  // Verificar se há narração ou música
+  const hasNarration = resolvedAudios.some(Boolean);
+  const hasBGM = !!backgroundMusicUrl;
+
+  // Se não há nada de áudio, apenas copia o vídeo
+  if (!hasNarration && !hasBGM) {
     fs.copyFileSync(silentVideoPath, outputPath);
+    console.log('[HyperFrames FFmpeg] Nenhum áudio encontrado, copiando vídeo sem áudio.');
     return;
   }
 
-  // Montar inputs do ffmpeg
-  let inputs    = [`-i "${silentVideoPath}"`];
+  // Montar inputs e filtros do FFmpeg
+  let inputs      = [`-i "${silentVideoPath}"`];
   let filterParts = [];
   let audioInputIdx = 1;
+  let narrationChunks = [];
+  let timeOffset = 0;
 
   // === Narração por segmento ===
-  if (narrationUrls.length > 0) {
-    // Montar concatenação das narrações com delay por cena
-    let narrationChunks = [];
-    let timeOffset = 0;
-
-    scenes.forEach((scene, i) => {
-      if (!scene.audioUrl) {
-        timeOffset += scene.durationSeconds || 5;
-        return;
-      }
-
-      let audioInput = scene.audioUrl;
-      if (audioInput.startsWith('data:')) {
-        const base64Data = audioInput.split(',')[1];
-        if (base64Data) {
-          const localAudioPath = path.join(path.dirname(silentVideoPath), `audio_scene_${i}.mp3`);
-          fs.writeFileSync(localAudioPath, Buffer.from(base64Data, 'base64'));
-          audioInput = localAudioPath;
-        }
-      }
-
-      inputs.push(`-i "${audioInput}"`);
-      const idx = audioInputIdx++;
-      const delay = Math.round(timeOffset * 1000); // ms
-
-      filterParts.push(`[${idx}:a]adelay=${delay}|${delay}[nar${i}]`);
-      narrationChunks.push(`[nar${i}]`);
+  scenes.forEach((scene, i) => {
+    const resolvedPath = resolvedAudios[i];
+    if (!resolvedPath) {
       timeOffset += scene.durationSeconds || 5;
-    });
-
-    if (narrationChunks.length > 0) {
-      // Mixar todas as narrações em um stream
-      filterParts.push(`${narrationChunks.join('')}amix=inputs=${narrationChunks.length}:normalize=0[narration]`);
+      return;
     }
+
+    inputs.push(`-i "${resolvedPath}"`);
+    const idx   = audioInputIdx++;
+    const delay = Math.round(timeOffset * 1000); // milissegundos
+
+    filterParts.push(`[${idx}:a]adelay=${delay}|${delay}[nar${i}]`);
+    narrationChunks.push(`[nar${i}]`);
+    timeOffset += scene.durationSeconds || 5;
+  });
+
+  // Consolidar narrações em um único stream
+  if (narrationChunks.length === 1) {
+    // Com 1 narração, não usar amix — apenas renomear o label
+    filterParts.push(`${narrationChunks[0]}anull[narration]`);
+  } else if (narrationChunks.length > 1) {
+    filterParts.push(`${narrationChunks.join('')}amix=inputs=${narrationChunks.length}:normalize=0:dropout_transition=0[narration]`);
   }
 
   // === Música de fundo ===
-  if (backgroundMusicUrl) {
-    inputs.push(`-i "${backgroundMusicUrl}"`);
+  if (hasBGM) {
+    const bgmLocalPath = path.join(workDir, 'bgm.mp3');
+    let bgmInput = backgroundMusicUrl;
+    try {
+      const resolved = await resolveAudioToLocalPath(backgroundMusicUrl, bgmLocalPath);
+      if (resolved) bgmInput = resolved;
+    } catch (err) {
+      console.error('[HyperFrames] Erro ao resolver BGM:', err.message);
+    }
+    inputs.push(`-i "${bgmInput}"`);
     const bgIdx = audioInputIdx++;
     filterParts.push(`[${bgIdx}:a]volume=0.12[bgm]`);
   }
@@ -258,12 +304,12 @@ async function mixAudioTracks(silentVideoPath, payload, outputPath) {
   // === Mistura final ===
   let finalAudioLabel;
 
-  if (narrationUrls.length > 0 && backgroundMusicUrl) {
-    filterParts.push('[narration][bgm]amix=inputs=2:normalize=0[audio_out]');
+  if (hasNarration && hasBGM) {
+    filterParts.push('[narration][bgm]amix=inputs=2:normalize=0:dropout_transition=0[audio_out]');
     finalAudioLabel = '[audio_out]';
-  } else if (narrationUrls.length > 0) {
+  } else if (hasNarration) {
     finalAudioLabel = '[narration]';
-  } else if (backgroundMusicUrl) {
+  } else {
     finalAudioLabel = '[bgm]';
   }
 
@@ -271,16 +317,18 @@ async function mixAudioTracks(silentVideoPath, payload, outputPath) {
   const ffmpegCmd = [
     'ffmpeg -y',
     inputs.join(' '),
-    filterComplex ? `-filter_complex "${filterComplex}"` : '',
-    filterComplex ? `-map 0:v -map "${finalAudioLabel}"` : '-map 0:v',
+    `-filter_complex "${filterComplex}"`,
+    `-map 0:v -map "${finalAudioLabel}"`,
     '-c:v copy',
     '-c:a aac -b:a 192k',
     '-shortest',
     `"${outputPath}"`
-  ].filter(Boolean).join(' ');
+  ].join(' ');
 
   console.log('[HyperFrames FFmpeg] Executando mixagem de áudio...');
-  execSync(ffmpegCmd, { timeout: 120000, stdio: 'pipe' });
+  console.log('[HyperFrames FFmpeg] Cmd:', ffmpegCmd.substring(0, 300) + '...');
+  execSync(ffmpegCmd, { timeout: 180000, stdio: 'pipe' });
+  console.log('[HyperFrames FFmpeg] Mixagem concluída.');
 }
 
 // ──────────────────────────────────────────────
