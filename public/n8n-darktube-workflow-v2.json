@@ -1,0 +1,408 @@
+{
+  "name": "Darktube Produção v2 — AI Directors",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "darktube_producao",
+        "options": {}
+      },
+      "name": "Webhook Darktube",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [208, 1968],
+      "id": "8ccccbd5-e9b1-4e54-b0f3-f20e291ab6b5",
+      "webhookId": "7b04b8bf-2535-478f-b156-f3bd7209d180"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst voice        = tpl.voice        || 'pt-BR-FranciscaNeural';\nconst format       = tpl.format       || 'vertical';\n\n// Engine inicial (será sobrescrito pelo AI Engine Selector)\nconst renderEngine = 'pending_ai_selection';\n\nconst userMedia = tpl.user_media || tpl.uploaded_images || tpl.images || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    topic:          tpl.video_title    || '',\n    emotion:        seg.emotion        || 'neutral',\n    user_media:     userMedia,\n    tpl\n  }\n}));"
+      },
+      "name": "Normalize + Auto Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [432, 1968],
+      "id": "2d97433c-075d-4dda-a781-392be0202aa6"
+    },
+    {
+      "parameters": { "options": {} },
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [656, 1968],
+      "id": "2d8fbf12-aa7c-48b2-aa62-0358dbb50c1d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Seleciona Imagem da Cena - estritamente 1-para-1 com a imagem enviada\nconst norm        = $json;\nconst idx         = parseInt(norm.index !== undefined ? norm.index : 0);\nconst tpl         = norm.tpl || {};\nconst visual      = norm.visual_content || {};\n\nconst userMedia   = norm.user_media || tpl.user_media || tpl.uploaded_images || tpl.images || [];\n\nlet providedUrl = norm.image_url\n  || norm.media_url\n  || visual.image_url\n  || (Array.isArray(userMedia) && userMedia[idx] ? (userMedia[idx].file_url || userMedia[idx]) : '')\n  || '';\n\nlet imageUrl = providedUrl || tpl.video_thumbnail || '';\nlet source   = providedUrl ? 'user_uploaded_image' : 'template_thumbnail';\n\nreturn [{ json: { ...norm, image_url: imageUrl, source } }];"
+      },
+      "name": "Generate Scene Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 1968],
+      "id": "8e123f64-6335-4b57-bdc5-8986e8308ae9"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://edge-tts.fjt-solutions.com/v1/audio/speech",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.voiceover?.text || $json.voiceover_text || $json.voiceoverText || $json.text }}\",\n  \"voice\": \"{{ $json.voice }}\",\n  \"language\": \"{{ $json.language }}\",\n  \"speed\": 1.0,\n  \"response_format\": \"mp3\"\n}",
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "name": "Generate TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1104, 1968],
+      "id": "e8e1106b-ba75-46b9-83f3-dc52709218c9"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://whisper.fjt-solutions.com/v1/audio/transcriptions",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "parameterType": "formBinaryData", "name": "file", "inputDataFieldName": "data" },
+            { "name": "model", "value": "Systran/faster-whisper-small" },
+            { "name": "response_format", "value": "verbose_json" },
+            { "name": "timestamp_granularities[]", "value": "word" },
+            { "name": "language", "value": "={{ $('Normalize + Auto Engine').first().json.language }}" }
+          ]
+        },
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "name": "Whisper Word Timestamps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1328, 1968],
+      "id": "b1d7578e-7a54-4cb8-8d82-87897fe321ef"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Monta SceneSegment completo ──\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\nconst ttsNode = $('Generate TTS');\nconst ttsItem = ttsNode.item || (ttsNode.all() && ttsNode.all()[0]) || {};\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\nconst imageUrl = segment.image_url || segment.media_url || visual.image_url || segment.tpl?.video_thumbnail || '';\n\nlet audioUrl = segment.audio_url || '';\nif (!audioUrl) {\n  let base64Data = '';\n  try {\n    const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);\n    if (getHelper) {\n      const buf = await getHelper.call(this, 0, 'data', 'Generate TTS');\n      if (buf && buf.length > 0) { base64Data = buf.toString('base64'); }\n    }\n  } catch (err) { console.error('Error fetching TTS binary buffer:', err.message); }\n\n  if (!base64Data && ttsItem && ttsItem.binary) {\n    const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';\n    const binaryObj = ttsItem.binary[binaryKey];\n    if (binaryObj && binaryObj.data && binaryObj.data !== 'database') { base64Data = binaryObj.data; }\n  }\n\n  if (base64Data) { audioUrl = `data:audio/mp3;base64,${base64Data}`; }\n}\n\nconst captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\n\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\nconst duration = wRes.duration || (() => {\n  const ts = segment.timestamp || '';\n  const parts = ts.split('-');\n  const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n  return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n})();\n\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')         animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch')  animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade',\n    emotion:        segment.emotion || 'neutral'\n  }\n}];"
+      },
+      "name": "Build Scene",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1552, 2048],
+      "id": "b7fa4bb7-8ade-4420-a197-917d2a377895"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Agrega todas as cenas geradas pelo loop ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst execId = $execution?.id || '';\nconst resumeUrl = $execution?.resumeUrl || '';\nconst baseCallback = resumeUrl || (execId ? `https://n8n.fjt-solutions.com/webhook-waiting/${execId}/darktube-render-complete` : `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`);\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     false,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    topic:         norm.topic         || tpl.video_title || '',\n    emotion:       scenes[0]?.emotion || 'neutral',\n    composition\n  }\n}];"
+      },
+      "name": "Aggregate Scenes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 1680],
+      "id": "d6c6475c-de83-4484-bf2d-d6b758e35fab"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI ENGINE SELECTOR — Prepara o prompt para o AI Agent OpenAI\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\n\nconst topic        = $json.topic        || comp.topic        || 'não informado';\nconst emotion      = $json.emotion      || scenes[0]?.emotion || 'neutral';\nconst captionStyle = comp.captionStyle  || 'subtitle';\nconst sceneCount   = scenes.length;\nconst totalDur     = scenes.reduce((s, c) => s + (c.durationSeconds || 5), 0);\nconst hasImages    = scenes.some(s => s.imageUrl) ? 'sim' : 'não';\nconst firstWords   = scenes.slice(0, 3).map(s => s.captionText || '').join(' | ');\n\nconst userMessage = `Analise este vídeo e escolha o engine de renderização:\n\n- Tema: ${topic}\n- Emoção predominante: ${emotion}\n- Estilo de legenda configurado: ${captionStyle}\n- Número de cenas: ${sceneCount}\n- Duração total: ${totalDur.toFixed(1)}s\n- Tem imagens de fundo: ${hasImages}\n- Primeiras legendas: ${firstWords}\n\nResponda APENAS com JSON puro (sem markdown): {\"engine\":\"hyperframes\",\"reason\":\"motivo curto\"}`;\n\nreturn [{ json: { ...$json, _selectorPrompt: userMessage } }];"
+      },
+      "name": "Engine Selector — Prepara",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1104, 1584],
+      "id": "ai-selector-prep-001"
+    },
+    {
+      "parameters": {
+        "prompt": "={{ $json._selectorPrompt }}",
+        "options": {
+          "systemMessage": "Você é um Seletor de Engine de Renderização de Vídeo. Analise o conteúdo do vídeo e decida qual engine usar.\n\nRESPONDA APENAS COM JSON PURO, sem markdown, sem explicação:\n{\"engine\":\"hyperframes\",\"reason\":\"motivo em 1 frase\"}\nou\n{\"engine\":\"remotion\",\"reason\":\"motivo em 1 frase\"}\n\nUSE HYPERFRAMES quando:\n- Vídeo tem imagens de fundo com efeitos cinematográficos pesados\n- Pede transições visuais: glitch, light leak, whip pan, cinematic zoom\n- Estilo de legenda 'subtitle' (caixa de texto clássica)\n- Tema documental, informativo, histórico, filosófico\n- 4 ou mais cenas com imagens diferentes\n- Estética sombria, cinematográfica, épica\n\nUSE REMOTION quando:\n- Palavras explodem na tela (estilo viral TikTok/Reels)\n- Karaoke sincronizado palavra-a-palavra\n- Estilo emocional/motivacional com spring physics\n- 1 a 3 cenas com alto impacto por texto\n- Ritmo rápido baseado em música\n- Legenda 'pop' ou 'karaoke'"
+        }
+      },
+      "name": "AI Agent — Engine Selector",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [1328, 1584],
+      "id": "ai-agent-selector-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// ENGINE SELECTOR — Extrai resultado do AI Agent\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '';\n\nlet parsed = { engine: 'hyperframes', reason: 'fallback padrão' };\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch {\n  parsed = {\n    engine: output.toLowerCase().includes('remotion') ? 'remotion' : 'hyperframes',\n    reason: 'detectado por keyword'\n  };\n}\n\nconst original = $('Engine Selector — Prepara').first().json;\nreturn [{\n  json: {\n    ...original,\n    render_engine: parsed.engine || 'hyperframes',\n    engineReason:  parsed.reason || '',\n  }\n}];"
+      },
+      "name": "Engine Selector — Extrai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1552, 1584],
+      "id": "ai-selector-extract-001"
+    },
+
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+                "combinator": "and",
+                "conditions": [{ "leftValue": "={{ $json.render_engine }}", "rightValue": "remotion", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "Remotion"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+                "combinator": "and",
+                "conditions": [{ "leftValue": "={{ $json.render_engine }}", "rightValue": "hyperframes", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "Hyperframes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Route to Engine",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1776, 1584],
+      "id": "25195eee-1ac3-49df-b913-1b371cf620e9"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR REMOTION — Prepara prompt de direção cinematográfica\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\nconst emotion = $json.emotion || scenes[0]?.emotion || 'neutral';\nconst style   = comp.captionStyle || 'pop';\nconst topic   = $json.topic || '';\n\nconst userMessage = `Crie a direção cinematográfica para este vídeo Remotion.\n\nEstilo de legenda: ${style}\nEmoção geral: ${emotion}\nTema: ${topic}\n\nCenas:\n${JSON.stringify(scenes.map(s => ({ index: s.index, captionText: s.captionText, durationSeconds: s.durationSeconds, emotion: s.emotion })), null, 2)}\n\nResponda APENAS com JSON array (sem markdown):\n[{\"index\":0,\"transitionIn\":\"slide-right\",\"transitionDurationFrames\":18,\"textEffect\":\"pop\",\"springPreset\":\"bouncy\",\"intensity\":0.8,\"emotionColor\":\"#FF6B35\"}]`;\n\nreturn [{ json: { ...$json, _directorPrompt: userMessage } }];"
+      },
+      "name": "Director Remotion — Prepara",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 1488],
+      "id": "director-remotion-prep-001"
+    },
+    {
+      "parameters": {
+        "prompt": "={{ $json._directorPrompt }}",
+        "options": {
+          "systemMessage": "Você é um Diretor de Cena especializado em Remotion (React + spring physics).\n\nREGRA ABSOLUTA: No Remotion, CSS animations e CSS transitions causam flickering. Use APENAS as opções abaixo.\n\nTRANSIÇÕES DISPONÍVEIS (@remotion/transitions):\n- fade: suave, elegante, universal\n- slide-right: entrada pela direita (energia, movimento)\n- slide-left: entrada pela esquerda\n- slide-up: entrada por baixo (revelação, ascensão)\n- wipe: cortina cinematográfica\n- flip: virada 3D (mudança de perspectiva)\n- none: corte direto, impacto bruto\n\nEFEITOS DE TEXTO (textEffect):\n- pop: palavra explode com spring bounce (padrão viral TikTok)\n- split-bounce: cada LETRA entra com spring staggerado (impacto máximo)\n- typewriter: caracteres aparecem um por um (suspense, mistério)\n- glitch: aberração cromática RGB na entrada (tech, urgência)\n- none: sem efeito especial\n\nPRESETS DE SPRING (springPreset):\n- bouncy: impacto alto, bounce visível (conteúdo viral, energia)\n- smooth: suave e fluido (motivacional, reflexivo)\n- dramatic: ultra-rápido, sem bounce (urgência, impacto)\n- gentle: lento e orgânico (meditação, paz)\n\nEscolha baseado na emoção de cada cena. Variedade é importante — não repita o mesmo para todas as cenas.\nResponda APENAS com JSON array (sem markdown, sem explicações)."
+        }
+      },
+      "name": "AI Agent — Director Remotion",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [2224, 1488],
+      "id": "ai-agent-director-remotion-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR REMOTION — Aplica direção ao payload\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '[]';\n\nlet directions = [];\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  const match = clean.match(/\\[.*\\]/s);\n  directions = JSON.parse(match ? match[0] : clean);\n} catch (e) {\n  console.log('Director Remotion parse error:', e.message);\n  directions = [];\n}\n\nconst original = $('Director Remotion — Prepara').first().json;\nconst comp = original.composition || {};\nconst scenes = comp.scenes || [];\n\nconst enriched = scenes.map(scene => {\n  const dir = directions.find(d => d.index === scene.index) || {};\n  return {\n    ...scene,\n    transitionIn:             dir.transitionIn             || scene.transitionIn || 'fade',\n    transitionDurationFrames: dir.transitionDurationFrames || 18,\n    textEffect:               dir.textEffect               || 'pop',\n    springPreset:             dir.springPreset             || 'bouncy',\n    intensity:                dir.intensity                ?? 0.8,\n    emotionColor:             dir.emotionColor             || null,\n  };\n});\n\nreturn [{\n  json: {\n    ...original,\n    composition: { ...comp, scenes: enriched },\n    _directorApplied: 'remotion',\n  }\n}];"
+      },
+      "name": "Director Remotion — Aplica",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2448, 1488],
+      "id": "director-remotion-apply-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n-remotionservice-ry6eh9:3001/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "name": "Remotion Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2672, 1488],
+      "id": "4304c962-a6d1-430d-a579-acfbfb7c2fb8"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR HYPERFRAMES — Prepara prompt de direção cinematográfica\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\nconst emotion = $json.emotion || scenes[0]?.emotion || 'neutral';\nconst style   = comp.captionStyle || 'subtitle';\nconst topic   = $json.topic || '';\n\nconst userMessage = `Crie a direção cinematográfica para este vídeo HyperFrames.\n\nEstilo de legenda: ${style}\nEmoção geral: ${emotion}\nTema: ${topic}\n\nCenas:\n${JSON.stringify(scenes.map(s => ({ index: s.index, captionText: s.captionText, durationSeconds: s.durationSeconds, hasImage: !!s.imageUrl, emotion: s.emotion })), null, 2)}\n\nResponda APENAS com JSON array (sem markdown):\n[{\"index\":0,\"animationStyle\":\"kenburns-right\",\"transitionIn\":\"light-leak\",\"captionEffect\":\"bounce\",\"intensity\":0.8}]`;\n\nreturn [{ json: { ...$json, _directorPrompt: userMessage } }];"
+      },
+      "name": "Director HyperFrames — Prepara",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 1680],
+      "id": "director-hf-prep-001"
+    },
+    {
+      "parameters": {
+        "prompt": "={{ $json._directorPrompt }}",
+        "options": {
+          "systemMessage": "Você é um Diretor de Cena especializado em HyperFrames (HTML + GSAP globalTimeline).\n\nCRIE DIREÇÃO CINEMATOGRÁFICA variada para cada cena. Nunca use o mesmo estilo para todas.\n\nANIMAÇÕES DE IMAGEM (animationStyle):\n- kenburns-right: zoom + pan suave para direita (clássico, documental)\n- kenburns-left: zoom + pan suave para esquerda (variedade)\n- zoom-punch: zoom dramático de entrada, depois sutil (impacto inicial)\n- parallax-up: câmera sobe enquanto cena avança (revelação, ascensão)\n- zoom-out: começa no detalhe e revela o todo (contexto, grandeza)\n\nTRANSIÇÕES DE ENTRADA (transitionIn):\n- fade: suave, elegante, universal\n- light-leak: luminosidade quente, nostálgico, cinematográfico\n- glitch: distorção digital, viral, tech, urgência\n- whip-pan: movimento lateral veloz, energético, esportivo\n- cinematic-zoom: escala + desfoque na entrada, dramático, épico\n- flash: corte brusco com flash branco, surpresa, impacto\n\nEFEITOS DE LEGENDA (captionEffect):\n- bounce: entrada com bounce e rotação (pop, energético)\n- clip-wipe: wipe da esquerda (elegante, editorial)\n- glitch-rgb: aberração cromática (tech, urgência)\n- editorial: tamanho contrastante com ênfase (profissional)\n\nEscolha baseado na emoção da cena. Varie sempre.\nResponda APENAS com JSON array (sem markdown, sem explicações)."
+        }
+      },
+      "name": "AI Agent — Director HyperFrames",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [2224, 1680],
+      "id": "ai-agent-director-hf-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR HYPERFRAMES — Aplica direção ao payload\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '[]';\n\nlet directions = [];\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  const match = clean.match(/\\[.*\\]/s);\n  directions = JSON.parse(match ? match[0] : clean);\n} catch (e) {\n  console.log('Director HyperFrames parse error:', e.message);\n  directions = [];\n}\n\nconst original = $('Director HyperFrames — Prepara').first().json;\nconst comp = original.composition || {};\nconst scenes = comp.scenes || [];\n\nconst enriched = scenes.map(scene => {\n  const dir = directions.find(d => d.index === scene.index) || {};\n  return {\n    ...scene,\n    animationStyle: dir.animationStyle || scene.animationStyle || 'kenburns-right',\n    transitionIn:   dir.transitionIn   || scene.transitionIn   || 'fade',\n    captionEffect:  dir.captionEffect  || 'bounce',\n    intensity:      dir.intensity      ?? 0.75,\n  };\n});\n\nreturn [{\n  json: {\n    ...original,\n    composition: { ...comp, scenes: enriched },\n    _directorApplied: 'hyperframes',\n  }\n}];"
+      },
+      "name": "Director HyperFrames — Aplica",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2448, 1680],
+      "id": "director-hf-apply-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n-hyperframesservice-sruzdk:3002/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "name": "Hyperframes Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [2672, 1680],
+      "id": "f5927597-f655-4104-8f40-861b39295e9f"
+    },
+
+    {
+      "parameters": { "resume": "webhook", "httpMethod": "POST", "options": {} },
+      "name": "Wait Render",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2896, 1584],
+      "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94",
+      "webhookId": "ff06ebff-2ea7-45b3-8a11-66c6c96fe988"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Auto-Post Blotato (Publicação Social) ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\nconst waitRes = $('Wait Render').first().json;\n\nconst accounts = tpl.target_accounts || [];\nif (accounts.length === 0) {\n  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || waitRes.videoUrl || '' } }];\n}\n\nreturn [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || waitRes.videoUrl || '' } }];"
+      },
+      "name": "Auto-Post Blotato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3120, 1584],
+      "id": "db564ca1-8553-468f-bfe5-7f18068aac4e"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"render_engine\": \"{{ $('Engine Selector — Extrai').first().json.render_engine }}\",\n  \"videoUrl\":      \"{{ $('Wait Render').first().json.body?.videoUrl || $('Wait Render').first().json.body?.video_url || $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.body?.videoUrl || $('Wait Render').first().json.body?.video_url || $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}\",\n  \"thumbnailUrl\":  \"{{ $('Wait Render').first().json.body?.thumbnailUrl || $('Wait Render').first().json.thumbnailUrl || '' }}\",\n  \"status\":        \"{{ $('Wait Render').first().json.body?.status || $('Wait Render').first().json.status || 'completed' }}\",\n  \"error\":         \"{{ $('Wait Render').first().json.body?.error || $('Wait Render').first().json.error || '' }}\"\n}",
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "name": "Callback DarkTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [3344, 1584],
+      "id": "a1b6073b-5541-47dd-a0a6-26773d95773a"
+    },
+    {
+      "parameters": {},
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [656, 2240],
+      "id": "e8e1106b-error-trigger-001"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":  \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : 'dt_error_session' }}\",\n  \"session_id\": \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : 'dt_error_session' }}\",\n  \"status\":     \"failed\",\n  \"error\":      \"{{ $json.execution?.error?.message || 'Erro durante execução no n8n' }}\"\n}",
+        "options": { "allowUnauthorizedCerts": true }
+      },
+      "name": "Callback Error DarkTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [912, 2240],
+      "id": "a1b6073b-error-callback-002"
+    }
+  ],
+  "connections": {
+    "Webhook Darktube": {
+      "main": [[{ "node": "Normalize + Auto Engine", "type": "main", "index": 0 }]]
+    },
+    "Normalize + Auto Engine": {
+      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+    },
+    "Loop Over Items": {
+      "main": [
+        [{ "node": "Aggregate Scenes", "type": "main", "index": 0 }],
+        [{ "node": "Generate Scene Image", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Scene Image": {
+      "main": [[{ "node": "Generate TTS", "type": "main", "index": 0 }]]
+    },
+    "Generate TTS": {
+      "main": [[{ "node": "Whisper Word Timestamps", "type": "main", "index": 0 }]]
+    },
+    "Whisper Word Timestamps": {
+      "main": [[{ "node": "Build Scene", "type": "main", "index": 0 }]]
+    },
+    "Build Scene": {
+      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+    },
+    "Aggregate Scenes": {
+      "main": [[{ "node": "Engine Selector — Prepara", "type": "main", "index": 0 }]]
+    },
+    "Engine Selector — Prepara": {
+      "main": [[{ "node": "AI Agent — Engine Selector", "type": "main", "index": 0 }]]
+    },
+    "AI Agent — Engine Selector": {
+      "main": [[{ "node": "Engine Selector — Extrai", "type": "main", "index": 0 }]]
+    },
+    "Engine Selector — Extrai": {
+      "main": [[{ "node": "Route to Engine", "type": "main", "index": 0 }]]
+    },
+    "Route to Engine": {
+      "main": [
+        [{ "node": "Director Remotion — Prepara", "type": "main", "index": 0 }],
+        [{ "node": "Director HyperFrames — Prepara", "type": "main", "index": 0 }]
+      ]
+    },
+    "Director Remotion — Prepara": {
+      "main": [[{ "node": "AI Agent — Director Remotion", "type": "main", "index": 0 }]]
+    },
+    "AI Agent — Director Remotion": {
+      "main": [[{ "node": "Director Remotion — Aplica", "type": "main", "index": 0 }]]
+    },
+    "Director Remotion — Aplica": {
+      "main": [[{ "node": "Remotion Render", "type": "main", "index": 0 }]]
+    },
+    "Director HyperFrames — Prepara": {
+      "main": [[{ "node": "AI Agent — Director HyperFrames", "type": "main", "index": 0 }]]
+    },
+    "AI Agent — Director HyperFrames": {
+      "main": [[{ "node": "Director HyperFrames — Aplica", "type": "main", "index": 0 }]]
+    },
+    "Director HyperFrames — Aplica": {
+      "main": [[{ "node": "Hyperframes Render", "type": "main", "index": 0 }]]
+    },
+    "Remotion Render": {
+      "main": [[{ "node": "Wait Render", "type": "main", "index": 0 }]]
+    },
+    "Hyperframes Render": {
+      "main": [[{ "node": "Wait Render", "type": "main", "index": 0 }]]
+    },
+    "Wait Render": {
+      "main": [[{ "node": "Auto-Post Blotato", "type": "main", "index": 0 }]]
+    },
+    "Auto-Post Blotato": {
+      "main": [[{ "node": "Callback DarkTube", "type": "main", "index": 0 }]]
+    },
+    "Error Trigger": {
+      "main": [[{ "node": "Callback Error DarkTube", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d5c1be1e686158128704986c8b96dfb65a421b52cf38e177cd9037bb8b11d8e0"
+  }
+}

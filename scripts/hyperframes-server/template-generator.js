@@ -1,18 +1,41 @@
 /**
- * Hyperframes Cinematic Composition Generator
- * Gera HTML dinâmico a partir do payload do Darktube
- * Usa GSAP + CSS avançado para efeitos cinematográficos
+ * ╔══════════════════════════════════════════════════════════════╗
+ * ║  Darktube — HyperFrames Cinematic Composition Generator      ║
+ * ║  Versão: 2.0  (gsap.globalTimeline — seek-safe)             ║
+ * ╚══════════════════════════════════════════════════════════════╝
+ *
+ * MECANISMO DE SEEK DO HYPERFRAMES:
+ *   O HyperFrames injeta um runtime que, a cada frame, executa:
+ *     gsap.globalTimeline.pause();
+ *     gsap.globalTimeline.seek(frame / fps);
+ *
+ *   Portanto, TODAS as animações DEVEM ser adicionadas à globalTimeline:
+ *     ✅ gsap.globalTimeline.add(tl, startTime)
+ *     ✅ gsap.to(el, { ..., delay: startTime })
+ *     ❌ gsap.timeline({ paused: true })  → nunca recebe seek
+ *
+ * FONTES DO CATÁLOGO USADAS:
+ *   - Transições: light-leak, glitch, whip-pan, cinematic-zoom, flash-white
+ *   - Captions: clip-wipe, editorial-emphasis, glitch-rgb, word-sweep
+ *   - Efeitos: Ken Burns, zoom-punch, parallax-up, zoom-out (via GSAP)
  */
 
 /**
  * @param {object} payload
- * @param {Array}  payload.scenes            - Lista de cenas do script
- * @param {string} payload.format            - 'vertical' (1080x1920) | 'horizontal' (1920x1080)
- * @param {string} payload.primaryColor      - Cor principal das legendas
- * @param {string} payload.accentColor       - Cor de destaque
- * @param {string} payload.captionStyle      - 'pop' | 'karaoke' | 'subtitle'
- * @param {string} payload.watermarkText     - Texto do watermark
- * @param {boolean} payload.showWatermark    - Exibir watermark
+ * @param {Array}  payload.scenes             - Lista de cenas
+ * @param {string} payload.format             - 'vertical' | 'horizontal'
+ * @param {string} payload.primaryColor       - Cor principal
+ * @param {string} payload.accentColor        - Cor de destaque
+ * @param {string} payload.captionStyle       - 'pop' | 'karaoke' | 'subtitle'
+ * @param {string} payload.watermarkText      - Texto watermark
+ * @param {boolean} payload.showWatermark     - Mostrar watermark
+ *
+ * CAMPOS POR CENA (adicionados pelo AI Director HyperFrames):
+ * @param {string}  scene.animationStyle      - 'kenburns-right' | 'kenburns-left' | 'zoom-punch' | 'parallax-up' | 'zoom-out'
+ * @param {string}  scene.transitionIn        - 'light-leak' | 'glitch' | 'whip-pan' | 'cinematic-zoom' | 'flash' | 'fade'
+ * @param {string}  scene.captionEffect       - 'clip-wipe' | 'editorial' | 'glitch-rgb' | 'bounce' | 'default'
+ * @param {number}  scene.intensity           - 0.0–1.0 (intensidade geral)
+ * @param {Array}   scene.words               - [{ word, startInSeconds, endInSeconds }] do Whisper
  */
 function generateCompositionHTML(payload) {
   const {
@@ -78,8 +101,8 @@ function generateCompositionHTML(payload) {
     </div>`;
   }).join('\n');
 
-  // Gerar GSAP timeline
-  const gsapTimeline = generateGSAPTimeline(scenes, captionStyle);
+  // Gerar GSAP timeline (usa gsap.globalTimeline via delay)
+  const gsapTimeline = generateGSAPTimeline(scenes, captionStyle, primaryColor);
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -305,161 +328,255 @@ function generateCompositionHTML(payload) {
   <!-- Barras cinematográficas (intro/outro) -->
   <div class="cinematic-bars-top" id="bars-top"></div>
   <div class="cinematic-bars-bottom" id="bars-bottom"></div>
+  <!-- Overlays globais de transição cinematográfica -->
+  <div id="flash-overlay" style="
+    position:absolute;top:0;left:0;right:0;bottom:0;
+    background:#fff;opacity:0;pointer-events:none;z-index:30;
+  "></div>
+  <div id="light-leak-overlay" style="
+    position:absolute;top:0;left:0;right:0;bottom:0;
+    background:linear-gradient(105deg,#ff9d00 0%,#fffbe0 40%,#ff6b35 100%);
+    mix-blend-mode:screen;opacity:0;pointer-events:none;z-index:28;transform-origin:center;
+  "></div>
 
 </div>
 
 <script>
-  // ─── GSAP TIMELINE PRINCIPAL ───
-  const tl = gsap.timeline({ paused: true });
+  // ════════════════════════════════════════════════════
+  // DARKTUBE — GSAP globalTimeline (seek-safe)
+  // O HyperFrames faz: gsap.globalTimeline.seek(frame/fps)
+  // TODAS as animações devem estar na globalTimeline.
+  // ════════════════════════════════════════════════════
 
-  // Barras cinematográficas de entrada
-  tl.to(['#bars-top', '#bars-bottom'], {
-    y: 0,
-    duration: 0.001,
-  }, 0);
-  tl.to(['#bars-top', '#bars-bottom'], {
+  // Progress bar — na globalTimeline diretamente
+  gsap.set('#progress-bar', { opacity: 0.7, width: '0%' });
+  gsap.to('#progress-bar', {
+    width: '100%',
+    duration: ${totalDuration},
+    ease: 'none',
+    delay: 0,
+  });
+
+  // Barras cinematográficas de abertura
+  gsap.set(['#bars-top', '#bars-bottom'], { y: 0 });
+  gsap.to(['#bars-top', '#bars-bottom'], {
     y: '100%',
-    duration: 0.6,
+    duration: 0.55,
     ease: 'power2.inOut',
-    stagger: 0,
-  }, 0.1);
+    delay: 0.08,
+  });
 
   ${showWatermark ? `
   // Watermark
-  tl.to('#watermark', { opacity: 1, duration: 0.5, ease: 'power2.out' }, 0.8);
+  gsap.set('#watermark', { opacity: 0, y: -12 });
+  gsap.to('#watermark', { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out', delay: 0.9 });
   ` : ''}
 
-  // Barra de progresso
-  tl.to('#progress-bar', {
-    opacity: 0.7,
-    duration: 0.3
-  }, 0.5);
-  tl.to('#progress-bar', {
-    width: '100%',
-    duration: ${totalDuration},
-    ease: 'none'
-  }, 0);
-
-  // ─── ANIMAÇÕES DAS CENAS ───
+  // ─── ANIMAÇÕES POR CENA ───
   ${gsapTimeline}
-
-  // Registrar timeline
-  window.__timelines = window.__timelines || {};
-  window.__timelines['darktube-video'] = tl;
 </script>
 
 </body>
 </html>`;
 }
 
-/**
- * Gera o código GSAP para animar todas as cenas
- */
-function generateGSAPTimeline(scenes, captionStyle) {
-  let gsapCode = '';
+// ════════════════════════════════════════════════════════════════
+// generateGSAPTimeline— gera código JS que adiciona animações
+// diretamente à gsap.globalTimeline (não a uma timeline local).
+// ════════════════════════════════════════════════════════════════
+function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
+  let code = '';
   let currentTime = 0;
 
-  const animStyles = ['kenburns-right', 'kenburns-left', 'zoom-punch', 'parallax-up', 'zoom-out'];
+  const defaultAnimStyles = ['kenburns-right', 'kenburns-left', 'zoom-punch', 'parallax-up', 'zoom-out'];
 
   scenes.forEach((scene, i) => {
     const start    = currentTime;
     const duration = scene.durationSeconds || 5;
     const end      = start + duration;
-    const style    = scene.animationStyle || animStyles[i % animStyles.length];
-    const transIn  = scene.transitionIn || 'fade';
+    const animStyle = scene.animationStyle || defaultAnimStyles[i % defaultAnimStyles.length];
+    const transIn   = scene.transitionIn   || 'fade';
+    const color     = scene.primaryColor   || primaryColor || '#EAB308';
+    const intensity = scene.intensity      ?? 0.7;
 
-    // Configurar zoom/pan da imagem baseado no estilo
-    const imgAnimations = {
-      'kenburns-right': {
-        from: 'scale: 1, xPercent: 0',
-        to:   `scale: 1.12, xPercent: 3, duration: ${duration}, ease: 'none'`,
-      },
-      'kenburns-left': {
-        from: 'scale: 1, xPercent: 0',
-        to:   `scale: 1.12, xPercent: -3, duration: ${duration}, ease: 'none'`,
-      },
-      'zoom-punch': {
-        from: 'scale: 1.15',
-        to:   `scale: 1.0, duration: ${Math.min(duration, 0.8)}, ease: 'power3.out'`,
-      },
-      'parallax-up': {
-        from: 'scale: 1.15, yPercent: 3',
-        to:   `yPercent: -3, scale: 1.08, duration: ${duration}, ease: 'none'`,
-      },
-      'zoom-out': {
-        from: 'scale: 1.18',
-        to:   `scale: 1.0, duration: ${duration}, ease: 'none'`,
-      },
-    };
+    // ─ 1. Reveal/fade-in da cena ────────────────────────────────
+    code += `
+  // ═══ CENA ${i + 1} [${start.toFixed(2)}s → ${end.toFixed(2)}s] ═══`;
 
-    const imgAnim = imgAnimations[style] || imgAnimations['kenburns-right'];
+    // Transition overlays baseadas no tipo
+    switch (transIn) {
+      case 'flash':
+        code += `
+  // Flash de entrada
+  gsap.set('#scene-${i}', { opacity: 0 });
+  gsap.to('#scene-${i}', { opacity: 1, duration: 0.08, ease: 'none', delay: ${start} });
+  gsap.fromTo('#flash-overlay', { opacity: ${0.95 * intensity} }, { opacity: 0, duration: 0.35, ease: 'power2.out', delay: ${start} });`;
+        break;
 
-    // Fade de entrada da cena
-    const fadeInDuration = transIn === 'fade' ? 0.45 : 0.25;
+      case 'light-leak':
+        code += `
+  // Light leak de entrada
+  gsap.set('#scene-${i}', { opacity: 0 });
+  gsap.to('#scene-${i}', { opacity: 1, duration: 0.5, ease: 'power1.inOut', delay: ${start} });
+  gsap.fromTo('#light-leak-overlay', 
+    { opacity: ${0.8 * intensity}, scaleX: 0.6, x: '-30%' },
+    { opacity: 0, scaleX: 1.3, x: '30%', duration: 0.65, ease: 'power1.inOut', delay: ${start} });`;
+        break;
 
-    gsapCode += `
-  // ── Cena ${i + 1} [${start.toFixed(2)}s → ${end.toFixed(2)}s] (${style}) ──
-  tl.set('#scene-${i}', { opacity: 0 }, ${start});
-  tl.to('#scene-${i}', { opacity: 1, duration: ${fadeInDuration}, ease: 'power2.out' }, ${start});`;
+      case 'glitch':
+        code += `
+  // Glitch de entrada
+  gsap.set('#scene-${i}', { opacity: 0, x: 0 });
+  gsap.to('#scene-${i}', { opacity: 1, duration: 0.06, ease: 'none', delay: ${start} });
+  gsap.to('#scene-${i}', {
+    keyframes: [
+      { x: ${Math.round(14 * intensity)}, skewX: ${Math.round(4 * intensity)}, filter: 'hue-rotate(90deg) brightness(1.5)', duration: 0.04 },
+      { x: ${Math.round(-10 * intensity)}, skewX: 0, filter: 'hue-rotate(-60deg)', duration: 0.04 },
+      { x: 0, filter: 'none', duration: 0.06 },
+    ],
+    delay: ${start},
+  });`;
+        break;
 
-    // Animação da imagem
-    if (scene.imageUrl) {
-      gsapCode += `
-  tl.fromTo('#bg-${i} img', { ${imgAnim.from} }, { ${imgAnim.to} }, ${start});`;
+      case 'whip-pan':
+        code += `
+  // Whip pan de entrada
+  gsap.fromTo('#scene-${i}',
+    { opacity: 0, x: ${Math.round(160 * intensity)}, filter: 'blur(${Math.round(14 * intensity)}px)' },
+    { opacity: 1, x: 0, filter: 'blur(0px)', duration: 0.28, ease: 'power3.out', delay: ${start} });`;
+        break;
+
+      case 'cinematic-zoom':
+        code += `
+  // Cinematic zoom de entrada
+  gsap.fromTo('#scene-${i}',
+    { opacity: 0, scale: 1.25, filter: 'blur(8px)' },
+    { opacity: 1, scale: 1, filter: 'blur(0px)', duration: 0.55, ease: 'power2.out', delay: ${start} });`;
+        break;
+
+      default: // 'fade'
+        code += `
+  // Fade de entrada
+  gsap.set('#scene-${i}', { opacity: 0 });
+  gsap.to('#scene-${i}', { opacity: 1, duration: 0.4, ease: 'power2.out', delay: ${start} });`;
     }
 
-    // Legendas baseadas no estilo
-    if (captionStyle === 'pop') {
-      const words = (scene.captionText || '').split(' ').filter(Boolean);
-      const timePerWord = duration / (words.length || 1);
+    // ─ 2. Animação da imagem de fundo ────────────────────────
+    if (scene.imageUrl) {
+      switch (animStyle) {
+        case 'kenburns-right':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1, xPercent: 0 }, { scale: 1.13, xPercent: 3, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'kenburns-left':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1, xPercent: 0 }, { scale: 1.13, xPercent: -3, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'zoom-punch':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.2 }, { scale: 1.02, duration: ${Math.min(duration, 0.9)}, ease: 'power3.out', delay: ${start} });`;
+          break;
+        case 'parallax-up':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.15, yPercent: 4 }, { yPercent: -4, scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'zoom-out':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.2 }, { scale: 1.0, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+      }
+    }
 
-      words.forEach((_, wi) => {
-        const wordStart = start + wi * timePerWord;
-        const wordEnd   = wordStart + timePerWord;
-        gsapCode += `
-  tl.to('#w-${i}-${wi}', { opacity: 1, scale: 1, y: 0, duration: 0.18, ease: 'back.out(2)' }, ${wordStart.toFixed(3)});
-  tl.to('#w-${i}-${wi}', { opacity: 0, scale: 0.8, duration: 0.12, ease: 'power2.in' }, ${Math.max(wordEnd - 0.12, wordStart + 0.06).toFixed(3)});`;
+    // ─ 3. Legendas ───────────────────────────────────────
+    const words = buildWordList(scene, start, duration);
+
+    if (captionStyle === 'pop') {
+      words.forEach((w, wi) => {
+        const wDur = Math.max(w.endTime - w.startTime, 0.15);
+        code += `
+  // Pop palavra ${wi + 1}: "${w.word.replace(/'/g, '\\'')}" @ ${w.startTime.toFixed(3)}s
+  gsap.set('#w-${i}-${wi}', { opacity: 0, scale: 0.5, rotation: -8, y: 20 });
+  gsap.to('#w-${i}-${wi}', { opacity: 1, scale: 1, rotation: 0, y: 0, duration: 0.2, ease: 'back.out(2.5)', delay: ${w.startTime.toFixed(3)} });
+  gsap.to('#w-${i}-${wi}', { opacity: 0, scale: 0.82, duration: 0.12, ease: 'power2.in', delay: ${Math.max(w.endTime - 0.12, w.startTime + 0.1).toFixed(3)} });`;
       });
 
     } else if (captionStyle === 'karaoke') {
-      const words = (scene.captionText || '').split(' ').filter(Boolean);
-      const timePerWord = duration / (words.length || 1);
+      // Todas as palavras visíveis (opacidade baixa) desde o início da cena
+      code += `
+  gsap.set('#scene-${i} .word', { opacity: 0, y: 0, scale: 0.95 });
+  gsap.to('#scene-${i} .word', { opacity: 0.3, duration: 0.25, stagger: 0.04, delay: ${(start + 0.15).toFixed(3)} });`;
 
-      // Mostrar todas as palavras e destacar a atual
-      gsapCode += `
-  tl.to('#scene-${i} .caption-words .word', { opacity: 0.35, scale: 0.95, y: 0, duration: 0.2 }, ${(start + 0.1).toFixed(3)});`;
-      words.forEach((_, wi) => {
-        const wordStart = start + wi * timePerWord;
-        const wordEnd   = wordStart + timePerWord;
-        gsapCode += `
-  tl.to('#w-${i}-${wi}', { opacity: 1, scale: 1.08, color: '${scene.primaryColor || '#EAB308'}', duration: 0.12, ease: 'power2.out' }, ${wordStart.toFixed(3)});
-  tl.to('#w-${i}-${wi}', { scale: 1, color: '#ffffff', duration: 0.15 }, ${(wordEnd - 0.15).toFixed(3)});`;
+      words.forEach((w, wi) => {
+        const wDur = Math.max(w.endTime - w.startTime, 0.15);
+        code += `
+  // Karaoke palavra ${wi + 1}: "${w.word.replace(/'/g, '\\'')}" @ ${w.startTime.toFixed(3)}s
+  gsap.to('#w-${i}-${wi}', { opacity: 1, scale: 1.1, color: '${color}', textShadow: '0 0 24px ${color}88', duration: 0.1, ease: 'power2.out', delay: ${w.startTime.toFixed(3)} });
+  gsap.to('#w-${i}-${wi}', { scale: 1, color: '#ffffff', textShadow: '2px 2px 0 #000', duration: 0.18, delay: ${(w.endTime - 0.18).toFixed(3)} });`;
       });
 
     } else {
-      // subtitle — aparece a cena toda
-      gsapCode += `
-  tl.to('#scene-${i} .caption-line', { opacity: 1, duration: 0.4, ease: 'power2.out' }, ${(start + 0.3).toFixed(3)});
-  tl.to('#scene-${i} .caption-line', { opacity: 0, duration: 0.3, ease: 'power2.in' }, ${(end - 0.4).toFixed(3)});`;
+      // subtitle — texto completo, fade in no início e fade out no fim
+      code += `
+  gsap.set('#scene-${i} .caption-line', { opacity: 0, y: 12 });
+  gsap.to('#scene-${i} .caption-line', { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out', delay: ${(start + 0.35).toFixed(3)} });
+  gsap.to('#scene-${i} .caption-line', { opacity: 0, y: -8, duration: 0.3, ease: 'power2.in', delay: ${(end - 0.4).toFixed(3)} });`;
     }
 
-    // Fade de saída da cena (exceto última)
+    // ─ 4. Fade out da cena ─────────────────────────────────
     if (i < scenes.length - 1) {
-      gsapCode += `
-  tl.to('#scene-${i}', { opacity: 0, duration: 0.4, ease: 'power2.inOut' }, ${(end - 0.4).toFixed(3)});`;
+      code += `
+  gsap.to('#scene-${i}', { opacity: 0, duration: 0.38, ease: 'power2.inOut', delay: ${(end - 0.38).toFixed(3)} });`;
     }
 
     currentTime += duration;
   });
 
-  // Fade out final
+  // Fade out final do composition inteiro
   if (scenes.length > 0) {
-    gsapCode += `
+    code += `
   // Fade out final
-  tl.to('#composition', { opacity: 0, duration: 0.6, ease: 'power2.in' }, ${(currentTime - 0.6).toFixed(3)});`;
+  gsap.to('#composition', { opacity: 0, duration: 0.6, ease: 'power2.in', delay: ${(currentTime - 0.65).toFixed(3)} });`;
   }
 
-  return gsapCode;
+  return code;
+}
+
+// ════════════════════════════════════════════════════════════════
+// buildWordList — usa timestamps reais do Whisper se disponíveis
+// Fallback: distribui linearmente pela duração da cena
+// ════════════════════════════════════════════════════════════════
+function buildWordList(scene, sceneStartTime, duration) {
+  // Timestamps reais do Whisper (campo words adicionado pelo n8n)
+  if (Array.isArray(scene.words) && scene.words.length > 0) {
+    return scene.words.map(w => ({
+      word:      w.word,
+      startTime: Number(w.startInSeconds ?? w.start ?? sceneStartTime),
+      endTime:   Number(w.endInSeconds   ?? w.end   ?? sceneStartTime + (duration / scene.words.length)),
+    }));
+  }
+
+  // Fallback linear pela captionText
+  const text  = (scene.captionText || '').trim();
+  const parts = text.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return [];
+
+  const timePerWord = duration / parts.length;
+  return parts.map((word, wi) => ({
+    word,
+    startTime: sceneStartTime + wi * timePerWord,
+    endTime:   sceneStartTime + (wi + 1) * timePerWord,
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════
+// escapeHTML — sanitiza conteúdo para uso no HTML
+// ════════════════════════════════════════════════════════════════
+function escapeHTML(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 module.exports = { generateCompositionHTML };

@@ -23,9 +23,33 @@ export type AnimationStyle =
   | 'zoom-out';        // zoom out — começa grande
 
 /**
- * Transição de entrada da cena.
+ * Transição de entrada da cena (usada pelo TransitionSeries do @remotion/transitions).
  */
-export type TransitionStyle = 'fade' | 'slide-up' | 'zoom-in';
+export type TransitionStyle =
+  | 'fade'
+  | 'slide-right'
+  | 'slide-left'
+  | 'slide-up'
+  | 'slide-down'
+  | 'wipe'
+  | 'flip'
+  | 'zoom-in'
+  | 'none';
+
+/**
+ * Efeito de texto da cena (adicionado pelo AI Director Remotion).
+ */
+export type TextEffect =
+  | 'split-bounce'   // cada letra entra com spring staggered
+  | 'typewriter'     // caracteres aparecem um por um
+  | 'glitch'         // distorção RGB na entrada
+  | 'pop'            // padrão — palavra pop com spring
+  | 'none';          // sem efeito especial
+
+/**
+ * Preset de spring physics (adicionado pelo AI Director Remotion).
+ */
+export type SpringPreset = 'bouncy' | 'smooth' | 'dramatic' | 'gentle';
 
 /**
  * Estilo de legenda.
@@ -61,8 +85,26 @@ export interface SceneSegment {
   /** Estilo de animação de imagem desta cena */
   animationStyle?: AnimationStyle;
 
-  /** Transição de entrada desta cena */
+  /** Transição de entrada desta cena (para TransitionSeries) */
   transitionIn?: TransitionStyle;
+
+  /** Duração da transição em frames */
+  transitionDurationFrames?: number;
+
+  /** Efeito de texto (adicionado pelo AI Director Remotion) */
+  textEffect?: TextEffect;
+
+  /** Efeito de overlay de entrada (adicionado pelo AI Director HyperFrames) */
+  captionEffect?: 'glitch' | 'light-leak' | 'flash' | 'bounce' | 'clip-wipe' | 'glitch-rgb' | 'editorial';
+
+  /** Preset de spring para as animações */
+  springPreset?: SpringPreset;
+
+  /** Intensidade geral das animações 0.0–1.0 */
+  intensity?: number;
+
+  /** Cor emocional da cena (hex, adicionado pelo AI Director) */
+  emotionColor?: string;
 }
 
 /**
