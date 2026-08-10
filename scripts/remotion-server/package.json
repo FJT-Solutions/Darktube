@@ -13,6 +13,7 @@
     "@remotion/media-utils": "^4.0.496",
     "@remotion/player": "^4.0.496",
     "@remotion/renderer": "^4.0.496",
+    "@remotion/transitions": "^4.0.496",
     "express": "^4.21.2",
     "remotion": "^4.0.496"
   }
