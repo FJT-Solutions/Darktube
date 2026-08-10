@@ -32,6 +32,7 @@ import {
   Video,
   Code,
   Trash2,
+  Download,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -48,26 +49,73 @@ import {
 } from "@/components/ui/dialog"
 
 function VideoPlayerModal({ videoUrl, title }: { videoUrl: string; title: string }) {
+  const [downloading, setDownloading] = useState(false)
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDownloading(true)
+    try {
+      const res = await fetch(videoUrl)
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = blobUrl
+      a.download = `darktube_render_${Date.now()}.mp4`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(blobUrl)
+    } catch {
+      window.open(videoUrl, "_blank")
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-500">
-          <PlayCircle className="h-3 w-3" />
-          Ver Vídeo
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none shadow-2xl">
-        <DialogHeader className="p-4 bg-zinc-900/50 backdrop-blur-md border-b border-white/10">
-          <DialogTitle className="text-white flex items-center gap-2">
-            <Clapperboard className="h-4 w-4 text-emerald-500" />
-            {title}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="aspect-video w-full bg-black flex items-center justify-center">
-          <video src={videoUrl} controls className="w-full h-full object-contain" autoPlay={false} />
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex items-center gap-2">
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-500">
+            <PlayCircle className="h-3 w-3" />
+            Ver Vídeo
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none shadow-2xl">
+          <DialogHeader className="p-4 bg-zinc-900/50 backdrop-blur-md border-b border-white/10 flex flex-row items-center justify-between">
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Clapperboard className="h-4 w-4 text-emerald-500" />
+              {title}
+            </DialogTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="h-8 text-xs gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black font-semibold mr-6"
+            >
+              {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              Baixar MP4
+            </Button>
+          </DialogHeader>
+          <div className="aspect-video w-full bg-black flex items-center justify-center">
+            <video src={videoUrl} controls className="w-full h-full object-contain" autoPlay={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleDownload}
+        disabled={downloading}
+        className="h-7 text-[10px] gap-1 border-blue-500/30 hover:bg-blue-500/10 text-blue-400 hover:text-blue-300"
+      >
+        {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+        Baixar
+      </Button>
+    </div>
   )
 }
 

@@ -174,14 +174,14 @@ const SceneLayer: React.FC<{
         }}
       />
 
-      {/* Overlays de entrada — controlados pelo captionEffect (campo do AI Director) */}
-      {(scene.captionEffect as string) === 'glitch' && (
+      {/* Overlays de entrada — controlados pelo overlayEffect ou captionEffect */}
+      {((scene.overlayEffect || scene.captionEffect) === 'glitch') && (
         <GlitchOverlay intensity={intensity} durationFrames={20} primaryColor={primaryColor} />
       )}
-      {(scene.captionEffect as string) === 'light-leak' && (
+      {((scene.overlayEffect || scene.captionEffect) === 'light-leak') && (
         <LightLeakOverlay intensity={intensity} durationFrames={28} />
       )}
-      {(scene.captionEffect as string) === 'flash' && (
+      {((scene.overlayEffect || scene.captionEffect) === 'flash') && (
         <FlashOverlay intensity={intensity * 0.9} durationFrames={12} />
       )}
 
@@ -202,7 +202,7 @@ const SceneLayer: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KEN BURNS — Animação de imagem via interpolate() (não CSS)
+// KEN BURNS & DYNAMIC CAMERA — Animação de imagem e 3D via interpolate()
 // ─────────────────────────────────────────────────────────────────────────────
 const KenBurnsImage: React.FC<{
   imgUrl: string;
@@ -216,26 +216,59 @@ const KenBurnsImage: React.FC<{
 
   switch (animationStyle) {
     case 'kenburns-right':
-      transform = `scale(${1 + progress * 0.12}) translateX(${progress * 2}%)`;
+      transform = `scale(${1.08 + progress * 0.22}) translateX(${progress * 8}%)`;
       break;
     case 'kenburns-left':
-      transform = `scale(${1 + progress * 0.12}) translateX(${-progress * 2}%)`;
+      transform = `scale(${1.08 + progress * 0.22}) translateX(${-progress * 8}%)`;
+      break;
+    case 'kenburns-up':
+      transform = `scale(${1.08 + progress * 0.22}) translateY(${-progress * 8}%)`;
+      break;
+    case 'kenburns-down':
+      transform = `scale(${1.08 + progress * 0.22}) translateY(${progress * 8}%)`;
       break;
     case 'zoom-punch': {
-      const punchScale = interpolate(frame, [0, 8, durationFrames], [1.18, 1.05, 1.0], {
+      const punchScale = interpolate(frame, [0, 10, durationFrames], [1.45, 1.15, 1.08], {
         extrapolateRight: 'clamp',
       });
       transform = `scale(${punchScale})`;
       break;
     }
     case 'parallax-up':
-      transform = `scale(${1 + progress * 0.08}) translateY(${3 - progress * 6}%)`;
+      transform = `scale(${1.15 + progress * 0.15}) translateY(${8 - progress * 14}%)`;
+      break;
+    case 'parallax-down':
+      transform = `scale(${1.15 + progress * 0.15}) translateY(${-8 + progress * 14}%)`;
+      break;
+    case 'parallax-left':
+      transform = `scale(${1.15 + progress * 0.15}) translateX(${8 - progress * 14}%)`;
+      break;
+    case 'parallax-right':
+      transform = `scale(${1.15 + progress * 0.15}) translateX(${-8 + progress * 14}%)`;
       break;
     case 'zoom-out':
-      transform = `scale(${1.18 - progress * 0.18})`;
+      transform = `scale(${1.38 - progress * 0.28})`;
       break;
+    case 'tilt-3d': {
+      const rotX = interpolate(progress, [0, 1], [10, -6]);
+      const rotY = interpolate(progress, [0, 1], [-12, 10]);
+      transform = `perspective(1000px) scale(1.22) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+      break;
+    }
+    case 'shake-impact': {
+      const shakeX = Math.sin(frame * 1.5) * interpolate(frame, [0, 12], [14, 0], { extrapolateRight: 'clamp' });
+      const shakeY = Math.cos(frame * 1.5) * interpolate(frame, [0, 12], [14, 0], { extrapolateRight: 'clamp' });
+      transform = `scale(1.15) translate(${shakeX}px, ${shakeY}px)`;
+      break;
+    }
+    case 'spin-in': {
+      const rot = interpolate(frame, [0, 15], [-20, 0], { extrapolateRight: 'clamp' });
+      const scaleSpin = interpolate(frame, [0, 15], [1.35, 1.10], { extrapolateRight: 'clamp' });
+      transform = `scale(${scaleSpin}) rotate(${rot}deg)`;
+      break;
+    }
     default:
-      transform = `scale(${1 + progress * 0.1})`;
+      transform = `scale(${1.08 + progress * 0.18})`;
   }
 
   return (
