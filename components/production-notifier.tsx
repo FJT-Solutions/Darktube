@@ -30,12 +30,27 @@ export function ProductionNotifier() {
             if (item.status === "completed") {
               activeIdsRef.current.delete(item.id)
               toast.success("🎬 Produção Concluída com Sucesso!", {
-                description: "Seu vídeo foi renderizado e já está disponível no histórico.",
-                duration: 10000,
+                description: "Seu vídeo foi renderizado e já está disponível para baixar.",
+                duration: 12000,
                 action: item.video_url
                   ? {
-                      label: "Assistir Vídeo",
-                      onClick: () => window.open(item.video_url, "_blank"),
+                      label: "Baixar Vídeo",
+                      onClick: async () => {
+                        try {
+                          const res = await fetch(item.video_url)
+                          const blob = await res.blob()
+                          const blobUrl = URL.createObjectURL(blob)
+                          const a = document.createElement("a")
+                          a.href = blobUrl
+                          a.download = `darktube_${item.id || Date.now()}.mp4`
+                          document.body.appendChild(a)
+                          a.click()
+                          document.body.removeChild(a)
+                          URL.revokeObjectURL(blobUrl)
+                        } catch {
+                          window.open(item.video_url, "_blank")
+                        }
+                      },
                     }
                   : undefined,
               })

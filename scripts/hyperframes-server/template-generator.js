@@ -466,24 +466,52 @@ function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
       switch (animStyle) {
         case 'kenburns-right':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1, xPercent: 0 }, { scale: 1.13, xPercent: 3, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('#bg-${i} img', { scale: 1.08, xPercent: 0 }, { scale: 1.25, xPercent: 6, duration: ${duration}, ease: 'none', delay: ${start} });`;
           break;
         case 'kenburns-left':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1, xPercent: 0 }, { scale: 1.13, xPercent: -3, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('#bg-${i} img', { scale: 1.08, xPercent: 0 }, { scale: 1.25, xPercent: -6, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'kenburns-up':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.08, yPercent: 0 }, { scale: 1.25, yPercent: -6, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'kenburns-down':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.08, yPercent: 0 }, { scale: 1.25, yPercent: 6, duration: ${duration}, ease: 'none', delay: ${start} });`;
           break;
         case 'zoom-punch':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.2 }, { scale: 1.02, duration: ${Math.min(duration, 0.9)}, ease: 'power3.out', delay: ${start} });`;
+  gsap.fromTo('#bg-${i} img', { scale: 1.45 }, { scale: 1.08, duration: ${Math.min(duration, 0.7)}, ease: 'power4.out', delay: ${start} });`;
           break;
         case 'parallax-up':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.15, yPercent: 4 }, { yPercent: -4, scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('#bg-${i} img', { scale: 1.18, yPercent: 6 }, { yPercent: -6, scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'parallax-down':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.18, yPercent: -6 }, { yPercent: 6, scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });`;
           break;
         case 'zoom-out':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.2 }, { scale: 1.0, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('#bg-${i} img', { scale: 1.38 }, { scale: 1.02, duration: ${duration}, ease: 'none', delay: ${start} });`;
           break;
+        case 'tilt-3d':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.28, rotationX: 12, rotationY: -10, transformPerspective: 1000 }, { rotationX: -6, rotationY: 8, scale: 1.12, duration: ${duration}, ease: 'none', delay: ${start} });`;
+          break;
+        case 'shake-impact':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.22 }, { scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });
+  gsap.to('#bg-${i} img', { x: '+=12', y: '-=8', yoyo: true, repeat: 5, duration: 0.05, delay: ${start} });`;
+          break;
+        case 'spin-in':
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.38, rotation: -18 }, { rotation: 0, scale: 1.08, duration: 0.6, ease: 'back.out(1.7)', delay: ${start} });`;
+          break;
+        default:
+          code += `
+  gsap.fromTo('#bg-${i} img', { scale: 1.08 }, { scale: 1.22, duration: ${duration}, ease: 'none', delay: ${start} });`;
       }
     }
 
