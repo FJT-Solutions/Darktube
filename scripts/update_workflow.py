@@ -201,7 +201,7 @@ return [{
 const segment = $('Generate Scene Image').item.json;
 const idx     = parseInt(segment.index !== undefined ? segment.index : 0);
 const ttsNode = $('Generate TTS');
-const ttsItem = ttsNode.item || ttsNode.all()[idx] || {};
+const ttsItem = ttsNode.item || (ttsNode.all() && ttsNode.all()[0]) || {};
 const wRes    = $('Whisper Word Timestamps').item.json;
 
 const voiceover = segment.voiceover || {};
@@ -219,7 +219,7 @@ if (!audioUrl) {
   try {
     const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);
     if (getHelper) {
-      const buf = await getHelper.call(this, idx, 'data', 'Generate TTS');
+      const buf = await getHelper.call(this, 0, 'data', 'Generate TTS');
       if (buf && buf.length > 0) {
         base64Data = buf.toString('base64');
       }
