@@ -493,8 +493,9 @@ function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
     if (captionStyle === 'pop') {
       words.forEach((w, wi) => {
         const wDur = Math.max(w.endTime - w.startTime, 0.15);
+        const safeWord = String(w.word).replace(/'/g, "\\'");
         code += `
-  // Pop palavra ${wi + 1}: "${w.word.replace(/'/g, '\\'')}" @ ${w.startTime.toFixed(3)}s
+  // Pop palavra ${wi + 1}: "${safeWord}" @ ${w.startTime.toFixed(3)}s
   gsap.set('#w-${i}-${wi}', { opacity: 0, scale: 0.5, rotation: -8, y: 20 });
   gsap.to('#w-${i}-${wi}', { opacity: 1, scale: 1, rotation: 0, y: 0, duration: 0.2, ease: 'back.out(2.5)', delay: ${w.startTime.toFixed(3)} });
   gsap.to('#w-${i}-${wi}', { opacity: 0, scale: 0.82, duration: 0.12, ease: 'power2.in', delay: ${Math.max(w.endTime - 0.12, w.startTime + 0.1).toFixed(3)} });`;
@@ -508,8 +509,9 @@ function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
 
       words.forEach((w, wi) => {
         const wDur = Math.max(w.endTime - w.startTime, 0.15);
+        const safeWord = String(w.word).replace(/'/g, "\\'");
         code += `
-  // Karaoke palavra ${wi + 1}: "${w.word.replace(/'/g, '\\'')}" @ ${w.startTime.toFixed(3)}s
+  // Karaoke palavra ${wi + 1}: "${safeWord}" @ ${w.startTime.toFixed(3)}s
   gsap.to('#w-${i}-${wi}', { opacity: 1, scale: 1.1, color: '${color}', textShadow: '0 0 24px ${color}88', duration: 0.1, ease: 'power2.out', delay: ${w.startTime.toFixed(3)} });
   gsap.to('#w-${i}-${wi}', { scale: 1, color: '#ffffff', textShadow: '2px 2px 0 #000', duration: 0.18, delay: ${(w.endTime - 0.18).toFixed(3)} });`;
       });
