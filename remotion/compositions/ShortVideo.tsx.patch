@@ -1,0 +1,159 @@
+--- remotion/compositions/ShortVideo.tsx
++++ remotion/compositions/ShortVideo.tsx
+@@ -82,6 +82,7 @@
+   primaryColor: string;
+   accentColor: string;
+   fps: number;
++  format: string;
+ }> = ({ scene, sceneIndex, durationFrames, captionStyle, primaryColor, accentColor, fps }) => {
+   const frame = useCurrentFrame();
+ 
+@@ -134,6 +135,7 @@
+         accentColor={accentColor}
+         durationFrames={durationFrames}
+         fps={fps}
++        format={format}
+       />
+ 
+       {/* Áudio da narração desta cena */}
+@@ -213,9 +215,13 @@
+   accentColor: string;
+   durationFrames: number;
+   fps: number;
+-}> = ({ scene, captionStyle, primaryColor, accentColor, durationFrames, fps }) => {
++  format: string;
++}> = ({ scene, captionStyle, primaryColor, accentColor, durationFrames, fps, format }) => {
+   const frame = useCurrentFrame();
+   const currentTimeInScene = frame / fps;
++  
++  // Responsive font sizes based on format
++  const isVertical = format === 'vertical';
+ 
+   const words = scene.words || [];
+   const captionText = scene.captionText || '';
+@@ -237,7 +243,7 @@
+           pointerEvents: 'none',
+         }}
+       >
+-        <PopWord word={currentWord.word} primaryColor={primaryColor} fps={fps} />
++        <PopWord word={currentWord.word} primaryColor={primaryColor} fps={fps} isVertical={isVertical} />
+       </AbsoluteFill>
+     );
+   }
+@@ -279,6 +285,7 @@
+                 primaryColor={primaryColor}
+                 accentColor={accentColor}
+                 fps={fps}
++                isVertical={isVertical}
+               />
+             );
+           })}
+@@ -298,7 +305,7 @@
+       style={{
+         justifyContent: 'flex-end',
+         alignItems: 'center',
+-        paddingBottom: '20%',
++        paddingBottom: isVertical ? '20%' : '12%',
+         paddingLeft: '5%',
+         paddingRight: '5%',
+         opacity: subtitleOpacity,
+@@ -310,7 +317,7 @@
+           textAlign: 'center',
+           color: accentColor,
+           fontFamily: 'Montserrat',
+-          fontSize: '70px',
++          fontSize: isVertical ? '70px' : '55px',
+           fontWeight: 800,
+           textTransform: 'uppercase',
+           WebkitTextStroke: '2px black',
+@@ -326,20 +333,26 @@
+ const PopWord: React.FC<{
+   word: string;
+   primaryColor: string;
+   fps: number;
+-}> = ({ word, primaryColor, fps }) => {
++  isVertical: boolean;
++}> = ({ word, primaryColor, fps, isVertical }) => {
+   const frame = useCurrentFrame();
+ 
+-  // Animação de pop (scale e rotate leve)
+-  const scale = interpolate(frame, [0, 5, 8], [0.5, 1.1, 1], {
+-    extrapolateLeft: 'clamp',
+-    extrapolateRight: 'clamp',
+-  });
+-  const rotation = interpolate(frame, [0, 5], [-5, 0], {
+-    extrapolateLeft: 'clamp',
+-    extrapolateRight: 'clamp',
++  // Animação profissional com Spring Physics (igual aos templates de Remotion)
++  const scale = spring({
++    frame,
++    fps,
++    config: { damping: 12, stiffness: 200, mass: 0.8 },
++  });
++  
++  const translateY = interpolate(scale, [0, 1], [30, 0], {
++    extrapolateRight: "clamp",
++  });
++  
++  const rotation = spring({
++    frame,
++    fps,
++    config: { damping: 10, stiffness: 150 },
++    from: -8,
++    to: 0,
+   });
+ 
+   return (
+@@ -348,11 +361,11 @@
+         textAlign: 'center',
+         color: primaryColor,
+         fontFamily: 'Montserrat',
+-        fontSize: '90px',
++        fontSize: isVertical ? '110px' : '85px',
+         fontWeight: 900,
+         textTransform: 'uppercase',
+         WebkitTextStroke: '3px black',
+         textShadow: '4px 4px 0px #000, 8px 8px 16px rgba(0,0,0,0.8)',
+-        transform: \`scale(\${scale}) rotate(\${rotation}deg)\`,
++        transform: \`scale(\${scale}) rotate(\${rotation}deg) translateY(\${translateY}px)\`,
+         willChange: 'transform',
+       }}
+     >
+@@ -367,23 +380,31 @@
+   isPast: boolean;
+   primaryColor: string;
+   accentColor: string;
+   fps: number;
+-}> = ({ word, isActive, isPast, primaryColor, accentColor, fps }) => {
++  isVertical: boolean;
++}> = ({ word, isActive, isPast, primaryColor, accentColor, fps, isVertical }) => {
+   const frame = useCurrentFrame();
+ 
+-  const scale = isActive
+-    ? interpolate(frame, [0, 5], [1, 1.15], { extrapolateRight: 'clamp' })
+-    : 1;
++  // Spring physics when active for a subtle bounce
++  const scale = isActive ? spring({
++    frame: frame % 15, // loop ou aciona no frame ativo
++    fps,
++    config: { damping: 14, stiffness: 200 },
++    from: 1,
++    to: 1.15,
++  }) : 1;
++
++  const translateY = isActive ? interpolate(scale, [1, 1.15], [0, -8]) : 0;
+ 
+   return (
+     <span
+       style={{
+         fontFamily: 'Montserrat',
+-        fontSize: '80px',
++        fontSize: isVertical ? '80px' : '65px',
+         fontWeight: 900,
+         textTransform: 'uppercase',
+         WebkitTextStroke: '3px black',
+         color: isActive ? primaryColor : isPast ? accentColor : '#AAAAAA',
+         textShadow: isActive ? \`0 0 15px \${primaryColor}, 4px 4px 0px #000\` : '4px 4px 0px #000',
+-        transform: \`scale(\${scale})\`,
++        transform: \`scale(\${scale}) translateY(\${translateY}px)\`,
+         display: 'inline-block',
