@@ -1,5 +1,4 @@
 {
-  "name": "Darktube",
   "nodes": [
     {
       "parameters": {
@@ -19,8 +18,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N \u2500\u2500\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst voice        = tpl.voice        || 'pt-BR-FranciscaNeural';\nconst format       = tpl.format       || 'vertical';\n\nconst renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')\n  ? 'remotion'\n  : 'hyperframes';\n\n// \u2500\u2500 Imagens enviadas pelo usu\u00e1rio (upload manual) \u2500\u2500\nconst userMedia = tpl.user_media\n  || tpl.uploaded_images\n  || tpl.images\n  || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'V\u00eddeo sem narra\u00e7\u00e3o' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\n// \u2500\u2500 CORRE\u00c7\u00c3O: Se o usu\u00e1rio enviou imagens, limitar as cenas\n//    ao exato n\u00famero de imagens enviadas \u2014 sem cenas extras \u2500\u2500\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    user_media:     userMedia,\n    tpl\n  }\n}));",
-        "options": {}
+        "jsCode": "// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst voice        = tpl.voice        || 'pt-BR-FranciscaNeural';\nconst format       = tpl.format       || 'vertical';\n\nconst renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')\n  ? 'remotion'\n  : 'hyperframes';\n\n// ── Imagens enviadas pelo usuário (upload manual) ──\nconst userMedia = tpl.user_media\n  || tpl.uploaded_images\n  || tpl.images\n  || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\n// ── CORREÇÃO: Se o usuário enviou imagens, limitar as cenas\n//    ao exato número de imagens enviadas — sem cenas extras ──\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    user_media:     userMedia,\n    tpl\n  }\n}));"
       },
       "name": "Normalize + Auto Engine",
       "type": "n8n-nodes-base.code",
@@ -33,7 +31,6 @@
     },
     {
       "parameters": {
-        "batchSize": 1,
         "options": {}
       },
       "name": "Loop Over Items",
@@ -47,8 +44,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Seleciona Imagem da Cena - estritamente 1-para-1 com a imagem enviada\nconst norm        = $json;\nconst idx         = parseInt(norm.index !== undefined ? norm.index : 0);\nconst tpl         = norm.tpl || {};\nconst visual      = norm.visual_content || {};\n\nconst userMedia   = norm.user_media \n  || tpl.user_media \n  || tpl.uploaded_images \n  || tpl.images \n  || [];\n\nlet providedUrl = norm.image_url \n  || norm.media_url \n  || visual.image_url \n  || (Array.isArray(userMedia) && userMedia[idx] ? (userMedia[idx].file_url || userMedia[idx]) : '') \n  || '';\n\nlet imageUrl = providedUrl || tpl.video_thumbnail || '';\nlet source   = providedUrl ? 'user_uploaded_image' : 'template_thumbnail';\n\nreturn [{\n  json: {\n    ...norm,\n    image_url: imageUrl,\n    source: source\n  }\n}];",
-        "options": {}
+        "jsCode": "// Seleciona Imagem da Cena - estritamente 1-para-1 com a imagem enviada\nconst norm        = $json;\nconst idx         = parseInt(norm.index !== undefined ? norm.index : 0);\nconst tpl         = norm.tpl || {};\nconst visual      = norm.visual_content || {};\n\nconst userMedia   = norm.user_media \n  || tpl.user_media \n  || tpl.uploaded_images \n  || tpl.images \n  || [];\n\nlet providedUrl = norm.image_url \n  || norm.media_url \n  || visual.image_url \n  || (Array.isArray(userMedia) && userMedia[idx] ? (userMedia[idx].file_url || userMedia[idx]) : '') \n  || '';\n\nlet imageUrl = providedUrl || tpl.video_thumbnail || '';\nlet source   = providedUrl ? 'user_uploaded_image' : 'template_thumbnail';\n\nreturn [{\n  json: {\n    ...norm,\n    image_url: imageUrl,\n    source: source\n  }\n}];"
       },
       "name": "Generate Scene Image",
       "type": "n8n-nodes-base.code",
@@ -67,7 +63,12 @@
         "specifyBody": "json",
         "jsonBody": "={\n  \"model\": \"tts-1\",\n  \"input\": \"{{ $json.voiceover?.text || $json.voiceover_text || $json.voiceoverText || $json.text }}\",\n  \"voice\": \"{{ $json.voice }}\",\n  \"language\": \"{{ $json.language }}\",\n  \"speed\": 1.0,\n  \"response_format\": \"mp3\"\n}",
         "options": {
-          "allowUnauthorizedCerts": true
+          "allowUnauthorizedCerts": true,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
         }
       },
       "name": "Generate TTS",
@@ -88,9 +89,8 @@
         "bodyParameters": {
           "parameters": [
             {
-              "name": "file",
-              "value": "={{ $json.data }}",
               "parameterType": "formBinaryData",
+              "name": "file",
               "inputDataFieldName": "data"
             },
             {
@@ -126,8 +126,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Monta SceneSegment completo \u2500\u2500\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\nconst ttsNode = $('Generate TTS');\nconst ttsItem = ttsNode.item || ttsNode.all()[idx] || {};\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\nconst imageUrl = segment.image_url\n  || segment.media_url\n  || visual.image_url\n  || segment.tpl?.video_thumbnail\n  || '';\n\nlet audioUrl = segment.audio_url || '';\nif (!audioUrl) {\n  let base64Data = '';\n  try {\n    const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);\n    if (getHelper) {\n      const buf = await getHelper.call(this, idx, 'data', 'Generate TTS');\n      if (buf && buf.length > 0) {\n        base64Data = buf.toString('base64');\n      }\n    }\n  } catch (err) {\n    console.error('Error fetching TTS binary buffer:', err.message);\n  }\n\n  if (!base64Data && ttsItem && ttsItem.binary) {\n    const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';\n    const binaryObj = ttsItem.binary[binaryKey];\n    if (binaryObj && binaryObj.data && binaryObj.data !== 'database') {\n      base64Data = binaryObj.data;\n    }\n  }\n\n  if (base64Data) {\n    audioUrl = `data:audio/mp3;base64,${base64Data}`;\n  }\n}\nconst captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\n\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\nconst duration = wRes.duration\n  || (() => {\n    const ts = segment.timestamp || '';\n    const parts = ts.split('-');\n    const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n    return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n  })();\n\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade'\n  }\n}];",
-        "options": {}
+        "jsCode": "// ── Monta SceneSegment completo ──\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\nconst ttsNode = $('Generate TTS');\nconst ttsItem = ttsNode.item || (ttsNode.all() && ttsNode.all()[0]) || {};\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\nconst imageUrl = segment.image_url\n  || segment.media_url\n  || visual.image_url\n  || segment.tpl?.video_thumbnail\n  || '';\n\nlet audioUrl = segment.audio_url || '';\nif (!audioUrl) {\n  let base64Data = '';\n  try {\n    const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);\n    if (getHelper) {\n      const buf = await getHelper.call(this, 0, 'data', 'Generate TTS');\n      if (buf && buf.length > 0) {\n        base64Data = buf.toString('base64');\n      }\n    }\n  } catch (err) {\n    console.error('Error fetching TTS binary buffer:', err.message);\n  }\n\n  if (!base64Data && ttsItem && ttsItem.binary) {\n    const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';\n    const binaryObj = ttsItem.binary[binaryKey];\n    if (binaryObj && binaryObj.data && binaryObj.data !== 'database') {\n      base64Data = binaryObj.data;\n    }\n  }\n\n  if (base64Data) {\n    audioUrl = `data:audio/mp3;base64,${base64Data}`;\n  }\n}\nconst captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\n\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\nconst duration = wRes.duration\n  || (() => {\n    const ts = segment.timestamp || '';\n    const parts = ts.split('-');\n    const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n    return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n  })();\n\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade'\n  }\n}];"
       },
       "name": "Build Scene",
       "type": "n8n-nodes-base.code",
@@ -140,8 +139,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Agrega todas as cenas geradas pelo loop \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst execId = $execution?.id || '';\nconst resumeUrl = $execution?.resumeUrl || '';\nconst baseCallback = resumeUrl || (execId ? `https://n8n.fjt-solutions.com/webhook-waiting/${execId}/darktube-render-complete` : `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`);\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     false,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];",
-        "options": {}
+        "jsCode": "// ── Agrega todas as cenas geradas pelo loop ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst execId = $execution?.id || '';\nconst resumeUrl = $execution?.resumeUrl || '';\nconst baseCallback = resumeUrl || (execId ? `https://n8n.fjt-solutions.com/webhook-waiting/${execId}/darktube-render-complete` : `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`);\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     false,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];"
       },
       "name": "Aggregate Scenes",
       "type": "n8n-nodes-base.code",
@@ -161,7 +159,8 @@
                 "options": {
                   "caseSensitive": true,
                   "leftValue": "",
-                  "typeValidation": "strict"
+                  "typeValidation": "strict",
+                  "version": 1
                 },
                 "combinator": "and",
                 "conditions": [
@@ -183,7 +182,8 @@
                 "options": {
                   "caseSensitive": true,
                   "leftValue": "",
-                  "typeValidation": "strict"
+                  "typeValidation": "strict",
+                  "version": 1
                 },
                 "combinator": "and",
                 "conditions": [
@@ -266,12 +266,12 @@
         1552,
         1584
       ],
-      "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94"
+      "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94",
+      "webhookId": "ff06ebff-2ea7-45b3-8a11-66c6c96fe988"
     },
     {
       "parameters": {
-        "jsCode": "// \u2500\u2500 Auto-Post Blotato (Publica\u00e7\u00e3o Social) \u2500\u2500\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\nconst waitRes = $('Wait Render').first().json;\n\nconst accounts = tpl.target_accounts || [];\nif (accounts.length === 0) {\n  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || waitRes.videoUrl || '' } }];\n}\n\nreturn [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || waitRes.videoUrl || '' } }];",
-        "options": {}
+        "jsCode": "// ── Auto-Post Blotato (Publicação Social) ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\nconst waitRes = $('Wait Render').first().json;\n\nconst accounts = tpl.target_accounts || [];\nif (accounts.length === 0) {\n  return [{ json: { status: 'skipped_no_accounts', video_url: waitRes.video_url || waitRes.videoUrl || '' } }];\n}\n\nreturn [{ json: { status: 'ready_to_post', accounts, video_url: waitRes.video_url || waitRes.videoUrl || '' } }];"
       },
       "name": "Auto-Post Blotato",
       "type": "n8n-nodes-base.code",
@@ -319,7 +319,7 @@
         "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}\",\n  \"status\":        \"failed\",\n  \"error\":         \"{{ $json.execution?.error?.message || 'Erro durante execu\u00e7\u00e3o no n8n' }}\"\n}",
+        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}\",\n  \"status\":        \"failed\",\n  \"error\":         \"{{ $json.execution?.error?.message || 'Erro durante execução no n8n' }}\"\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
@@ -328,7 +328,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        900,
+        912,
         2240
       ],
       "id": "a1b6073b-error-callback-002"
@@ -504,7 +504,230 @@
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1"
+  "pinData": {
+    "Webhook Darktube": [
+      {
+        "headers": {
+          "host": "n8n.fjt-solutions.com",
+          "user-agent": "node",
+          "content-length": "16897",
+          "accept": "*/*",
+          "accept-encoding": "br, gzip, deflate",
+          "accept-language": "*",
+          "content-type": "application/json",
+          "sec-fetch-mode": "cors",
+          "x-forwarded-for": "172.17.0.1",
+          "x-forwarded-host": "n8n.fjt-solutions.com",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "48accbe986c6",
+          "x-real-ip": "172.17.0.1"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "message": "Production Request from DarkTube",
+          "timestamp": "2026-07-27T16:50:07.266Z",
+          "user_id": "1ac374d6-2d02-4c07-82f2-e1d3ac491fc8",
+          "template": {
+            "id": "e447ef5b-bd49-4378-9ddf-d4b44c908566",
+            "name": "Template: Domine suas EMOÇÕES e alcance ...",
+            "video_url": "https://youtube.com/watch?v=DZuIjwM38xg",
+            "original_video_id": "DZuIjwM38xg",
+            "video_title": "Domine suas EMOÇÕES e alcance a PAZ interior | ESTOICISMO 😌⚜️",
+            "video_thumbnail": "https://i.ytimg.com/vi/DZuIjwM38xg/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDaaR__N5PDGhrT26fl0sIZs8gkCA",
+            "format": "vertical",
+            "engine_mode": "local",
+            "image_model": "manual-image",
+            "thumbnail_model": "manual-image",
+            "video_model": "manual-none-video",
+            "voice_model": "edge-tts-docker",
+            "music_model": "suno-v4",
+            "render_model": "remotion-engine",
+            "render_engine": "remotion",
+            "caption_style": "subtitle",
+            "animation_mix": "zoom-punch",
+            "transition_style": "fade",
+            "language": "pt",
+            "voice": "pt-BR-FranciscaNeural",
+            "voice_language": "pt-BR",
+            "has_music": true,
+            "music_style": "epic",
+            "post_frequency": "daily",
+            "post_days": [],
+            "post_times": [],
+            "target_accounts": [],
+            "thumbnail_prompt": "CLOSE-UP DRAMÁTICO de um busto de guerreiro helênico, com capacete coríntio detalhado, feito de mármore antigo e rachado, olhos profundamente pensativos e sombra dramática no rosto. Fundo de um templo em ruínas sob um céu tempestuoso com raios distantes e nuvens cinzentas, raios de luz dourada perfurando a escuridão. Estilo cinematográfico, alta resolução, 8K.",
+            "music_prompt": "Epic cinematic orchestral soundtrack with deep strings, powerful percussion, and haunting ambient elements that evoke a sense of ancient wisdom and introspection.",
+            "sfx_prompt": "Create a soundscape that includes gentle thunder, crackling fire, and distant echoes to create an atmosphere of ancient contemplation and internal struggle.",
+            "script_segments": [
+              {
+                "timestamp": "0:00-0:30",
+                "segment_type": "GANCHO",
+                "voiceover": {
+                  "text": "Você já se sentiu dominado pelas suas emoções, incapaz de encontrar paz interior?",
+                  "style": "Narração profunda e autoritária, incentivando reflexão pessoal."
+                },
+                "visual_content": {
+                  "image_prompt": "A lone philosopher standing at the edge of a rugged cliff, overlooking a vast, tumultuous ocean under a stormy sky.",
+                  "animation_instructions": "Slow dolly in towards the philosopher, with dramatic clouds moving in the background."
+                },
+                "voice_direction": "Deep, authoritative voice with a reflective tone.",
+                "sound_design": "Sound of crashing waves and distant thunder to set a dramatic tone.",
+                "emotion": "introspecção"
+              },
+              {
+                "timestamp": "0:31-3:00",
+                "segment_type": "DESENVOLVIMENTO_N",
+                "voiceover": {
+                  "text": "O estoicismo nos ensina a encontrar equilíbrio em meio ao caos, controlando nossas reações e emoções.",
+                  "style": "Tom inspirador e educativo, destacando a sabedoria antiga."
+                },
+                "visual_content": {
+                  "image_prompt": "An ancient library filled with scrolls and a stoic philosopher reading by candlelight.",
+                  "animation_instructions": "Pan across the library with focus on the philosopher's contemplative expression."
+                },
+                "voice_direction": "Inspirational and educational tone, emphasizing ancient wisdom.",
+                "sound_design": "Soft sound of pages turning and candle flickering.",
+                "emotion": "sabedoria"
+              },
+              {
+                "timestamp": "3:01-9:00",
+                "segment_type": "DESENVOLVIMENTO_N",
+                "voiceover": {
+                  "text": "A verdadeira paz interior vem do entendimento de que não podemos controlar os eventos externos, mas apenas nossa reação a eles.",
+                  "style": "Tom calmo e esclarecedor, promovendo auto-reflexão."
+                },
+                "visual_content": {
+                  "image_prompt": "A serene garden with a statue of a stoic figure, surrounded by gentle flowing water and lush greenery.",
+                  "animation_instructions": "Slow zoom out from the statue to reveal the entire tranquil garden setting."
+                },
+                "voice_direction": "Calm and enlightening tone to promote self-reflection.",
+                "sound_design": "Gentle flowing water and soft wind rustling through leaves.",
+                "emotion": "calma"
+              },
+              {
+                "timestamp": "9:01-17:00",
+                "segment_type": "DESENVOLVIMENTO_N",
+                "voiceover": {
+                  "text": "Ao praticar o desapego, aprendemos a não sermos escravos dos nossos desejos e medos.",
+                  "style": "Tom resoluto e motivacional, incentivando a prática pessoal."
+                },
+                "visual_content": {
+                  "image_prompt": "A warrior meditating in a dimly lit room, surrounded by symbols of stoicism.",
+                  "animation_instructions": "Circle around the meditating warrior to emphasize the symbols in the background."
+                },
+                "voice_direction": "Resolute and motivational tone to encourage personal practice.",
+                "sound_design": "Subtle heartbeats and distant chimes to create a meditative atmosphere.",
+                "emotion": "determinação"
+              },
+              {
+                "timestamp": "17:01-29:51",
+                "segment_type": "CLÍMAX",
+                "voiceover": {
+                  "text": "Ao dominar suas emoções, você se torna o mestre do seu destino, alcançando verdadeira liberdade.",
+                  "style": "Tom triunfante e empoderador, culminando na mensagem central."
+                },
+                "visual_content": {
+                  "image_prompt": "A majestic sunrise breaking over a mountain peak, symbolizing new beginnings and mastery.",
+                  "animation_instructions": "Dramatic reveal of the sunrise over the peak with lens flare effects."
+                },
+                "voice_direction": "Triumphant and empowering tone to deliver the central message.",
+                "sound_design": "Rising orchestral score with triumphant brass and strings.",
+                "emotion": "empoderamento"
+              }
+            ],
+            "generated_script": "{\n  \"detected_voice_type\": \"masculine_br\",\n  \"detected_voice_language\": \"pt-BR\",\n  \"detected_music_style\": \"epic\",\n  \"recommended_image_model\": \"ideogram-v3-quality\",\n  \"recommended_video_model\": \"sora-2\",\n  \"music_prompt\": \"Epic cinematic orchestral soundtrack with deep strings, powerful percussion, and haunting ambient elements that evoke a sense of ancient wisdom and introspection.\",\n  \"sfx_prompt\": \"Create a soundscape that includes gentle thunder, crackling fire, and distant echoes to create an atmosphere of ancient contemplation and internal struggle.\",\n  \"script_base\": [\n    {\n      \"timestamp\": \"0:00-0:30\",\n      \"segment_type\": \"GANCHO\",\n      \"voiceover\": {\n        \"text\": \"Você já se sentiu dominado pelas suas emoções, incapaz de encontrar paz interior?\",\n        \"style\": \"Narração profunda e autoritária, incentivando reflexão pessoal.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A lone philosopher standing at the edge of a rugged cliff, overlooking a vast, tumultuous ocean under a stormy sky.\",\n        \"animation_instructions\": \"Slow dolly in towards the philosopher, with dramatic clouds moving in the background.\"\n      },\n      \"voice_direction\": \"Deep, authoritative voice with a reflective tone.\",\n      \"sound_design\": \"Sound of crashing waves and distant thunder to set a dramatic tone.\",\n      \"emotion\": \"introspecção\"\n    },\n    {\n      \"timestamp\": \"0:31-3:00\",\n      \"segment_type\": \"DESENVOLVIMENTO_N\",\n      \"voiceover\": {\n        \"text\": \"O estoicismo nos ensina a encontrar equilíbrio em meio ao caos, controlando nossas reações e emoções.\",\n        \"style\": \"Tom inspirador e educativo, destacando a sabedoria antiga.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"An ancient library filled with scrolls and a stoic philosopher reading by candlelight.\",\n        \"animation_instructions\": \"Pan across the library with focus on the philosopher's contemplative expression.\"\n      },\n      \"voice_direction\": \"Inspirational and educational tone, emphasizing ancient wisdom.\",\n      \"sound_design\": \"Soft sound of pages turning and candle flickering.\",\n      \"emotion\": \"sabedoria\"\n    },\n    {\n      \"timestamp\": \"3:01-9:00\",\n      \"segment_type\": \"DESENVOLVIMENTO_N\",\n      \"voiceover\": {\n        \"text\": \"A verdadeira paz interior vem do entendimento de que não podemos controlar os eventos externos, mas apenas nossa reação a eles.\",\n        \"style\": \"Tom calmo e esclarecedor, promovendo auto-reflexão.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A serene garden with a statue of a stoic figure, surrounded by gentle flowing water and lush greenery.\",\n        \"animation_instructions\": \"Slow zoom out from the statue to reveal the entire tranquil garden setting.\"\n      },\n      \"voice_direction\": \"Calm and enlightening tone to promote self-reflection.\",\n      \"sound_design\": \"Gentle flowing water and soft wind rustling through leaves.\",\n      \"emotion\": \"calma\"\n    },\n    {\n      \"timestamp\": \"9:01-17:00\",\n      \"segment_type\": \"DESENVOLVIMENTO_N\",\n      \"voiceover\": {\n        \"text\": \"Ao praticar o desapego, aprendemos a não sermos escravos dos nossos desejos e medos.\",\n        \"style\": \"Tom resoluto e motivacional, incentivando a prática pessoal.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A warrior meditating in a dimly lit room, surrounded by symbols of stoicism.\",\n        \"animation_instructions\": \"Circle around the meditating warrior to emphasize the symbols in the background.\"\n      },\n      \"voice_direction\": \"Resolute and motivational tone to encourage personal practice.\",\n      \"sound_design\": \"Subtle heartbeats and distant chimes to create a meditative atmosphere.\",\n      \"emotion\": \"determinação\"\n    },\n    {\n      \"timestamp\": \"17:01-29:51\",\n      \"segment_type\": \"CLÍMAX\",\n      \"voiceover\": {\n        \"text\": \"Ao dominar suas emoções, você se torna o mestre do seu destino, alcançando verdadeira liberdade.\",\n        \"style\": \"Tom triunfante e empoderador, culminando na mensagem central.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A majestic sunrise breaking over a mountain peak, symbolizing new beginnings and mastery.\",\n        \"animation_instructions\": \"Dramatic reveal of the sunrise over the peak with lens flare effects.\"\n      },\n      \"voice_direction\": \"Triumphant and empowering tone to deliver the central message.\",\n      \"sound_design\": \"Rising orchestral score with triumphant brass and strings.\",\n      \"emotion\": \"empoderamento\"\n    }\n  ]\n}",
+            "ai_analysis": {
+              "style": "Motivacional Estoico e Filosofia Antiga",
+              "tools": [
+                "Black Forest Labs flux-2 pro",
+                "ideogram v3",
+                "seedream 5.0 Lite",
+                "Kling 3.0",
+                "Open AI sora 2",
+                "Runway Gen-3",
+                "Elevenlabs V3",
+                "Elevenlabs Text to Speech (multilingual v2)",
+                "Suno v3.5"
+              ],
+              "pacing": "Lento",
+              "summary": "O vídeo apresenta uma série de estátuas e bustos em estilo clássico (gregos/romanos, figuras como Zeus e guerreiros) em cenários dramáticos e atmosféricos (chamas, tempestades com raios, nuvens escuras). Textos motivacionais e filosóficos sobre dominar emoções, resiliência e aceitação do destino são sobrepostos em fonte amarela ou branca. A estética é sombria, grandiosa e inspiradora, com foco em sabedoria ancestral e autodomínio.",
+              "confidence": 0.98,
+              "transcript": "",
+              "feasibility": "Alta",
+              "visualStyle": "Cinematográfico",
+              "justification": "O vídeo utiliza frames estáticos ou com movimento mínimo de bustos e estátuas clássicas, com sobreposição de texto em fonte amarela/branca. O fundo atmosférico (fogo, tempestade, raios) e a qualidade das imagens sugerem forte uso de IA generativa para criar um estilo 'dark academia' com temática de estoicismo. A repetição de elementos e o foco em uma figura central por cena são características comuns de vídeos produzidos com IA. A transição de tema de 'domínio das emoções' para 'aceitação do destino' é coesa com a filosofia estoica.",
+              "remodelingTip": "Para superar este vídeo original, a estratégia ideal é transicionar de estátuas estáticas para cenas dinâmicas geradas por IA, onde figuras antigas (não necessariamente estátuas) interagem sutilmente com seus ambientes, expressando as emoções ou a calma descrita no texto. Varie os ângulos de câmera, introduza elementos em movimento (vento, chuva, fogo dinâmico) e use uma narração com entonação rica e trilha sonora que evolua com a mensagem.",
+              "productionMethod": "IA Gerativa",
+              "has_text_on_screen": true,
+              "detected_audio_type": "voice",
+              "remodeling_template": {
+                "ai_stack": {
+                  "image": "ideogram v3",
+                  "music": "Suno v3.5",
+                  "video": "Open AI sora 2",
+                  "voice": "Elevenlabs Text to Speech (multilingual v2)"
+                },
+                "music_style": "Epic Cinematic Orchestral (com elementos de cordas e percussão), Dark Ambient, Neoclássico.",
+                "script_base": [
+                  {
+                    "emotion": "Curiosidade | Urgência",
+                    "timestamp": "0:00-0:05",
+                    "voiceover": {
+                      "text": "Você já sentiu que suas emoções são um campo de batalha? Que os ventos da vida te jogam para lá e para cá, sem controle? E se eu te dissesse que existe um caminho ancestral para a verdadeira maestria?",
+                      "style": "Tom de voz grave, questionador, com ligeira pausa antes da última frase para criar impacto."
+                    },
+                    "segment_type": "GANCHO",
+                    "visual_content": {
+                      "image_prompt": "Cena de um general romano, vivo, não uma estátua, no auge de uma colina observando seu exército sob um céu tempestuoso e relâmpagos cintilantes ao longe. Ele está calmo, com uma expressão de determinação inabalável. Detalhes realistas de armadura e manto. Estilo de pintura a óleo digital.",
+                      "animation_instructions": "Slow zoom in no rosto do general, com sutis movimentos de nuvens e raios no fundo. Câmera ligeiramente inclinada para dar imponência."
+                    }
+                  },
+                  {
+                    "emotion": "Reflexão | Empoderamento",
+                    "timestamp": "0:06-0:15",
+                    "voiceover": {
+                      "text": "No coração da filosofia estoica, a pergunta mais potente é: O que é o pior que poderia acontecer? Não para temer, mas para aceitar. Porque ao aceitar, você desarma o medo. Você não controla o mundo externo, mas você domina, sim, a sua reação a ele.",
+                      "style": "Tom de voz mais didático, firme, com ênfase nas palavras 'aceitar' e 'domina'."
+                    },
+                    "segment_type": "DESENVOLVIMENTO",
+                    "visual_content": {
+                      "image_prompt": "Filósofo grego (como Séneca ou Epicteto), não uma estátua, sentado em uma biblioteca antiga, iluminada apenas por uma janela que revela uma chuva torrencial lá fora. Ele escreve em um pergaminho, com expressão serena e focada. Detalhes de livros e artefatos antigos. Renderização hiper-realista.",
+                      "animation_instructions": "Pan suave da estante de livros para o filósofo. Pequenos detalhes de fumaça subindo de uma lâmpada a óleo ou gotas de chuva na janela. Close-up da mão escrevendo."
+                    }
+                  },
+                  {
+                    "emotion": "Motivação | Alívio",
+                    "timestamp": "0:16-0:20",
+                    "voiceover": {
+                      "text": "Aceite o que está além do seu controle. Concentre-se no que está. Sua força interior é ilimitada. Comece sua jornada de autodomínio hoje e descubra o poder de DOMINAR SUAS EMOÇÕES. Clique no link e transforme sua vida.",
+                      "style": "Tom de voz inspirador, conclusivo, com aumento de volume e intensidade nas últimas frases."
+                    },
+                    "segment_type": "CTA",
+                    "visual_content": {
+                      "image_prompt": "Uma figura humana (silhueta de homem ou mulher) em pé no topo de uma montanha rochosa, com os braços abertos, observando um nascer do sol dourado rompendo as nuvens escuras. O céu se abre revelando cores vibrantes. Sentimento de esperança e vitória. Estilo foto-realista, cinematográfico.",
+                      "animation_instructions": "Slow backward zoom, revelando a paisagem grandiosa. Raio de luz do sol se expandindo. Fade in de um CTA de texto na tela: 'COMECE AGORA!'"
+                    }
+                  }
+                ],
+                "video_style": "Misticismo Estoico, Dark Academia, Mitológico Moderno.",
+                "thumbnail_prompt": "CLOSE-UP DRAMÁTICO de um busto de guerreiro helênico, com capacete coríntio detalhado, feito de mármore antigo e rachado, olhos profundamente pensativos e sombra dramática no rosto. Fundo de um templo em ruínas sob um céu tempestuoso com raios distantes e nuvens cinzentas, raios de luz dourada perfurando a escuridão. Estilo cinematográfico, alta resolução, 8K.",
+                "composition_rules": "Utilize a regra dos terços para posicionar o sujeito principal. Aplique iluminação de três pontos para criar profundidade e dramaticidade. Cenários devem ser ricos em detalhes, mas focados na emoção ou ação do personagem. Cores predominantes: tons terrosos, cinzas, dourados e azuis profundos.",
+                "visual_directives": "Cenas geradas por IA que retratam figuras antigas (filósofos, guerreiros, deuses) em momentos de introspecção, batalha interna ou contemplação serena. Utilize iluminação dramática para destacar a figura principal e o ambiente. Evite estátuas estáticas; prefira personagens vivendo a cena. Varie entre planos abertos e closes.",
+                "target_audience_psychology": "Ativa o gatilho mental da Autoridade (sabedoria antiga), da Inspiração (autodomínio), e do Medo de Perder (não viver plenamente) seguido por Alívio (solução proposta)."
+              },
+              "original_audio_description": "Provável narração masculina, com voz profunda e autoritária, em tom motivacional e filosófico, acompanhada por uma trilha sonora épica ou dramática de fundo, possivelmente com elementos orquestrais e sons ambientes (ex: trovões, fogo crepitante) que complementam as imagens."
+            }
+          }
+        },
+        "webhookUrl": "https://n8n.fjt-solutions.com/webhook/darktube_producao",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d5c1be1e686158128704986c8b96dfb65a421b52cf38e177cd9037bb8b11d8e0"
   }
 }
