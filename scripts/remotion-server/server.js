@@ -10,6 +10,16 @@ app.use(express.json({ limit: '50mb' }));
 const PORT = process.env.PORT || 3001;
 const OUTPUT_DIR = path.join(__dirname, 'output');
 const STORAGE_BASE_URL = process.env.STORAGE_BASE_URL || '';
+
+// Usa Chromium do sistema (instalado no Dockerfile via apt-get)
+// Evita download de 90MB do Chrome Headless Shell a cada cold start
+const CHROME_PATH =
+  process.env.CHROME_EXECUTABLE_PATH ||
+  process.env.PUPPETEER_EXECUTABLE_PATH ||
+  '/usr/bin/chromium';
+
+console.log('[Remotion Service] Chrome path:', CHROME_PATH);
+
 let bundledLocation = null;
 
 if (!fs.existsSync(OUTPUT_DIR)) {
@@ -136,15 +146,28 @@ async function renderAsync(historyId, composition, callbackUrl) {
       height,
     });
 
+    // ── Concorrência controlada para evitar OOM Kill ──
+    // Exit 137 = OOM Kill. Com Chrome headless cada frame usa ~200-300MB.
+    // 2 frames simultâneos é seguro para containers com 1-2GB de RAM.
+    // Ajuste RENDER_CONCURRENCY no Dokploy se a VPS tiver mais memória disponível.
+    const concurrency = parseInt(process.env.RENDER_CONCURRENCY || '2');
+
     await renderMedia({
       composition: comp,
       serveUrl: bundledLocation,
       outputLocation: outputFilePath,
       codec: 'h264',
-      concurrency: 14, // 14 vCPUs da VPS
+      concurrency,
       imageFormat: 'jpeg',
       jpegQuality: 82,
       inputProps,
+      // Usa Chromium do sistema — sem download, sem OOM por download paralelo
+      chromiumOptions: {
+        disableWebSecurity: true,
+        executablePath: CHROME_PATH,
+      },
+      // Timeout por frame — evita hang eterno se o browser travar
+      timeoutInMilliseconds: 30_000,
     });
 
     console.log(`[Remotion Render] Concluído: ${outputFilePath}`);
