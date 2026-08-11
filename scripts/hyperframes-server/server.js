@@ -100,6 +100,48 @@ app.post('/thumbnail', async (req, res) => {
 // ──────────────────────────────────────────────
 app.use('/storage', express.static(OUTPUT_DIR));
 
+let removeBackground = null;
+try {
+  const bgRmModule = require('@imgly/background-removal-node');
+  removeBackground = bgRmModule.removeBackground;
+  console.log('[HyperFrames Cutout] Módulo @imgly/background-removal-node ativo!');
+} catch (err) {
+  console.log('[HyperFrames Cutout] Módulo de remoção de fundo desativado:', err.message);
+}
+
+// ──────────────────────────────────────────────
+// AUTO-CUTOUT 2.5D — Separa Sujeito de Fundo em 1 imagem para HyperFrames
+// ──────────────────────────────────────────────
+async function processSceneCutouts(scenes) {
+  if (!removeBackground || !scenes || scenes.length === 0) return;
+  console.log('[HyperFrames Cutout] Analisando auto-recorte 2.5D para cenas...');
+
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+    if (!scene.imageUrl || scene.subjectImageUrl || scene.foregroundUrl) continue;
+    const clean = scene.imageUrl.toLowerCase().split('?')[0];
+    if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov')) continue;
+
+    try {
+      console.log(`[HyperFrames Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
+      const blob = await removeBackground(scene.imageUrl);
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      const fgFileName = `cutout_hf_${Date.now()}_${i}.png`;
+      const fgPath = path.join(OUTPUT_DIR, fgFileName);
+      fs.writeFileSync(fgPath, buffer);
+
+      const fgUrl = STORAGE_BASE_URL
+        ? `${STORAGE_BASE_URL}/${fgFileName}`
+        : `/storage/${fgFileName}`;
+
+      scene.subjectImageUrl = fgUrl;
+      console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: ${fgUrl}`);
+    } catch (err) {
+      console.error(`[HyperFrames Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
+    }
+  }
+}
+
 // ──────────────────────────────────────────────
 // RENDER ASSÍNCRONO
 // ──────────────────────────────────────────────
@@ -115,6 +157,11 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
   try {
     // 1. Criar diretório de trabalho
     fs.mkdirSync(workDir, { recursive: true });
+
+    // 1.5 Auto-cutout 2.5D para imagens de 1 camada
+    if (payload && payload.scenes) {
+      await processSceneCutouts(payload.scenes);
+    }
 
     // 2. Gerar HTML da composição
     console.log(`[HyperFrames] Gerando HTML para job: ${historyId}`);
