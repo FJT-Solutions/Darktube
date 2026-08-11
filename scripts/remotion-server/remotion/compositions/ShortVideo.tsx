@@ -150,8 +150,15 @@ const SceneLayer: React.FC<{
 
   return (
     <AbsoluteFill>
-      {/* Fundo — imagem com Ken Burns ou gradiente */}
-      {scene.imageUrl ? (
+      {/* Fundo — Imagem 2.5D Parallax, Ken Burns ou Gradiente */}
+      {(scene.subjectImageUrl || scene.foregroundUrl) ? (
+        <Parallax25DImage
+          bgUrl={scene.imageUrl}
+          fgUrl={scene.subjectImageUrl || scene.foregroundUrl!}
+          durationFrames={durationFrames}
+          animationStyle={scene.animationStyle || 'parallax-up'}
+        />
+      ) : scene.imageUrl ? (
         <KenBurnsImage
           imgUrl={scene.imageUrl}
           durationFrames={durationFrames}
@@ -224,6 +231,60 @@ const SceneLayer: React.FC<{
 
       {/* Áudio da narração desta cena */}
       {scene.audioUrl && <Audio src={scene.audioUrl} />}
+    </AbsoluteFill>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARALLAX 2.5D IMAGE — Sujeito (Foreground PNG recortado) + Fundo (Background)
+// Permite profundidade 3D real em QUALQUER imagem enviada/gerada!
+// ─────────────────────────────────────────────────────────────────────────────
+const Parallax25DImage: React.FC<{
+  bgUrl: string;
+  fgUrl: string;
+  durationFrames: number;
+  animationStyle: string;
+}> = ({ bgUrl, fgUrl, durationFrames, animationStyle }) => {
+  const frame = useCurrentFrame();
+  const progress = interpolate(frame, [0, durationFrames], [0, 1], { extrapolateRight: 'clamp' });
+
+  // 1. Movimento do fundo (lento, profundo)
+  const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
+  const bgX = Math.sin(frame * 0.04) * 4;
+  const bgY = Math.cos(frame * 0.03) * 3;
+
+  // 2. Movimento do sujeito em primeiro plano (mais rápido, perspectiva 3D)
+  const fgScale = interpolate(progress, [0, 1], [1.12, 1.30]);
+  const fgX = Math.sin(frame * 0.06) * 8 + (progress * 12);
+  const fgY = Math.cos(frame * 0.05) * 6;
+  const rotY = interpolate(progress, [0, 1], [-6, 6]);
+
+  return (
+    <AbsoluteFill style={{ overflow: 'hidden', perspective: '800px' }}>
+      {/* Camada 1: Fundo (Background) */}
+      <Img
+        src={bgUrl}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform: `scale(${bgScale}) translate(${bgX}px, ${bgY}px)`,
+          filter: 'blur(2px) brightness(0.85)',
+          willChange: 'transform',
+        }}
+      />
+      {/* Camada 2: Sujeito Recortado (Foreground) */}
+      <Img
+        src={fgUrl}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform: `scale(${fgScale}) translate(${fgX}px, ${fgY}px) rotateY(${rotY}deg)`,
+          filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.7))',
+          willChange: 'transform',
+        }}
+      />
     </AbsoluteFill>
   );
 };
