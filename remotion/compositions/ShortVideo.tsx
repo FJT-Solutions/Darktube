@@ -21,6 +21,7 @@ import { flip }  from '@remotion/transitions/flip';
 import { RemotionShortProps, SceneSegment, TransitionStyle, SpringPreset } from '../types';
 import { SplitBounceText, TypewriterText, GlitchText, EditorialText, KineticPopText } from './TextSplit';
 import { GlitchOverlay, LightLeakOverlay, FlashOverlay, ParticlesOverlay, ColorGradingLayer } from './GlitchOverlay';
+import { FinancialCounterOverlay, CodeTerminalOverlay } from './MotionGraphicsOverlay';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Spring presets — configurações de física por estilo emocional
@@ -201,6 +202,14 @@ const SceneLayer: React.FC<{
       )}
       {((scene.overlayEffect || scene.captionEffect) === 'particles') && (
         <ParticlesOverlay intensity={intensity} durationFrames={durationFrames} color={scene.emotionColor || primaryColor} />
+      )}
+
+      {/* ── PROGRAMMATIC MOTION GRAPHIC OVERLAYS ── */}
+      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'counter' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'finance') && (
+        <FinancialCounterOverlay durationFrames={durationFrames} color={scene.emotionColor || '#00C853'} />
+      )}
+      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'code-terminal' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'terminal') && (
+        <CodeTerminalOverlay durationFrames={durationFrames} primaryColor={scene.emotionColor || '#00E0FF'} />
       )}
 
       {/* Legendas */}
