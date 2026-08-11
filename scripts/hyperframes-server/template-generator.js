@@ -467,57 +467,60 @@ function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
   gsap.to('#scene-${i}', { opacity: 1, duration: 0.4, ease: 'power2.out', delay: ${start} });`;
     }
 
-    // ─ 2. Animação da imagem de fundo ────────────────────────
+    // ─ 2. Animação da imagem de fundo ou vídeo ────────────────────────
     if (scene.imageUrl) {
+      const mediaSel = `#bg-${i} img, #bg-${i} video`;
       switch (animStyle) {
         case 'kenburns-right':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.08, xPercent: 0 }, { scale: 1.25, xPercent: 6, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.12, xPercent: -3 }, { scale: 1.35, xPercent: 8, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
           break;
         case 'kenburns-left':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.08, xPercent: 0 }, { scale: 1.25, xPercent: -6, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.12, xPercent: 3 }, { scale: 1.35, xPercent: -8, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
           break;
         case 'kenburns-up':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.08, yPercent: 0 }, { scale: 1.25, yPercent: -6, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.12, yPercent: 4 }, { scale: 1.35, yPercent: -8, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
           break;
         case 'kenburns-down':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.08, yPercent: 0 }, { scale: 1.25, yPercent: 6, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.12, yPercent: -4 }, { scale: 1.35, yPercent: 8, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
           break;
         case 'zoom-punch':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.45 }, { scale: 1.08, duration: ${Math.min(duration, 0.7)}, ease: 'power4.out', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.55, rotation: -2 }, { scale: 1.12, rotation: 0, duration: ${Math.min(duration, 0.8)}, ease: 'power4.out', delay: ${start} });
+  gsap.to('${mediaSel}', { scale: 1.25, duration: ${Math.max(duration - 0.8, 0.1)}, ease: 'sine.inOut', delay: ${start + 0.8} });`;
           break;
         case 'parallax-up':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.18, yPercent: 6 }, { yPercent: -6, scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.25, yPercent: 10 }, { yPercent: -8, scale: 1.12, duration: ${duration}, ease: 'power1.inOut', delay: ${start} });`;
           break;
         case 'parallax-down':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.18, yPercent: -6 }, { yPercent: 6, scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.25, yPercent: -10 }, { yPercent: 8, scale: 1.12, duration: ${duration}, ease: 'power1.inOut', delay: ${start} });`;
           break;
         case 'zoom-out':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.38 }, { scale: 1.02, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.48 }, { scale: 1.05, duration: ${duration}, ease: 'power1.out', delay: ${start} });`;
           break;
         case 'tilt-3d':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.28, rotationX: 12, rotationY: -10, transformPerspective: 1000 }, { rotationX: -6, rotationY: 8, scale: 1.12, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.35, rotationX: 16, rotationY: -14, transformPerspective: 800 }, { rotationX: -8, rotationY: 10, scale: 1.15, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
           break;
         case 'shake-impact':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.22 }, { scale: 1.08, duration: ${duration}, ease: 'none', delay: ${start} });
-  gsap.to('#bg-${i} img', { x: '+=12', y: '-=8', yoyo: true, repeat: 5, duration: 0.05, delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.28 }, { scale: 1.12, duration: ${duration}, ease: 'none', delay: ${start} });
+  gsap.to('${mediaSel}', { x: '+=16', y: '-=10', yoyo: true, repeat: 7, duration: 0.04, delay: ${start} });`;
           break;
         case 'spin-in':
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.38, rotation: -18 }, { rotation: 0, scale: 1.08, duration: 0.6, ease: 'back.out(1.7)', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.45, rotation: -28 }, { rotation: 0, scale: 1.12, duration: 0.7, ease: 'back.out(1.7)', delay: ${start} });
+  gsap.to('${mediaSel}', { scale: 1.25, duration: ${Math.max(duration - 0.7, 0.1)}, ease: 'none', delay: ${start + 0.7} });`;
           break;
         default:
           code += `
-  gsap.fromTo('#bg-${i} img', { scale: 1.08 }, { scale: 1.22, duration: ${duration}, ease: 'none', delay: ${start} });`;
+  gsap.fromTo('${mediaSel}', { scale: 1.12 }, { scale: 1.30, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
       }
     }
 
