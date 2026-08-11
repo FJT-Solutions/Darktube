@@ -335,19 +335,6 @@ const KenBurnsImage: React.FC<{
     </AbsoluteFill>
   );
 };
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: 'center',
-          transform,
-          transformOrigin: 'center center',
-          willChange: 'transform',
-        }}
-      />
-    </AbsoluteFill>
-  );
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LEGENDAS — 3 estilos com efeitos avançados
