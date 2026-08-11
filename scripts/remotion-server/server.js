@@ -211,7 +211,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
     // Exit 137 = OOM Kill. Com Chrome headless cada frame usa ~200-300MB.
     // 2 frames simultâneos é seguro para containers com 1-2GB de RAM.
     // Ajuste RENDER_CONCURRENCY no Dokploy se a VPS tiver mais memória disponível.
-    const concurrency = parseInt(process.env.RENDER_CONCURRENCY || '4');
+    const concurrency = parseInt(process.env.RENDER_CONCURRENCY || '4', 10);
+    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} frames simultâneos em paralelo`);
 
     let lastPercent = -1;
     await renderMedia({
