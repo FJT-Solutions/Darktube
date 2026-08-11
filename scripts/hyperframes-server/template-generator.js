@@ -77,10 +77,16 @@ function generateCompositionHTML(payload) {
          data-duration="${duration}"
          data-track-index="${i}">
 
-      <!-- Imagem de fundo -->
+      <!-- Imagem ou Vídeo de fundo -->
       <div class="scene-bg" id="bg-${i}">
         ${scene.imageUrl
-          ? `<img src="${scene.imageUrl}" alt="Scene ${i + 1}" loading="eager" />`
+          ? (function() {
+              const clean = scene.imageUrl.toLowerCase().split('?')[0];
+              const isVid = clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.includes('/video/') || clean.includes('video_');
+              return isVid
+                ? `<video src="${scene.imageUrl}" autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
+                : `<img src="${scene.imageUrl}" alt="Scene ${i + 1}" loading="eager" />`;
+            })()
           : `<div class="scene-gradient" style="background: linear-gradient(135deg, #0f0f23 0%, #1a0a2e 50%, #16213e 100%);"></div>`
         }
       </div>

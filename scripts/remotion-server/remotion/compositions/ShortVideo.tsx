@@ -1,8 +1,8 @@
-import React from 'react';
 import {
   AbsoluteFill,
   Audio,
   Img,
+  OffthreadVideo,
   interpolate,
   spring,
   useCurrentFrame,
@@ -78,33 +78,37 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
 
       {/* ── CENAS com TransitionSeries ── */}
       <TransitionSeries>
-        {segments.map(({ scene, durationFrames, transitionStyle, transitionFrames }, i) => (
-          <React.Fragment key={i}>
-            <TransitionSeries.Sequence durationInFrames={durationFrames}>
-              <SceneLayer
-                scene={scene}
-                sceneIndex={i}
-                totalScenes={scenes.length}
-                durationFrames={durationFrames}
-                captionStyle={captionStyle}
-                primaryColor={primaryColor}
-                accentColor={accentColor}
-                format={format}
-              />
-            </TransitionSeries.Sequence>
+        {segments.map(({ scene, durationFrames, transitionStyle, transitionFrames }, i) => {
+          const isLast = i === scenes.length - 1;
+          // Na última cena, não há transição de saída — a cena ocupa todo o tempo restante
+          return (
+            <React.Fragment key={i}>
+              <TransitionSeries.Sequence durationInFrames={durationFrames}>
+                <SceneLayer
+                  scene={scene}
+                  sceneIndex={i}
+                  totalScenes={scenes.length}
+                  durationFrames={durationFrames}
+                  captionStyle={captionStyle}
+                  primaryColor={primaryColor}
+                  accentColor={accentColor}
+                  format={format}
+                />
+              </TransitionSeries.Sequence>
 
-            {/* Adiciona transição entre cenas (exceto após a última) */}
-            {i < scenes.length - 1 && transitionStyle !== 'none' && (
-              <TransitionSeries.Transition
-                presentation={getTransitionPresentation(transitionStyle)}
-                timing={springTiming({
-                  durationInFrames: transitionFrames,
-                  config: { damping: 14, stiffness: 200 },
-                })}
-              />
-            )}
-          </React.Fragment>
-        ))}
+              {/* Adiciona transição entre cenas (exceto após a última) */}
+              {!isLast && transitionStyle !== 'none' && (
+                <TransitionSeries.Transition
+                  presentation={getTransitionPresentation(transitionStyle)}
+                  timing={springTiming({
+                    durationInFrames: transitionFrames,
+                    config: { damping: 14, stiffness: 200 },
+                  })}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </TransitionSeries>
 
       {/* ── WATERMARK GLOBAL ── */}
@@ -215,7 +219,8 @@ const SceneLayer: React.FC<{
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KEN BURNS & DYNAMIC CAMERA — Animação de imagem e 3D via interpolate()
+// KEN BURNS & DYNAMIC CAMERA — Animação de imagem, vídeo IA e 3D via interpolate()
+// Suporta arquivos de vídeo (.mp4/.webm) e imagens estáticas (.png/.jpg)
 // ─────────────────────────────────────────────────────────────────────────────
 const KenBurnsImage: React.FC<{
   imgUrl: string;
@@ -225,69 +230,111 @@ const KenBurnsImage: React.FC<{
   const frame = useCurrentFrame();
   const progress = interpolate(frame, [0, durationFrames], [0, 1], { extrapolateRight: 'clamp' });
 
+  // Detecta se a mídia é um arquivo de vídeo (ex: clipe animado por IA gerado via Runway/Kling/Luma/Sora)
+  const isVideoMedia = (url: string) => {
+    if (!url) return false;
+    const clean = url.toLowerCase().split('?')[0];
+    return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.includes('/video/') || clean.includes('video_');
+  };
+
+  const isVideo = isVideoMedia(imgUrl);
+
+  // Micro-pulso flutuante (2px) para garantir movimento dinâmico contínuo em todas as cenas
+  const floatX = Math.sin(frame * 0.08) * 3;
+  const floatY = Math.cos(frame * 0.06) * 3;
+
   let transform = '';
 
   switch (animationStyle) {
     case 'kenburns-right':
-      transform = `scale(${1.08 + progress * 0.22}) translateX(${progress * 8}%)`;
+      transform = `scale(${1.12 + progress * 0.28}) translate(${progress * 10 + floatX}%, ${floatY}px)`;
       break;
     case 'kenburns-left':
-      transform = `scale(${1.08 + progress * 0.22}) translateX(${-progress * 8}%)`;
+      transform = `scale(${1.12 + progress * 0.28}) translate(${-progress * 10 + floatX}%, ${floatY}px)`;
       break;
     case 'kenburns-up':
-      transform = `scale(${1.08 + progress * 0.22}) translateY(${-progress * 8}%)`;
+      transform = `scale(${1.12 + progress * 0.28}) translate(${floatX}px, ${-progress * 10 + floatY}%)`;
       break;
     case 'kenburns-down':
-      transform = `scale(${1.08 + progress * 0.22}) translateY(${progress * 8}%)`;
+      transform = `scale(${1.12 + progress * 0.28}) translate(${floatX}px, ${progress * 10 + floatY}%)`;
       break;
     case 'zoom-punch': {
-      const punchScale = interpolate(frame, [0, 10, durationFrames], [1.45, 1.15, 1.08], {
+      const punchScale = interpolate(frame, [0, 8, durationFrames], [1.55, 1.22, 1.10], {
         extrapolateRight: 'clamp',
       });
-      transform = `scale(${punchScale})`;
+      const rot = Math.sin(frame * 0.1) * 1.5;
+      transform = `scale(${punchScale}) rotate(${rot}deg)`;
       break;
     }
     case 'parallax-up':
-      transform = `scale(${1.15 + progress * 0.15}) translateY(${8 - progress * 14}%)`;
+      transform = `scale(${1.20 + progress * 0.20}) translate(${floatX}px, ${10 - progress * 18}%)`;
       break;
     case 'parallax-down':
-      transform = `scale(${1.15 + progress * 0.15}) translateY(${-8 + progress * 14}%)`;
+      transform = `scale(${1.20 + progress * 0.20}) translate(${floatX}px, ${-10 + progress * 18}%)`;
       break;
     case 'parallax-left':
-      transform = `scale(${1.15 + progress * 0.15}) translateX(${8 - progress * 14}%)`;
+      transform = `scale(${1.20 + progress * 0.20}) translate(${10 - progress * 18}%, ${floatY}px)`;
       break;
     case 'parallax-right':
-      transform = `scale(${1.15 + progress * 0.15}) translateX(${-8 + progress * 14}%)`;
+      transform = `scale(${1.20 + progress * 0.20}) translate(${-10 + progress * 18}%, ${floatY}px)`;
       break;
     case 'zoom-out':
-      transform = `scale(${1.38 - progress * 0.28})`;
+      transform = `scale(${1.45 - progress * 0.35}) translate(${floatX}px, ${floatY}px)`;
       break;
     case 'tilt-3d': {
-      const rotX = interpolate(progress, [0, 1], [10, -6]);
-      const rotY = interpolate(progress, [0, 1], [-12, 10]);
-      transform = `perspective(1000px) scale(1.22) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+      const rotX = interpolate(progress, [0, 1], [14, -8]);
+      const rotY = interpolate(progress, [0, 1], [-16, 14]);
+      transform = `perspective(800px) scale(1.28) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
       break;
     }
     case 'shake-impact': {
-      const shakeX = Math.sin(frame * 1.5) * interpolate(frame, [0, 12], [14, 0], { extrapolateRight: 'clamp' });
-      const shakeY = Math.cos(frame * 1.5) * interpolate(frame, [0, 12], [14, 0], { extrapolateRight: 'clamp' });
-      transform = `scale(1.15) translate(${shakeX}px, ${shakeY}px)`;
+      const shakeX = Math.sin(frame * 1.8) * interpolate(frame, [0, 16], [18, 0], { extrapolateRight: 'clamp' });
+      const shakeY = Math.cos(frame * 1.8) * interpolate(frame, [0, 16], [18, 0], { extrapolateRight: 'clamp' });
+      transform = `scale(1.20) translate(${shakeX}px, ${shakeY}px)`;
       break;
     }
     case 'spin-in': {
-      const rot = interpolate(frame, [0, 15], [-20, 0], { extrapolateRight: 'clamp' });
-      const scaleSpin = interpolate(frame, [0, 15], [1.35, 1.10], { extrapolateRight: 'clamp' });
+      const rot = interpolate(frame, [0, 18], [-28, 0], { extrapolateRight: 'clamp' });
+      const scaleSpin = interpolate(frame, [0, 18], [1.45, 1.15], { extrapolateRight: 'clamp' });
       transform = `scale(${scaleSpin}) rotate(${rot}deg)`;
       break;
     }
     default:
-      transform = `scale(${1.08 + progress * 0.18})`;
+      transform = `scale(${1.12 + progress * 0.22}) translate(${floatX}px, ${floatY}px)`;
   }
 
   return (
     <AbsoluteFill style={{ overflow: 'hidden' }}>
-      <Img
-        src={imgUrl}
+      {isVideo ? (
+        <OffthreadVideo
+          src={imgUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            transform,
+            transformOrigin: 'center center',
+            willChange: 'transform',
+          }}
+        />
+      ) : (
+        <Img
+          src={imgUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center',
+            transform,
+            transformOrigin: 'center center',
+            willChange: 'transform',
+          }}
+        />
+      )}
+    </AbsoluteFill>
+  );
+};
         style={{
           width: '100%',
           height: '100%',

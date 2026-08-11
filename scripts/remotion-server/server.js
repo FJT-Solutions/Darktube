@@ -116,12 +116,24 @@ async function renderAsync(historyId, composition, callbackUrl) {
     const width  = isVertical ? 1080 : 1920;
     const height = isVertical ? 1920 : 1080;
 
-    // Calcular duração total em frames (30fps)
+    // ── Calcular duração total EXATA em frames (30fps) descontando a sobreposição de transições ──
     const fps = 30;
-    const totalSeconds = composition.scenes.reduce(
-      (sum, s) => sum + (s.durationSeconds || 5), 0
-    );
-    const durationInFrames = Math.ceil(totalSeconds * fps);
+    const DEFAULT_TRANSITION_FRAMES = 18;
+
+    let calcFrames = 0;
+    const scenesList = composition.scenes || [];
+    for (let i = 0; i < scenesList.length; i++) {
+      const scene = scenesList[i];
+      const sceneDur = Math.round((scene.durationSeconds || 5) * fps);
+      calcFrames += sceneDur;
+      if (i < scenesList.length - 1) {
+        const tStyle = scene.transitionIn || 'fade';
+        const tFrames = scene.transitionDurationFrames || (tStyle === 'none' ? 0 : DEFAULT_TRANSITION_FRAMES);
+        calcFrames -= tFrames;
+      }
+    }
+    const durationInFrames = Math.max(30, calcFrames);
+    console.log(`[Remotion Render] Duração exata calculada: ${durationInFrames} frames (${(durationInFrames / fps).toFixed(2)}s) para ${scenesList.length} cenas`);
 
     // inputProps = o que o ShortVideoComposition recebe via useVideoConfig + props
     const inputProps = {
