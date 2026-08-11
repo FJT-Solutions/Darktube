@@ -40,8 +40,9 @@ export type TransitionStyle =
   | 'slide-up'
   | 'slide-down'
   | 'wipe'
-  | 'flip'
   | 'clock-wipe'
+  | 'flip'
+  | 'rotate'
   | 'zoom-in'
   | 'none';
 
