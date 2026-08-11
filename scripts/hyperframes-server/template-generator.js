@@ -77,15 +77,18 @@ function generateCompositionHTML(payload) {
          data-duration="${duration}"
          data-track-index="${i}">
 
-      <!-- Imagem ou Vídeo de fundo -->
+      <!-- Imagem, Vídeo ou 2.5D Parallax de fundo -->
       <div class="scene-bg" id="bg-${i}">
-        ${scene.imageUrl
+        ${(scene.subjectImageUrl || scene.foregroundUrl)
+          ? `<img src="${scene.imageUrl}" class="bg-layer" alt="BG ${i + 1}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;filter:blur(2px) brightness(0.85);" />
+             <img src="${scene.subjectImageUrl || scene.foregroundUrl}" class="fg-layer" alt="FG ${i + 1}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 15px 30px rgba(0,0,0,0.75));" />`
+          : scene.imageUrl
           ? (function() {
               const clean = scene.imageUrl.toLowerCase().split('?')[0];
               const isVid = clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.includes('/video/') || clean.includes('video_');
               return isVid
                 ? `<video src="${scene.imageUrl}" autoplay loop muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>`
-                : `<img src="${scene.imageUrl}" alt="Scene ${i + 1}" loading="eager" />`;
+                : `<img src="${scene.imageUrl}" class="main-media" alt="Scene ${i + 1}" loading="eager" />`;
             })()
           : `<div class="scene-gradient" style="background: linear-gradient(135deg, #0f0f23 0%, #1a0a2e 50%, #16213e 100%);"></div>`
         }
@@ -469,7 +472,13 @@ function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
 
     // ─ 2. Animação da imagem de fundo ou vídeo ────────────────────────
     if (scene.imageUrl) {
-      const mediaSel = `#bg-${i} img, #bg-${i} video`;
+      if (scene.subjectImageUrl || scene.foregroundUrl) {
+        // Animação 2.5D Parallax de Profundidade em duas camadas (Fundo + Sujeito Recortado)
+        code += `
+  gsap.fromTo('#bg-${i} .bg-layer', { scale: 1.05, xPercent: -3 }, { scale: 1.18, xPercent: 5, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });
+  gsap.fromTo('#bg-${i} .fg-layer', { scale: 1.12, xPercent: 4, rotationY: -6, transformPerspective: 800 }, { scale: 1.30, xPercent: -6, rotationY: 6, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
+      } else {
+        const mediaSel = `#bg-${i} img, #bg-${i} video`;
       switch (animStyle) {
         case 'kenburns-right':
           code += `
