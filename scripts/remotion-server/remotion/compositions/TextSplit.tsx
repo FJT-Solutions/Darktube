@@ -201,3 +201,100 @@ export const GlitchText: React.FC<{
     </div>
   );
 };
+
+// ─── Editorial text: título bold com barra neon lateral animada ───────────────
+export const EditorialText: React.FC<{
+  text: string;
+  primaryColor: string;
+  fontSize: number;
+  frame: number;
+  fontWeight?: number;
+}> = ({ text, primaryColor, fontSize, frame, fontWeight = 900 }) => {
+  const { fps } = useVideoConfig();
+
+  const slideIn = interpolate(frame, [0, 14], [-60, 0], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(frame, [0, 8],  [0,   1], { extrapolateRight: 'clamp' });
+  const barScale = interpolate(frame, [0, 18], [0, 1],  { extrapolateRight: 'clamp' });
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '18px',
+        opacity,
+        transform: `translateX(${slideIn}px)`,
+        willChange: 'transform, opacity',
+      }}
+    >
+      {/* Barra neon lateral */}
+      <div
+        style={{
+          width: '6px',
+          height: `${fontSize * 1.2}px`,
+          backgroundColor: primaryColor,
+          boxShadow: `0 0 16px ${primaryColor}, 0 0 32px ${primaryColor}88`,
+          borderRadius: '3px',
+          transform: `scaleY(${barScale})`,
+          transformOrigin: 'bottom center',
+          flexShrink: 0,
+        }}
+      />
+      <span
+        style={{
+          fontSize,
+          fontWeight,
+          fontFamily: 'Montserrat, Inter, sans-serif',
+          color: '#ffffff',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          textShadow: '0 2px 12px rgba(0,0,0,0.9)',
+          lineHeight: 1.15,
+        }}
+      >
+        {text}
+      </span>
+    </div>
+  );
+};
+
+// ─── Kinetic Pop text: snap elástico ultra-dramático (spring stiff) ────────────
+export const KineticPopText: React.FC<{
+  text: string;
+  primaryColor: string;
+  fps: number;
+  isVertical: boolean;
+  springConfig: { damping: number; stiffness: number; mass: number };
+  frame: number;
+}> = ({ text, primaryColor, fps, isVertical, springConfig, frame }) => {
+  const scaleVal = spring({ frame: Math.max(0, frame), fps, config: springConfig });
+
+  const scaleX = interpolate(scaleVal, [0, 1], [0.2, 1], { extrapolateRight: 'clamp' });
+  const scaleY = interpolate(scaleVal, [0, 0.5, 1], [2.2, 0.85, 1.0], { extrapolateRight: 'clamp' });
+  const opacity = interpolate(scaleVal, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' });
+
+  return (
+    <div
+      style={{
+        transform: `scaleX(${scaleX}) scaleY(${scaleY})`,
+        transformOrigin: 'center bottom',
+        color: '#ffffff',
+        fontSize: isVertical ? 120 : 95,
+        fontWeight: 900,
+        fontFamily: 'Montserrat, sans-serif',
+        textTransform: 'uppercase',
+        textAlign: 'center',
+        padding: '10px 28px',
+        backgroundColor: primaryColor,
+        borderRadius: '12px',
+        boxShadow: `0 20px 40px rgba(0,0,0,0.6), 0 0 60px ${primaryColor}66`,
+        border: '4px solid rgba(255,255,255,0.2)',
+        opacity,
+        willChange: 'transform, opacity',
+        WebkitTextStroke: '2px rgba(0,0,0,0.4)',
+      }}
+    >
+      {text}
+    </div>
+  );
+};

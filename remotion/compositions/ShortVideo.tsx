@@ -18,8 +18,8 @@ import { slide } from '@remotion/transitions/slide';
 import { wipe }  from '@remotion/transitions/wipe';
 import { flip }  from '@remotion/transitions/flip';
 import { RemotionShortProps, SceneSegment, TransitionStyle, SpringPreset } from '../types';
-import { SplitBounceText, TypewriterText, GlitchText } from './TextSplit';
-import { GlitchOverlay, LightLeakOverlay, FlashOverlay } from './GlitchOverlay';
+import { SplitBounceText, TypewriterText, GlitchText, EditorialText, KineticPopText } from './TextSplit';
+import { GlitchOverlay, LightLeakOverlay, FlashOverlay, ParticlesOverlay, ColorGradingLayer } from './GlitchOverlay';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Spring presets — configurações de física por estilo emocional
@@ -34,14 +34,17 @@ const SPRING_PRESETS: Record<SpringPreset, { damping: number; stiffness: number;
 // Mapa de transições do @remotion/transitions
 function getTransitionPresentation(style: TransitionStyle, direction?: string) {
   switch (style) {
-    case 'slide-right': return slide({ direction: 'from-right' }) as any;
-    case 'slide-left':  return slide({ direction: 'from-left'  }) as any;
-    case 'slide-up':    return slide({ direction: 'from-bottom' }) as any;
-    case 'slide-down':  return slide({ direction: 'from-top'   }) as any;
-    case 'wipe':        return wipe({ direction: 'from-right'  }) as any;
-    case 'flip':        return flip({ direction: 'from-right'  }) as any;
+    case 'slide-right':  return slide({ direction: 'from-right'  }) as any;
+    case 'slide-left':   return slide({ direction: 'from-left'   }) as any;
+    case 'slide-up':     return slide({ direction: 'from-bottom' }) as any;
+    case 'slide-down':   return slide({ direction: 'from-top'    }) as any;
+    case 'wipe':         return wipe({ direction: 'from-right'   }) as any;
+    case 'clock-wipe':   return wipe({ direction: 'from-left'    }) as any;
+    case 'flip':         return flip({ direction: 'from-right'   }) as any;
+    case 'rotate':       return flip({ direction: 'from-bottom'  }) as any;
+    case 'zoom-in':      return fade() as any;  // @remotion/transitions has no zoom-in; fade is cleanest fallback
     case 'fade':
-    default:            return fade() as any;
+    default:             return fade() as any;
   }
 }
 
@@ -174,7 +177,14 @@ const SceneLayer: React.FC<{
         }}
       />
 
-      {/* Overlays de entrada — controlados pelo overlayEffect ou captionEffect */}
+      {/* ── Color Grading — aplicado como tint sobre a imagem ── */}
+      <ColorGradingLayer
+        colorGrading={scene.colorGrading}
+        emotionColor={scene.emotionColor}
+        intensity={intensity}
+      />
+
+      {/* ── Overlays de entrada — controlados pelo overlayEffect ou captionEffect ── */}
       {((scene.overlayEffect || scene.captionEffect) === 'glitch') && (
         <GlitchOverlay intensity={intensity} durationFrames={20} primaryColor={primaryColor} />
       )}
@@ -183,6 +193,9 @@ const SceneLayer: React.FC<{
       )}
       {((scene.overlayEffect || scene.captionEffect) === 'flash') && (
         <FlashOverlay intensity={intensity * 0.9} durationFrames={12} />
+      )}
+      {((scene.overlayEffect || scene.captionEffect) === 'particles') && (
+        <ParticlesOverlay intensity={intensity} durationFrames={durationFrames} color={scene.emotionColor || primaryColor} />
       )}
 
       {/* Legendas */}
@@ -345,6 +358,29 @@ const CaptionLayer: React.FC<{
             text={currentWord.word}
             fontSize={fontSize + 20}
             intensity={scene.intensity ?? 0.8}
+          />
+        ) : textEffect === 'typewriter' ? (
+          <TypewriterText
+            text={currentWord.word}
+            fontSize={fontSize + 20}
+            color={accentColor}
+            charsPerSecond={18}
+          />
+        ) : textEffect === 'editorial' ? (
+          <EditorialText
+            text={currentWord.word}
+            primaryColor={primaryColor}
+            fontSize={fontSize + 20}
+            frame={wordFrame}
+          />
+        ) : textEffect === 'kinetic-pop' ? (
+          <KineticPopText
+            text={currentWord.word}
+            primaryColor={primaryColor}
+            fps={fps}
+            isVertical={isVertical}
+            springConfig={{ damping: 4, stiffness: 600, mass: 0.25 }}
+            frame={wordFrame}
           />
         ) : (
           /* Pop padrão com spring physics */

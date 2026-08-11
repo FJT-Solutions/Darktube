@@ -146,3 +146,152 @@ export const FlashOverlay: React.FC<{
     />
   );
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ParticlesOverlay — partículas flutuantes cinematográficas (poeira/bokeh)
+// 100% via frame interpolation, sem CSS animations
+// ─────────────────────────────────────────────────────────────────────────────
+const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
+  x: (i * 37 + 11) % 100,
+  y: (i * 53 + 7)  % 100,
+  size: 3 + (i % 5) * 2,
+  speed: 0.015 + (i % 4) * 0.008,
+  phase: i * 0.7,
+  opacity: 0.15 + (i % 3) * 0.1,
+}));
+
+export const ParticlesOverlay: React.FC<{
+  intensity?: number;
+  durationFrames?: number;
+  color?: string;
+}> = ({ intensity = 0.7, durationFrames = 90, color = '#ffffff' }) => {
+  const frame = useCurrentFrame();
+
+  const fadeIn = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  const fadeOut = interpolate(frame, [durationFrames - 20, durationFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const envelope = Math.min(fadeIn, fadeOut) * intensity;
+
+  if (envelope < 0.01) return null;
+
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 42, overflow: 'hidden' }}>
+      {PARTICLES.map((p, i) => {
+        // Float upward + slight horizontal drift — deterministic per frame
+        const yOffset = ((frame * p.speed * 100) % 120) - 10;
+        const xDrift  = Math.sin(frame * 0.03 + p.phase) * 3;
+        const yPos    = (p.y - yOffset + 100) % 110;
+        const scale   = 0.6 + Math.sin(frame * 0.04 + p.phase) * 0.4;
+
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${p.x + xDrift}%`,
+              top: `${yPos}%`,
+              width: p.size,
+              height: p.size,
+              borderRadius: '50%',
+              backgroundColor: color,
+              opacity: p.opacity * envelope,
+              transform: `scale(${scale})`,
+              filter: `blur(${p.size * 0.4}px)`,
+              willChange: 'transform, opacity',
+            }}
+          />
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ColorGradingLayer — aplica perfis de color grading via CSS filter
+// Posicionado sobre a imagem, sob os overlays
+// ─────────────────────────────────────────────────────────────────────────────
+const GRADING_FILTERS: Record<string, string> = {
+  cinematic:   'contrast(1.22) saturate(0.78) brightness(0.88)',
+  warm:        'sepia(0.28) saturate(1.35) brightness(1.04)',
+  cold:        'saturate(0.72) hue-rotate(195deg) brightness(0.94)',
+  vintage:     'sepia(0.55) contrast(1.12) saturate(0.75) brightness(0.85)',
+  hdr:         'contrast(1.38) saturate(1.45) brightness(1.06)',
+  'dark-academia': 'sepia(0.45) contrast(1.18) saturate(0.65) brightness(0.82)',
+  cyberpunk:   'hue-rotate(260deg) saturate(1.6) contrast(1.25) brightness(0.92)',
+  'warm-cinema':   'sepia(0.22) saturate(1.28) brightness(1.02) contrast(1.1)',
+  'dramatic-bw':   'saturate(0) contrast(1.4) brightness(0.85)',
+  'vibrant-gold':  'sepia(0.18) saturate(1.55) brightness(1.08) hue-rotate(-10deg)',
+};
+
+// Overlay de cor emocional tonal (vinheta colorida)
+export const ColorGradingLayer: React.FC<{
+  colorGrading?: string;
+  emotionColor?: string | null;
+  intensity?: number;
+}> = ({ colorGrading, emotionColor, intensity = 0.8 }) => {
+  const frame = useCurrentFrame();
+  const fadeIn = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+
+  const filter = (colorGrading && colorGrading !== 'none')
+    ? GRADING_FILTERS[colorGrading] || ''
+    : '';
+
+  const hasEmotion = emotionColor && emotionColor !== 'null';
+
+  if (!filter && !hasEmotion) return null;
+
+  return (
+    <>
+      {/* Filtro de color grading — camada de tint sobre toda a cena */}
+      {filter && (
+        <AbsoluteFill
+          style={{
+            pointerEvents: 'none',
+            zIndex: 30,
+            opacity: fadeIn * intensity,
+            backdropFilter: filter,
+            // Workaround: usa um div transparente com mix-blend para tint
+          }}
+        >
+          {/* Aplica o filtro via uma div com background semi-transparente + mix-blend */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: getGradingTint(colorGrading || 'none'),
+              mixBlendMode: 'multiply',
+              opacity: 0.35 * intensity * fadeIn,
+            }}
+          />
+        </AbsoluteFill>
+      )}
+
+      {/* Overlay emocional — vinheta colorida baseada em emotionColor */}
+      {hasEmotion && (
+        <AbsoluteFill
+          style={{
+            pointerEvents: 'none',
+            zIndex: 31,
+            background: `radial-gradient(ellipse at center, transparent 40%, ${emotionColor}18 80%, ${emotionColor}30 100%)`,
+            opacity: fadeIn * intensity * 0.6,
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+function getGradingTint(grading: string): string {
+  switch (grading) {
+    case 'cinematic':     return 'linear-gradient(135deg, #0a0a2a 0%, #1a0e3a 100%)';
+    case 'warm':          return 'linear-gradient(135deg, #3d1a00 0%, #6b2e00 100%)';
+    case 'cold':          return 'linear-gradient(135deg, #001a3d 0%, #002b5e 100%)';
+    case 'vintage':       return 'linear-gradient(135deg, #3d2b00 0%, #5e3a00 100%)';
+    case 'hdr':           return 'linear-gradient(135deg, #1a001a 0%, #0a1a0a 100%)';
+    case 'dark-academia': return 'linear-gradient(135deg, #1a1000 0%, #2d1f00 100%)';
+    case 'cyberpunk':     return 'linear-gradient(135deg, #0d001a 0%, #00001a 100%)';
+    case 'warm-cinema':   return 'linear-gradient(135deg, #2d1500 0%, #4a2000 100%)';
+    case 'dramatic-bw':   return 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)';
+    case 'vibrant-gold':  return 'linear-gradient(135deg, #2d2000 0%, #4a3500 100%)';
+    default:              return 'transparent';
+  }
+}
