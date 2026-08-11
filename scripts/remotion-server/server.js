@@ -156,6 +156,11 @@ async function renderAsync(historyId, composition, callbackUrl) {
       fps,
       width,
       height,
+      chromiumOptions: {
+        disableWebSecurity: true,
+        executablePath: CHROME_PATH,
+      },
+      timeoutInMilliseconds: 30_000,
     });
 
     // ── Concorrência controlada para evitar OOM Kill ──
