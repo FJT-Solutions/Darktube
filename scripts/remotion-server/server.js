@@ -100,6 +100,48 @@ app.post('/render', async (req, res) => {
   renderAsync(historyId, composition, callbackUrl);
 });
 
+let removeBackground = null;
+try {
+  const bgRmModule = require('@imgly/background-removal-node');
+  removeBackground = bgRmModule.removeBackground;
+  console.log('[Remotion Cutout] Módulo @imgly/background-removal-node ativo!');
+} catch (err) {
+  console.log('[Remotion Cutout] Módulo de remoção de fundo desativado:', err.message);
+}
+
+// ──────────────────────────────────────────────
+// AUTO-CUTOUT 2.5D — Separa Sujeito de Fundo automaticamente em 1 imagem
+// ──────────────────────────────────────────────
+async function processSceneCutouts(scenes) {
+  if (!removeBackground || !scenes || scenes.length === 0) return;
+  console.log('[Remotion Cutout] Analisando auto-recorte 2.5D para cenas...');
+
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+    if (!scene.imageUrl || scene.subjectImageUrl || scene.foregroundUrl) continue;
+    const clean = scene.imageUrl.toLowerCase().split('?')[0];
+    if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov')) continue;
+
+    try {
+      console.log(`[Remotion Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
+      const blob = await removeBackground(scene.imageUrl);
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      const fgFileName = `cutout_${Date.now()}_${i}.png`;
+      const fgPath = path.join(OUTPUT_DIR, fgFileName);
+      fs.writeFileSync(fgPath, buffer);
+
+      const fgUrl = STORAGE_BASE_URL
+        ? `${STORAGE_BASE_URL}/${fgFileName}`
+        : `/storage/${fgFileName}`;
+
+      scene.subjectImageUrl = fgUrl;
+      console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: ${fgUrl}`);
+    } catch (err) {
+      console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado (fallback KenBurns ativo):`, err.message);
+    }
+  }
+}
+
 // ──────────────────────────────────────────────
 // RENDER ASSÍNCRONO
 // ──────────────────────────────────────────────
@@ -110,6 +152,9 @@ async function renderAsync(historyId, composition, callbackUrl) {
 
   try {
     if (!bundledLocation) await initBundle();
+
+    // Tenta gerar camadas 2.5D automaticamente para imagens de 1 camada
+    await processSceneCutouts(composition.scenes);
 
     // Determinar dimensões pelo format
     const isVertical = (composition.format || 'vertical') === 'vertical';
