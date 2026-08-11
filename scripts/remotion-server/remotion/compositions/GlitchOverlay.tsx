@@ -258,8 +258,8 @@ export const ColorGradingLayer: React.FC<{
               position: 'absolute',
               inset: 0,
               background: getGradingTint(colorGrading || 'none'),
-              mixBlendMode: 'multiply',
-              opacity: 0.35 * intensity * fadeIn,
+              mixBlendMode: 'soft-light',
+              opacity: 0.45 * intensity * fadeIn,
             }}
           />
         </AbsoluteFill>
