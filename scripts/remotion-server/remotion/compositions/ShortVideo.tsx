@@ -179,6 +179,7 @@ const SceneLayer: React.FC<{
         style={{
           background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.88) 100%)',
           pointerEvents: 'none',
+          opacity: 0.35 * intensity,
         }}
       />
 
@@ -187,6 +188,7 @@ const SceneLayer: React.FC<{
         style={{
           background: 'linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.3) 30%, transparent 55%)',
           pointerEvents: 'none',
+          opacity: 0.65 * intensity,
         }}
       />
 
@@ -248,16 +250,130 @@ const Parallax25DImage: React.FC<{
   const frame = useCurrentFrame();
   const progress = interpolate(frame, [0, durationFrames], [0, 1], { extrapolateRight: 'clamp' });
 
-  // 1. Movimento do fundo (lento, profundo)
-  const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
-  const bgX = Math.sin(frame * 0.04) * 4;
-  const bgY = Math.cos(frame * 0.03) * 3;
+  // Micro-movimento flutuante contínuo
+  const floatX = Math.sin(frame * 0.05) * 3;
+  const floatY = Math.cos(frame * 0.04) * 3;
 
-  // 2. Movimento do sujeito em primeiro plano (mais rápido, perspectiva 3D)
-  const fgScale = interpolate(progress, [0, 1], [1.12, 1.30]);
-  const fgX = Math.sin(frame * 0.06) * 8 + (progress * 12);
-  const fgY = Math.cos(frame * 0.05) * 6;
-  const rotY = interpolate(progress, [0, 1], [-6, 6]);
+  let bgTransform = '';
+  let fgTransform = '';
+
+  switch (animationStyle) {
+    case 'parallax-up': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
+      const bgY = interpolate(progress, [0, 1], [5, -5]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
+      const fgY = interpolate(progress, [0, 1], [8, -12]);
+      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}px)`;
+      break;
+    }
+    case 'parallax-down': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
+      const bgY = interpolate(progress, [0, 1], [-5, 5]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
+      const fgY = interpolate(progress, [0, 1], [-8, 12]);
+      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}px)`;
+      break;
+    }
+    case 'parallax-left': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
+      const bgX = interpolate(progress, [0, 1], [5, -5]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
+      const fgX = interpolate(progress, [0, 1], [8, -12]);
+      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}px, ${floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}px, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'parallax-right': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
+      const bgX = interpolate(progress, [0, 1], [-5, 5]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
+      const fgX = interpolate(progress, [0, 1], [-8, 12]);
+      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}px, ${floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}px, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'zoom-out': {
+      const bgScale = interpolate(progress, [0, 1], [1.15, 1.02]);
+      const fgScale = interpolate(progress, [0, 1], [1.32, 1.12]);
+      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'zoom-punch': {
+      const punchProgress = interpolate(frame, [0, 8, durationFrames], [1.45, 1.18, 1.08], {
+        extrapolateRight: 'clamp',
+      });
+      const rot = Math.sin(frame * 0.1) * 1.5;
+      bgTransform = `scale(${punchProgress}) translate(${floatX}px, ${floatY}px)`;
+      fgTransform = `scale(${punchProgress * 1.1}) rotate(${rot}deg) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'tilt-3d': {
+      const rotX = interpolate(progress, [0, 1], [10, -6]);
+      const rotY = interpolate(progress, [0, 1], [-12, 10]);
+      bgTransform = `perspective(800px) scale(1.08) rotateX(${rotX * 0.4}deg) rotateY(${rotY * 0.4}deg) translate(${floatX}px, ${floatY}px)`;
+      fgTransform = `perspective(800px) scale(1.22) rotateX(${rotX}deg) rotateY(${rotY}deg) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'shake-impact': {
+      const shakeX = Math.sin(frame * 1.8) * interpolate(frame, [0, 16], [12, 0], { extrapolateRight: 'clamp' });
+      const shakeY = Math.cos(frame * 1.8) * interpolate(frame, [0, 16], [12, 0], { extrapolateRight: 'clamp' });
+      bgTransform = `scale(1.06) translate(${shakeX * 0.4 + floatX}px, ${shakeY * 0.4 + floatY}px)`;
+      fgTransform = `scale(1.2) translate(${shakeX + floatX * 1.5}px, ${shakeY + floatY * 1.5}px)`;
+      break;
+    }
+    case 'spin-in': {
+      const rot = interpolate(frame, [0, 18], [-20, 0], { extrapolateRight: 'clamp' });
+      const scaleProgress = interpolate(frame, [0, 18], [1.32, 1.0], { extrapolateRight: 'clamp' });
+      bgTransform = `scale(${1.05 * scaleProgress}) rotate(${rot * 0.4}deg) translate(${floatX}px, ${floatY}px)`;
+      fgTransform = `scale(${1.18 * scaleProgress}) rotate(${rot}deg) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'kenburns-right': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
+      const bgX = interpolate(progress, [0, 1], [0, 4]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
+      const fgX = interpolate(progress, [0, 1], [0, 8]);
+      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}%, ${floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}%, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'kenburns-left': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
+      const bgX = interpolate(progress, [0, 1], [0, -4]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
+      const fgX = interpolate(progress, [0, 1], [0, -8]);
+      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}%, ${floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}%, ${floatY * 1.5}px)`;
+      break;
+    }
+    case 'kenburns-up': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
+      const bgY = interpolate(progress, [0, 1], [0, -4]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
+      const fgY = interpolate(progress, [0, 1], [0, -8]);
+      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}%)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}%)`;
+      break;
+    }
+    case 'kenburns-down': {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
+      const bgY = interpolate(progress, [0, 1], [0, 4]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
+      const fgY = interpolate(progress, [0, 1], [0, 8]);
+      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}%)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${bgY + floatY * 1.5}%)`;
+      break;
+    }
+    default: {
+      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
+      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
+      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${floatY}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
+    }
+  }
 
   return (
     <AbsoluteFill style={{ overflow: 'hidden', perspective: '800px' }}>
@@ -268,8 +384,8 @@ const Parallax25DImage: React.FC<{
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          transform: `scale(${bgScale}) translate(${bgX}px, ${bgY}px)`,
-          filter: 'blur(2px) brightness(0.85)',
+          transform: bgTransform,
+          filter: 'blur(1px) brightness(0.95)',
           willChange: 'transform',
         }}
       />
@@ -280,7 +396,7 @@ const Parallax25DImage: React.FC<{
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          transform: `scale(${fgScale}) translate(${fgX}px, ${fgY}px) rotateY(${rotY}deg)`,
+          transform: fgTransform,
           filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.7))',
           willChange: 'transform',
         }}
