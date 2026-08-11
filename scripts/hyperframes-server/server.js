@@ -116,6 +116,8 @@ async function processSceneCutouts(scenes) {
   if (!removeBackground || !scenes || scenes.length === 0) return;
   console.log('[HyperFrames Cutout] Analisando auto-recorte 2.5D para cenas...');
 
+  const crypto = require('crypto');
+
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
     if (!scene.imageUrl || scene.subjectImageUrl || scene.foregroundUrl) continue;
@@ -123,11 +125,20 @@ async function processSceneCutouts(scenes) {
     if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov')) continue;
 
     try {
+      const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
+      const fgFileName = `cutout_hf_${hash}.png`;
+      const fgPath = path.join(OUTPUT_DIR, fgFileName);
+
+      if (fs.existsSync(fgPath)) {
+        console.log(`[HyperFrames Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
+        const buffer = fs.readFileSync(fgPath);
+        scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+        continue;
+      }
+
       console.log(`[HyperFrames Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
       const blob = await removeBackground(scene.imageUrl);
       const buffer = Buffer.from(await blob.arrayBuffer());
-      const fgFileName = `cutout_hf_${Date.now()}_${i}.png`;
-      const fgPath = path.join(OUTPUT_DIR, fgFileName);
       fs.writeFileSync(fgPath, buffer);
 
       // Usa Data URI Base64 para garantir carregamento instantâneo no Chromium sem erros 404

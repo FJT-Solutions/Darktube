@@ -9,10 +9,32 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ShortVideo"
         component={ShortVideoComposition}
-        durationInFrames={30 * 60} // Default 60s @ 30fps
         fps={30}
         width={1080}
         height={1920}
+        calculateMetadata={async ({ props }) => {
+          const shortProps = props as RemotionShortProps;
+          const scenesList = shortProps.scenes || [];
+          const fps = 30;
+          const DEFAULT_TRANSITION_FRAMES = 18;
+
+          let calcFrames = 0;
+          for (let i = 0; i < scenesList.length; i++) {
+            const scene = scenesList[i];
+            const sceneDur = Math.round((scene.durationSeconds || 5) * fps);
+            calcFrames += sceneDur;
+            if (i < scenesList.length - 1) {
+              const tStyle = scene.transitionIn || 'fade';
+              const tFrames = scene.transitionDurationFrames || (tStyle === 'none' ? 0 : DEFAULT_TRANSITION_FRAMES);
+              calcFrames -= tFrames;
+            }
+          }
+          const durationInFrames = Math.max(30, calcFrames);
+
+          return {
+            durationInFrames,
+          };
+        }}
         defaultProps={{
           scenes: [
             {
