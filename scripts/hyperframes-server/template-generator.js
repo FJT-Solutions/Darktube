@@ -532,6 +532,7 @@ function generateGSAPTimeline(scenes, captionStyle, primaryColor) {
   gsap.fromTo('${mediaSel}', { scale: 1.12 }, { scale: 1.30, duration: ${duration}, ease: 'sine.inOut', delay: ${start} });`;
       }
     }
+  }
 
     // ─ 3. Legendas ───────────────────────────────────────
     const words = buildWordList(scene, start, duration);
