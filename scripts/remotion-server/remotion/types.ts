@@ -92,6 +92,10 @@ export interface SceneSegment {
   /** URL da imagem gerada para esta cena (Flux / Gemini Imagen) */
   imageUrl?: string;
 
+  /** URL do sujeito recortado em PNG transparente para Parallax 2.5D */
+  subjectImageUrl?: string;
+  foregroundUrl?: string;
+
   /** Texto completo do segmento (usado para subtitle e fallback) */
   captionText?: string;
 
