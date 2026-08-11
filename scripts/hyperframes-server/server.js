@@ -130,12 +130,11 @@ async function processSceneCutouts(scenes) {
       const fgPath = path.join(OUTPUT_DIR, fgFileName);
       fs.writeFileSync(fgPath, buffer);
 
-      const fgUrl = STORAGE_BASE_URL
-        ? `${STORAGE_BASE_URL}/${fgFileName}`
-        : `/storage/${fgFileName}`;
+      // Usa Data URI Base64 para garantir carregamento instantâneo no Chromium sem erros 404
+      const fgUrl = `data:image/png;base64,${buffer.toString('base64')}`;
 
       scene.subjectImageUrl = fgUrl;
-      console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: ${fgUrl}`);
+      console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta (${(buffer.length / 1024).toFixed(1)} KB Base64)`);
     } catch (err) {
       console.error(`[HyperFrames Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
     }
