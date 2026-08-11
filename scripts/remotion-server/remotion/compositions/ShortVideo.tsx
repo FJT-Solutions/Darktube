@@ -153,7 +153,7 @@ const SceneLayer: React.FC<{
       {/* Fundo — Imagem 2.5D Parallax, Ken Burns ou Gradiente */}
       {(scene.subjectImageUrl || scene.foregroundUrl) ? (
         <Parallax25DImage
-          bgUrl={scene.imageUrl}
+          bgUrl={scene.imageUrl || ''}
           fgUrl={scene.subjectImageUrl || scene.foregroundUrl!}
           durationFrames={durationFrames}
           animationStyle={scene.animationStyle || 'parallax-up'}
