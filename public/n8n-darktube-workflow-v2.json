@@ -221,21 +221,21 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        -1808,
-        4268
+        -1872,
+        4460
       ],
       "id": "62357797-f55e-4e09-b585-c81af69edf10"
     },
     {
       "parameters": {
-        "jsCode": "// ── Monta SceneSegment completo (v5 — Audio via DarkTube Storage Upload) ──\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\n// ── IMAGEM ──\nconst imageUrl = segment.image_url || segment.media_url || visual.image_url || segment.tpl?.video_thumbnail || '';\n\n// ── ÁUDIO — URL pública gerada pelo nó Upload TTS Audio ──\nlet audioUrl = '';\ntry {\n  const uploadResult = $('Upload TTS Audio').item.json;\n  audioUrl = uploadResult.url || uploadResult.publicUrl || '';\n} catch (err) {\n  // fallback: se o upload falhou, tenta base64 via POST direto ao Edge-TTS\n  const text2 = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\n  const voice2 = segment.voice || 'pt-BR-AntonioNeural';\n  if (text2) {\n    try {\n      const r = await fetch('https://edge-tts.fjt-solutions.com/v1/audio/speech', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ model: 'tts-1', input: text2, voice: voice2, language: 'pt', speed: 1.0, response_format: 'mp3' })\n      });\n      if (r.ok) {\n        const ab = await r.arrayBuffer();\n        audioUrl = `data:audio/mp3;base64,${Buffer.from(ab).toString('base64')}`;\n      }\n    } catch (_) {}\n  }\n}\n\n// ── LEGENDA ──\nconst text = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\nconst captionText = text;\n\n// ── PALAVRAS (timestamps do Whisper) ──\nconst rawWords = (wRes.words || wRes.segments?.[0]?.words || []);\nconst MIN_WORD_DISPLAY = 0.35;\nconst words = rawWords.map((w, wi) => {\n  const start = parseFloat(w.start);\n  const rawEnd = parseFloat(w.end);\n  const nextStart = (wi < rawWords.length - 1) ? parseFloat(rawWords[wi + 1].start) : rawEnd + 1;\n  const expandedEnd = Math.max(rawEnd, start + MIN_WORD_DISPLAY, Math.min(start + 0.8, nextStart - 0.02));\n  return { word: w.word, startInSeconds: start, endInSeconds: expandedEnd };\n});\n\n// ── DURAÇÃO ──\nconst audioDuration = wRes.duration || 5;\nconst duration = audioDuration + 2;\n\n// ── ANIMAÇÃO (ciclo variado p/ cada cena) ──\nconst ALL_STYLES = ['zoom-punch','tilt-3d','parallax-up','parallax-down','zoom-out','shake-impact','spin-in','kenburns-right','kenburns-left'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')        animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index: idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn: 'fade',\n    emotion: segment.emotion || 'neutral'\n  }\n}];"
+        "jsCode": "// ── Monta SceneSegment completo (v6 — branches paralelos: Upload TTS Audio + Whisper) ──\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\n\n// ── Whisper vem de Whisper Word Timestamps (branch paralelo) ──\nlet wRes = {};\ntry { wRes = $('Whisper Word Timestamps').item.json; } catch (_) {}\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\n// ── IMAGEM ──\nconst imageUrl = segment.image_url || segment.media_url || visual.image_url || segment.tpl?.video_thumbnail || '';\n\n// ── ÁUDIO — URL pública gerada pelo nó Upload TTS Audio (branch paralelo) ──\nlet audioUrl = '';\ntry {\n  const uploadResult = $('Upload TTS Audio').item.json;\n  audioUrl = uploadResult.url || uploadResult.publicUrl || '';\n} catch (err) {\n  // fallback direto ao Edge-TTS se upload falhou\n  const text2 = voiceover.text || segment.voiceover_text || segment.text || '';\n  const voice2 = segment.voice || 'pt-BR-AntonioNeural';\n  if (text2) {\n    try {\n      const r = await fetch('https://edge-tts.fjt-solutions.com/v1/audio/speech', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ model: 'tts-1', input: text2, voice: voice2, language: 'pt', speed: 1.0, response_format: 'mp3' })\n      });\n      if (r.ok) {\n        const ab = await r.arrayBuffer();\n        audioUrl = `data:audio/mp3;base64,${Buffer.from(ab).toString('base64')}`;\n      }\n    } catch (_) {}\n  }\n}\n\n// ── LEGENDA ──\nconst text = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\nconst captionText = text;\n\n// ── PALAVRAS (timestamps do Whisper) ──\nconst rawWords = (wRes.words || wRes.segments?.[0]?.words || []);\nconst MIN_WORD_DISPLAY = 0.35;\nconst words = rawWords.map((w, wi) => {\n  const start = parseFloat(w.start);\n  const rawEnd = parseFloat(w.end);\n  const nextStart = (wi < rawWords.length - 1) ? parseFloat(rawWords[wi + 1].start) : rawEnd + 1;\n  const expandedEnd = Math.max(rawEnd, start + MIN_WORD_DISPLAY, Math.min(start + 0.8, nextStart - 0.02));\n  return { word: w.word, startInSeconds: start, endInSeconds: expandedEnd };\n});\n\n// ── DURAÇÃO ──\nconst audioDuration = wRes.duration || 5;\nconst duration = audioDuration + 2;\n\n// ── ANIMAÇÃO ──\nconst ALL_STYLES = ['zoom-punch','tilt-3d','parallax-up','parallax-down','zoom-out','shake-impact','spin-in','kenburns-right','kenburns-left'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')        animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index: idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn: 'fade',\n    emotion: segment.emotion || 'neutral'\n  }\n}];"
       },
       "name": "Build Scene",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1520,
-        4340
+        -1296,
+        4364
       ],
       "id": "0a5da9f8-dd92-49f2-97af-90d16198064b"
     },
@@ -529,10 +529,25 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        -1936,
+        -1872,
         4268
       ],
       "id": "a4b5c6d7-e8f9-4012-a3b4-c5d6e7f80123"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "name": "Merge Audio + Whisper",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -1552,
+        4364
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     }
   ],
   "connections": {
@@ -659,6 +674,11 @@
             "node": "Upload TTS Audio",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Whisper Word Timestamps",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -667,9 +687,9 @@
       "main": [
         [
           {
-            "node": "Build Scene",
+            "node": "Merge Audio + Whisper",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -828,7 +848,18 @@
       "main": [
         [
           {
-            "node": "Whisper Word Timestamps",
+            "node": "Merge Audio + Whisper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Audio + Whisper": {
+      "main": [
+        [
+          {
+            "node": "Build Scene",
             "type": "main",
             "index": 0
           }
