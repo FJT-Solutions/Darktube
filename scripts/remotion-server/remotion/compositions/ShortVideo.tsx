@@ -20,7 +20,7 @@ import { wipe }  from '@remotion/transitions/wipe';
 import { flip }  from '@remotion/transitions/flip';
 import { RemotionShortProps, SceneSegment, TransitionStyle, SpringPreset } from '../types';
 import { SplitBounceText, TypewriterText, GlitchText, EditorialText, KineticPopText } from './TextSplit';
-import { GlitchOverlay, LightLeakOverlay, FlashOverlay, ParticlesOverlay, ColorGradingLayer } from './GlitchOverlay';
+import { GlitchOverlay, LightLeakOverlay, FlashOverlay, ParticlesOverlay, ColorGradingLayer, GRADING_FILTERS } from './GlitchOverlay';
 import { FinancialCounterOverlay, CodeTerminalOverlay } from './MotionGraphicsOverlay';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,12 +157,14 @@ const SceneLayer: React.FC<{
           fgUrl={scene.subjectImageUrl || scene.foregroundUrl!}
           durationFrames={durationFrames}
           animationStyle={scene.animationStyle || 'parallax-up'}
+          colorGrading={scene.colorGrading}
         />
       ) : scene.imageUrl ? (
         <KenBurnsImage
           imgUrl={scene.imageUrl}
           durationFrames={durationFrames}
           animationStyle={scene.animationStyle || 'kenburns-right'}
+          colorGrading={scene.colorGrading}
         />
       ) : (
         <AbsoluteFill
@@ -246,7 +248,8 @@ const Parallax25DImage: React.FC<{
   fgUrl: string;
   durationFrames: number;
   animationStyle: string;
-}> = ({ bgUrl, fgUrl, durationFrames, animationStyle }) => {
+  colorGrading?: string;
+}> = ({ bgUrl, fgUrl, durationFrames, animationStyle, colorGrading }) => {
   const frame = useCurrentFrame();
   const progress = interpolate(frame, [0, durationFrames], [0, 1], { extrapolateRight: 'clamp' });
 
@@ -375,6 +378,8 @@ const Parallax25DImage: React.FC<{
     }
   }
 
+  const gradingFilter = (colorGrading && colorGrading !== 'none') ? GRADING_FILTERS[colorGrading] || '' : '';
+
   return (
     <AbsoluteFill style={{ overflow: 'hidden', perspective: '800px' }}>
       {/* Camada 1: Fundo (Background) */}
@@ -385,7 +390,7 @@ const Parallax25DImage: React.FC<{
           height: '100%',
           objectFit: 'cover',
           transform: bgTransform,
-          filter: 'blur(1px) brightness(0.95)',
+          filter: gradingFilter ? `${gradingFilter} blur(1px) brightness(0.95)` : 'blur(1px) brightness(0.95)',
           willChange: 'transform',
         }}
       />
@@ -397,7 +402,7 @@ const Parallax25DImage: React.FC<{
           height: '100%',
           objectFit: 'cover',
           transform: fgTransform,
-          filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.7))',
+          filter: gradingFilter || 'none',
           willChange: 'transform',
         }}
       />
@@ -413,7 +418,8 @@ const KenBurnsImage: React.FC<{
   imgUrl: string;
   durationFrames: number;
   animationStyle: string;
-}> = ({ imgUrl, durationFrames, animationStyle }) => {
+  colorGrading?: string;
+}> = ({ imgUrl, durationFrames, animationStyle, colorGrading }) => {
   const frame = useCurrentFrame();
   const progress = interpolate(frame, [0, durationFrames], [0, 1], { extrapolateRight: 'clamp' });
 
@@ -490,6 +496,8 @@ const KenBurnsImage: React.FC<{
       transform = `scale(${1.12 + progress * 0.22}) translate(${floatX}px, ${floatY}px)`;
   }
 
+  const gradingFilter = (colorGrading && colorGrading !== 'none') ? GRADING_FILTERS[colorGrading] || '' : '';
+
   return (
     <AbsoluteFill style={{ overflow: 'hidden' }}>
       {isVideo ? (
@@ -503,6 +511,7 @@ const KenBurnsImage: React.FC<{
             transform,
             transformOrigin: 'center center',
             willChange: 'transform',
+            filter: gradingFilter || 'none',
           }}
         />
       ) : (
@@ -516,6 +525,7 @@ const KenBurnsImage: React.FC<{
             transform,
             transformOrigin: 'center center',
             willChange: 'transform',
+            filter: gradingFilter || 'none',
           }}
         />
       )}

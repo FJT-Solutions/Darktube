@@ -209,7 +209,7 @@ export const ParticlesOverlay: React.FC<{
 // ColorGradingLayer — aplica perfis de color grading via CSS filter
 // Posicionado sobre a imagem, sob os overlays
 // ─────────────────────────────────────────────────────────────────────────────
-const GRADING_FILTERS: Record<string, string> = {
+export const GRADING_FILTERS: Record<string, string> = {
   cinematic:   'contrast(1.22) saturate(0.78) brightness(0.88)',
   warm:        'sepia(0.28) saturate(1.35) brightness(1.04)',
   cold:        'saturate(0.72) hue-rotate(195deg) brightness(0.94)',
@@ -248,8 +248,6 @@ export const ColorGradingLayer: React.FC<{
             pointerEvents: 'none',
             zIndex: 30,
             opacity: fadeIn * intensity,
-            backdropFilter: filter,
-            // Workaround: usa um div transparente com mix-blend para tint
           }}
         >
           {/* Aplica o filtro via uma div com background semi-transparente + mix-blend */}
