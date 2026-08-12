@@ -1,6 +1,7 @@
 # ─── Base: Node.js 22 (requisito mínimo do Hyperframes) ───
 FROM node:22-slim
-
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
+RUN echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
 # ─── Dependências do sistema ───
 # Chromium headless para o Hyperframes + FFmpeg para mixagem de áudio
 RUN apt-get update && apt-get install -y \
