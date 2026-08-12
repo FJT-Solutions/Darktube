@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     wget \
+    make \
+    g++ \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Variáveis de ambiente do Chromium ───
