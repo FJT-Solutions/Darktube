@@ -214,6 +214,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
       browserExecutable: CHROME_PATH,
       chromiumOptions: {
         disableWebSecurity: true,
+        args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
+        enableMultiProcessOnLinux: true,
       },
       timeoutInMilliseconds: 30_000,
     });
@@ -239,6 +241,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
       browserExecutable: CHROME_PATH,
       chromiumOptions: {
         disableWebSecurity: true,
+        args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
+        enableMultiProcessOnLinux: true,
       },
       onProgress: ({ progress }) => {
         const pct = Math.floor(progress * 100);
