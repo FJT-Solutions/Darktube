@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     make \
     g++ \
     python3 \
+    libvips-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Variáveis de ambiente do Chromium ───
