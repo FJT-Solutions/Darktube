@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libpangocairo-1.0-0 \
     libgtk-3-0 \
+    make \
+    g++ \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
