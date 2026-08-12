@@ -2,7 +2,6 @@ import React from 'react';
 import {
   AbsoluteFill,
   Audio,
-  Img,
   OffthreadVideo,
   interpolate,
   spring,
@@ -383,7 +382,7 @@ const Parallax25DImage: React.FC<{
   return (
     <AbsoluteFill style={{ overflow: 'hidden', perspective: '800px' }}>
       {/* Camada 1: Fundo (Background) */}
-      <Img
+      <img
         src={bgUrl}
         style={{
           width: '100%',
@@ -395,7 +394,7 @@ const Parallax25DImage: React.FC<{
         }}
       />
       {/* Camada 2: Sujeito Recortado (Foreground) */}
-      <Img
+      <img
         src={fgUrl}
         style={{
           width: '100%',
@@ -515,7 +514,7 @@ const KenBurnsImage: React.FC<{
           }}
         />
       ) : (
-        <Img
+        <img
           src={imgUrl}
           style={{
             width: '100%',
