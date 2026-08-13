@@ -153,6 +153,41 @@ async function processSceneCutouts(scenes) {
 }
 
 // ──────────────────────────────────────────────
+// PRÉ-CARREGAMENTO DE ÁUDIO (evita HTTP Range timeouts)
+// ──────────────────────────────────────────────
+async function processSceneAudios(composition) {
+  if (!composition) return;
+  const scenes = composition.scenes || [];
+  console.log('[HyperFrames Audio] Pré-carregando áudios das cenas...');
+
+  const fetchAudioAsBase64 = async (url) => {
+    if (!url || !url.startsWith('http')) return url;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return url;
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const mime = url.split('?')[0].endsWith('.wav') ? 'audio/wav' : 'audio/mp3';
+      return `data:${mime};base64,${buffer.toString('base64')}`;
+    } catch (err) {
+      console.error(`[HyperFrames Audio] ⚠️ Falha ao pré-carregar áudio (${url}):`, err.message);
+      return url;
+    }
+  };
+
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+    if (scene.audioUrl) {
+      scene.audioUrl = await fetchAudioAsBase64(scene.audioUrl);
+    }
+  }
+
+  if (composition.backgroundMusicUrl) {
+    composition.backgroundMusicUrl = await fetchAudioAsBase64(composition.backgroundMusicUrl);
+  }
+}
+
+// ──────────────────────────────────────────────
 // RENDER ASSÍNCRONO
 // ──────────────────────────────────────────────
 async function renderVideoAsync(historyId, payload, callbackUrl) {
@@ -171,6 +206,7 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
     // 1.5 Auto-cutout 2.5D para imagens de 1 camada
     if (payload && payload.scenes) {
       await processSceneCutouts(payload.scenes);
+      await processSceneAudios(payload);
     }
 
     // 2. Gerar HTML da composição
