@@ -285,7 +285,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       },
       onProgress: ({ progress, renderedDoneInFrames }) => {
         const pct = Math.floor(progress * 100);
-        if (pct % 2 === 0 && pct !== lastPercent) {
+        if (pct !== lastPercent) {
           lastPercent = pct;
           const doneFrames = renderedDoneInFrames || Math.floor(progress * comp.durationInFrames);
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
