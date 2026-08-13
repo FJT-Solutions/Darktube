@@ -153,6 +153,41 @@ async function processSceneCutouts(scenes) {
 }
 
 // ──────────────────────────────────────────────
+// PRÉ-CARREGAMENTO DE ÁUDIO (evita HTTP Range timeouts no HTML5 <audio> do Chrome)
+// ──────────────────────────────────────────────
+async function processSceneAudios(composition) {
+  if (!composition) return;
+  const scenes = composition.scenes || [];
+  console.log('[Remotion Audio] Pré-carregando áudios das cenas...');
+
+  const fetchAudioAsBase64 = async (url) => {
+    if (!url || !url.startsWith('http')) return url;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return url;
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const mime = url.split('?')[0].endsWith('.wav') ? 'audio/wav' : 'audio/mp3';
+      return `data:${mime};base64,${buffer.toString('base64')}`;
+    } catch (err) {
+      console.error(`[Remotion Audio] ⚠️ Falha ao pré-carregar áudio (${url}):`, err.message);
+      return url;
+    }
+  };
+
+  for (let i = 0; i < scenes.length; i++) {
+    const scene = scenes[i];
+    if (scene.audioUrl) {
+      scene.audioUrl = await fetchAudioAsBase64(scene.audioUrl);
+    }
+  }
+
+  if (composition.backgroundMusicUrl) {
+    composition.backgroundMusicUrl = await fetchAudioAsBase64(composition.backgroundMusicUrl);
+  }
+}
+
+// ──────────────────────────────────────────────
 // RENDER ASSÍNCRONO
 // ──────────────────────────────────────────────
 async function renderAsync(historyId, composition, callbackUrl) {
@@ -165,6 +200,9 @@ async function renderAsync(historyId, composition, callbackUrl) {
 
     // Tenta gerar camadas 2.5D automaticamente para imagens de 1 camada
     await processSceneCutouts(composition.scenes);
+
+    // Pré-carrega áudios para Base64 para buscar sem latência de rede
+    await processSceneAudios(composition);
 
     // Determinar dimensões pelo format
     const isVertical = (composition.format || 'vertical') === 'vertical';
@@ -217,7 +255,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
         args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
         enableMultiProcessOnLinux: true,
       },
-      timeoutInMilliseconds: 30_000,
+      timeoutInMilliseconds: 60_000,
+      delayRenderTimeoutInMilliseconds: 120_000,
     });
 
     // ── Concorrência controlada para evitar OOM Kill ──
@@ -254,6 +293,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       },
       // Timeout por frame — evita hang se o browser travar
       timeoutInMilliseconds: 60_000,
+      delayRenderTimeoutInMilliseconds: 120_000,
     });
 
     console.log(`[Remotion Render] Concluído: ${outputFilePath}`);
