@@ -136,8 +136,8 @@ async function processSceneCutouts(scenes) {
 
       if (fs.existsSync(fgPath)) {
         console.log(`[Remotion Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-        const baseUrl = STORAGE_BASE_URL || `http://localhost:${PORT}`;
-        scene.subjectImageUrl = `${baseUrl}/storage/${fgFileName}`;
+        const buffer = fs.readFileSync(fgPath);
+        scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
         continue;
       }
 
@@ -146,11 +146,8 @@ async function processSceneCutouts(scenes) {
       const buffer = Buffer.from(await blob.arrayBuffer());
       fs.writeFileSync(fgPath, buffer);
 
-      const baseUrl = STORAGE_BASE_URL || `http://localhost:${PORT}`;
-      const fgUrl = `${baseUrl}/storage/${fgFileName}`;
-
-      scene.subjectImageUrl = fgUrl;
-      console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: ${fgUrl}`);
+      scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+      console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta (Base64 em memória)`);
     } catch (err) {
       console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado (fallback KenBurns ativo):`, err.message);
     }
