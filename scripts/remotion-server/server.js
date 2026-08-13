@@ -56,9 +56,13 @@ app.get('/health', (req, res) => {
 });
 
 // ──────────────────────────────────────────────
-// SERVIR arquivos renderizados
+// SERVIR arquivos renderizados e bundle do Remotion
 // ──────────────────────────────────────────────
 app.use('/storage', express.static(OUTPUT_DIR));
+app.use('/bundle', (req, res, next) => {
+  if (!bundledLocation) return res.status(503).send('Bundle Remotion ainda não está pronto');
+  express.static(bundledLocation)(req, res, next);
+});
 
 // ──────────────────────────────────────────────
 // RENDER — aceita novo formato de payload
@@ -241,8 +245,11 @@ async function renderAsync(historyId, composition, callbackUrl) {
       format:              composition.format              || 'vertical',
     };
 
+    // Serve o bundle via HTTP em 127.0.0.1 no Express para garantir estabilidade e evitar servidor temporário na porta 3000
+    const serveUrl = `http://127.0.0.1:${PORT}/bundle`;
+
     const comp = await selectComposition({
-      serveUrl: bundledLocation,
+      serveUrl,
       id: 'ShortVideo',
       inputProps,
       // Override das dimensões dinâmicas
@@ -270,7 +277,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
     let lastPercent = -1;
     await renderMedia({
       composition: comp,
-      serveUrl: bundledLocation,
+      serveUrl,
       outputLocation: outputFilePath,
       codec: 'h264',
       concurrency,
