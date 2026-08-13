@@ -101,9 +101,8 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
               {!isLast && transitionStyle !== 'none' && (
                 <TransitionSeries.Transition
                   presentation={getTransitionPresentation(transitionStyle)}
-                  timing={springTiming({
+                  timing={linearTiming({
                     durationInFrames: transitionFrames,
-                    config: { damping: 14, stiffness: 200 },
                   })}
                 />
               )}
