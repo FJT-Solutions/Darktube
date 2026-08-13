@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   AbsoluteFill,
-  Audio,
   OffthreadVideo,
   interpolate,
   spring,
@@ -119,10 +118,7 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
       {/* ── BARRA DE PROGRESSO ── */}
       <ProgressBar totalScenes={scenes.length} primaryColor={primaryColor} accentColor={accentColor} />
 
-      {/* ── MÚSICA DE FUNDO ── */}
-      {backgroundMusicUrl && (
-        <Audio src={backgroundMusicUrl} volume={0.12} />
-      )}
+      {/* Música de fundo — mixada via FFmpeg no servidor */}
     </AbsoluteFill>
   );
 };
@@ -231,8 +227,7 @@ const SceneLayer: React.FC<{
         format={format}
       />
 
-      {/* Áudio da narração desta cena */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
+      {/* Áudio removido do Remotion — mixado via FFmpeg no servidor para evitar delayRender timeouts */}
     </AbsoluteFill>
   );
 };
