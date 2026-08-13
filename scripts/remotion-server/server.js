@@ -255,8 +255,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
         args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
         enableMultiProcessOnLinux: true,
       },
-      timeoutInMilliseconds: 60_000,
-      delayRenderTimeoutInMilliseconds: 120_000,
+      timeoutInMilliseconds: 180_000,
+      delayRenderTimeoutInMilliseconds: 180_000,
     });
 
     // ── Concorrência controlada para evitar OOM Kill ──
@@ -292,8 +292,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
         }
       },
       // Timeout por frame — evita hang se o browser travar
-      timeoutInMilliseconds: 60_000,
-      delayRenderTimeoutInMilliseconds: 120_000,
+      timeoutInMilliseconds: 180_000,
+      delayRenderTimeoutInMilliseconds: 180_000,
     });
 
     console.log(`[Remotion Render] Concluído: ${outputFilePath}`);
