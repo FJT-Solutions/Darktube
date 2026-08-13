@@ -244,11 +244,12 @@ async function renderAsync(historyId, composition, callbackUrl) {
         args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
         enableMultiProcessOnLinux: true,
       },
-      onProgress: ({ progress }) => {
+      onProgress: ({ progress, renderedDoneInFrames }) => {
         const pct = Math.floor(progress * 100);
-        if (pct % 10 === 0 && pct !== lastPercent) {
+        if (pct % 2 === 0 && pct !== lastPercent) {
           lastPercent = pct;
-          console.log(`[Remotion Render] Renderizando: ${pct}% concluído`);
+          const doneFrames = renderedDoneInFrames || Math.floor(progress * comp.durationInFrames);
+          console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
       },
       // Timeout por frame — evita hang se o browser travar
