@@ -3,6 +3,7 @@ const { bundle } = require('@remotion/bundler');
 const { renderMedia, selectComposition } = require('@remotion/renderer');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -296,7 +297,11 @@ async function renderAsync(historyId, composition, callbackUrl) {
       delayRenderTimeoutInMilliseconds: 180_000,
     });
 
-    console.log(`[Remotion Render] Concluído: ${outputFilePath}`);
+    console.log(`[Remotion Render] Concluído (vídeo silencioso): ${outputFilePath}`);
+
+    // Mixar áudio via FFmpeg pós-renderização
+    await mixAudioWithFFmpeg(outputFilePath, composition, historyId);
+    console.log(`[Remotion Render] Concluído com áudio: ${outputFilePath}`);
 
     const videoUrl = STORAGE_BASE_URL
       ? `${STORAGE_BASE_URL}/render_${historyId}.mp4`
@@ -312,6 +317,110 @@ async function renderAsync(historyId, composition, callbackUrl) {
       error: error.message || 'Erro de renderização Remotion',
     });
   }
+}
+// ──────────────────────────────────────────────
+// MIXAR ÁUDIO VIA FFMPEG (pós-processamento, sem delayRender no Remotion)
+// ──────────────────────────────────────────────
+async function mixAudioWithFFmpeg(silentVideoPath, composition, historyId) {
+  const { scenes = [], backgroundMusicUrl } = composition;
+  const workDir = path.join('/tmp', `remotion_audio_${historyId}`);
+  fs.mkdirSync(workDir, { recursive: true });
+
+  const resolveAudio = async (audioUrl, localPath) => {
+    if (!audioUrl) return null;
+    if (audioUrl.startsWith('data:')) {
+      const commaIdx = audioUrl.indexOf(',');
+      if (commaIdx === -1) return null;
+      fs.writeFileSync(localPath, Buffer.from(audioUrl.slice(commaIdx + 1), 'base64'));
+      return localPath;
+    }
+    if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+      try {
+        const res = await fetch(audioUrl);
+        if (!res.ok) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        fs.writeFileSync(localPath, buf);
+        return localPath;
+      } catch { return null; }
+    }
+    return fs.existsSync(audioUrl) ? audioUrl : null;
+  };
+
+  const resolvedAudios = await Promise.all(
+    scenes.map((scene, i) => resolveAudio(scene.audioUrl, path.join(workDir, `nar_${i}.mp3`)))
+  );
+
+  const hasNarration = resolvedAudios.some(Boolean);
+  const bgmPath = backgroundMusicUrl
+    ? await resolveAudio(backgroundMusicUrl, path.join(workDir, 'bgm.mp3'))
+    : null;
+
+  if (!hasNarration && !bgmPath) {
+    console.log('[Remotion FFmpeg] Nenhum áudio disponível, vídeo permanece mudo.');
+    return silentVideoPath;
+  }
+
+  const outputPath = path.join(workDir, 'final_with_audio.mp4');
+
+  let inputs = [`-i "${silentVideoPath}"`];
+  let filterParts = [];
+  let audioInputIdx = 1;
+  let narrationChunks = [];
+  let timeOffset = 0;
+
+  // Adicionar narrações com delay por cena
+  scenes.forEach((scene, i) => {
+    const resolved = resolvedAudios[i];
+    if (!resolved) { timeOffset += scene.durationSeconds || 5; return; }
+    inputs.push(`-i "${resolved}"`);
+    const delay = Math.round(timeOffset * 1000);
+    filterParts.push(`[${audioInputIdx}:a]adelay=${delay}|${delay}[nar${i}]`);
+    narrationChunks.push(`[nar${i}]`);
+    audioInputIdx++;
+    timeOffset += scene.durationSeconds || 5;
+  });
+
+  // Consolidar narrações
+  if (narrationChunks.length === 1) {
+    filterParts.push(`${narrationChunks[0]}anull[narration]`);
+  } else if (narrationChunks.length > 1) {
+    filterParts.push(`${narrationChunks.join('')}amix=inputs=${narrationChunks.length}:normalize=0:dropout_transition=0[narration]`);
+  }
+
+  // Adicionar BGM se existir
+  let finalAudio = '';
+  if (bgmPath) {
+    inputs.push(`-i "${bgmPath}"`);
+    filterParts.push(`[${audioInputIdx}:a]volume=0.12[bgm]`);
+    if (narrationChunks.length > 0) {
+      filterParts.push('[narration][bgm]amix=inputs=2:normalize=0:dropout_transition=0[audio_out]');
+      finalAudio = '[audio_out]';
+    } else {
+      finalAudio = '[bgm]';
+    }
+  } else {
+    finalAudio = narrationChunks.length > 0 ? '[narration]' : '';
+  }
+
+  const filterGraph = filterParts.join('; ');
+  const ffmpegCmd = [
+    'ffmpeg -y',
+    inputs.join(' '),
+    `-filter_complex "${filterGraph}"`,
+    `-map 0:v -map "${finalAudio}"`,
+    '-c:v copy -c:a aac -b:a 128k -shortest',
+    `"${outputPath}"`,
+  ].join(' ');
+
+  console.log('[Remotion FFmpeg] Mixando áudio...');
+  execSync(ffmpegCmd, { timeout: 300_000, stdio: 'pipe' });
+
+  // Substituir o arquivo original pelo com áudio
+  fs.renameSync(outputPath, silentVideoPath);
+  try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (_) {}
+
+  console.log('[Remotion FFmpeg] Áudio mixado com sucesso.');
+  return silentVideoPath;
 }
 
 async function sendCallback(url, body) {
