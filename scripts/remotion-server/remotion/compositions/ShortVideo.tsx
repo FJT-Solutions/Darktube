@@ -359,48 +359,6 @@ const Parallax25DImage: React.FC<{
       </div>
     </AbsoluteFill>
   );
-};ale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}%)`;
-      break;
-    }
-    default: {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
-      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
-    }
-  }
-
-  const gradingFilter = (colorGrading && colorGrading !== 'none') ? GRADING_FILTERS[colorGrading] || '' : '';
-
-  return (
-    <AbsoluteFill style={{ overflow: 'hidden', perspective: '800px' }}>
-      {/* Camada 1: Fundo (Background) */}
-      <Img
-        src={bgUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform: bgTransform,
-          filter: gradingFilter ? `${gradingFilter} brightness(0.92)` : 'brightness(0.92)',
-          opacity: 0.95,
-          willChange: 'transform',
-        }}
-      />
-      {/* Camada 2: Sujeito Recortado (Foreground) */}
-      <Img
-        src={fgUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform: fgTransform,
-          filter: gradingFilter || 'none',
-          willChange: 'transform',
-        }}
-      />
-    </AbsoluteFill>
-  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
