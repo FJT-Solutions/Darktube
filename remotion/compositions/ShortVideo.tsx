@@ -112,11 +112,6 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
         })}
       </TransitionSeries>
 
-      {/* ── WATERMARK GLOBAL ── */}
-      {showWatermark && (
-        <WatermarkOverlay text={watermarkText} primaryColor={primaryColor} />
-      )}
-
       {/* ── BARRA DE PROGRESSO ── */}
       <ProgressBar totalScenes={scenes.length} primaryColor={primaryColor} accentColor={accentColor} />
 
@@ -772,56 +767,6 @@ const KaraokeWord: React.FC<{
     >
       {word}
     </span>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// WATERMARK
-// ─────────────────────────────────────────────────────────────────────────────
-const WatermarkOverlay: React.FC<{ text: string; primaryColor: string }> = ({ text, primaryColor }) => {
-  const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [0, 20], [0, 0.9], { extrapolateRight: 'clamp' });
-  const translateY = interpolate(frame, [0, 20], [-12, 0], { extrapolateRight: 'clamp' });
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 52,
-        right: 44,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        border: '1px solid rgba(255,255,255,0.12)',
-        borderRadius: '100px',
-        padding: '10px 22px',
-        opacity,
-        transform: `translateY(${translateY}px)`,
-        zIndex: 100,
-      }}
-    >
-      <div
-        style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: primaryColor,
-          boxShadow: `0 0 10px ${primaryColor}`,
-        }}
-      />
-      <span
-        style={{
-          fontSize: '24px',
-          fontWeight: 700,
-          color: 'rgba(255,255,255,0.88)',
-          letterSpacing: '1px',
-          fontFamily: 'Inter, sans-serif',
-        }}
-      >
-        {text}
-      </span>
-    </div>
   );
 };
 
