@@ -110,40 +110,91 @@ try {
 }
 
 // ──────────────────────────────────────────────
-// AUTO-CUTOUT 2.5D — Separa Sujeito de Fundo em 1 imagem para HyperFrames
+// PRÉ-DOWNLOAD E RECORTE 2.5D DE TODOS OS ASSETS
+// Garante 0% de requisições externas durante a renderização do HyperFrames
 // ──────────────────────────────────────────────
-async function processSceneCutouts(scenes) {
-  if (!removeBackground || !scenes || scenes.length === 0) return;
-  console.log('[HyperFrames Cutout] Analisando auto-recorte 2.5D para cenas...');
+async function preloadAndProcessAllAssets(scenes) {
+  if (!scenes || scenes.length === 0) return;
+  console.log('[HyperFrames Assets] Pré-carregando e baixando todas as mídias localmente...');
 
   const crypto = require('crypto');
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    if (!scene.imageUrl || scene.subjectImageUrl || scene.foregroundUrl) continue;
-    const clean = scene.imageUrl.toLowerCase().split('?')[0];
-    if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov')) continue;
 
-    try {
-      const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
-      const fgFileName = `cutout_hf_${hash}.png`;
-      const fgPath = path.join(OUTPUT_DIR, fgFileName);
+    // 1. Baixar imageUrl principal se for remoto
+    if (scene.imageUrl && scene.imageUrl.startsWith('http') && !scene.imageUrl.includes(`127.0.0.1:${PORT}`)) {
+      try {
+        const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
+        const clean = scene.imageUrl.toLowerCase().split('?')[0];
+        const ext = clean.endsWith('.png') ? 'png' : clean.endsWith('.webp') ? 'webp' : clean.endsWith('.mp4') ? 'mp4' : 'jpg';
+        const fileName = `media_hf_${hash}.${ext}`;
+        const filePath = path.join(OUTPUT_DIR, fileName);
 
-      if (fs.existsSync(fgPath)) {
-        console.log(`[HyperFrames Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-        scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
-        continue;
+        if (!fs.existsSync(filePath)) {
+          console.log(`[HyperFrames Assets] Baixando mídia da cena ${i + 1}...`);
+          const res = await fetch(scene.imageUrl);
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            fs.writeFileSync(filePath, buf);
+          }
+        }
+        if (fs.existsSync(filePath)) {
+          scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+          console.log(`[HyperFrames Assets] ✅ Cena ${i + 1} imagem local: /storage/${fileName}`);
+        }
+      } catch (err) {
+        console.error(`[HyperFrames Assets] ⚠️ Falha ao baixar imagem da cena ${i + 1}:`, err.message);
       }
+    }
 
-      console.log(`[HyperFrames Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
-      const blob = await removeBackground(scene.imageUrl);
-      const buffer = Buffer.from(await blob.arrayBuffer());
-      fs.writeFileSync(fgPath, buffer);
+    // 2. Baixar foregroundUrl se já fornecido externamente
+    if (scene.foregroundUrl && scene.foregroundUrl.startsWith('http') && !scene.foregroundUrl.includes(`127.0.0.1:${PORT}`)) {
+      try {
+        const hash = crypto.createHash('md5').update(scene.foregroundUrl).digest('hex');
+        const fileName = `fg_hf_${hash}.png`;
+        const filePath = path.join(OUTPUT_DIR, fileName);
 
-      scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
-      console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
-    } catch (err) {
-      console.error(`[HyperFrames Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
+        if (!fs.existsSync(filePath)) {
+          const res = await fetch(scene.foregroundUrl);
+          if (res.ok) {
+            fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
+          }
+        }
+        if (fs.existsSync(filePath)) {
+          scene.foregroundUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+        }
+      } catch (err) {
+        console.error(`[HyperFrames Assets] ⚠️ Falha ao baixar foreground da cena ${i + 1}:`, err.message);
+      }
+    }
+
+    // 3. Processar auto-recorte 2.5D
+    if (removeBackground && scene.imageUrl && !scene.subjectImageUrl && !scene.foregroundUrl) {
+      const clean = scene.imageUrl.toLowerCase().split('?')[0];
+      if (!clean.endsWith('.mp4') && !clean.endsWith('.webm') && !clean.endsWith('.mov')) {
+        try {
+          const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
+          const fgFileName = `cutout_hf_${hash}.png`;
+          const fgPath = path.join(OUTPUT_DIR, fgFileName);
+
+          if (fs.existsSync(fgPath)) {
+            console.log(`[HyperFrames Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
+            scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+            continue;
+          }
+
+          console.log(`[HyperFrames Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
+          const blob = await removeBackground(scene.imageUrl);
+          const buffer = Buffer.from(await blob.arrayBuffer());
+          fs.writeFileSync(fgPath, buffer);
+
+          scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+          console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
+        } catch (err) {
+          console.error(`[HyperFrames Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
+        }
+      }
     }
   }
 }
@@ -199,9 +250,9 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
     // 1. Criar diretório de trabalho
     fs.mkdirSync(workDir, { recursive: true });
 
-    // 1.5 Auto-cutout 2.5D para imagens de 1 camada
+    // 1.5 Pré-carrega mídias, auto-cutout 2.5D e áudios
     if (payload && payload.scenes) {
-      await processSceneCutouts(payload.scenes);
+      await preloadAndProcessAllAssets(payload.scenes);
       await processSceneAudios(payload);
     }
 
@@ -214,7 +265,7 @@ async function renderVideoAsync(historyId, payload, callbackUrl) {
     console.log(`[HyperFrames] Renderizando vídeo visual: ${historyId}`);
     execSync(
       `${path.join(__dirname, 'node_modules/.bin/hyperframes')} render ${workDir} --output ${silentPath}`,
-      { timeout: 600000, stdio: 'pipe' } // 10 minutos max
+      { timeout: 600000, stdio: 'inherit' } // stdio inherit evita buffer pipe deadlock
     );
     console.log(`[HyperFrames] Vídeo visual renderizado: ${historyId}`);
 
