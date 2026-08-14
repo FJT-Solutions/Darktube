@@ -322,16 +322,10 @@ function generateCompositionHTML(payload) {
 <body>
 
 <div id="composition" data-composition-id="darktube-video"
-     data-width="${width}" data-height="${height}">
+     data-width="${width}" data-height="${height}"
+     data-duration="${totalDuration}" data-fps="30">
 
   ${scenesHTML}
-
-  <!-- Watermark global -->
-  ${showWatermark ? `
-  <div class="watermark" id="watermark">
-    <div class="watermark-dot"></div>
-    <span class="watermark-text">${watermarkText.replace(/</g, '&lt;')}</span>
-  </div>` : ''}
 
   <!-- Barra de progresso -->
   <div class="progress-bar" id="progress-bar"></div>
@@ -354,10 +348,11 @@ function generateCompositionHTML(payload) {
 
 <script>
   // ════════════════════════════════════════════════════
-  // DARKTUBE — GSAP globalTimeline (seek-safe)
-  // O HyperFrames faz: gsap.globalTimeline.seek(frame/fps)
-  // TODAS as animações devem estar na globalTimeline.
+  // DARKTUBE — HyperFrames Timeline Registry (seek-safe)
   // ════════════════════════════════════════════════════
+  window.__timelines = window.__timelines || {};
+  window.__timelines['darktube-video'] = gsap.globalTimeline;
+  window.__timeline = gsap.globalTimeline;
 
   // Progress bar — na globalTimeline diretamente
   gsap.set('#progress-bar', { opacity: 0.7, width: '0%' });
@@ -376,12 +371,6 @@ function generateCompositionHTML(payload) {
     ease: 'power2.inOut',
     delay: 0.08,
   });
-
-  ${showWatermark ? `
-  // Watermark
-  gsap.set('#watermark', { opacity: 0, y: -12 });
-  gsap.to('#watermark', { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out', delay: 0.9 });
-  ` : ''}
 
   // ─── ANIMAÇÕES POR CENA ───
   ${gsapTimeline}
