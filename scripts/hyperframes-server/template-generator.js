@@ -80,8 +80,11 @@ function generateCompositionHTML(payload) {
       <!-- Imagem, Vídeo ou 2.5D Parallax de fundo -->
       <div class="scene-bg" id="bg-${i}">
         ${(scene.subjectImageUrl || scene.foregroundUrl)
-          ? `<img src="${scene.imageUrl}" class="bg-layer" alt="BG ${i + 1}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;filter:blur(2px) brightness(0.85);" />
-             <img src="${scene.subjectImageUrl || scene.foregroundUrl}" class="fg-layer" alt="FG ${i + 1}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;filter:drop-shadow(0 15px 30px rgba(0,0,0,0.75));" />`
+          ? `<img src="${scene.imageUrl}" class="bg-layer" alt="BG ${i + 1}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;transform:scale(1.35);filter:brightness(0.6) contrast(1.15);opacity:0.75;" />
+             <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 40%, rgba(5,8,16,0.7) 75%, rgba(5,8,16,0.95) 100%);pointer-events:none;"></div>
+             <div class="fg-container" style="position:absolute;inset:0;display:flex;justify-content:${format === 'vertical' ? 'center' : 'flex-end'};align-items:center;padding-right:${format === 'vertical' ? '0' : '60px'};">
+               <img src="${scene.subjectImageUrl || scene.foregroundUrl}" class="fg-layer" alt="FG ${i + 1}" style="width:${format === 'vertical' ? '100%' : '75%'};height:100%;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 25px 45px rgba(0,0,0,0.85));" />
+             </div>`
           : scene.imageUrl
           ? (function() {
               const clean = scene.imageUrl.toLowerCase().split('?')[0];
@@ -203,38 +206,37 @@ function generateCompositionHTML(payload) {
       pointer-events: none;
     }
 
-    /* ─── LEGENDAS ─── */
+    /* ─── LEGENDAS KINETIC PRO ─── */
     .caption-container {
       position: absolute;
-      bottom: ${format === 'vertical' ? '18%' : '12%'};
+      bottom: ${format === 'vertical' ? '18%' : '10%'};
       left: 6%;
       right: 6%;
       text-align: center;
-      z-index: 10;
+      z-index: 20;
     }
 
     .caption-subtitle {
       bottom: ${format === 'vertical' ? '12%' : '8%'};
-      background: rgba(0, 0, 0, 0.72);
-      backdrop-filter: blur(12px);
+      background: rgba(0, 0, 0, 0.78);
       border-radius: 16px;
-      padding: 20px 32px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 18px 28px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .caption-words {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
     }
 
     .word {
       display: inline-block;
-      font-size: ${format === 'vertical' ? '72px' : '56px'};
+      font-size: ${format === 'vertical' ? '76px' : '54px'};
       font-weight: 900;
       line-height: 1.1;
-      color: ${accentColor};
+      color: #FFFFFF;
       text-transform: uppercase;
       letter-spacing: 1px;
       opacity: 0;

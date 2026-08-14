@@ -21,6 +21,7 @@ import { RemotionShortProps, SceneSegment, TransitionStyle, SpringPreset } from 
 import { SplitBounceText, TypewriterText, GlitchText, EditorialText, KineticPopText } from './TextSplit';
 import { GlitchOverlay, LightLeakOverlay, FlashOverlay, ParticlesOverlay, ColorGradingLayer, GRADING_FILTERS } from './GlitchOverlay';
 import { FinancialCounterOverlay, CodeTerminalOverlay } from './MotionGraphicsOverlay';
+import { AnimatedLineChart, AnimatedBarChart, AnimatedMapRoute, DocumentaryLowerThird } from './Infographics';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Spring presets — configurações de física por estilo emocional
@@ -189,33 +190,27 @@ const SceneLayer: React.FC<{
         }}
       />
 
-      {/* ── Color Grading — aplicado como tint sobre a imagem ── */}
-      <ColorGradingLayer
-        colorGrading={scene.colorGrading}
-        emotionColor={scene.emotionColor}
-        intensity={intensity}
-      />
-
-      {/* ── Overlays de entrada — controlados pelo overlayEffect ou captionEffect ── */}
-      {((scene.overlayEffect || scene.captionEffect) === 'glitch') && (
-        <GlitchOverlay intensity={intensity} durationFrames={20} primaryColor={primaryColor} />
-      )}
-      {((scene.overlayEffect || scene.captionEffect) === 'light-leak') && (
-        <LightLeakOverlay intensity={intensity} durationFrames={28} />
-      )}
-      {((scene.overlayEffect || scene.captionEffect) === 'flash') && (
-        <FlashOverlay intensity={intensity * 0.9} durationFrames={12} />
-      )}
-      {((scene.overlayEffect || scene.captionEffect) === 'particles') && (
-        <ParticlesOverlay intensity={intensity} durationFrames={durationFrames} color={scene.emotionColor || primaryColor} />
-      )}
-
-      {/* ── PROGRAMMATIC MOTION GRAPHIC OVERLAYS ── */}
+      {/* ── Color Grad      {/* ── PROGRAMMATIC MOTION GRAPHIC & INFOGRAPHIC OVERLAYS ── */}
       {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'counter' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'finance') && (
         <FinancialCounterOverlay durationFrames={durationFrames} color={scene.emotionColor || '#00C853'} />
       )}
       {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'code-terminal' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'terminal') && (
         <CodeTerminalOverlay durationFrames={durationFrames} primaryColor={scene.emotionColor || '#00E0FF'} />
+      )}
+      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'line-chart') && (
+        <div style={{ position: 'absolute', top: format === 'vertical' ? 140 : 'auto', bottom: format === 'vertical' ? 'auto' : 120, left: format === 'vertical' ? 50 : 80, zIndex: 40 }}>
+          <AnimatedLineChart isVertical={format === 'vertical'} color={primaryColor} />
+        </div>
+      )}
+      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bar-chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bars') && (
+        <div style={{ position: 'absolute', top: format === 'vertical' ? 140 : 'auto', bottom: format === 'vertical' ? 'auto' : 120, left: format === 'vertical' ? 50 : 80, zIndex: 40 }}>
+          <AnimatedBarChart isVertical={format === 'vertical'} />
+        </div>
+      )}
+      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'map' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'route') && (
+        <div style={{ position: 'absolute', top: format === 'vertical' ? 140 : 'auto', bottom: format === 'vertical' ? 'auto' : 120, left: format === 'vertical' ? 50 : 80, zIndex: 40 }}>
+          <AnimatedMapRoute isVertical={format === 'vertical'} />
+        </div>
       )}
 
       {/* Legendas */}
@@ -227,15 +222,13 @@ const SceneLayer: React.FC<{
         durationFrames={durationFrames}
         format={format}
       />
-
-      {/* Áudio removido do Remotion — mixado via FFmpeg no servidor para evitar delayRender timeouts */}
     </AbsoluteFill>
   );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PARALLAX 2.5D IMAGE — Sujeito (Foreground PNG recortado) + Fundo (Background)
-// Permite profundidade 3D real em QUALQUER imagem enviada/gerada!
+// Fundo estendido (130%) com desfoque de lente sutil para eliminar duplicações
 // ─────────────────────────────────────────────────────────────────────────────
 const Parallax25DImage: React.FC<{
   bgUrl: string;
@@ -243,125 +236,130 @@ const Parallax25DImage: React.FC<{
   durationFrames: number;
   animationStyle: string;
   colorGrading?: string;
-}> = ({ bgUrl, fgUrl, durationFrames, animationStyle, colorGrading }) => {
+  format?: string;
+}> = ({ bgUrl, fgUrl, durationFrames, animationStyle, colorGrading, format = 'vertical' }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const progress = interpolate(frame, [0, durationFrames], [0, 1], { extrapolateRight: 'clamp' });
 
-  // Micro-movimento flutuante contínuo
-  const floatX = Math.sin(frame * 0.05) * 3;
-  const floatY = Math.cos(frame * 0.04) * 3;
+  // Entrada suave com física spring
+  const enterSpring = spring({
+    frame,
+    fps,
+    config: { damping: 14, stiffness: 85 },
+  });
+
+  // Micro-movimento flutuante contínuo (respiração / câmera de mão)
+  const floatX = Math.sin(frame * 0.04) * 4;
+  const floatY = Math.cos(frame * 0.03) * 4;
 
   let bgTransform = '';
   let fgTransform = '';
 
+  const isVertical = format === 'vertical';
+
   switch (animationStyle) {
     case 'parallax-up': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
-      const bgY = interpolate(progress, [0, 1], [5, -5]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
-      const fgY = interpolate(progress, [0, 1], [8, -12]);
-      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}px)`;
+      const bgScale = interpolate(progress, [0, 1], [1.30, 1.38]);
+      const bgY = interpolate(progress, [0, 1], [10, -10]);
+      const fgScale = interpolate(enterSpring, [0, 1], [0.94, 1.05]);
+      const fgY = interpolate(progress, [0, 1], [15, -20]);
+      bgTransform = `scale(${bgScale}) translate(${floatX * 0.5}px, ${bgY + floatY * 0.5}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX}px, ${fgY + floatY}px)`;
       break;
     }
     case 'parallax-down': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
-      const bgY = interpolate(progress, [0, 1], [-5, 5]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
-      const fgY = interpolate(progress, [0, 1], [-8, 12]);
-      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}px)`;
+      const bgScale = interpolate(progress, [0, 1], [1.30, 1.38]);
+      const bgY = interpolate(progress, [0, 1], [-10, 10]);
+      const fgScale = interpolate(enterSpring, [0, 1], [0.94, 1.05]);
+      const fgY = interpolate(progress, [0, 1], [-15, 20]);
+      bgTransform = `scale(${bgScale}) translate(${floatX * 0.5}px, ${bgY + floatY * 0.5}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX}px, ${fgY + floatY}px)`;
       break;
     }
     case 'parallax-left': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
-      const bgX = interpolate(progress, [0, 1], [5, -5]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
-      const fgX = interpolate(progress, [0, 1], [8, -12]);
-      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}px, ${floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}px, ${floatY * 1.5}px)`;
+      const bgScale = interpolate(progress, [0, 1], [1.30, 1.38]);
+      const bgX = interpolate(progress, [0, 1], [10, -10]);
+      const fgScale = interpolate(enterSpring, [0, 1], [0.94, 1.05]);
+      const fgX = interpolate(progress, [0, 1], [15, -20]);
+      bgTransform = `scale(${bgScale}) translate(${bgX + floatX * 0.5}px, ${floatY * 0.5}px)`;
+      fgTransform = `scale(${fgScale}) translate(${fgX + floatX}px, ${floatY}px)`;
       break;
     }
     case 'parallax-right': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.12]);
-      const bgX = interpolate(progress, [0, 1], [-5, 5]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.25]);
-      const fgX = interpolate(progress, [0, 1], [-8, 12]);
-      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}px, ${floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}px, ${floatY * 1.5}px)`;
+      const bgScale = interpolate(progress, [0, 1], [1.30, 1.38]);
+      const bgX = interpolate(progress, [0, 1], [-10, 10]);
+      const fgScale = interpolate(enterSpring, [0, 1], [0.94, 1.05]);
+      const fgX = interpolate(progress, [0, 1], [-15, 20]);
+      bgTransform = `scale(${bgScale}) translate(${bgX + floatX * 0.5}px, ${floatY * 0.5}px)`;
+      fgTransform = `scale(${fgScale}) translate(${fgX + floatX}px, ${floatY}px)`;
       break;
     }
-    case 'zoom-out': {
-      const bgScale = interpolate(progress, [0, 1], [1.15, 1.02]);
-      const fgScale = interpolate(progress, [0, 1], [1.32, 1.12]);
-      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
-      break;
+    default: {
+      const bgScale = interpolate(progress, [0, 1], [1.30, 1.36]);
+      const fgScale = interpolate(enterSpring, [0, 1], [0.95, 1.04]);
+      bgTransform = `scale(${bgScale}) translate(${floatX * 0.5}px, ${floatY * 0.5}px)`;
+      fgTransform = `scale(${fgScale}) translate(${floatX}px, ${floatY}px)`;
     }
-    case 'zoom-punch': {
-      const punchProgress = interpolate(frame, [0, 8, durationFrames], [1.45, 1.18, 1.08], {
-        extrapolateRight: 'clamp',
-      });
-      const rot = Math.sin(frame * 0.1) * 1.5;
-      bgTransform = `scale(${punchProgress}) translate(${floatX}px, ${floatY}px)`;
-      fgTransform = `scale(${punchProgress * 1.1}) rotate(${rot}deg) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
-      break;
-    }
-    case 'tilt-3d': {
-      const rotX = interpolate(progress, [0, 1], [10, -6]);
-      const rotY = interpolate(progress, [0, 1], [-12, 10]);
-      bgTransform = `perspective(800px) scale(1.08) rotateX(${rotX * 0.4}deg) rotateY(${rotY * 0.4}deg) translate(${floatX}px, ${floatY}px)`;
-      fgTransform = `perspective(800px) scale(1.22) rotateX(${rotX}deg) rotateY(${rotY}deg) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
-      break;
-    }
-    case 'shake-impact': {
-      const shakeX = Math.sin(frame * 1.8) * interpolate(frame, [0, 16], [12, 0], { extrapolateRight: 'clamp' });
-      const shakeY = Math.cos(frame * 1.8) * interpolate(frame, [0, 16], [12, 0], { extrapolateRight: 'clamp' });
-      bgTransform = `scale(1.06) translate(${shakeX * 0.4 + floatX}px, ${shakeY * 0.4 + floatY}px)`;
-      fgTransform = `scale(1.2) translate(${shakeX + floatX * 1.5}px, ${shakeY + floatY * 1.5}px)`;
-      break;
-    }
-    case 'spin-in': {
-      const rot = interpolate(frame, [0, 18], [-20, 0], { extrapolateRight: 'clamp' });
-      const scaleProgress = interpolate(frame, [0, 18], [1.32, 1.0], { extrapolateRight: 'clamp' });
-      bgTransform = `scale(${1.05 * scaleProgress}) rotate(${rot * 0.4}deg) translate(${floatX}px, ${floatY}px)`;
-      fgTransform = `scale(${1.18 * scaleProgress}) rotate(${rot}deg) translate(${floatX * 1.5}px, ${floatY * 1.5}px)`;
-      break;
-    }
-    case 'kenburns-right': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
-      const bgX = interpolate(progress, [0, 1], [0, 4]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
-      const fgX = interpolate(progress, [0, 1], [0, 8]);
-      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}%, ${floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}%, ${floatY * 1.5}px)`;
-      break;
-    }
-    case 'kenburns-left': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
-      const bgX = interpolate(progress, [0, 1], [0, -4]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
-      const fgX = interpolate(progress, [0, 1], [0, -8]);
-      bgTransform = `scale(${bgScale}) translate(${bgX + floatX}%, ${floatY}px)`;
-      fgTransform = `scale(${fgScale}) translate(${fgX + floatX * 1.5}%, ${floatY * 1.5}px)`;
-      break;
-    }
-    case 'kenburns-up': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
-      const bgY = interpolate(progress, [0, 1], [0, -4]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
-      const fgY = interpolate(progress, [0, 1], [0, -8]);
-      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}%)`;
-      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}%)`;
-      break;
-    }
-    case 'kenburns-down': {
-      const bgScale = interpolate(progress, [0, 1], [1.05, 1.15]);
-      const bgY = interpolate(progress, [0, 1], [0, 4]);
-      const fgScale = interpolate(progress, [0, 1], [1.15, 1.28]);
-      const fgY = interpolate(progress, [0, 1], [0, 8]);
-      bgTransform = `scale(${bgScale}) translate(${floatX}px, ${bgY + floatY}%)`;
-      fgTransform = `scale(${fgScale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}%)`;
+  }
+
+  const gradingFilter = (colorGrading && colorGrading !== 'none') ? GRADING_FILTERS[colorGrading] || '' : '';
+
+  return (
+    <AbsoluteFill style={{ overflow: 'hidden', perspective: '1000px', backgroundColor: '#0B0F19' }}>
+      {/* Camada 1: Fundo Estendido com tratamento de profundidade (Zero duplicidade de cabeça) */}
+      <Img
+        src={bgUrl}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform: bgTransform,
+          filter: gradingFilter ? `${gradingFilter} brightness(0.6) contrast(1.15)` : 'brightness(0.6) contrast(1.15)',
+          opacity: 0.75,
+          willChange: 'transform',
+        }}
+      />
+
+      {/* Camada de Vinheta Escura de Profundidade */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(5,8,16,0.7) 75%, rgba(5,8,16,0.95) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Camada 2: Sujeito Recortado com Sombra de Contato Realista */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          justifyContent: isVertical ? 'center' : 'flex-end',
+          alignItems: 'center',
+          transform: fgTransform,
+          willChange: 'transform',
+          paddingRight: isVertical ? 0 : 60,
+        }}
+      >
+        <Img
+          src={fgUrl}
+          style={{
+            width: isVertical ? '100%' : '75%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center bottom',
+            filter: gradingFilter
+              ? `${gradingFilter} drop-shadow(0 25px 45px rgba(0,0,0,0.85))`
+              : 'drop-shadow(0 25px 45px rgba(0,0,0,0.85))',
+          }}
+        />
+      </div>
+    </AbsoluteFill>
+  );
+};ale}) translate(${floatX * 1.5}px, ${fgY + floatY * 1.5}%)`;
       break;
     }
     default: {
@@ -748,30 +746,28 @@ const PopWord: React.FC<{
   frame: number;
 }> = ({ word, primaryColor, fps, isVertical, springConfig, frame }) => {
   const scaleVal = spring({ frame: Math.max(0, frame), fps, config: springConfig });
-
-  const translateY = interpolate(scaleVal, [0, 1], [50, 0], { extrapolateRight: 'clamp' });
-  const rotation = interpolate(Math.max(0, frame), [0, 6, 10], [-10, 2, 0], { extrapolateRight: 'clamp' });
+  const translateY = interpolate(scaleVal, [0, 1], [30, 0], { extrapolateRight: 'clamp' });
+  const rotation = interpolate(Math.max(0, frame), [0, 6, 10], [-6, 2, 0], { extrapolateRight: 'clamp' });
 
   return (
     <div
       style={{
         transform: `scale(${scaleVal}) rotate(${rotation}deg) translateY(${translateY}px)`,
-        color: '#ffffff',
-        fontSize: isVertical ? 110 : 85,
+        color: '#FFFFFF',
+        fontSize: isVertical ? 96 : 72,
         fontWeight: 900,
         textTransform: 'uppercase',
         textAlign: 'center',
-        padding: '14px 32px',
-        backgroundColor: primaryColor,
-        borderRadius: '16px',
-        boxShadow: `0 15px 30px rgba(0,0,0,0.5), inset 0 -4px 0 rgba(0,0,0,0.25), 0 0 50px ${primaryColor}55`,
-        border: '3px solid rgba(0,0,0,0.5)',
+        fontFamily: 'Montserrat, Inter, Impact, sans-serif',
+        WebkitTextStroke: isVertical ? '6px #000000' : '4px #000000',
+        paintOrder: 'stroke fill',
+        textShadow: `0 8px 24px rgba(0,0,0,0.95), 0 0 35px ${primaryColor}88`,
         transformOrigin: 'center center',
         willChange: 'transform',
-        WebkitTextStroke: '2px rgba(0,0,0,0.3)',
+        letterSpacing: '1px',
       }}
     >
-      {word}
+      <span style={{ color: primaryColor }}>{word}</span>
     </div>
   );
 };
@@ -791,29 +787,29 @@ const KaraokeWord: React.FC<{
 }> = ({ word, isActive, isPast, primaryColor, accentColor, fps, isVertical, springConfig }) => {
   const frame = useCurrentFrame();
 
-  // Re-trigger o spring quando a palavra fica ativa
-  // Usa frame local para que o spring comece sempre do zero quando ativa
   const localFrame = isActive ? (frame % Math.ceil(fps * 0.5)) : 0;
   const scale = isActive
-    ? spring({ frame: localFrame, fps, config: springConfig, from: 1, to: 1.12 })
+    ? spring({ frame: localFrame, fps, config: springConfig, from: 1, to: 1.15 })
     : 1;
 
   return (
     <span
       style={{
-        fontFamily: 'Montserrat, sans-serif',
-        fontSize: isVertical ? 78 : 62,
+        fontFamily: 'Montserrat, Inter, Impact, sans-serif',
+        fontSize: isVertical ? 82 : 58,
         fontWeight: 900,
         textTransform: 'uppercase',
-        WebkitTextStroke: '3px black',
-        color: isActive ? primaryColor : isPast ? 'rgba(255,255,255,0.85)' : 'rgba(150,150,150,0.7)',
+        WebkitTextStroke: isVertical ? '6px #000000' : '4px #000000',
+        paintOrder: 'stroke fill',
+        color: isActive ? primaryColor : isPast ? 'rgba(255,255,255,0.95)' : 'rgba(200,200,200,0.6)',
         textShadow: isActive
-          ? `0 0 20px ${primaryColor}aa, 4px 4px 0 #000`
-          : '3px 3px 0 #000',
+          ? `0 0 30px ${primaryColor}, 0 6px 20px #000000`
+          : '0 4px 12px #000000',
         transform: `scale(${scale})`,
         display: 'inline-block',
         willChange: 'transform, color',
         transformOrigin: 'center bottom',
+        margin: '0 6px',
       }}
     >
       {word}
