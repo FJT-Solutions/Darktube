@@ -195,7 +195,7 @@ export const ParticlesOverlay: React.FC<{
               backgroundColor: color,
               opacity: p.opacity * envelope,
               transform: `scale(${scale})`,
-              filter: `blur(${p.size * 0.4}px)`,
+              boxShadow: `0 0 ${p.size * 2}px ${color}`,
               willChange: 'transform, opacity',
             }}
           />

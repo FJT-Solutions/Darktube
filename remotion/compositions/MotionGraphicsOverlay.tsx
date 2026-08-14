@@ -164,8 +164,7 @@ export const FinancialCounterOverlay: React.FC<{
           borderTop: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           alignItems: 'center',
-          backgroundColor: 'rgba(10, 10, 15, 0.75)',
-          backdropFilter: 'blur(8px)',
+          backgroundColor: 'rgba(10, 10, 15, 0.92)',
         }}
       >
         <div
@@ -237,8 +236,7 @@ export const CodeTerminalOverlay: React.FC<{
         style={{
           width: '780px',
           height: '460px',
-          backgroundColor: 'rgba(17, 17, 24, 0.88)',
-          backdropFilter: 'blur(20px)',
+          backgroundColor: 'rgba(17, 17, 24, 0.95)',
           borderRadius: '16px',
           border: `1px solid ${primaryColor}66`,
           boxShadow: `0 20px 60px rgba(0,0,0,0.8), 0 0 30px ${primaryColor}22, inset 0 0 20px ${primaryColor}11`,

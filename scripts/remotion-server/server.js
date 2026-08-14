@@ -136,8 +136,7 @@ async function processSceneCutouts(scenes) {
 
       if (fs.existsSync(fgPath)) {
         console.log(`[Remotion Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-        const buffer = fs.readFileSync(fgPath);
-        scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+        scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
         continue;
       }
 
@@ -146,46 +145,11 @@ async function processSceneCutouts(scenes) {
       const buffer = Buffer.from(await blob.arrayBuffer());
       fs.writeFileSync(fgPath, buffer);
 
-      scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
-      console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta (Base64 em memória)`);
+      scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+      console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
     } catch (err) {
       console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado (fallback KenBurns ativo):`, err.message);
     }
-  }
-}
-
-// ──────────────────────────────────────────────
-// PRÉ-CARREGAMENTO DE ÁUDIO (evita HTTP Range timeouts no HTML5 <audio> do Chrome)
-// ──────────────────────────────────────────────
-async function processSceneAudios(composition) {
-  if (!composition) return;
-  const scenes = composition.scenes || [];
-  console.log('[Remotion Audio] Pré-carregando áudios das cenas...');
-
-  const fetchAudioAsBase64 = async (url) => {
-    if (!url || !url.startsWith('http')) return url;
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return url;
-      const arrayBuffer = await res.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const mime = url.split('?')[0].endsWith('.wav') ? 'audio/wav' : 'audio/mp3';
-      return `data:${mime};base64,${buffer.toString('base64')}`;
-    } catch (err) {
-      console.error(`[Remotion Audio] ⚠️ Falha ao pré-carregar áudio (${url}):`, err.message);
-      return url;
-    }
-  };
-
-  for (let i = 0; i < scenes.length; i++) {
-    const scene = scenes[i];
-    if (scene.audioUrl) {
-      scene.audioUrl = await fetchAudioAsBase64(scene.audioUrl);
-    }
-  }
-
-  if (composition.backgroundMusicUrl) {
-    composition.backgroundMusicUrl = await fetchAudioAsBase64(composition.backgroundMusicUrl);
   }
 }
 
@@ -202,9 +166,6 @@ async function renderAsync(historyId, composition, callbackUrl) {
 
     // Tenta gerar camadas 2.5D automaticamente para imagens de 1 camada
     await processSceneCutouts(composition.scenes);
-
-    // Pré-carrega áudios para Base64 para buscar sem latência de rede
-    await processSceneAudios(composition);
 
     // Determinar dimensões pelo format
     const isVertical = (composition.format || 'vertical') === 'vertical';
@@ -245,6 +206,20 @@ async function renderAsync(historyId, composition, callbackUrl) {
     // Serve o bundle via HTTP em 127.0.0.1 no Express para garantir estabilidade e evitar servidor temporário na porta 3000
     const serveUrl = `http://127.0.0.1:${PORT}/bundle`;
 
+    const chromiumArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-software-rasterizer',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-breakpad',
+      '--mute-audio',
+      '--no-first-run',
+    ];
+
     const comp = await selectComposition({
       serveUrl,
       id: 'ShortVideo',
@@ -257,18 +232,16 @@ async function renderAsync(historyId, composition, callbackUrl) {
       browserExecutable: CHROME_PATH,
       chromiumOptions: {
         disableWebSecurity: true,
-        args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
+        args: chromiumArgs,
         enableMultiProcessOnLinux: true,
       },
-      timeoutInMilliseconds: 180_000,
-      delayRenderTimeoutInMilliseconds: 180_000,
+      timeoutInMilliseconds: 300_000,
+      delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    // ── Concorrência controlada para evitar OOM Kill ──
-    // Exit 137 = OOM Kill. Com Chrome headless cada frame usa ~200-300MB.
-    // 2 frames simultâneos é seguro para containers com 1-2GB de RAM.
-    // Ajuste RENDER_CONCURRENCY no Dokploy se a VPS tiver mais memória disponível.
-    const concurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '8', 10);
+    // Concorrência balanceada para renderização estável e rápida
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '6', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 8));
     console.log(`[Remotion Render] Concorrência ativa: ${concurrency} frames simultâneos em paralelo`);
 
     let lastPercent = -1;
@@ -281,11 +254,11 @@ async function renderAsync(historyId, composition, callbackUrl) {
       imageFormat: 'jpeg',
       jpegQuality: 82,
       inputProps,
-      // Usa Chromium do sistema — sem download, sem OOM por download paralelo
+      // Usa Chromium do sistema com flags otimizadas
       browserExecutable: CHROME_PATH,
       chromiumOptions: {
         disableWebSecurity: true,
-        args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
+        args: chromiumArgs,
         enableMultiProcessOnLinux: true,
       },
       onProgress: ({ progress, renderedDoneInFrames }) => {
@@ -296,9 +269,9 @@ async function renderAsync(historyId, composition, callbackUrl) {
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
       },
-      // Timeout por frame — evita hang se o browser travar
-      timeoutInMilliseconds: 180_000,
-      delayRenderTimeoutInMilliseconds: 180_000,
+      // Timeout por frame — 5 minutos
+      timeoutInMilliseconds: 300_000,
+      delayRenderTimeoutInMilliseconds: 300_000,
     });
 
     console.log(`[Remotion Render] Concluído (vídeo silencioso): ${outputFilePath}`);

@@ -131,8 +131,7 @@ async function processSceneCutouts(scenes) {
 
       if (fs.existsSync(fgPath)) {
         console.log(`[HyperFrames Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-        const buffer = fs.readFileSync(fgPath);
-        scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+        scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
         continue;
       }
 
@@ -141,8 +140,8 @@ async function processSceneCutouts(scenes) {
       const buffer = Buffer.from(await blob.arrayBuffer());
       fs.writeFileSync(fgPath, buffer);
 
-      scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
-      console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta (Base64 em memória)`);
+      scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+      console.log(`[HyperFrames Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
     } catch (err) {
       console.error(`[HyperFrames Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
     }

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Img,
   OffthreadVideo,
   interpolate,
   spring,
@@ -376,19 +377,20 @@ const Parallax25DImage: React.FC<{
   return (
     <AbsoluteFill style={{ overflow: 'hidden', perspective: '800px' }}>
       {/* Camada 1: Fundo (Background) */}
-      <img
+      <Img
         src={bgUrl}
         style={{
           width: '100%',
           height: '100%',
           objectFit: 'cover',
           transform: bgTransform,
-          filter: gradingFilter ? `${gradingFilter} blur(1px) brightness(0.95)` : 'blur(1px) brightness(0.95)',
+          filter: gradingFilter ? `${gradingFilter} brightness(0.92)` : 'brightness(0.92)',
+          opacity: 0.95,
           willChange: 'transform',
         }}
       />
       {/* Camada 2: Sujeito Recortado (Foreground) */}
-      <img
+      <Img
         src={fgUrl}
         style={{
           width: '100%',
@@ -508,7 +510,7 @@ const KenBurnsImage: React.FC<{
           }}
         />
       ) : (
-        <img
+        <Img
           src={imgUrl}
           style={{
             width: '100%',
@@ -714,8 +716,7 @@ const CaptionLayer: React.FC<{
         style={{
           opacity: subtitleOpacity,
           transform: `translateY(${subtitleY}px)`,
-          backgroundColor: 'rgba(0, 0, 0, 0.72)',
-          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
           borderRadius: '16px',
           padding: '20px 32px',
           border: '1px solid rgba(255,255,255,0.08)',
