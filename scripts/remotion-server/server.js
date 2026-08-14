@@ -115,40 +115,91 @@ try {
 }
 
 // ──────────────────────────────────────────────
-// AUTO-CUTOUT 2.5D — Separa Sujeito de Fundo automaticamente em 1 imagem
+// PRÉ-DOWNLOAD E RECORTE 2.5D DE TODOS OS ASSETS
+// Garante 0% de requisições externas durante a renderização do Remotion
 // ──────────────────────────────────────────────
-async function processSceneCutouts(scenes) {
-  if (!removeBackground || !scenes || scenes.length === 0) return;
-  console.log('[Remotion Cutout] Analisando auto-recorte 2.5D para cenas...');
+async function preloadAndProcessAllAssets(scenes) {
+  if (!scenes || scenes.length === 0) return;
+  console.log('[Remotion Assets] Pré-carregando e baixando todas as mídias localmente...');
 
   const crypto = require('crypto');
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    if (!scene.imageUrl || scene.subjectImageUrl || scene.foregroundUrl) continue;
-    const clean = scene.imageUrl.toLowerCase().split('?')[0];
-    if (clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov')) continue;
 
-    try {
-      const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
-      const fgFileName = `cutout_${hash}.png`;
-      const fgPath = path.join(OUTPUT_DIR, fgFileName);
+    // 1. Baixar imageUrl principal se for remoto
+    if (scene.imageUrl && scene.imageUrl.startsWith('http') && !scene.imageUrl.includes(`127.0.0.1:${PORT}`)) {
+      try {
+        const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
+        const clean = scene.imageUrl.toLowerCase().split('?')[0];
+        const ext = clean.endsWith('.png') ? 'png' : clean.endsWith('.webp') ? 'webp' : clean.endsWith('.mp4') ? 'mp4' : 'jpg';
+        const fileName = `media_${hash}.${ext}`;
+        const filePath = path.join(OUTPUT_DIR, fileName);
 
-      if (fs.existsSync(fgPath)) {
-        console.log(`[Remotion Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-        scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
-        continue;
+        if (!fs.existsSync(filePath)) {
+          console.log(`[Remotion Assets] Baixando mídia da cena ${i + 1}...`);
+          const res = await fetch(scene.imageUrl);
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            fs.writeFileSync(filePath, buf);
+          }
+        }
+        if (fs.existsSync(filePath)) {
+          scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+          console.log(`[Remotion Assets] ✅ Cena ${i + 1} imagem local: /storage/${fileName}`);
+        }
+      } catch (err) {
+        console.error(`[Remotion Assets] ⚠️ Falha ao baixar imagem da cena ${i + 1}:`, err.message);
       }
+    }
 
-      console.log(`[Remotion Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
-      const blob = await removeBackground(scene.imageUrl);
-      const buffer = Buffer.from(await blob.arrayBuffer());
-      fs.writeFileSync(fgPath, buffer);
+    // 2. Baixar foregroundUrl se já fornecido externamente
+    if (scene.foregroundUrl && scene.foregroundUrl.startsWith('http') && !scene.foregroundUrl.includes(`127.0.0.1:${PORT}`)) {
+      try {
+        const hash = crypto.createHash('md5').update(scene.foregroundUrl).digest('hex');
+        const fileName = `fg_${hash}.png`;
+        const filePath = path.join(OUTPUT_DIR, fileName);
 
-      scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
-      console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
-    } catch (err) {
-      console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado (fallback KenBurns ativo):`, err.message);
+        if (!fs.existsSync(filePath)) {
+          const res = await fetch(scene.foregroundUrl);
+          if (res.ok) {
+            fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
+          }
+        }
+        if (fs.existsSync(filePath)) {
+          scene.foregroundUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+        }
+      } catch (err) {
+        console.error(`[Remotion Assets] ⚠️ Falha ao baixar foreground da cena ${i + 1}:`, err.message);
+      }
+    }
+
+    // 3. Processar auto-recorte 2.5D
+    if (removeBackground && scene.imageUrl && !scene.subjectImageUrl && !scene.foregroundUrl) {
+      const clean = scene.imageUrl.toLowerCase().split('?')[0];
+      if (!clean.endsWith('.mp4') && !clean.endsWith('.webm') && !clean.endsWith('.mov')) {
+        try {
+          const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
+          const fgFileName = `cutout_${hash}.png`;
+          const fgPath = path.join(OUTPUT_DIR, fgFileName);
+
+          if (fs.existsSync(fgPath)) {
+            console.log(`[Remotion Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
+            scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+            continue;
+          }
+
+          console.log(`[Remotion Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
+          const blob = await removeBackground(scene.imageUrl);
+          const buffer = Buffer.from(await blob.arrayBuffer());
+          fs.writeFileSync(fgPath, buffer);
+
+          scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+          console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
+        } catch (err) {
+          console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
+        }
+      }
     }
   }
 }
@@ -164,8 +215,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
   try {
     if (!bundledLocation) await initBundle();
 
-    // Tenta gerar camadas 2.5D automaticamente para imagens de 1 camada
-    await processSceneCutouts(composition.scenes);
+    // Pré-carrega e baixa todos os assets localmente + gera recortes 2.5D
+    await preloadAndProcessAllAssets(composition.scenes);
 
     // Determinar dimensões pelo format
     const isVertical = (composition.format || 'vertical') === 'vertical';
@@ -203,7 +254,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       format:              composition.format              || 'vertical',
     };
 
-    // Serve o bundle via HTTP em 127.0.0.1 no Express para garantir estabilidade e evitar servidor temporário na porta 3000
+    // Serve o bundle via HTTP em 127.0.0.1 no Express
     const serveUrl = `http://127.0.0.1:${PORT}/bundle`;
 
     const chromiumArgs = [
@@ -224,7 +275,6 @@ async function renderAsync(historyId, composition, callbackUrl) {
       serveUrl,
       id: 'ShortVideo',
       inputProps,
-      // Override das dimensões dinâmicas
       durationInFrames,
       fps,
       width,
@@ -234,14 +284,15 @@ async function renderAsync(historyId, composition, callbackUrl) {
         disableWebSecurity: true,
         args: chromiumArgs,
         enableMultiProcessOnLinux: true,
+        gl: null,
       },
       timeoutInMilliseconds: 300_000,
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    // Concorrência balanceada para renderização estável e rápida
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '6', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 8));
+    // Concorrência estável: 4 a 6 workers é o ideal para evitar lock de CPU e esgotamento de memória em vídeos longos
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 6));
     console.log(`[Remotion Render] Concorrência ativa: ${concurrency} frames simultâneos em paralelo`);
 
     let lastPercent = -1;
@@ -254,12 +305,13 @@ async function renderAsync(historyId, composition, callbackUrl) {
       imageFormat: 'jpeg',
       jpegQuality: 82,
       inputProps,
-      // Usa Chromium do sistema com flags otimizadas
+      gl: null,
       browserExecutable: CHROME_PATH,
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
         enableMultiProcessOnLinux: true,
+        gl: null,
       },
       onProgress: ({ progress, renderedDoneInFrames }) => {
         const pct = Math.floor(progress * 100);
@@ -269,7 +321,6 @@ async function renderAsync(historyId, composition, callbackUrl) {
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
       },
-      // Timeout por frame — 5 minutos
       timeoutInMilliseconds: 300_000,
       delayRenderTimeoutInMilliseconds: 300_000,
     });
