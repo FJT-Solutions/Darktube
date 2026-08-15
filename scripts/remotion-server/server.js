@@ -138,10 +138,17 @@ async function preloadAndProcessAllAssets(scenes) {
 
         if (!fs.existsSync(filePath)) {
           console.log(`[Remotion Assets] Baixando mídia da cena ${i + 1}...`);
-          const res = await fetch(scene.imageUrl);
+          const res = await fetch(scene.imageUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+            }
+          });
           if (res.ok) {
             const buf = Buffer.from(await res.arrayBuffer());
             fs.writeFileSync(filePath, buf);
+          } else {
+            console.warn(`[Remotion Assets] ⚠️ Servidor remoto retornou HTTP ${res.status} para cena ${i + 1}`);
           }
         }
         if (fs.existsSync(filePath)) {
@@ -161,7 +168,11 @@ async function preloadAndProcessAllAssets(scenes) {
         const filePath = path.join(OUTPUT_DIR, fileName);
 
         if (!fs.existsSync(filePath)) {
-          const res = await fetch(scene.foregroundUrl);
+          const res = await fetch(scene.foregroundUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            }
+          });
           if (res.ok) {
             fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
           }
