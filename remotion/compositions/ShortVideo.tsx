@@ -163,8 +163,57 @@ const SceneLayer: React.FC<{
     );
   }
 
-  // 2. CENA ILUSTRATIVA / PERSONAGEM RECORTADO 2.5D (Sem Fundo Poluído)
-  if (scene.sceneType === 'ILUSTRATIVA' || scene.subjectImageUrl || scene.foregroundUrl) {
+  // 2. CENA DATA_VIZ (Gráficos, Métricas, Contadores)
+  if (scene.sceneType === 'DATA_VIZ' || (scene.animationStyle && ['bar-chart', 'line-chart', 'counter-confetti', 'odometer-digit-roll'].includes(scene.animationStyle))) {
+    return (
+      <AbsoluteFill>
+        <LivingBackground
+          type={scene.livingBgType || 'concentric-rings'}
+          baseColor={scene.emotionColor || '#0B132B'}
+          accentColor={primaryColor}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 40px', zIndex: 30 }}>
+          {scene.captionText && (
+            <div style={{ fontSize: 44, fontWeight: 900, color: '#FFFFFF', textAlign: 'center', marginBottom: 40, textShadow: '0 4px 12px rgba(0,0,0,0.6)' }}>
+              {scene.captionText}
+            </div>
+          )}
+          {scene.animationStyle === 'bar-chart' ? (
+            <AnimatedBarChart isVertical={format === 'vertical'} />
+          ) : (
+            <AnimatedLineChart isVertical={format === 'vertical'} color={primaryColor} />
+          )}
+          {scene.badgeText && (
+            <div style={{ marginTop: 40, padding: '14px 28px', backgroundColor: scene.badgeColor || primaryColor, borderRadius: 999, color: '#000', fontWeight: 900, fontSize: 32, boxShadow: '0 8px 0 rgba(0,0,0,0.4)' }}>
+              {scene.badgeText}
+            </div>
+          )}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  // 3. CENA CODE_TECH (Terminal, Código, Hacker)
+  if (scene.sceneType === 'CODE_TECH' || scene.animationStyle === 'typing-code-block' || scene.animationStyle === 'terminal-3d') {
+    return (
+      <AbsoluteFill>
+        <LivingBackground
+          type={scene.livingBgType || 'mesh-gradient'}
+          baseColor={scene.emotionColor || '#050811'}
+          accentColor={primaryColor}
+        />
+        <CodeTerminalOverlay primaryColor={primaryColor} />
+        {scene.captionText && (
+          <div style={{ position: 'absolute', bottom: 180, width: '100%', textAlign: 'center', fontSize: 38, fontWeight: 900, color: '#FFFFFF', textShadow: '0 4px 12px rgba(0,0,0,0.8)', zIndex: 40 }}>
+            {scene.captionText}
+          </div>
+        )}
+      </AbsoluteFill>
+    );
+  }
+
+  // 4. CENA ILUSTRATIVA / PERSONAGEM RECORTADO 2.5D (Sem Fundo Poluído)
+  if (scene.sceneType === 'ILUSTRATIVA' || scene.sceneType === 'UI_SHOWCASE' || scene.subjectImageUrl || scene.foregroundUrl) {
     return (
       <AbsoluteFill>
         <LivingBackground
@@ -181,22 +230,6 @@ const SceneLayer: React.FC<{
           primaryColor={primaryColor}
           exitDirection={exitDirection}
         />
-        {/* Infográficos opcionais */}
-        {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'line-chart') && (
-          <div style={{ position: 'absolute', top: 140, left: 50, zIndex: 40 }}>
-            <AnimatedLineChart isVertical={format === 'vertical'} color={primaryColor} />
-          </div>
-        )}
-        {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bar-chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bars') && (
-          <div style={{ position: 'absolute', top: 140, left: 50, zIndex: 40 }}>
-            <AnimatedBarChart isVertical={format === 'vertical'} />
-          </div>
-        )}
-        {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'map' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'route') && (
-          <div style={{ position: 'absolute', top: 140, left: 50, zIndex: 40 }}>
-            <AnimatedMapRoute isVertical={format === 'vertical'} />
-          </div>
-        )}
       </AbsoluteFill>
     );
   }
