@@ -23,6 +23,10 @@ import { GlitchOverlay, LightLeakOverlay, FlashOverlay, ParticlesOverlay, ColorG
 import { FinancialCounterOverlay, CodeTerminalOverlay } from './MotionGraphicsOverlay';
 import { AnimatedLineChart, AnimatedBarChart, AnimatedMapRoute, DocumentaryLowerThird } from './Infographics';
 
+import { LivingBackground } from './LivingBackground';
+import { LetteringScene } from './LetteringScene';
+import { IllustrativeScene } from './IllustrativeScene';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Spring presets — configurações de física por estilo emocional
 // ─────────────────────────────────────────────────────────────────────────────
@@ -121,7 +125,7 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CENA INDIVIDUAL
+// CENA INDIVIDUAL (Padrão VERBO Motion O.S.)
 // ─────────────────────────────────────────────────────────────────────────────
 const SceneLayer: React.FC<{
   scene: SceneSegment;
@@ -132,83 +136,88 @@ const SceneLayer: React.FC<{
   primaryColor: string;
   accentColor: string;
   format: string;
-}> = ({ scene, durationFrames, captionStyle, primaryColor, accentColor, format }) => {
+}> = ({ scene, sceneIndex, totalScenes, durationFrames, captionStyle, primaryColor, accentColor, format }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const transIn = scene.transitionIn || 'fade';
-  const intensity = scene.intensity ?? 0.8;
+  const exitDirections: Array<'left' | 'right' | 'up' | 'down'> = ['left', 'up', 'right', 'down'];
+  const exitDirection = exitDirections[sceneIndex % exitDirections.length];
 
+  // 1. CENA DE LETTERING HERO (Tipografia Gigante, Stagger, Blur Inércia)
+  if (scene.sceneType === 'LETTERING' || (scene.letteringLines && scene.letteringLines.length > 0)) {
+    return (
+      <AbsoluteFill>
+        <LivingBackground
+          type={scene.livingBgType || (sceneIndex % 2 === 0 ? 'dot-grid' : 'floating-symbols')}
+          baseColor={scene.emotionColor || '#0B132B'}
+          accentColor={primaryColor}
+        />
+        <LetteringScene
+          lines={scene.letteringLines}
+          fallbackText={scene.captionText}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          exitDirection={exitDirection}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 2. CENA ILUSTRATIVA / PERSONAGEM RECORTADO 2.5D (Sem Fundo Poluído)
+  if (scene.sceneType === 'ILUSTRATIVA' || scene.subjectImageUrl || scene.foregroundUrl) {
+    return (
+      <AbsoluteFill>
+        <LivingBackground
+          type={scene.livingBgType || (sceneIndex % 2 === 0 ? 'concentric-rings' : 'ambient-particles')}
+          baseColor={scene.emotionColor || '#070B19'}
+          accentColor={primaryColor}
+        />
+        <IllustrativeScene
+          subjectImageUrl={scene.subjectImageUrl || scene.foregroundUrl}
+          bgImageUrl={scene.imageUrl}
+          headlineText={scene.captionText}
+          badgeText={scene.badgeText}
+          badgeColor={scene.badgeColor || primaryColor}
+          primaryColor={primaryColor}
+          exitDirection={exitDirection}
+        />
+        {/* Infográficos opcionais */}
+        {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'line-chart') && (
+          <div style={{ position: 'absolute', top: 140, left: 50, zIndex: 40 }}>
+            <AnimatedLineChart isVertical={format === 'vertical'} color={primaryColor} />
+          </div>
+        )}
+        {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bar-chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bars') && (
+          <div style={{ position: 'absolute', top: 140, left: 50, zIndex: 40 }}>
+            <AnimatedBarChart isVertical={format === 'vertical'} />
+          </div>
+        )}
+        {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'map' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'route') && (
+          <div style={{ position: 'absolute', top: 140, left: 50, zIndex: 40 }}>
+            <AnimatedMapRoute isVertical={format === 'vertical'} />
+          </div>
+        )}
+      </AbsoluteFill>
+    );
+  }
+
+  // 3. FALLBACK DINÂMICO
+  const intensity = scene.intensity ?? 0.8;
   return (
     <AbsoluteFill>
-      {/* Fundo — Imagem 2.5D Parallax, Ken Burns ou Gradiente */}
-      {(scene.subjectImageUrl || scene.foregroundUrl) ? (
-        <Parallax25DImage
-          bgUrl={scene.imageUrl || ''}
-          fgUrl={scene.subjectImageUrl || scene.foregroundUrl!}
-          durationFrames={durationFrames}
-          animationStyle={scene.animationStyle || 'parallax-up'}
-          colorGrading={scene.colorGrading}
-        />
-      ) : scene.imageUrl ? (
+      <LivingBackground
+        type={scene.livingBgType || 'dot-grid'}
+        baseColor={scene.emotionColor || '#0B132B'}
+        accentColor={primaryColor}
+      />
+      {scene.imageUrl && (
         <KenBurnsImage
           imgUrl={scene.imageUrl}
           durationFrames={durationFrames}
           animationStyle={scene.animationStyle || 'kenburns-right'}
           colorGrading={scene.colorGrading}
         />
-      ) : (
-        <AbsoluteFill
-          style={{
-            background: scene.emotionColor
-              ? `linear-gradient(135deg, ${scene.emotionColor}22 0%, #0f0f23 50%, #16213e 100%)`
-              : 'linear-gradient(135deg, #0f0f23 0%, #1a0a2e 50%, #16213e 100%)',
-          }}
-        />
       )}
-
-      {/* Vignette cinematográfica */}
-      <AbsoluteFill
-        style={{
-          background: 'radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.55) 70%, rgba(0,0,0,0.88) 100%)',
-          pointerEvents: 'none',
-          opacity: 0.35 * intensity,
-        }}
-      />
-
-      {/* Gradiente inferior para legenda */}
-      <AbsoluteFill
-        style={{
-          background: 'linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.3) 30%, transparent 55%)',
-          pointerEvents: 'none',
-          opacity: 0.65 * intensity,
-        }}
-      />
-
-      {/* ── Color Grad      {/* ── PROGRAMMATIC MOTION GRAPHIC & INFOGRAPHIC OVERLAYS ── */}
-      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'counter' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'finance') && (
-        <FinancialCounterOverlay durationFrames={durationFrames} color={scene.emotionColor || '#00C853'} />
-      )}
-      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'code-terminal' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'terminal') && (
-        <CodeTerminalOverlay durationFrames={durationFrames} primaryColor={scene.emotionColor || '#00E0FF'} />
-      )}
-      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'line-chart') && (
-        <div style={{ position: 'absolute', top: format === 'vertical' ? 140 : 'auto', bottom: format === 'vertical' ? 'auto' : 120, left: format === 'vertical' ? 50 : 80, zIndex: 40 }}>
-          <AnimatedLineChart isVertical={format === 'vertical'} color={primaryColor} />
-        </div>
-      )}
-      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bar-chart' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'bars') && (
-        <div style={{ position: 'absolute', top: format === 'vertical' ? 140 : 'auto', bottom: format === 'vertical' ? 'auto' : 120, left: format === 'vertical' ? 50 : 80, zIndex: 40 }}>
-          <AnimatedBarChart isVertical={format === 'vertical'} />
-        </div>
-      )}
-      {((scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'map' || (scene.overlayEffect || scene.captionEffect || scene.animationStyle) === 'route') && (
-        <div style={{ position: 'absolute', top: format === 'vertical' ? 140 : 'auto', bottom: format === 'vertical' ? 'auto' : 120, left: format === 'vertical' ? 50 : 80, zIndex: 40 }}>
-          <AnimatedMapRoute isVertical={format === 'vertical'} />
-        </div>
-      )}
-
-      {/* Legendas */}
       <CaptionLayer
         scene={scene}
         captionStyle={captionStyle}

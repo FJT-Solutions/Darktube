@@ -78,6 +78,20 @@ export type SpringPreset = 'bouncy' | 'smooth' | 'dramatic' | 'gentle';
  */
 export type CaptionStyle = 'pop' | 'karaoke' | 'subtitle';
 
+export type SceneType = 'LETTERING' | 'ILUSTRATIVA' | 'HYBRID';
+
+export interface LetteringLine {
+  text: string;
+  size?: number; // e.g. 90, 130
+  weight?: 700 | 800 | 900;
+  color?: string; // hex
+  isHighlight?: boolean;
+  highlightColor?: string;
+  badge?: string;
+}
+
+export type LivingBgType = 'dot-grid' | 'concentric-rings' | 'floating-symbols' | 'ambient-particles' | 'gradient-mesh' | 'clean';
+
 /**
  * Uma cena individual do vídeo.
  * Cada SceneSegment corresponde a um segmento do script gerado pelo Gemini.
@@ -85,6 +99,19 @@ export type CaptionStyle = 'pop' | 'karaoke' | 'subtitle';
 export interface SceneSegment {
   /** Índice da cena (0-based) */
   index: number;
+
+  /** Tipo da cena no padrão VERBO Motion OS */
+  sceneType?: SceneType;
+
+  /** Linhas de tipografia estruturada para cenas de LETTERING */
+  letteringLines?: LetteringLine[];
+
+  /** Tipo de background vivo */
+  livingBgType?: LivingBgType;
+
+  /** Badge cinético flutuante (ex: '+350%', '🔥 ALERTA', '💰 $10K') */
+  badgeText?: string;
+  badgeColor?: string;
 
   /** URL do áudio de narração DESTA cena (gerado pelo Edge-TTS) */
   audioUrl?: string;
