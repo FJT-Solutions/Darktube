@@ -44,10 +44,12 @@
     "@remotion/bundler": "^4.0.496",
     "@remotion/captions": "^4.0.496",
     "@remotion/cli": "^4.0.496",
-    "@remotion/media-utils": "^4.0.496",
+    "@remotion/google-fonts": "^4.0.512",
+    "@remotion/lottie": "^4.0.512",
+    "@remotion/media-utils": "^4.0.512",
     "@remotion/player": "^4.0.496",
     "@remotion/renderer": "^4.0.496",
-    "@remotion/transitions": "^4.0.507",
+    "@remotion/transitions": "^4.0.512",
     "@types/request": "^2.48.13",
     "@vercel/analytics": "1.6.1",
     "autoprefixer": "^10.4.20",
@@ -78,7 +80,7 @@
     "vaul": "^1.1.2",
     "youtube-sr": "^4.3.11",
     "youtube-transcript": "^1.2.1",
-    "zod": "^3.24.1"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.0",

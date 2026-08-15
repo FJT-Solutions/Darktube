@@ -1,0 +1,94 @@
+{
+  "name": "remotion-captioneer",
+  "version": "0.9.0",
+  "type": "module",
+  "description": "Drop-in animated captions for Remotion. Audio to word-level synced subtitle components. Supports OpenAI, Groq, Deepgram, AssemblyAI, ElevenLabs.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "captioneer": "./dist/cli.js"
+  },
+  "scripts": {
+    "start": "remotion studio",
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "render": "remotion render",
+    "remotion:preview": "remotion preview",
+    "preview:web": "node dist/cli.js preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "validate:docs": "node scripts/validate-docs.mjs"
+  },
+  "keywords": [
+    "remotion",
+    "captions",
+    "subtitles",
+    "video",
+    "whisper",
+    "openai",
+    "groq",
+    "deepgram",
+    "assemblyai",
+    "elevenlabs",
+    "speech-to-text",
+    "animation",
+    "programmatic-video",
+    "react",
+    "karaoke",
+    "typewriter"
+  ],
+  "author": "Shuvo Roy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neutral-Stage/remotion-captioneer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neutral-Stage/remotion-captioneer/issues"
+  },
+  "homepage": "https://neutral-stage.github.io/remotion-captioneer/",
+  "dependencies": {
+    "@remotion/captions": "4.0.438",
+    "@remotion/install-whisper-cpp": "4.0.438",
+    "remotion": "4.0.438",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.438",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "prettier": "^3.3.3",
+    "@remotion/eslint-config": "4.0.438",
+    "@remotion/eslint-plugin": "4.0.438",
+    "@typescript-eslint/eslint-plugin": "6.21.0",
+    "@typescript-eslint/parser": "6.21.0",
+    "eslint": "8.57.1",
+    "eslint-plugin-react": "7.37.4",
+    "eslint-plugin-react-hooks": "4.6.0",
+    "vitest": "^3.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
