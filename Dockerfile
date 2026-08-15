@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
-RUN pnpm i --frozen-lockfile
+RUN pnpm i --no-frozen-lockfile
 
 # 2. Build Next.js app
 FROM base AS builder
