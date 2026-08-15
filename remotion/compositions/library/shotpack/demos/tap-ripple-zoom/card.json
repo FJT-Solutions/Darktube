@@ -1,0 +1,30 @@
+{
+  "id": "tap-ripple-zoom",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "In a phone chat UI, a touch point taps an AI bubble, a two-ring water ripple spreads, the bubble scales down under the press, and the whole device focus-zooms into the bubble (spring damping 15 / stiffness 80 / mass 1, scale 1\u21922.75); after settling, the whole device breathes",
+  "duration": "~5s (150f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium-low (a small peak at the tap moment, then the zoom settles slowly)",
+  "styles": [
+    {
+      "key": "tap-ripple-zoom",
+      "label": "tap-ripple-zoom",
+      "media": "./media/tap-ripple-zoom-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/tap-ripple-zoom-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/tap-ripple-zoom-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/tap-ripple-zoom/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/tap-ripple-zoom/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/tap-ripple-zoom/TapRippleZoom.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/tap-ripple-zoom/prompt.md",
+  "unlock": null
+}

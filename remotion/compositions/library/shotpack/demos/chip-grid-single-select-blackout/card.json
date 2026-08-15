@@ -1,0 +1,29 @@
+{
+  "id": "chip-grid-single-select-blackout",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "Five option chips, arranged 3+2 and centered, fade in one by one; at the selected frame a single gray press frame is inserted, then over a few frames the background flips pure black, the text flips white, and there's a very light 1\u21921.04\u21921 bounce-back, while the other chips dim to 18% with their positions locked; the remaining items then go to zero, the black chip lifts and narrows, and a calculation row fades in below",
+  "duration": "~5.0s (150f@30fps)",
+  "energy": "Medium-low (the only pop is that single gray flash; everything else is pulling back)",
+  "styles": [
+    {
+      "key": "chip-grid-single-select-blackout",
+      "label": "chip-grid-single-select-blackout",
+      "media": "./media/chip-grid-single-select-blackout.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/chip-grid-single-select-blackout.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/chip-grid-single-select-blackout/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/chip-grid-single-select-blackout/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/chip-grid-single-select-blackout/ChipGridSingleSelectBlackout.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/chip-grid-single-select-blackout/prompt.md",
+  "unlock": null
+}

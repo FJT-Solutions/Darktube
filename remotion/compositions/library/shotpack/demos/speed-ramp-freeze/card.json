@@ -1,0 +1,35 @@
+{
+  "id": "speed-ramp-freeze",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm"
+  ],
+  "summary": "Two rhythm techniques built on nonlinear frame-number remap \u2014 speed-ramp (fast \u2192 0.2x gaze \u2192 fast) and freeze-annotate (flowing \u2192 freeze with circle annotation \u2192 thaw)",
+  "duration": "Speed-ramp total 4\u20135s (slow window \u226540f); freeze-annotate total 4\u20135s (freeze segment \u226545f)",
+  "energy": "Medium-high (the speed contrast itself is the energy beat)",
+  "styles": [
+    {
+      "key": "speed-ramp",
+      "label": "speed-ramp",
+      "media": "./media/speed-ramp.mp4?v=1784437314770"
+    },
+    {
+      "key": "freeze-annotate",
+      "label": "freeze-annotate",
+      "media": "./media/freeze-annotate.mp4?v=1784437314772"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/speed-ramp.mp4?v=1784437314770",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/speed-ramp-freeze/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/speed-ramp-freeze/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/speed-ramp-freeze/FreezeAnnotateReal.tsx",
+    "./demos/rhythm/speed-ramp-freeze/SpeedRampReal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/speed-ramp-freeze/prompt.md",
+  "unlock": null
+}

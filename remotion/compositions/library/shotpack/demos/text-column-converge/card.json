@@ -1,0 +1,30 @@
+{
+  "id": "text-column-converge",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "outro"
+  ],
+  "summary": "Two words in standoff converge \u2014 the left \"NEW\" and a right feature word stay pinned to equal frame margins on their respective sides with hard-cut cycling and zero shrinkage throughout, and only on the final word does a single ease-in-out slide bring them to the center line, interlocking into a phrase; small text below appears almost as a hard cut; an end-reveal title card",
+  "duration": "cycling 7\u201316f/word \u00d7 8\u20139 words + converge ~36f + stillness after small text; whole segment ~5\u20136s",
+  "energy": "Medium-low (machine rhythm, small-text spec-list temperament, not word stomping)",
+  "styles": [
+    {
+      "key": "text-column-converge",
+      "label": "text-column-converge",
+      "media": "./media/text-column-converge.mp4?v=1784437314815"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/text-column-converge.mp4?v=1784437314815",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/text-column-converge/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/text-column-converge/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/text-column-converge/TextColumnConverge.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/text-column-converge/prompt.md",
+  "unlock": null
+}

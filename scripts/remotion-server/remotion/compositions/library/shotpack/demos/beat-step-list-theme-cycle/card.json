@@ -1,0 +1,30 @@
+{
+  "id": "beat-step-list-theme-cycle",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "typography"
+  ],
+  "summary": "A three-channel metronome \u2014 an adjective list on a dark field steps up one row per beat, a pill fixed at the viewport center \"catches\" the next word and changes color, the whole field's background swaps on the same beat; row, color, and field channels lock to the same beat point",
+  "duration": "Setup 30f + 18f per beat \u00d7 beat count + closing hold; 3 beats \u2248 3.5s (demo 110f)",
+  "energy": "High (one beat every 0.6s, all three channels jumping together; density-driven high energy)",
+  "styles": [
+    {
+      "key": "beat-step-list-theme-cycle",
+      "label": "beat-step-list-theme-cycle",
+      "media": "./media/beat-step-list-theme-cycle.mp4?v=1784437314492"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/beat-step-list-theme-cycle.mp4?v=1784437314492",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/beat-step-list-theme-cycle/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/beat-step-list-theme-cycle/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/beat-step-list-theme-cycle/BeatStepListThemeCycle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/beat-step-list-theme-cycle/prompt.md",
+  "unlock": null
+}

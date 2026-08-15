@@ -1,0 +1,30 @@
+{
+  "id": "device-flip-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "hardware",
+  "tags": [
+    "mobile",
+    "hardware"
+  ],
+  "summary": "The phone body flips from its back side in 2.5D toward the camera; at the moment the front settles, the screen lights up and the app's main UI layers reveal in a stagger, then the whole device breathes to settle",
+  "duration": "~4s (120f, including \u226530f of stillness after settling)",
+  "energy": "Low \u2192 the flip accelerates into medium-high \u2192 lighting-up peak \u2192 low breathing after settling",
+  "styles": [
+    {
+      "key": "device-flip-reveal",
+      "label": "device-flip-reveal",
+      "media": "./media/device-flip-reveal.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/device-flip-reveal.mp4",
+  "poster": "https://r2.getshotpack.com/media/device-flip-reveal-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/device-flip-reveal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/device-flip-reveal/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/device-flip-reveal/DeviceFlipReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/device-flip-reveal/prompt.md",
+  "unlock": null
+}

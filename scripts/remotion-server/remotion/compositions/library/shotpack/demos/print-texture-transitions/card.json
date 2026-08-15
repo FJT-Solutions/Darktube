@@ -1,0 +1,29 @@
+{
+  "id": "print-texture-transitions",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Print-texture transitions \u2014 ink-bleed-reveal (ink bleeding through a wispy edge to eat away the old scene)",
+  "duration": "4\u20134.5s (bleed segment 55\u201380f + stillness ending \u226530f)",
+  "energy": "Medium (progressive manifestation, no impact beat)",
+  "styles": [
+    {
+      "key": "ink-bleed-reveal",
+      "label": "ink-bleed-reveal \u58a8\u6e17\u63ed\u793a",
+      "media": "./media/ink-bleed-reveal.mp4?v=1784437314705"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/ink-bleed-reveal.mp4?v=1784437314705",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/print-texture-transitions/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/print-texture-transitions/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/print-texture-transitions/InkBleedReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/print-texture-transitions/prompt.md",
+  "unlock": null
+}

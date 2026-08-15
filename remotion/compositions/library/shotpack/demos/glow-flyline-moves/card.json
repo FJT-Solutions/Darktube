@@ -1,0 +1,42 @@
+{
+  "id": "glow-flyline-moves",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "data"
+  ],
+  "summary": "Dark-field glow orbs and flylines, three variants \u2014 glow-orb-ambient ambient orb noise, flyline-arc arc connection, orb-flyline-relay same-frame resonance combo",
+  "duration": "A ~5s / B ~4.7s / C ~5.2s",
+  "energy": "A low (noise-level) / B medium / C medium-high",
+  "styles": [
+    {
+      "key": "glow-orb-ambient",
+      "label": "glow-orb-ambient",
+      "media": "./media/glow-orb-ambient.mp4?v=1784437314579"
+    },
+    {
+      "key": "flyline-arc",
+      "label": "flyline-arc",
+      "media": "./media/flyline-arc.mp4?v=1784437314581"
+    },
+    {
+      "key": "orb-flyline-relay",
+      "label": "orb-flyline-relay",
+      "media": "./media/orb-flyline-relay.mp4?v=1784437314584"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/glow-orb-ambient.mp4?v=1784437314579",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/glow-flyline-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/glow-flyline-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/glow-flyline-moves/FlylineArc.tsx",
+    "./demos/effects/glow-flyline-moves/GlowOrbAmbient.tsx",
+    "./demos/effects/glow-flyline-moves/OrbFlylineRelay.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/glow-flyline-moves/prompt.md",
+  "unlock": null
+}

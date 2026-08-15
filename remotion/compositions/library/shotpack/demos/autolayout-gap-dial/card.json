@@ -1,0 +1,29 @@
+{
+  "id": "autolayout-gap-dial",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "A gap dial drives the layout \u2014 a row of link blocks with a marquee selection outline and gap annotations, badge numbers ticking up step by step while blocks get pushed apart in real time by the parameter and spring back into place; visualizing \"parameter-driven layout\"",
+  "duration": "~4s (120f: marquee entry + widening 38f + hold + spring bounce-back)",
+  "energy": "Medium (tool-rational style; the payoff is the locked sync between number and displacement)",
+  "styles": [
+    {
+      "key": "autolayout-gap-dial",
+      "label": "autolayout-gap-dial",
+      "media": "./media/autolayout-gap-dial.mp4?v=1784437314483"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/autolayout-gap-dial.mp4?v=1784437314483",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/autolayout-gap-dial/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/autolayout-gap-dial/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/autolayout-gap-dial/AutolayoutGapDial.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/autolayout-gap-dial/prompt.md",
+  "unlock": null
+}

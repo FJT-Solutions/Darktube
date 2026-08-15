@@ -1,0 +1,36 @@
+{
+  "id": "icon-performance-moves",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "interaction"
+  ],
+  "summary": "Icon performance, two variants \u2014 pop-burst-confirm confirmation burst (checkmark builds, pops big, explodes particles + spreading ring) and attention-bounce attention-seeking bounce (icon bounces higher in sequence + landing squash + camera drawn in)",
+  "duration": "A 3\u20134s / B 4\u20135s",
+  "energy": "A climactic accent / B charging intro",
+  "styles": [
+    {
+      "key": "pop-burst-confirm",
+      "label": "pop-burst-confirm",
+      "media": "./media/pop-burst-confirm.mp4?v=1784437314602"
+    },
+    {
+      "key": "attention-bounce",
+      "label": "attention-bounce",
+      "media": "./media/attention-bounce.mp4?v=1784437314603"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/pop-burst-confirm.mp4?v=1784437314602",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/icon-performance-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/icon-performance-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/icon-performance-moves/AttentionBounce.tsx",
+    "./demos/effects/icon-performance-moves/PopBurstConfirm.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/icon-performance-moves/prompt.md",
+  "unlock": null
+}

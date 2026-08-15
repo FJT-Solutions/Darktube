@@ -1,0 +1,35 @@
+{
+  "id": "theme-switch-moves",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "Theme switching in two variants \u2014 theme-sweep, a diagonal sweep (the interface reskins in place where the boundary passes), and palette-ripple, the combo piece (the \u2318K palette shrinks to a point and a ripple spreads from that point to reskin)",
+  "duration": "A 3\u20134s / B 5\u20136s",
+  "energy": "A Medium / B Medium-high (the combo piece has a complete causal chain)",
+  "styles": [
+    {
+      "key": "theme-sweep-toggle",
+      "label": "theme-sweep-toggle",
+      "media": "./media/theme-sweep-toggle.mp4?v=1784437314818"
+    },
+    {
+      "key": "palette-theme-ripple",
+      "label": "palette-theme-ripple",
+      "media": "./media/palette-theme-ripple.mp4?v=1784437314820"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/theme-sweep-toggle.mp4?v=1784437314818",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/theme-switch-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/theme-switch-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/theme-switch-moves/PaletteThemeRipple.tsx",
+    "./demos/interaction/theme-switch-moves/ThemeSweepToggle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/theme-switch-moves/prompt.md",
+  "unlock": null
+}

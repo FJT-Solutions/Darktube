@@ -1,0 +1,35 @@
+{
+  "id": "gauge-readout-moves",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data"
+  ],
+  "summary": "Two gauge-reading variants \u2014 needle-sweep-selftest (ignition self-check: the needle whips across the full arc, then settles back to the true value) and tape-scroll-fixed-pointer (the needle stays put while the tick-marked tape scrolls past, with a sprint-and-brake)",
+  "duration": "A 4\u20135s / B 4\u20135s",
+  "energy": "Medium-high (mechanical ritual type)",
+  "styles": [
+    {
+      "key": "needle-sweep-selftest",
+      "label": "needle-sweep-selftest",
+      "media": "./media/needle-sweep-selftest.mp4?v=1784437314573"
+    },
+    {
+      "key": "tape-scroll-fixed-pointer",
+      "label": "tape-scroll-fixed-pointer",
+      "media": "./media/tape-scroll-fixed-pointer.mp4?v=1784437314575"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/needle-sweep-selftest.mp4?v=1784437314573",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/gauge-readout-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/gauge-readout-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/gauge-readout-moves/NeedleSweepSelftest.tsx",
+    "./demos/data/gauge-readout-moves/TapeScrollFixedPointer.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/gauge-readout-moves/prompt.md",
+  "unlock": null
+}

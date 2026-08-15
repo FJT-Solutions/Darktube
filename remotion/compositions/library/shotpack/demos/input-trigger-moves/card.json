@@ -1,0 +1,36 @@
+{
+  "id": "input-trigger-moves",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction",
+    "opening"
+  ],
+  "summary": "Input triggers in two variants \u2014 cursor-performance, a cursor performing a click push-in, and keycap-smash-cut, a keycap fuse detonating into a smash cut",
+  "duration": "A ~5s / C ~5s",
+  "energy": "A Medium / C High",
+  "styles": [
+    {
+      "key": "cursor-performance",
+      "label": "cursor-performance",
+      "media": "./media/cursor-performance.mp4?v=1784437314610"
+    },
+    {
+      "key": "keycap-smash-cut",
+      "label": "keycap-smash-cut",
+      "media": "./media/keycap-smash-cut.mp4?v=1784437314612"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/cursor-performance.mp4?v=1784437314610",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/input-trigger-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/input-trigger-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/input-trigger-moves/CursorPerformancePunchIn.tsx",
+    "./demos/interaction/input-trigger-moves/KeycapSmashCut.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/input-trigger-moves/prompt.md",
+  "unlock": null
+}

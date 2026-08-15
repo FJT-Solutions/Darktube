@@ -1,0 +1,30 @@
+{
+  "id": "tear-streak-transitions",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition",
+    "effects"
+  ],
+  "summary": "Tear transition \u2014 glitch-displace noise tear (hard cut inside 16 horizontal strips misaligning and shaking), strip-level tearing with a digital-glitch meaning",
+  "duration": "Prior state \u226540f + tear 17\u201324f + ending \u226540f, ~4.5s (135\u2013140f)",
+  "energy": "High",
+  "styles": [
+    {
+      "key": "glitch-displace",
+      "label": "glitch-displace",
+      "media": "./media/glitch-displace.mp4?v=1784437314792"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/glitch-displace.mp4?v=1784437314792",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/tear-streak-transitions/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/tear-streak-transitions/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/tear-streak-transitions/GlitchDisplace.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/tear-streak-transitions/prompt.md",
+  "unlock": null
+}

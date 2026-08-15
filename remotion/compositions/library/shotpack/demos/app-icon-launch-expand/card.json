@@ -1,0 +1,30 @@
+{
+  "id": "app-icon-launch-expand",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "transition",
+  "tags": [
+    "mobile",
+    "transition"
+  ],
+  "summary": "A desktop app icon is tapped by a finger, springs to scale up from its own center to fill the screen, and becomes the app's main screen (the home screen shrinks and dims in sync, app content reveals in a stagger); once settled, the whole device breathes",
+  "duration": "~6.4s (192f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (the spring expansion at the tap is the only peak, then app content settles in a stagger)",
+  "styles": [
+    {
+      "key": "app-icon-launch-expand",
+      "label": "app-icon-launch-expand",
+      "media": "./media/app-icon-launch-expand.mp4?v=1786372605154"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/app-icon-launch-expand.mp4?v=1786372605154",
+  "poster": "https://r2.getshotpack.com/media/app-icon-launch-expand-1786372605154.png",
+  "card": "https://getshotpack.com/demos/mobile/app-icon-launch-expand/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/app-icon-launch-expand/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/app-icon-launch-expand/AppIconLaunchExpand.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/app-icon-launch-expand/prompt.md",
+  "unlock": null
+}

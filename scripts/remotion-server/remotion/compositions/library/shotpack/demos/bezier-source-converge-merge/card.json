@@ -1,0 +1,29 @@
+{
+  "id": "bezier-source-converge-merge",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Four source nodes on the left each have a thin B\u00e9zier curve connecting to the same converge point on the right; the curves first draw on from left to right in staggered order, the nodes slide along their own curve toward the converge point with a three-stage accelerating shrink to zero, accent-colored data packets glide along the paths the whole time, and after the merge completes the curves are erased from the left end, leaving only the circular badge",
+  "duration": "~5.6s (168f@30fps)",
+  "energy": "Medium (long slow steady shot, kept alive by the gliding packets; the merge moment is the only small peak)",
+  "styles": [
+    {
+      "key": "bezier-source-converge-merge",
+      "label": "bezier-source-converge-merge",
+      "media": "./media/bezier-source-converge-merge.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/bezier-source-converge-merge.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/bezier-source-converge-merge/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/bezier-source-converge-merge/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/bezier-source-converge-merge/BezierSourceConvergeMerge.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/bezier-source-converge-merge/prompt.md",
+  "unlock": null
+}

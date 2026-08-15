@@ -1,0 +1,29 @@
+{
+  "id": "product-card-progressive-assemble",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "A detail card assembles itself like fields being grabbed one by one \u2014 image\u2192title\u2192breadcrumb pills pop in sequence\u2192original price appears then gets crossed-out and demoted, accent new price springs out\u2192body text reveals line by line with a highlight block sweeping left to right\u2192color swatches light up; the whole card pushes forward at a very slow scale the entire time",
+  "duration": "~5.0s (150f@30fps)",
+  "energy": "Medium (continuous small events densely packed, no single explosion; forward push keeps the momentum)",
+  "styles": [
+    {
+      "key": "product-card-progressive-assemble",
+      "label": "product-card-progressive-assemble",
+      "media": "./media/product-card-progressive-assemble.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/product-card-progressive-assemble.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/product-card-progressive-assemble/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/product-card-progressive-assemble/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/product-card-progressive-assemble/ProductCardProgressiveAssemble.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/product-card-progressive-assemble/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "word-relay-filmstrip",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "ui-entrance"
+  ],
+  "summary": "A left column of equal-height black-and-white alternating page cards steps forward in scroll, while the right side has a serif large word relaying in place (noun constant + verb rotating) \u2014 the column scrolls exactly one step at the instant the word swaps, and the word block's vertical center precisely aligns with the current page card's midpoint",
+  "duration": "~1.5\u20132s per word period \u00d7 3\u20134 words; whole segment 5\u20137s",
+  "energy": "Medium-low (editorial temperament; rhythm comes from the \"click\" of word swaps)",
+  "styles": [
+    {
+      "key": "word-relay-filmstrip",
+      "label": "word-relay-filmstrip",
+      "media": "./media/word-relay-filmstrip.mp4?v=1784437314883"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/word-relay-filmstrip.mp4?v=1784437314883",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/word-relay-filmstrip/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/word-relay-filmstrip/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/word-relay-filmstrip/WordRelayFilmstrip.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/word-relay-filmstrip/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,28 @@
+{
+  "id": "document-typewriter-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "ui-entrance"
+  ],
+  "summary": "A fully typeset real document \"writes\" itself in after the cursor, the sidebar follows, and history entries drop into the track one by one",
+  "duration": "~3.7s (110f, including the history-list-stack tail)",
+  "energy": "Low-mid (highest information density, steady rhythm so the viewer can read)",
+  "styles": [
+    {
+      "key": "document-typewriter-reveal",
+      "label": "document-typewriter-reveal",
+      "media": "./media/document-typewriter-reveal.mp4?v=1784437314877"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/document-typewriter-reveal.mp4?v=1784437314877",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/document-typewriter-reveal/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/typography/document-typewriter-reveal/prompt.md",
+  "unlock": null
+}

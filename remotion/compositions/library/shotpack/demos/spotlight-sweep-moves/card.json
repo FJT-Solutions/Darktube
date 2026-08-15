@@ -1,0 +1,43 @@
+{
+  "id": "spotlight-sweep-moves",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "ui-entrance",
+    "transition"
+  ],
+  "summary": "Dark-field spotlight development, three variants \u2014 A wake-sleep sweep (bright where the light is, dark when it leaves), B edge-hugging glow pan (purple light seeps along UI edges + constant-velocity spotlight drifts right), C corner constant-velocity development (radial spotlight expands at constant velocity from a corner, lighting the full screen); \"light is narrative\" UI showcase in black",
+  "duration": "single variant 3.5\u20134.5s; A/B can chain into a tour segment",
+  "energy": "medium-low (restrained, mysterious; the burst point is the \"lighting up\" instant)",
+  "styles": [
+    {
+      "key": "glow-wake-sleep-panel",
+      "label": "glow-wake-sleep-panel",
+      "media": "./media/glow-wake-sleep-panel.mp4?v=1784785066792"
+    },
+    {
+      "key": "slide-spotlight-pan",
+      "label": "slide-spotlight-pan",
+      "media": "./media/slide-spotlight-pan.mp4?v=1785050512851"
+    },
+    {
+      "key": "corner-spotlight-reveal",
+      "label": "corner-spotlight-reveal",
+      "media": "./media/corner-spotlight-reveal.mp4?v=1784784591965"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/glow-wake-sleep-panel.mp4?v=1784785066792",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/spotlight-sweep-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/spotlight-sweep-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/spotlight-sweep-moves/CornerSpotlightReveal.tsx",
+    "./demos/effects/spotlight-sweep-moves/GlowWakeSleepPanel.tsx",
+    "./demos/effects/spotlight-sweep-moves/SlideSpotlightPan.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/spotlight-sweep-moves/prompt.md",
+  "unlock": null
+}

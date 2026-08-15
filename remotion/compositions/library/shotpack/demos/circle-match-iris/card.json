@@ -1,0 +1,29 @@
+{
+  "id": "circle-match-iris",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Circle-matched iris transition \u2014 the iris bursts from the center of a circular element on the foreground page, and the new page's circular chart inside the iris picks up on the same circle; the match cut gives the iris a semantic anchor",
+  "duration": "4.7s (anchor pulse 30f + iris expansion 45f + chart growth 55f + stillness 40f)",
+  "energy": "Medium-High",
+  "styles": [
+    {
+      "key": "circle-match-iris",
+      "label": "circle-match-iris",
+      "media": "./media/circle-match-iris.mp4?v=1784437314526"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/circle-match-iris.mp4?v=1784437314526",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/circle-match-iris/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/circle-match-iris/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/circle-match-iris/CircleMatchIris.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/circle-match-iris/prompt.md",
+  "unlock": null
+}

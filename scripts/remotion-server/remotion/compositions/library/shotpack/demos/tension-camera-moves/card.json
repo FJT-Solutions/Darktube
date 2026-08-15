@@ -1,0 +1,47 @@
+{
+  "id": "tension-camera-moves",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera"
+  ],
+  "summary": "Four emotional camera moves \u2014 bullet-time freeze orbit, dutch-roll righting, slow-push pressure, pull-back isolation; the camera makes viewers \"feel\" instead of \"watch\"",
+  "duration": "4\u20135s per variant; \u22642 variants total per video (\u22641 use each)",
+  "energy": "A High / B Medium / C Low, building / D Low, closing",
+  "styles": [
+    {
+      "key": "bullet-time-freeze-orbit",
+      "label": "bullet-time-freeze-orbit \u51bb\u7ed3\u73af\u7ed5",
+      "media": "./media/bullet-time-freeze-orbit.mp4?v=1784437314794"
+    },
+    {
+      "key": "dutch-roll-to-level",
+      "label": "dutch-roll-to-level \u659c\u89d2\u6eda\u6b63",
+      "media": "./media/dutch-roll-to-level.mp4?v=1784437314796"
+    },
+    {
+      "key": "slow-push-in",
+      "label": "slow-push-in \u6162\u63a8\u538b\u8feb",
+      "media": "./media/slow-push-in.mp4?v=1784437314801"
+    },
+    {
+      "key": "pull-back-isolation",
+      "label": "pull-back-isolation \u62c9\u8fdc\u5b64\u7acb",
+      "media": "./media/pull-back-isolation.mp4?v=1784437314803"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/bullet-time-freeze-orbit.mp4?v=1784437314794",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/tension-camera-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/tension-camera-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/tension-camera-moves/BulletTimeFreezeOrbit.tsx",
+    "./demos/camera/tension-camera-moves/DutchRollToLevel.tsx",
+    "./demos/camera/tension-camera-moves/PullBackIsolation.tsx",
+    "./demos/camera/tension-camera-moves/SlowPushIn.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/tension-camera-moves/prompt.md",
+  "unlock": null
+}

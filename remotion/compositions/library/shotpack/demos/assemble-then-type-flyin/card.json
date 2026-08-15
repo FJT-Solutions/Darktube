@@ -1,0 +1,29 @@
+{
+  "id": "assemble-then-type-flyin",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "On an empty dark grid, the text-free component skeleton first flies in from all sides to lock into place; then each letter of the copy spins in through 3D space to land, big title first, small labels last; once everything lands, the page takes shape",
+  "duration": "~5.2s (156f@30fps)",
+  "energy": "Medium-high (sparse skeleton stage, dense text stage; energy ramps monotonically to the finish)",
+  "styles": [
+    {
+      "key": "assemble-then-type-flyin",
+      "label": "assemble-then-type-flyin",
+      "media": "./media/assemble-then-type-flyin.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/assemble-then-type-flyin.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/assemble-then-type-flyin/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/assemble-then-type-flyin/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/assemble-then-type-flyin/AssembleThenTypeFlyin.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/assemble-then-type-flyin/prompt.md",
+  "unlock": null
+}

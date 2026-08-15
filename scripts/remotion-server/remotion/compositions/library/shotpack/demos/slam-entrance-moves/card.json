@@ -1,0 +1,42 @@
+{
+  "id": "slam-entrance-moves",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "ui-entrance"
+  ],
+  "summary": "High-energy slam entrances, three variants \u2014 kanada-perspective-snap Kanada-perspective hard stop, score-slam score slam-down, impact-burst-kit landing impact kit (ripples to neighbor cards)",
+  "duration": "single-variant action segment 6\u201322f + impact aftershock ~16f + hold \u226545f",
+  "energy": "high",
+  "styles": [
+    {
+      "key": "kanada-perspective-snap",
+      "label": "kanada-perspective-snap",
+      "media": "./media/kanada-perspective-snap.mp4?v=1784437314749"
+    },
+    {
+      "key": "score-slam",
+      "label": "score-slam",
+      "media": "./media/score-slam.mp4?v=1784437314751"
+    },
+    {
+      "key": "impact-burst-kit",
+      "label": "impact-burst-kit",
+      "media": "./media/impact-burst-kit.mp4?v=1784437314753"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/kanada-perspective-snap.mp4?v=1784437314749",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/slam-entrance-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/slam-entrance-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/slam-entrance-moves/ImpactBurstKit.tsx",
+    "./demos/effects/slam-entrance-moves/KanadaPerspectiveSnap.tsx",
+    "./demos/effects/slam-entrance-moves/ScoreSlam.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/slam-entrance-moves/prompt.md",
+  "unlock": null
+}

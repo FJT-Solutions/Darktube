@@ -1,0 +1,29 @@
+{
+  "id": "chip-lift-to-user-pill",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "The target chip in the grid hard-cuts to inverted black-on-white over 3 frames, the other chips fade out and shrink staggered by their Manhattan distance from it; the black chip grows rightward anchored at its left edge into a pill, typing out a name character by character and lighting a green dot, then a 1px connector line pulls over to a circular badge",
+  "duration": "~5.0s (150f@30fps)",
+  "energy": "Medium (the selection moment is the hard hit; everything after is unhurried growth and typing)",
+  "styles": [
+    {
+      "key": "chip-lift-to-user-pill",
+      "label": "chip-lift-to-user-pill",
+      "media": "./media/chip-lift-to-user-pill.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/chip-lift-to-user-pill.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/chip-lift-to-user-pill/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/chip-lift-to-user-pill/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/chip-lift-to-user-pill/ChipLiftToUserPill.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/chip-lift-to-user-pill/prompt.md",
+  "unlock": null
+}

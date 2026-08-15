@@ -1,0 +1,37 @@
+{
+  "id": "overhead-camera-moves",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera",
+    "opening",
+    "transition"
+  ],
+  "summary": "Two overhead reveal moves \u2014 tilt-reveal rights the frame to reveal, and overhead-tabletop-drop slides across a tabletop card array then plunges in",
+  "duration": "A ~4.8s / B ~4.7s",
+  "energy": "A Medium / B Medium-high",
+  "styles": [
+    {
+      "key": "tilt-reveal",
+      "label": "tilt-reveal",
+      "media": "./media/tilt-reveal.mp4?v=1784437314664"
+    },
+    {
+      "key": "overhead-tabletop-drop",
+      "label": "overhead-tabletop-drop",
+      "media": "./media/overhead-tabletop-drop.mp4?v=1784437314666"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/tilt-reveal.mp4?v=1784437314664",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/overhead-camera-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/overhead-camera-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/overhead-camera-moves/OverheadTabletopDrop.tsx",
+    "./demos/camera/overhead-camera-moves/TiltReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/overhead-camera-moves/prompt.md",
+  "unlock": null
+}

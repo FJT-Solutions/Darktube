@@ -1,0 +1,30 @@
+{
+  "id": "card-flip-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition",
+    "data"
+  ],
+  "summary": "Feature card 3D flip reveal \u2014 a card flips 180\u00b0 around the Y axis, and at its thinnest side-edge moment a highlight band that moves with the angle sweeps across; the back face reveals a large conclusion number, cards scanning across the whole row one by one with staggered timing",
+  "duration": "Single flip 26f, three-card stagger 10f, ~4.9s total (incl. hold)",
+  "energy": "Medium-High",
+  "styles": [
+    {
+      "key": "card-flip-reveal",
+      "label": "card-flip-reveal",
+      "media": "./media/card-flip-reveal.mp4?v=1784437314510"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/card-flip-reveal.mp4?v=1784437314510",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/card-flip-reveal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/card-flip-reveal/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/card-flip-reveal/CardFlipReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/card-flip-reveal/prompt.md",
+  "unlock": null
+}

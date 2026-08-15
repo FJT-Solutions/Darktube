@@ -1,0 +1,30 @@
+{
+  "id": "command-palette-summon",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction",
+    "ui-entrance"
+  ],
+  "summary": "The command palette descends \u2014 the whole screen dims with blur, the \u2318K palette drops in with overshoot, candidate rows surface staggered, and typing narrows the list in real time",
+  "duration": "4\u20135s",
+  "energy": "Medium (ritual style; the drop-in frame and the narrowing are the two small beats)",
+  "styles": [
+    {
+      "key": "command-palette-summon",
+      "label": "command-palette-summon",
+      "media": "./media/command-palette-summon.mp4?v=1784437314539"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/command-palette-summon.mp4?v=1784437314539",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/command-palette-summon/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/command-palette-summon/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/command-palette-summon/CommandPaletteSummon.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/command-palette-summon/prompt.md",
+  "unlock": null
+}

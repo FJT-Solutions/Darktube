@@ -1,0 +1,29 @@
+{
+  "id": "edit-hook-moves",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro"
+  ],
+  "summary": "logo-sting-button end-of-film hook \u2014 after the end logo settles, a 12f easter-egg hard-cut inserts before closing, a trailer-style button ending",
+  "duration": "~5s",
+  "energy": "Low \u2192 momentary medium \u2192 low",
+  "styles": [
+    {
+      "key": "logo-sting-button",
+      "label": "logo-sting-button",
+      "media": "./media/logo-sting-button.mp4?v=1784437314562"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/logo-sting-button.mp4?v=1784437314562",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/edit-hook-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/outro/edit-hook-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/outro/edit-hook-moves/LogoStingButton.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/outro/edit-hook-moves/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "timeline-travel",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data",
+    "camera"
+  ],
+  "summary": "Horizontal timeline travel \u2014 the camera accelerates along the horizontal tick axis past version ticks; as it passes each tick a card springs upright in a brief pause, and the final tick ends in a hard stop that pushes in close",
+  "duration": "4\u20135s",
+  "energy": "Medium-high (an acceleration \u2192 hard-stop rhythm shot)",
+  "styles": [
+    {
+      "key": "timeline-travel",
+      "label": "timeline-travel",
+      "media": "./media/timeline-travel.mp4?v=1784437314823"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/timeline-travel.mp4?v=1784437314823",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/timeline-travel/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/timeline-travel/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/timeline-travel/TimelineTravel.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/timeline-travel/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "hatch-depth",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data"
+  ],
+  "summary": "Hatch-pattern placeholder bars wipe-stretch into place one by one; then the hatching fades out, an accent-colored solid layer fades in, values pop up, and the placeholder graphic transforms into a real data bar chart",
+  "duration": "~4.4s (132f @ 30fps; growth 0\u20131.7s \u00b7 transformation 2.2\u20133.4s \u00b7 micro-tremor ending)",
+  "energy": "Medium (information builds progressively, no explosion; the texture swap creates the \"it's live\" moment)",
+  "styles": [
+    {
+      "key": "hatch-depth",
+      "label": "hatch-depth",
+      "media": "./media/hatch-depth.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/hatch-depth.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/hatch-depth/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/hatch-depth/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/hatch-depth/HatchDepth.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/hatch-depth/prompt.md",
+  "unlock": null
+}

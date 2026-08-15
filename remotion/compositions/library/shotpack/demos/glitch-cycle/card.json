@@ -1,0 +1,29 @@
+{
+  "id": "glitch-cycle",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "A single monospace slot row cycles 4 status phrases; each phrase's head and tail go full-glitch via the probabilistic keyframes [1,0,0,0.1,0,0,1], the middle occasionally twitches a single character, and on every switch the whole line layers RGB split with a horizontal jitter; the last phrase's probability drops to 0 so the ending is clean",
+  "duration": "~5.6s (168f@30fps, 4 phrases at 42f each)",
+  "energy": "Medium-high (continuous high-frequency noise pulses, switching points are peaks)",
+  "styles": [
+    {
+      "key": "glitch-cycle",
+      "label": "glitch-cycle",
+      "media": "./media/glitch-cycle.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/glitch-cycle.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/glitch-cycle/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/glitch-cycle/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/glitch-cycle/GlitchCycle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/glitch-cycle/prompt.md",
+  "unlock": null
+}

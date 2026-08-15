@@ -1,0 +1,29 @@
+{
+  "id": "ui-strip-away-outro",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro"
+  ],
+  "summary": "A subtractive ending \u2014 after clicking Publish, the entire editor UI evaporates in staggered layers from the periphery toward the center; on the black field only that button remains, sliding to screen center and scaling up, then the button fades out to hand off to the wordmark final",
+  "duration": "~4.3s (130f: cursor settles 34f \u2192 evaporation ~40f \u2192 button alone \u2192 wordmark takeover)",
+  "energy": "Medium (quiet operation up front, sustained exit in the middle, no instantaneous impact)",
+  "styles": [
+    {
+      "key": "ui-strip-away-outro",
+      "label": "ui-strip-away-outro",
+      "media": "./media/ui-strip-away-outro.mp4?v=1784437314866"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/ui-strip-away-outro.mp4?v=1784437314866",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/ui-strip-away-outro/prompt.md",
+  "tsx": "https://getshotpack.com/demos/outro/ui-strip-away-outro/demo.tsx",
+  "tsxFiles": [
+    "./demos/outro/ui-strip-away-outro/UiStripAwayOutro.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/outro/ui-strip-away-outro/prompt.md",
+  "unlock": null
+}

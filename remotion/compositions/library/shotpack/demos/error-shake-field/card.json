@@ -1,0 +1,30 @@
+{
+  "id": "error-shake-field",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "After tapping submit on a login form, validation fails: the whole device shakes horizontally (~8 cycles, amplitude decaying to 0), the email input turns red with a red glow, an inline error message slides up, and after the error state lingers the whole device breathes",
+  "duration": "~5.6s (168f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium-high (the shake is the only impact peak, then it quickly decays and settles)",
+  "styles": [
+    {
+      "key": "error-shake-field",
+      "label": "error-shake-field",
+      "media": "./media/error-shake-field.mp4?v=1786372193224"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/error-shake-field.mp4?v=1786372193224",
+  "poster": "https://r2.getshotpack.com/media/error-shake-field-1786372193224.png",
+  "card": "https://getshotpack.com/demos/mobile/error-shake-field/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/error-shake-field/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/error-shake-field/ErrorShakeField.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/error-shake-field/prompt.md",
+  "unlock": null
+}

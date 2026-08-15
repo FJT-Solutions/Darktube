@@ -1,0 +1,36 @@
+{
+  "id": "scroll-brake-moves",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data",
+    "rhythm"
+  ],
+  "summary": "Two long-scroll hard-brake variants \u2014 changelog-scroll-brake (the basic version: a high-speed long scroll decelerates exponentially to an exact stop + the target row lifts) and brake-reticle-lock (the combo version: reticles bite onto the stop point on the exact same frame as the brake)",
+  "duration": "A 4\u20135s / B 5s",
+  "energy": "Opens high, lands medium (speed-contrast type)",
+  "styles": [
+    {
+      "key": "changelog-scroll-brake",
+      "label": "changelog-scroll-brake",
+      "media": "./media/changelog-scroll-brake.mp4?v=1784437314727"
+    },
+    {
+      "key": "brake-reticle-lock",
+      "label": "brake-reticle-lock",
+      "media": "./media/brake-reticle-lock.mp4?v=1784437314729"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/changelog-scroll-brake.mp4?v=1784437314727",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/scroll-brake-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/scroll-brake-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/scroll-brake-moves/BrakeReticleLock.tsx",
+    "./demos/data/scroll-brake-moves/ChangelogScrollBrake.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/scroll-brake-moves/prompt.md",
+  "unlock": null
+}

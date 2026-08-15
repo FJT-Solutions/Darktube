@@ -1,0 +1,36 @@
+{
+  "id": "transition-travel",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition",
+    "camera"
+  ],
+  "summary": "Travel-style transitions, two variants \u2014 shared-element morph home and letterform-zoom; the camera dives into real elements in the frame to change scenes",
+  "duration": "n/a (technique card; each variant's action segment 25\u201360f, surrounding holds counted separately, frames drawn from the adjacent shots' budgets)",
+  "energy": "n/a (technique card, doesn't occupy an energy slot)",
+  "styles": [
+    {
+      "key": "shared-element-morph",
+      "label": "\u5171\u4eab\u5143\u7d20\u5f52\u4f4d shared-element-morph",
+      "media": "./media/shared-element-morph.mp4?v=1784437314838"
+    },
+    {
+      "key": "letterform-zoom",
+      "label": "\u5b57\u8154\u7a7f\u8d8a letterform-zoom",
+      "media": "./media/letterform-zoom.mp4?v=1784437314839"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/shared-element-morph.mp4?v=1784437314838",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/transition-travel/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/transition-travel/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/transition-travel/LetterformZoom.tsx",
+    "./demos/transition/transition-travel/SharedElementMorph.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/transition-travel/prompt.md",
+  "unlock": null
+}

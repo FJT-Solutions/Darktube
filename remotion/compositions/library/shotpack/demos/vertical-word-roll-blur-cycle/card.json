@@ -1,0 +1,29 @@
+{
+  "id": "vertical-word-roll-blur-cycle",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "The trailing word of a sentence becomes a vertical wheel, 3 word swaps at 0.55s each (outQuint seven-tenths + outBack three-tenths, fast-then-very-slow with a micro overshoot), adjacent rows get vertical blur and gray scaling by distance, and the center word tints from gray to the accent color the instant it settles",
+  "duration": "~5.0s (150f@30fps: stillness \u2192 3 word swaps \u2192 whole group fades out at tail)",
+  "energy": "Medium (steady three beats, no peaks)",
+  "styles": [
+    {
+      "key": "vertical-word-roll-blur-cycle",
+      "label": "vertical-word-roll-blur-cycle",
+      "media": "./media/vertical-word-roll-blur-cycle.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/vertical-word-roll-blur-cycle.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/vertical-word-roll-blur-cycle/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/vertical-word-roll-blur-cycle/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/vertical-word-roll-blur-cycle/VerticalWordRollBlurCycle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/vertical-word-roll-blur-cycle/prompt.md",
+  "unlock": null
+}

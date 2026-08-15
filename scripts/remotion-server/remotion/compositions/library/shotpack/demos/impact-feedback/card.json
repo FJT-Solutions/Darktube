@@ -1,0 +1,35 @@
+{
+  "id": "impact-feedback",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "Hit feedback, two variants \u2014 hit-counter combo counting (hit-stop + damage numbers + combo jump text) and anime-impact impact frame (negative + focus lines + chromatic aberration)",
+  "duration": "n/a (element-level technique, parasitic on landing moves; frame usage per variant in the parameter table)",
+  "energy": "high (instantaneous impact)",
+  "styles": [
+    {
+      "key": "hit-counter",
+      "label": "hit-counter \u8fde\u62db\u8ba1\u6570",
+      "media": "./media/hit-counter.mp4?v=1784437314606"
+    },
+    {
+      "key": "anime-impact",
+      "label": "anime-impact \u6253\u51fb\u5e27",
+      "media": "./media/anime-impact.mp4?v=1784437314607"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/hit-counter.mp4?v=1784437314606",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/impact-feedback/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/impact-feedback/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/impact-feedback/AnimeImpact.tsx",
+    "./demos/effects/impact-feedback/HitCounter.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/impact-feedback/prompt.md",
+  "unlock": null
+}

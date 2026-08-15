@@ -1,0 +1,35 @@
+{
+  "id": "collab-cursor-moves",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "Collab cursors as actors in two variants \u2014 dialogue-duet, a two-cursor dialogue duet on a dark stage (approach/orbit/light handoff/magnified into a transition), and cast-ensemble, a five-cursor ensemble atmosphere layer (staggered fly-in + sine drift + typing cameo + converging onlookers)",
+  "duration": "A ~4.7s (140f) / B ~4.7s (140f)",
+  "energy": "A Medium (high narrative density) / B Low-medium (atmosphere layer, can pad any duration)",
+  "styles": [
+    {
+      "key": "dialogue-duet",
+      "label": "dialogue-duet",
+      "media": "./media/dialogue-duet.mp4?v=1784437314531"
+    },
+    {
+      "key": "cast-ensemble",
+      "label": "cast-ensemble",
+      "media": "./media/cast-ensemble.mp4?v=1784437314534"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/dialogue-duet.mp4?v=1784437314531",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/collab-cursor-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/collab-cursor-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/collab-cursor-moves/CursorCastEnsemble.tsx",
+    "./demos/interaction/collab-cursor-moves/CursorDialogueDuet.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/collab-cursor-moves/prompt.md",
+  "unlock": null
+}

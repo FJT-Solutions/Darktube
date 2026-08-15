@@ -1,0 +1,29 @@
+{
+  "id": "glass-pill-dictation-typing",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "On pure black, a fixed-width glass pill pops in at about 1.25\u00d7 then settles down softly; inside, an accent light sweeps in from dark-on-the-left to bright-on-the-right; the caret leads, then a placeholder sentence types out, the light gradually dies as typing progresses, ending as a neutral dark glass bar",
+  "duration": "~1.7s (50f@30fps)",
+  "energy": "Low (the quietest beat in the film; only the light recedes)",
+  "styles": [
+    {
+      "key": "glass-pill-dictation-typing",
+      "label": "glass-pill-dictation-typing",
+      "media": "./media/glass-pill-dictation-typing.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/glass-pill-dictation-typing.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/glass-pill-dictation-typing/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/glass-pill-dictation-typing/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/glass-pill-dictation-typing/GlassPillDictationTyping.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/glass-pill-dictation-typing/prompt.md",
+  "unlock": null
+}

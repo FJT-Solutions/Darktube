@@ -1,0 +1,30 @@
+{
+  "id": "before-after-slider-scrub",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data",
+    "interaction"
+  ],
+  "summary": "Before/after comparison slider \u2014 the \"before/after\" versions stack on top of each other; the divider handle first whips across, then slowly sweeps back, revealing the new version like a photo developing under the bar",
+  "duration": "4\u20135s",
+  "energy": "Medium (the fast whip is the impact beat; the slow sweep is the reading period)",
+  "styles": [
+    {
+      "key": "before-after-slider-scrub",
+      "label": "before-after-slider-scrub",
+      "media": "./media/before-after-slider-scrub.mp4?v=1784437314494"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/before-after-slider-scrub.mp4?v=1784437314494",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/before-after-slider-scrub/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/before-after-slider-scrub/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/before-after-slider-scrub/BeforeAfterSliderScrub.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/before-after-slider-scrub/prompt.md",
+  "unlock": null
+}

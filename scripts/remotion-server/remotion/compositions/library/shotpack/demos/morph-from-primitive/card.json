@@ -1,0 +1,30 @@
+{
+  "id": "morph-from-primitive",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance",
+    "opening"
+  ],
+  "summary": "Primitive morph \u2014 a circle takes one breathing beat (anticipation), then an SVG path interpolates over 24f into a rounded-card outline, with content fading in",
+  "duration": "~4.7s (breath 20f + morph 24f + content fade-in 12f)",
+  "energy": "Medium-low",
+  "styles": [
+    {
+      "key": "morph-from-primitive",
+      "label": "morph-from-primitive",
+      "media": "./media/morph-from-primitive.mp4?v=1784437314642"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/morph-from-primitive.mp4?v=1784437314642",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/morph-from-primitive/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/morph-from-primitive/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/morph-from-primitive/MorphFromPrimitive.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/morph-from-primitive/prompt.md",
+  "unlock": null
+}

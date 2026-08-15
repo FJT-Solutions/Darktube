@@ -1,0 +1,29 @@
+{
+  "id": "radial-ripple-phone-chips",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "Four concentric circles on a light gray background breathe out of phase like water ripples, a phone mockup at center auto-scrolls its in-screen feed, and white chips on both sides pop in with spring and hover",
+  "duration": "~5.6s (168f@30fps)",
+  "energy": "low (quiet, breathing, kept from going cold by the concentric circles' sustained undulation)",
+  "styles": [
+    {
+      "key": "radial-ripple-phone-chips",
+      "label": "radial-ripple-phone-chips",
+      "media": "./media/radial-ripple-phone-chips.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/radial-ripple-phone-chips.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/radial-ripple-phone-chips/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/radial-ripple-phone-chips/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/radial-ripple-phone-chips/RadialRipplePhoneChips.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/radial-ripple-phone-chips/prompt.md",
+  "unlock": null
+}

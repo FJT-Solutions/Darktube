@@ -1,0 +1,31 @@
+{
+  "id": "letterspace-materialize",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "typography",
+    "outro"
+  ],
+  "summary": "A wide-letter-spaced wordmark crystallizes as every character draws its stroke in continuous parallel \u2014 all letters start on the same frame, strokes grow like handwriting, and all finish into the word on the same frame; a brand wordmark develops on an atmospheric backdrop",
+  "duration": "Settle ~15f + draw ~50f + final settle \u226530f; 3\u20134s total",
+  "energy": "Low (a serene ritual, done in one breath)",
+  "styles": [
+    {
+      "key": "letterspace-materialize",
+      "label": "letterspace-materialize",
+      "media": "./media/letterspace-materialize.mp4?v=1784437314618"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/letterspace-materialize.mp4?v=1784437314618",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/letterspace-materialize/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/letterspace-materialize/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/letterspace-materialize/LetterspaceMaterialize.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/letterspace-materialize/prompt.md",
+  "unlock": null
+}

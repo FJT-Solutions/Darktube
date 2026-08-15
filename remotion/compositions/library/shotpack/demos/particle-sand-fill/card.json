@@ -1,0 +1,30 @@
+{
+  "id": "particle-sand-fill",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data",
+    "effects"
+  ],
+  "summary": "Particles rain into a funnel to build bars \u2014 the bar chart doesn't grow, it \"gets rained into existence\": square particles fall one by one and pile into bars; when full, they solidify into a solid bar and the value pops in",
+  "duration": "4\u20135s",
+  "energy": "Medium-high (construction-feel entrance)",
+  "styles": [
+    {
+      "key": "particle-sand-fill",
+      "label": "particle-sand-fill",
+      "media": "./media/particle-sand-fill.mp4?v=1784437314700"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/particle-sand-fill.mp4?v=1784437314700",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/particle-sand-fill/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/particle-sand-fill/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/particle-sand-fill/ParticleSandFill.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/particle-sand-fill/prompt.md",
+  "unlock": null
+}

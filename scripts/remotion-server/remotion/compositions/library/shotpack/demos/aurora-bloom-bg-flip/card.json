@@ -1,0 +1,29 @@
+{
+  "id": "aurora-bloom-bg-flip",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "Soft-focus purple-orange blobs rise from the bottom of a light gray background, then the whole base color darkens to near-black in ~0.36s and the blobs compress into afterglow; the copy syncs a blur-out sentence switch with a blur-in, leaving a gap between sentences rather than cross-fading",
+  "duration": "~5.2s (156f@30fps)",
+  "energy": "Low to high (first 2/3 is build-up; the darkening instant is the film's accent)",
+  "styles": [
+    {
+      "key": "aurora-bloom-bg-flip",
+      "label": "aurora-bloom-bg-flip",
+      "media": "./media/aurora-bloom-bg-flip.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/aurora-bloom-bg-flip.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/aurora-bloom-bg-flip/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/aurora-bloom-bg-flip/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/aurora-bloom-bg-flip/AuroraBloomBgFlip.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/aurora-bloom-bg-flip/prompt.md",
+  "unlock": null
+}

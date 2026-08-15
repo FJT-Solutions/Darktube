@@ -1,0 +1,29 @@
+{
+  "id": "counter-confetti",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data"
+  ],
+  "summary": "A big number sprints up the count with easeOutQuart plus a scale overshoot; one beat before landing, 52 confetti pieces blast in on parabolas from both sides; an impact ring expands and the label's letter-spacing tightens to close",
+  "duration": "~4.6s (138f @ 30fps; counting 0.3\u20132.6s \u00b7 confetti from 2.4s \u00b7 settled 3.3s)",
+  "energy": "High (the count-up builds tension + the burst releases it; the standard emotional-peak shot)",
+  "styles": [
+    {
+      "key": "counter-confetti",
+      "label": "counter-confetti",
+      "media": "./media/counter-confetti.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/counter-confetti.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/counter-confetti/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/counter-confetti/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/counter-confetti/CounterConfetti.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/counter-confetti/prompt.md",
+  "unlock": null
+}

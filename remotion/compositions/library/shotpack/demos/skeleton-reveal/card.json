@@ -1,0 +1,29 @@
+{
+  "id": "skeleton-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "A three-tier fidelity reveal \u2014 draft \u2192 skeleton \u2192 content: hand-drawn doodle placeholders (boiling jitter) are replaced in one beat by gray-bar skeleton windows; after the skeleton list rolls in, the lens pushes closer and the gray bars develop row by row into avatars + word-by-word text, with the last word landing half a beat late",
+  "duration": "~5.7s (172f: doodle 1s + swap-to-real 0.3s + skeleton roll-in 1.2s + push-in develop 3s)",
+  "energy": "Medium (narrative entrance; the point is the two \"becomes real\" transitions)",
+  "styles": [
+    {
+      "key": "skeleton-reveal",
+      "label": "skeleton-reveal",
+      "media": "./media/skeleton-reveal.mp4?v=1784437314746"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/skeleton-reveal.mp4?v=1784437314746",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/skeleton-reveal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/skeleton-reveal/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/skeleton-reveal/SkeletonReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/skeleton-reveal/prompt.md",
+  "unlock": null
+}

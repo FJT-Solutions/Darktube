@@ -1,0 +1,35 @@
+{
+  "id": "rhythm-interrupt-moves",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm"
+  ],
+  "summary": "Two rhythm-interrupting variants \u2014 jump-cut-punch-in three-step jump-cut push-in, strobe-black-frames strobe black frames",
+  "duration": "B ~4.5s / C ~4.5s",
+  "energy": "B Medium / C High",
+  "styles": [
+    {
+      "key": "jump-cut-punch-in",
+      "label": "jump-cut-punch-in",
+      "media": "./media/jump-cut-punch-in.mp4?v=1784437314707"
+    },
+    {
+      "key": "strobe-black-frames",
+      "label": "strobe-black-frames",
+      "media": "./media/strobe-black-frames.mp4?v=1784437314708"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/jump-cut-punch-in.mp4?v=1784437314707",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/rhythm-interrupt-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/rhythm-interrupt-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/rhythm-interrupt-moves/JumpCutPunchIn.tsx",
+    "./demos/rhythm/rhythm-interrupt-moves/StrobeBlackFrames.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/rhythm-interrupt-moves/prompt.md",
+  "unlock": null
+}

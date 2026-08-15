@@ -1,0 +1,29 @@
+{
+  "id": "card-flock-tumble",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Three UI page cards tumble through 3D from their thin side edges and land as a stepped stack (fully crisp throughout, smoothly continuous splines), keep slowly rotating after landing, snap-suck toward the center, burst into a single turbulent smoke ring that expands outward, and a giant wordmark sweeps across to close",
+  "duration": "Tumble ~1.5s + slow-rotate showcase ~0.3s + suction 0.3s + smoke ring + giant wordmark ~2s; whole section 4.5s",
+  "energy": "Extremely High (use at the film's energy peak)",
+  "styles": [
+    {
+      "key": "card-flock-tumble",
+      "label": "card-flock-tumble",
+      "media": "./media/card-flock-tumble.mp4?v=1784437314514"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/card-flock-tumble.mp4?v=1784437314514",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/card-flock-tumble/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/card-flock-tumble/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/card-flock-tumble/CardFlockTumble.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/card-flock-tumble/prompt.md",
+  "unlock": null
+}

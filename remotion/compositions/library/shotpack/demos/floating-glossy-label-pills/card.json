@@ -1,0 +1,29 @@
+{
+  "id": "floating-glossy-label-pills",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Four light-gray dashboard wireframe panels each topped with a glossy highlight capsule label in a row; the track shifts position over three beats to the right (ease-in \u2192 mid push \u2192 ease-out, first beat slower with a long tail); the centered one magnifies and sharpens, the two sides shrink to 0.62, sink, fade and slightly blur, forming a corridor feel; at the end a black cursor with a white outline slides diagonally from top right to rest at the right end of the last capsule",
+  "duration": "~4.0s (120f@30fps)",
+  "energy": "Medium (three position shifts form the beat, no explosion; the cursor is the attention hand-off at the end)",
+  "styles": [
+    {
+      "key": "floating-glossy-label-pills",
+      "label": "floating-glossy-label-pills",
+      "media": "./media/floating-glossy-label-pills.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/floating-glossy-label-pills.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/floating-glossy-label-pills/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/floating-glossy-label-pills/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/floating-glossy-label-pills/FloatingGlossyLabelPills.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/floating-glossy-label-pills/prompt.md",
+  "unlock": null
+}

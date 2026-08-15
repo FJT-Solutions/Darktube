@@ -1,0 +1,30 @@
+{
+  "id": "spectrum-morph-ui",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "typography"
+  ],
+  "summary": "Spectrum-ized UI \u2014 the title's underline splits into a row of vertical bars dancing to the spectrum for two bars, then converges back into a straight line; music visualization growing on the UI",
+  "duration": "~4.7s (split 8f + dancing 64f + converge 12f + static 39f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "spectrum-morph-ui",
+      "label": "spectrum-morph-ui",
+      "media": "./media/spectrum-morph-ui.mp4?v=1784437314767"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/spectrum-morph-ui.mp4?v=1784437314767",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/spectrum-morph-ui/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/spectrum-morph-ui/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/spectrum-morph-ui/SpectrumMorphUi.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/spectrum-morph-ui/prompt.md",
+  "unlock": null
+}

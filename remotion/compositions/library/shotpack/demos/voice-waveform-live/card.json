@@ -1,0 +1,29 @@
+{
+  "id": "voice-waveform-live",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "A recording pill's live voiceprint \u2014 64 thin vertical bars rise and fall with \"speech\", towering in the middle while speaking and collapsing to a dotted line on pauses, with the waveform scrolling right to left; a full performance of speak \u2192 pause \u2192 speak \u2192 submit-collapse",
+  "duration": "~5s (150f: entry 12f + speak 1.4s + pause 0.8s + speak 1.4s + submit-collapse 0.8s)",
+  "energy": "Medium (functional aliveness, not showboating)",
+  "styles": [
+    {
+      "key": "voice-waveform-live",
+      "label": "voice-waveform-live",
+      "media": "./media/voice-waveform-live.mp4?v=1784437314870"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/voice-waveform-live.mp4?v=1784437314870",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/voice-waveform-live/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/voice-waveform-live/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/voice-waveform-live/VoiceWaveformLive.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/voice-waveform-live/prompt.md",
+  "unlock": null
+}

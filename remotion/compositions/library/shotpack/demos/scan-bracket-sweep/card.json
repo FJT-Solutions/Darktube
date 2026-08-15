@@ -1,0 +1,29 @@
+{
+  "id": "scan-bracket-sweep",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "A skeleton document pops to center, L-shaped viewfinder brackets drop at the four corners, and a 2.5px solid line with a gradient tail sweeps back and forth across the document 5 passes \u2014 the document stays still throughout; only light reads it",
+  "duration": "~5.0s (150f@30fps)",
+  "energy": "medium-low (mechanical, restrained; the rhythm lives in the reciprocating sweep's breathing)",
+  "styles": [
+    {
+      "key": "scan-bracket-sweep",
+      "label": "scan-bracket-sweep",
+      "media": "./media/scan-bracket-sweep.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/scan-bracket-sweep.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/scan-bracket-sweep/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/scan-bracket-sweep/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/scan-bracket-sweep/ScanBracketSweep.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/scan-bracket-sweep/prompt.md",
+  "unlock": null
+}

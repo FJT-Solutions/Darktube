@@ -1,0 +1,35 @@
+{
+  "id": "type-entrance-moves",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "Title entrance, two variants \u2014 scramble-decode (the answer grows out of noise) and letter-drop-physics (characters fall with gravity, bounce, settle), pick one by tone",
+  "duration": "single variant 4\u20135s (including hold and still ending; action segments A ~66f / B ~106f)",
+  "energy": "Medium-high (A leans rational progression, B leans physical playfulness)",
+  "styles": [
+    {
+      "key": "scramble-decode",
+      "label": "scramble-decode \u4e71\u7801\u89e3\u7801",
+      "media": "./media/scramble-decode.mp4?v=1784437314853"
+    },
+    {
+      "key": "letter-drop-physics",
+      "label": "letter-drop-physics \u5b57\u7b26\u5760\u843d",
+      "media": "./media/letter-drop-physics.mp4?v=1784437314856"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/scramble-decode.mp4?v=1784437314853",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/type-entrance-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/type-entrance-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/type-entrance-moves/LetterDropPhysics.tsx",
+    "./demos/typography/type-entrance-moves/ScrambleDecode.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/type-entrance-moves/prompt.md",
+  "unlock": null
+}

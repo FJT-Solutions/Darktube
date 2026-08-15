@@ -1,0 +1,29 @@
+{
+  "id": "flying-words",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "22 keywords laid out by golden angle on a flattened ellipse cross-section, flying along the z-axis from -1750px past the camera at 800px; opacity follows the [0,1,0.5,0.2,0] life curve, running 2 full loops end-seamlessly",
+  "duration": "~6.0s (180f@30fps, 2 full loops, seamlessly loopable)",
+  "energy": "High (continuous full-screen 3D translation, not a single still frame)",
+  "styles": [
+    {
+      "key": "flying-words",
+      "label": "flying-words",
+      "media": "./media/flying-words.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/flying-words.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/flying-words/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/flying-words/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/flying-words/FlyingWords.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/flying-words/prompt.md",
+  "unlock": null
+}

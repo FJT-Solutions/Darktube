@@ -1,0 +1,35 @@
+{
+  "id": "space-camera-moves",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera"
+  ],
+  "summary": "Two 3D-spatial camera moves \u2014 exploded-view (components blow apart along Z then reassemble) and drone-dive-landing (drone plunge landing)",
+  "duration": "A 5s (explode-hover-reassemble entire run); C 3\u20135s one-way plunge",
+  "energy": "High",
+  "styles": [
+    {
+      "key": "exploded-view",
+      "label": "exploded-view",
+      "media": "./media/exploded-view.mp4?v=1784437314760"
+    },
+    {
+      "key": "drone-dive-landing",
+      "label": "drone-dive-landing",
+      "media": "./media/drone-dive-landing.mp4?v=1784437314765"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/exploded-view.mp4?v=1784437314760",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/space-camera-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/space-camera-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/space-camera-moves/DroneDiveLanding.tsx",
+    "./demos/camera/space-camera-moves/ExplodedView.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/space-camera-moves/prompt.md",
+  "unlock": null
+}

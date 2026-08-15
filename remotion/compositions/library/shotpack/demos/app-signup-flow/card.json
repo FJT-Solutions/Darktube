@@ -1,0 +1,30 @@
+{
+  "id": "app-signup-flow",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "The phone springs up from the bottom, a cursor types into the Email field character by character, password dots fill in, a success popup springs out after clicking Sign Up, then the Dashboard stat cards stagger in and the whole device breathes to settle",
+  "duration": "~6s (180f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (segmented progression: entrance \u2192 typing \u2192 tap \u2192 popup \u2192 list, no single impact peak)",
+  "styles": [
+    {
+      "key": "app-signup-flow",
+      "label": "app-signup-flow",
+      "media": "./media/app-signup-flow.mp4?v=1786347501596"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/app-signup-flow.mp4?v=1786347501596",
+  "poster": "https://r2.getshotpack.com/media/app-signup-flow-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/app-signup-flow/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/app-signup-flow/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/app-signup-flow/AppSignupFlow.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/app-signup-flow/prompt.md",
+  "unlock": null
+}

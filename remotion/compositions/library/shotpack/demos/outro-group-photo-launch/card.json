@@ -1,0 +1,27 @@
+{
+  "id": "outro-group-photo-launch",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro"
+  ],
+  "summary": "Representative elements of the whole film fly in from all directions to form a group photo around the wordmark; crane camera settle + stage light + golden dust make a launch-show close",
+  "duration": "~4.8s (145f)",
+  "energy": "Peak (the film's highest point)",
+  "styles": [
+    {
+      "key": "outro-group-photo-launch",
+      "label": "outro-group-photo-launch",
+      "media": "./media/outro-group-photo-launch.mp4?v=1784437314661"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/outro-group-photo-launch.mp4?v=1784437314661",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/outro-group-photo-launch/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/outro/outro-group-photo-launch/prompt.md",
+  "unlock": null
+}

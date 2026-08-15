@@ -1,0 +1,29 @@
+{
+  "id": "value-stagger-gradient",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "16 bars' entrance delay is temporal staggering, while height/hue/displacement/blur each lay out a numerical gradient from first to last; a second beat switches the stagger origin to the center, re-spreading with the pulse amplitude largest at the center",
+  "duration": "~5.0s (150f@30fps)",
+  "energy": "Medium-high (the first beat is a continuous spread; the second beat's center pulse is a clear single peak)",
+  "styles": [
+    {
+      "key": "value-stagger-gradient",
+      "label": "value-stagger-gradient",
+      "media": "./media/value-stagger-gradient.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/value-stagger-gradient.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/value-stagger-gradient/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/value-stagger-gradient/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/value-stagger-gradient/ValueStaggerGradient.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/value-stagger-gradient/prompt.md",
+  "unlock": null
+}

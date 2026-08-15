@@ -1,0 +1,35 @@
+{
+  "id": "ui-to-brand-morph",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro"
+  ],
+  "summary": "Two-variant UI-to-brand morph \u2014 icon-flip-bloom flattens the icon's Y-axis into a vertical line that blooms into a flower-shaped mark + wordmark settling letter by letter; input-morph-assemble shrinks the input box into a pill with three primitive elements dropping in to assemble into a single logo petal",
+  "duration": "A ~4.3s (130f) / B ~4.7s (140f)",
+  "energy": "Medium-high (closing highlight; one complete transformation tells it all)",
+  "styles": [
+    {
+      "key": "icon-flip-bloom",
+      "label": "icon-flip-bloom",
+      "media": "./media/icon-flip-bloom.mp4?v=1784437314868"
+    },
+    {
+      "key": "input-morph-assemble",
+      "label": "input-morph-assemble",
+      "media": "./media/input-morph-assemble.mp4?v=1785045002395"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/icon-flip-bloom.mp4?v=1784437314868",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/ui-to-brand-morph/prompt.md",
+  "tsx": "https://getshotpack.com/demos/outro/ui-to-brand-morph/demo.tsx",
+  "tsxFiles": [
+    "./demos/outro/ui-to-brand-morph/IconFlipBloomLogo.tsx",
+    "./demos/outro/ui-to-brand-morph/InputMorphsIntoLogo.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/outro/ui-to-brand-morph/prompt.md",
+  "unlock": null
+}

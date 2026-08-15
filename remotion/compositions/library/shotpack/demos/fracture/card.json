@@ -1,0 +1,29 @@
+{
+  "id": "fracture",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening"
+  ],
+  "summary": "A 5\u00d75 tile grid assembles from a 3D fragmented state into a full poster via concentric ripples from the center; a one-beat pause to read the word, then all fragments accelerate spinning outward and leave the frame",
+  "duration": "~5.2s (156f@30fps; assemble 0\u20132.6s \u00b7 hold 1s \u00b7 scatter 1.5s)",
+  "energy": "High (high energy at both ends, stillness in the middle \u2014 fits bracketing a BGM accent)",
+  "styles": [
+    {
+      "key": "fracture",
+      "label": "fracture",
+      "media": "./media/fracture.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/fracture.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/fracture/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/fracture/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/fracture/Fracture.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/fracture/prompt.md",
+  "unlock": null
+}

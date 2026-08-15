@@ -1,0 +1,30 @@
+{
+  "id": "gradient-word-sweep",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "effects"
+  ],
+  "summary": "On a black background, a keyword in a slogan gets \"charged\" by a gradient color sweep fast left-to-right \u2014 the wavefront characters glow brightest then decay backward, and once filled, thin purple-red lightning links between characters while the whole word holds a steady breathing glow",
+  "duration": "sweep-charge ~15\u201320f (must be fast) + steady lightning-breathing 1\u20132s; total 2.5\u20133.5s",
+  "energy": "High (one word bursts; everything around it should yield)",
+  "styles": [
+    {
+      "key": "gradient-word-sweep",
+      "label": "gradient-word-sweep",
+      "media": "./media/gradient-word-sweep.mp4?v=1784437314587"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/gradient-word-sweep.mp4?v=1784437314587",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/gradient-word-sweep/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/gradient-word-sweep/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/gradient-word-sweep/GradientWordSweep.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/gradient-word-sweep/prompt.md",
+  "unlock": null
+}

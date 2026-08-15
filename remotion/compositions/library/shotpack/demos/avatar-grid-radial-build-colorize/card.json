@@ -1,0 +1,29 @@
+{
+  "id": "avatar-grid-radial-build-colorize",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data"
+  ],
+  "summary": "An 8\u00d77 grid of small cards grows ring by ring from the center to fill the screen (content mixes initials / icon / image placeholders), then ~15% of the cards turn red at random moments to flag anomalies, with the title and legend staying put in the center",
+  "duration": "~5.6s (168f @ 30fps; fill 0.5\u20131.7s \u00b7 coloring emerges 1.7\u20133.4s)",
+  "energy": "Medium (the growth phase has rhythm; the coloring phase is a quiet \"discovery\" moment)",
+  "styles": [
+    {
+      "key": "avatar-grid-radial-build-colorize",
+      "label": "avatar-grid-radial-build-colorize",
+      "media": "./media/avatar-grid-radial-build-colorize.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/avatar-grid-radial-build-colorize.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/avatar-grid-radial-build-colorize/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/avatar-grid-radial-build-colorize/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/avatar-grid-radial-build-colorize/AvatarGridRadialBuildColorize.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/avatar-grid-radial-build-colorize/prompt.md",
+  "unlock": null
+}

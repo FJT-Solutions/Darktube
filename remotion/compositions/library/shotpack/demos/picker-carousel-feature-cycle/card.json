@@ -1,0 +1,29 @@
+{
+  "id": "picker-carousel-feature-cycle",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "A mobile-style vertical picker \u2014 the focus pill stays put while content flows through it, each item snapping to a halt with pronounced outQuint deceleration then fully resting, opacity/font size/grayscale layered by distance from center, and the pill does a very light scaleY breath on landing",
+  "duration": "~3.6s (108f@30fps)",
+  "energy": "Medium (every snap is a beat, 5 beats advancing at an even pace)",
+  "styles": [
+    {
+      "key": "picker-carousel-feature-cycle",
+      "label": "picker-carousel-feature-cycle",
+      "media": "./media/picker-carousel-feature-cycle.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/picker-carousel-feature-cycle.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/picker-carousel-feature-cycle/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/picker-carousel-feature-cycle/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/picker-carousel-feature-cycle/PickerCarouselFeatureCycle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/picker-carousel-feature-cycle/prompt.md",
+  "unlock": null
+}

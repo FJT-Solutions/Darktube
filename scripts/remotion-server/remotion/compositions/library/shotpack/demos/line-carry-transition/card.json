@@ -1,0 +1,30 @@
+{
+  "id": "line-carry-transition",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition",
+    "camera"
+  ],
+  "summary": "Line-relay lateral transition \u2014 scene A's progress bar extends off-frame, the camera follows the line sideways, the line rounds a corner mid-move to frame scene B's card box, with no cut anywhere",
+  "duration": "~5.3s (progress bar fills + lateral move 60f + framing + content fade-in + stillness 36f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "line-carry-transition",
+      "label": "line-carry-transition",
+      "media": "./media/line-carry-transition.mp4?v=1784437314628"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/line-carry-transition.mp4?v=1784437314628",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/line-carry-transition/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/line-carry-transition/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/line-carry-transition/LineCarryTransition.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/line-carry-transition/prompt.md",
+  "unlock": null
+}

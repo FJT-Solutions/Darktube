@@ -1,0 +1,36 @@
+{
+  "id": "particle-celebrate-hits",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data",
+    "effects"
+  ],
+  "summary": "Two celebration-particle variants \u2014 confetti-crossfire (twin cannons fire crossing confetti barrages on the milestone-reveal frame) and counter-tick-sparks (the counter bursts sparks at its top each time it crosses a full thousand)",
+  "duration": "A 3\u20134s / B 4\u20135s",
+  "energy": "Climax-embellishment type (the burst must settle back into clean stillness)",
+  "styles": [
+    {
+      "key": "confetti-crossfire",
+      "label": "confetti-crossfire",
+      "media": "./media/confetti-crossfire.mp4?v=1784437314696"
+    },
+    {
+      "key": "counter-tick-sparks",
+      "label": "counter-tick-sparks",
+      "media": "./media/counter-tick-sparks.mp4?v=1784437314697"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/confetti-crossfire.mp4?v=1784437314696",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/particle-celebrate-hits/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/particle-celebrate-hits/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/particle-celebrate-hits/ConfettiCrossfire.tsx",
+    "./demos/data/particle-celebrate-hits/CounterTickSparks.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/particle-celebrate-hits/prompt.md",
+  "unlock": null
+}

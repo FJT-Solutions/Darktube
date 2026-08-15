@@ -1,0 +1,30 @@
+{
+  "id": "paper-plane-messenger",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition",
+    "camera"
+  ],
+  "summary": "Paper-plane messenger transition \u2014 after clicking \"send\", the camera pulls back out of window A, the origami plane flies out along a B\u00e9zier arc (pitch following the tangent), the camera escorts it through multi-layer parallax props, arrives and settles at window B's door, and B zooms in to take over the full screen",
+  "duration": "~5s (150f: click 12f \u2192 pull-back 16\u201342f \u2192 flight 34\u2013104f \u2192 B takeover 112\u2013146f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "paper-plane-messenger",
+      "label": "paper-plane-messenger",
+      "media": "./media/paper-plane-messenger.mp4?v=1784437314692"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/paper-plane-messenger.mp4?v=1784437314692",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/paper-plane-messenger/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/paper-plane-messenger/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/paper-plane-messenger/PaperPlaneMessenger.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/paper-plane-messenger/prompt.md",
+  "unlock": null
+}

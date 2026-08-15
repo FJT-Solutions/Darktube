@@ -1,0 +1,29 @@
+{
+  "id": "brace-expand",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "A pair of curly braces first appears small in the center, then shoots outward to \u00b1148px while scaling up to title size; the text's clip width is strictly bound to the brace spacing, revealing it like a curtain being drawn; after settling, letter-spacing relaxes slightly",
+  "duration": "~3.8s (114f@30fps: 7f appear \u2192 spring open \u2192 letter-spacing relax after settling \u2192 hold)",
+  "energy": "Medium (the single overshoot is the only peak, the rest is still)",
+  "styles": [
+    {
+      "key": "brace-expand",
+      "label": "brace-expand",
+      "media": "./media/brace-expand.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/brace-expand.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/brace-expand/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/brace-expand/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/brace-expand/BraceExpand.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/brace-expand/prompt.md",
+  "unlock": null
+}

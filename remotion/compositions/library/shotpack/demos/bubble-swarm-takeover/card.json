@@ -1,0 +1,29 @@
+{
+  "id": "bubble-swarm-takeover",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Pearl-gloss bubble swarm curtain transition \u2014 bubbles of varied sizes drift in from off-screen, growing until they fill the whole screen, while the page simultaneously \"washes white\". The cut is hidden at the occlusion peak, and once the bubbles scatter outward the new scene is already there; an i18n text-capsule variant can be mixed in",
+  "duration": "~4.3s (130f: drift-in ~67f + peak-hide cut + scatter ~43f)",
+  "energy": "Medium-High (sustained swarm movement, no instantaneous impact)",
+  "styles": [
+    {
+      "key": "bubble-swarm-takeover",
+      "label": "bubble-swarm-takeover",
+      "media": "./media/bubble-swarm-takeover.mp4?v=1784437314504"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/bubble-swarm-takeover.mp4?v=1784437314504",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/bubble-swarm-takeover/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/bubble-swarm-takeover/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/bubble-swarm-takeover/BubbleSwarmTakeover.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/bubble-swarm-takeover/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "color-block-step-wipe",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Discrete stepped color-block screen swallow, two variants \u2014 A: a small central bar hard-steps 3\u20135 times to fill the full screen (after takeover a badge pops out in two jumps); B: a color block eats the screen diagonally from a corner in 3 steps while carrying a page card forward one jump per step",
+  "duration": "A ~2.5s (growth 44f + badge + hold) / B ~1.5\u20132s (3 jumps 30f + hold); demo total 150f",
+  "energy": "Medium-High (energy comes from the \"jump\" hitches, not speed)",
+  "styles": [
+    {
+      "key": "color-block-step-wipe",
+      "label": "color-block-step-wipe",
+      "media": "./media/color-block-step-wipe.mp4?v=1784437314536"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/color-block-step-wipe.mp4?v=1784437314536",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/color-block-step-wipe/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/color-block-step-wipe/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/color-block-step-wipe/ColorBlockStepWipe.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/color-block-step-wipe/prompt.md",
+  "unlock": null
+}

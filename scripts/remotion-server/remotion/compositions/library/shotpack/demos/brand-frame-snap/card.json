@@ -1,0 +1,30 @@
+{
+  "id": "brand-frame-snap",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "transition"
+  ],
+  "summary": "Brand-color picture-frame grammar \u2014 a thick solid-color frame grows around the full screen before the content, and a recording window drops inside; on mode switch the whole frame hard-flips color on the same frame and the in-window layout swaps on the same frame \u2014 one borderColor handles chapter navigation, status cue, and brand exposure",
+  "duration": "Single flip ~4.3s (130f); the frame itself can persist for the whole film",
+  "energy": "Medium (high at the flip instant; otherwise a quiet packaging layer)",
+  "styles": [
+    {
+      "key": "brand-frame-snap",
+      "label": "brand-frame-snap",
+      "media": "./media/brand-frame-snap.mp4?v=1784437314500"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/brand-frame-snap.mp4?v=1784437314500",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/brand-frame-snap/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/brand-frame-snap/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/brand-frame-snap/BrandFrameSnap.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/brand-frame-snap/prompt.md",
+  "unlock": null
+}

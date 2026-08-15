@@ -1,0 +1,29 @@
+{
+  "id": "basic-3d-scene",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera"
+  ],
+  "summary": "impress.js-style spatial presentation: cards scattered through 3D space at different positions/rotations/scales, camera flies between stops taking the inverse of each step's pose, final step pulls back to OVERVIEW",
+  "duration": "~6.0s (180f @ 30fps; four stops, three flights of 0.96s each)",
+  "energy": "Medium (each transition offers a spatial surprise; hold segments read cards quietly)",
+  "styles": [
+    {
+      "key": "basic-3d-scene",
+      "label": "basic-3d-scene",
+      "media": "./media/basic-3d-scene.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/basic-3d-scene.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/basic-3d-scene/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/basic-3d-scene/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/basic-3d-scene/Basic3DScene.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/basic-3d-scene/prompt.md",
+  "unlock": null
+}

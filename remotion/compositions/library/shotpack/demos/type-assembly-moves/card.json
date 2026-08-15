@@ -1,0 +1,47 @@
+{
+  "id": "type-assembly-moves",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "Text assembly, four variants \u2014 split-text-stagger per-character split rise, letterform-drift-assembly drift convergence, tracking-expand-reveal letter-spacing breathing, text-on-path flowing in along a line",
+  "duration": "single variant 4\u20135s (action segments A ~56f / B ~104f / C ~58f / D ~99f, all including hold)",
+  "energy": "A medium / B medium-high / C low-medium / D medium",
+  "styles": [
+    {
+      "key": "split-text-stagger",
+      "label": "split-text-stagger \u88c2\u5347",
+      "media": "./media/split-text-stagger.mp4?v=1784437314844"
+    },
+    {
+      "key": "drift-assembly",
+      "label": "drift-assembly \u6f02\u79fb\u5408\u62e2",
+      "media": "./media/drift-assembly.mp4?v=1784437314846"
+    },
+    {
+      "key": "tracking-expand",
+      "label": "tracking-expand \u5b57\u8ddd\u547c\u5438",
+      "media": "./media/tracking-expand.mp4?v=1784437314848"
+    },
+    {
+      "key": "text-on-path",
+      "label": "text-on-path \u6cbf\u7ebf\u6d41\u5165",
+      "media": "./media/text-on-path.mp4?v=1784437314851"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/split-text-stagger.mp4?v=1784437314844",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/type-assembly-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/type-assembly-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/type-assembly-moves/LetterformDriftAssembly.tsx",
+    "./demos/typography/type-assembly-moves/SplitTextStagger.tsx",
+    "./demos/typography/type-assembly-moves/TextOnPath.tsx",
+    "./demos/typography/type-assembly-moves/TrackingExpandReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/type-assembly-moves/prompt.md",
+  "unlock": null
+}

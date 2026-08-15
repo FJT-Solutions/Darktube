@@ -1,0 +1,29 @@
+{
+  "id": "carousel-3d",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "8 cards arranged via sin/cos into a ring of radius 190px rotating through one full turn at constant speed; each card only orbits around Y and billboards outward on its own; the front and back use the same directional texture with backface-visibility:hidden, guaranteeing every moment stays upright and never flipped; the camera stays pinned at a slight low-angle close-up the entire time",
+  "duration": "~5.6s (168f@30fps)",
+  "energy": "Medium (uniform speed with no variation \u2014 a steady-state motion that can loop forever)",
+  "styles": [
+    {
+      "key": "carousel-3d",
+      "label": "carousel-3d",
+      "media": "./media/carousel-3d.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/carousel-3d.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/carousel-3d/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/carousel-3d/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/carousel-3d/Carousel3D.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/carousel-3d/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,31 @@
+{
+  "id": "icon-field-colorize",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "ui-entrance",
+    "outro"
+  ],
+  "summary": "A grayscale dot-matrix of small icons emerges staggered to fill the screen; a one-beat pause, then several brand-color horizontal bands sweep down across the whole field at extreme speed \u2014 an opening/closing card that \"lays out the full feature set, then lights it up in brand color in one instant\"",
+  "duration": "Emergence ~45f staggered + settle ~10f + color flip 12\u201345f + final settle; 3\u20134s total",
+  "energy": "Medium (emergence is setup; the color-flip instant is the only burst)",
+  "styles": [
+    {
+      "key": "icon-field-colorize",
+      "label": "icon-field-colorize",
+      "media": "./media/icon-field-colorize.mp4?v=1784437314599"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/icon-field-colorize.mp4?v=1784437314599",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/icon-field-colorize/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/icon-field-colorize/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/icon-field-colorize/IconFieldColorize.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/icon-field-colorize/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "odometer-digit-roll",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data",
+    "typography"
+  ],
+  "summary": "Odometer-style rolling number in giant type \u2014 each digit of a full-screen hero metric spins vertically like a slot-machine reel with motion trails, locking in place one by one left to right with an overshoot; the instant all digits lock, the whole number deepens in a pulse",
+  "duration": "rolling + digit-by-digit lock ~63f + pulse 8f + hold \u226545f, ~5s",
+  "energy": "Medium-high",
+  "styles": [
+    {
+      "key": "odometer-digit-roll",
+      "label": "odometer-digit-roll",
+      "media": "./media/odometer-digit-roll.mp4?v=1784437314659"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/odometer-digit-roll.mp4?v=1784437314659",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/odometer-digit-roll/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/odometer-digit-roll/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/odometer-digit-roll/OdometerDigitRoll.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/odometer-digit-roll/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "pull-to-refresh",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "A finger pulls the feed down from the top: the list shifts down as a whole, the circular indicator at the top grows and rotates 0\u2192180\u00b0; after dragging past the threshold and releasing, the indicator spins loading (360\u00b0\u00d73), the list springs back and swaps in new content cards",
+  "duration": "~7s (210f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (pull charging \u2192 release loading spin \u2192 content refresh; the rhythm goes still, to active, then settles)",
+  "styles": [
+    {
+      "key": "pull-to-refresh",
+      "label": "pull-to-refresh",
+      "media": "./media/pull-to-refresh.mp4?v=1786372188510"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/pull-to-refresh.mp4?v=1786372188510",
+  "poster": "https://r2.getshotpack.com/media/pull-to-refresh-1786372188510.png",
+  "card": "https://getshotpack.com/demos/mobile/pull-to-refresh/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/pull-to-refresh/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/pull-to-refresh/PullToRefresh.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/pull-to-refresh/prompt.md",
+  "unlock": null
+}

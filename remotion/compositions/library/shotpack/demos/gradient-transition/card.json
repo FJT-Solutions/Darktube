@@ -1,0 +1,29 @@
+{
+  "id": "gradient-transition",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Background smoothly transitions among the three CSS gradient types linear, radial, and conic \u2014 angle, color stops, center, and radius each interpolate parameter-by-parameter, with short cross-fades between segments when switching types",
+  "duration": "~6.0s (180f@30fps; linear 0\u20132.4s \u00b7 radial 2\u20134.2s \u00b7 conic 4\u20136s)",
+  "energy": "Low (pure background motion, yielding to the foreground content)",
+  "styles": [
+    {
+      "key": "gradient-transition",
+      "label": "gradient-transition",
+      "media": "./media/gradient-transition.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/gradient-transition.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/gradient-transition/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/gradient-transition/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/gradient-transition/GradientTransition.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/gradient-transition/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "hashtag-to-pill-materialize",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction",
+    "typography"
+  ],
+  "summary": "A topic word types itself into being \u2014 \"#word\" types out centered (red solid caret steady-on), hard-cuts in 1 frame into a wide pill tag, holds, then shrinks and shifts left to land in the page's tag slot, then hard-cuts in 1 frame to reveal the finished page; a \"two hard cuts sandwiching one slide\" rhythm skeleton",
+  "duration": "typing ~40f + hard-cut pill hold ~18f + shrink-shift ~14f + stillness after hard-cut reveal; whole segment ~3.5s (original film 18\u201321.5s)",
+  "energy": "Medium (crisp; powered by hard cuts, not bounces)",
+  "styles": [
+    {
+      "key": "hashtag-to-pill-materialize",
+      "label": "hashtag-to-pill-materialize",
+      "media": "./media/hashtag-to-pill-materialize.mp4?v=1784437314594"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/hashtag-to-pill-materialize.mp4?v=1784437314594",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/hashtag-to-pill-materialize/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/hashtag-to-pill-materialize/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/hashtag-to-pill-materialize/HashtagToPillMaterialize.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/hashtag-to-pill-materialize/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "wallet-counter-roll",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "data",
+  "tags": [
+    "mobile",
+    "data"
+  ],
+  "summary": "The balance in a phone wallet rolls through a 4-digit odometer at high speed, then each digit decelerates in turn with an overshoot and locks onto 8,492; the transaction list below staggers in, and finally the whole device breathes to settle",
+  "duration": "~6s (180f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (high speed during the roll \u2192 each digit locks in turn)",
+  "styles": [
+    {
+      "key": "wallet-counter-roll",
+      "label": "wallet-counter-roll",
+      "media": "./media/wallet-counter-roll-1786362965619.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/wallet-counter-roll-1786362965619.mp4",
+  "poster": "https://r2.getshotpack.com/media/wallet-counter-roll-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/wallet-counter-roll/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/wallet-counter-roll/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/wallet-counter-roll/WalletCounterRoll.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/wallet-counter-roll/prompt.md",
+  "unlock": null
+}

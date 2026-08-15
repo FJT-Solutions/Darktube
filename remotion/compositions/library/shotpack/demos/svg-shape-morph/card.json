@@ -1,0 +1,29 @@
+{
+  "id": "svg-shape-morph",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "One 140-point closed outline smoothly morphs into another shape and back; the two shapes are first resampled in polar coordinates to the same point count, per-point radius interpolation with inOutCubic; mid-morph layers a slight scale breathing, slow self-rotation, and hue drifting from 185\u00b0 to 305\u00b0",
+  "duration": "~5.2s (156f@30fps)",
+  "energy": "Low (continuous flow with no explosion \u2014 good as narration base or breathing beat)",
+  "styles": [
+    {
+      "key": "svg-shape-morph",
+      "label": "svg-shape-morph",
+      "media": "./media/svg-shape-morph.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/svg-shape-morph.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/svg-shape-morph/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/svg-shape-morph/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/svg-shape-morph/SvgShapeMorph.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/svg-shape-morph/prompt.md",
+  "unlock": null
+}

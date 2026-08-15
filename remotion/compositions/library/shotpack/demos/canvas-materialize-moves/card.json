@@ -1,0 +1,36 @@
+{
+  "id": "canvas-materialize-moves",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction",
+    "ui-entrance"
+  ],
+  "summary": "Content \"materializes onto the canvas\" in two variants \u2014 panel-to-canvas row-flip cards (panel table rows fly out along an arc, morphing across containers into canvas cards) and diagram-cascade cascading tree generation (after the prompt types out, nodes pop in layer by layer, connections growing before their nodes)",
+  "duration": "A ~4.3s (130f) / B ~5.3s (160f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "panel-to-canvas",
+      "label": "panel-to-canvas \u884c\u5012\u5361",
+      "media": "./media/panel-to-canvas.mp4?v=1784437314506"
+    },
+    {
+      "key": "diagram-cascade",
+      "label": "diagram-cascade \u7ea7\u8054\u751f\u6210\u6811",
+      "media": "./media/diagram-cascade.mp4?v=1784437314508"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/panel-to-canvas.mp4?v=1784437314506",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/canvas-materialize-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/canvas-materialize-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/canvas-materialize-moves/DiagramCascadeBuild.tsx",
+    "./demos/interaction/canvas-materialize-moves/PanelToCanvasMaterialize.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/canvas-materialize-moves/prompt.md",
+  "unlock": null
+}

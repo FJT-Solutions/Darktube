@@ -1,0 +1,29 @@
+{
+  "id": "logo-shrink-wordmark-lockup",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro"
+  ],
+  "summary": "A neon-gap giant ring rapidly contracts into a small solid white O in the center with an overshoot brake; the icon shifts left to make room, letters slide in one by one to complete the lockup, an accent-color tagline closes it out",
+  "duration": "~4.4s (132f@30fps; contract 0.1\u20131.2s \u00b7 yield 1.5\u20132.1s \u00b7 letters 2\u20132.7s \u00b7 tagline 3.2\u20133.7s)",
+  "energy": "Medium (impactful contraction segment, overall a steady settling rhythm)",
+  "styles": [
+    {
+      "key": "logo-shrink-wordmark-lockup",
+      "label": "logo-shrink-wordmark-lockup",
+      "media": "./media/logo-shrink-wordmark-lockup.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/logo-shrink-wordmark-lockup.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/logo-shrink-wordmark-lockup/prompt.md",
+  "tsx": "https://getshotpack.com/demos/outro/logo-shrink-wordmark-lockup/demo.tsx",
+  "tsxFiles": [
+    "./demos/outro/logo-shrink-wordmark-lockup/LogoShrinkWordmarkLockup.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/outro/logo-shrink-wordmark-lockup/prompt.md",
+  "unlock": null
+}

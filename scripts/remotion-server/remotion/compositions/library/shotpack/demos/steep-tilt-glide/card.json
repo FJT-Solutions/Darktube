@@ -1,0 +1,30 @@
+{
+  "id": "steep-tilt-glide",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera",
+    "ui-entrance"
+  ],
+  "summary": "Under a fixed camera, an upright page stands at a steep 60\u00b0 perspective (right edge near, left edge far), and the page itself slides along its own 3D lateral plane past the lens (object moves, camera doesn't); the slide carries velocity ghosting, floating text/components stick down, and the scene opens from dark into light",
+  "duration": "4s (120f) single shot; wider pages can run longer",
+  "energy": "Medium-high (perspective spectacle + continuous motion, but an even rhythm)",
+  "styles": [
+    {
+      "key": "steep-tilt-glide",
+      "label": "steep-tilt-glide",
+      "media": "./media/steep-tilt-glide.mp4?v=1784437314787"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/steep-tilt-glide.mp4?v=1784437314787",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/steep-tilt-glide/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/steep-tilt-glide/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/steep-tilt-glide/SteepTiltGlide.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/steep-tilt-glide/prompt.md",
+  "unlock": null
+}

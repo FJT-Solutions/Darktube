@@ -1,0 +1,36 @@
+{
+  "id": "typewriter-moves",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "opening"
+  ],
+  "summary": "Typewriter, two variants \u2014 terminal-typewriter: the terminal command finishes typing and detonates a scene switch; error-retype: a \"rephrase\" three-act play of mistyping, deleting, and retyping",
+  "duration": "A ~5s / B ~5.5s",
+  "energy": "A medium-high / B medium-low",
+  "styles": [
+    {
+      "key": "terminal-typewriter",
+      "label": "terminal-typewriter",
+      "media": "./media/terminal-typewriter.mp4?v=1784437314862"
+    },
+    {
+      "key": "error-retype",
+      "label": "error-retype",
+      "media": "./media/error-retype.mp4?v=1784437314864"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/terminal-typewriter.mp4?v=1784437314862",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/typewriter-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/typewriter-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/typewriter-moves/TerminalTypewriter.tsx",
+    "./demos/typography/typewriter-moves/TypewriterErrorRetype.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/typewriter-moves/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "dashboard-glow-highlight-pill",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "Gold lettering hovers over a black field as a data dashboard rises from the bottom with perspective and keeps drifting in 3D; a gold light spot tours from the right side down to the bottom, stretches into a capsule, then draws out the popup's glowing outline starting from it",
+  "duration": "~2.0s (60f@30fps)",
+  "energy": "High (2s packs rise + tour + draw-on + popup in four segments; handoffs must be airtight)",
+  "styles": [
+    {
+      "key": "dashboard-glow-highlight-pill",
+      "label": "dashboard-glow-highlight-pill",
+      "media": "./media/dashboard-glow-highlight-pill.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/dashboard-glow-highlight-pill.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/dashboard-glow-highlight-pill/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/dashboard-glow-highlight-pill/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/dashboard-glow-highlight-pill/DashboardGlowHighlightPill.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/dashboard-glow-highlight-pill/prompt.md",
+  "unlock": null
+}
