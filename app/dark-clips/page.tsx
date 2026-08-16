@@ -682,8 +682,9 @@ export default function DarkClipsPage() {
                         <Film className="h-4 w-4 text-red-500" /> Preview Interativo 9:16
                       </CardTitle>
                       <CardDescription className="text-[11px]">
-                        {selectedClip ? `${selectedClip.authorHandle} · ${selectedClip.duration}s` : "Nenhum vídeo selecionado"}
+                        {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Nenhum vídeo selecionado"}
                       </CardDescription>
+
                     </div>
                     {renderedUrl && (
                       <a href={renderedUrl} download={`darkclip_${Date.now()}.mp4`} target="_blank" rel="noreferrer">
@@ -817,7 +818,8 @@ export default function DarkClipsPage() {
                               </Badge>
                             </div>
 
-                            <p className="font-bold text-xs truncate text-primary">{clip.authorHandle}</p>
+                            <p className="font-bold text-xs truncate text-primary">{clip.author_handle || clip.author_name}</p>
+
                             <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
                               {clip.original_caption || clip.original_url}
                             </p>

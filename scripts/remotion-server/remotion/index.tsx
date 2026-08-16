@@ -9,7 +9,7 @@ export const RemotionRoot: React.FC = () => {
     <>
       <Composition
         id="DarkClipsVideo"
-        component={DarkClipsVideoComposition}
+        component={DarkClipsVideoComposition as any}
         fps={30}
         width={1080}
         height={1920}

@@ -170,7 +170,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
 
                 {/* Verified Badges */}
                 {badgeType === 'blue' && (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ shrink: 0 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                     <path
                       d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
                       fill="#38BDF8"
@@ -183,7 +183,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 )}
 
                 {badgeType === 'gold' && (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ shrink: 0 }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                     <path
                       d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
                       fill="#EAB308"
