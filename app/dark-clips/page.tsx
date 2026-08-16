@@ -185,7 +185,7 @@ export default function DarkClipsPage() {
       setHighlightedCard(targetCardId);
       const el = document.getElementById(targetCardId);
       if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
       setTimeout(() => {
         setHighlightedCard((curr) => (curr === targetCardId ? null : curr));
@@ -2380,28 +2380,28 @@ export default function DarkClipsPage() {
               </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
-              <div className="lg:col-span-5 sticky top-6 self-start space-y-4">
-                <Card className="border-border shadow-2xl overflow-hidden bg-card">
-                  <CardHeader className="p-4 pb-2 border-b border-border/40">
+              <div className="lg:col-span-5 sticky top-4 self-start space-y-3">
+                <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col">
+                  <CardHeader className="p-3 pb-2 border-b border-border/40">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Eye className="h-4 w-4 text-primary" /> Visualização ao Vivo (Canvas 9:16)
                       </CardTitle>
-                      <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+                      <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary py-0">
                         Interativo
                       </Badge>
                     </div>
                   </CardHeader>
 
                   {/* Seletor de Vídeo de Exemplo Limpo para Teste de Layout */}
-                  <div className="p-3 bg-secondary/20 border-b border-border/40 space-y-2">
-                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Film className="h-3.5 w-3.5 text-primary" /> Vídeo de Exemplo (Teste do Layout):
+                  <div className="px-3 py-2 bg-secondary/20 border-b border-border/40 space-y-1.5">
+                    <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <Film className="h-3 w-3 text-primary" /> Vídeo de Exemplo:
                     </span>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-1.5">
                       {[
-                        { url: "/sample-oceans.mp4", label: "🌊 Oceano HD" },
-                        { url: "/sample-viral-clip.mp4", label: "🎬 Animação" },
+                        { url: "/sample-oceans.mp4", label: "🌊 Oceano" },
+                        { url: "/sample-viral-clip.mp4", label: "🎬 Clipes" },
                         { url: "/sample-nature.mp4", label: "🌿 Natureza" },
                       ].map((s) => (
                         <Button
@@ -2410,7 +2410,7 @@ export default function DarkClipsPage() {
                           size="sm"
                           variant={sampleVideoUrl === s.url ? "default" : "outline"}
                           onClick={() => setSampleVideoUrl(s.url)}
-                          className="text-xs h-8 font-bold"
+                          className="text-[11px] h-7 font-bold px-1"
                         >
                           {s.label}
                         </Button>
@@ -2418,7 +2418,7 @@ export default function DarkClipsPage() {
                     </div>
                   </div>
 
-                  <CardContent className="p-4 flex flex-col items-center justify-center bg-black/40">
+                  <CardContent className="p-2.5 flex flex-col items-center justify-center bg-black/40 overflow-hidden">
                     <DarkClipsPreviewPlayer
                       videoUrl={sampleVideoUrl}
                       durationInSeconds={15}
@@ -2446,31 +2446,31 @@ export default function DarkClipsPage() {
                   </CardContent>
 
                   {/* Modeler Preview Footer Action Bar */}
-                  <div className="p-4 border-t border-border/40 flex flex-col sm:flex-row gap-3 justify-between items-center bg-card/50">
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                      <Badge variant="outline" className="text-[10px] border-border bg-secondary/30">
-                        1080 x 1920 (9:16)
+                  <div className="p-3 border-t border-border/40 flex flex-col sm:flex-row gap-2 justify-between items-center bg-card/50">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                      <Badge variant="outline" className="text-[9px] border-border bg-secondary/30 py-0">
+                        1080x1920 (9:16)
                       </Badge>
-                      <span className="truncate max-w-[140px]">{activePreset?.name || "Layout Atual"}</span>
+                      <span className="truncate max-w-[120px] text-[11px]">{activePreset?.name || "Layout Atual"}</span>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleQuickSavePreset()}
                         disabled={savingPreset}
-                        className="gap-1.5 text-xs font-bold h-8 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                        className="gap-1 text-xs font-bold h-7 px-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
                       >
-                        {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                        Salvar Layout 💾
+                        {savingPreset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        Salvar 💾
                       </Button>
                       <Button
                         size="sm"
                         onClick={() => handleProceedToCreation()}
-                        className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-8 shadow-md shadow-primary/20"
+                        className="gap-1 bg-primary text-primary-foreground font-bold text-xs h-7 px-2.5 shadow-md shadow-primary/20"
                       >
-                        Avançar para Criação 🎬 <ChevronRight className="h-3.5 w-3.5" />
+                        Avançar 🎬 <ChevronRight className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>

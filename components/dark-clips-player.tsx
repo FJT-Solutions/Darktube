@@ -67,6 +67,9 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   // Platform UI Simulation Mode
   const [previewMode, setPreviewMode] = useState<'clean' | 'tiktok' | 'reels' | 'shorts'>('clean');
 
+  // Canvas Viewport Compact Zoom Mode ('fit' auto-responsivo ao display | 'sm' 420px | 'md' 500px | 'lg' 580px)
+  const [canvasZoom, setCanvasZoom] = useState<'fit' | 'sm' | 'md' | 'lg'>('fit');
+
   // Active layer being dragged (supports header, mainText, subText, video, watermark, footer, arrows, and arrow-0, arrow-1...)
   const [activeLayer, setActiveLayer] = useState<string>('none');
   const [hoveredLayer, setHoveredLayer] = useState<string>('none');
@@ -108,17 +111,21 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   // Dynamic values for Platform Overlays
   const displayHandle = profileHeader.handle ? profileHeader.handle.replace(/^@/, '') : 'darkclips';
   const displayName = profileHeader.name || 'Dark Clips';
-  const displayCaption = headline.mainText || headline.subText || footer.text || 'Assista até o final! 🔥';
+  const displayCaption = headline.mainText || 'Criando clipes virais no DarkTube';
 
   // Handle Drag Start & Layer Selection
-  const handlePointerDown = (layer: string, e: React.PointerEvent) => {
+  const handlePointerDown = (
+    layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | string,
+    e: React.PointerEvent
+  ) => {
+    e.preventDefault();
     e.stopPropagation();
     setActiveLayer(layer);
     setDragging(true);
     setDragStartY(e.clientY);
     setDragStartX(e.clientX);
 
-    // Bi-directional Auto-Scroll trigger to Left Cards
+    // Trigger Layer Focus on parent configuration card with smooth scroll
     if (onLayerFocus) {
       if (layer === 'header') {
         onLayerFocus('header');
@@ -233,68 +240,115 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows, onUpdateArrowItem, effectiveArrowsList]);
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-[340px] mx-auto select-none">
+    <div className="flex flex-col items-center gap-2 w-full mx-auto select-none">
       
-      {/* ── Platform Simulation Switcher Bar ── */}
-      <div className="w-full bg-secondary/40 p-1 rounded-xl border border-border/60 flex items-center justify-between gap-1 text-[11px] shadow-sm">
-        <button
-          type="button"
-          onClick={() => setPreviewMode('clean')}
-          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center ${
-            previewMode === 'clean'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Visualização limpa sem interface de rede social"
-        >
-          Limpo
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewMode('tiktok')}
-          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
-            previewMode === 'tiktok'
-              ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Simular botões e interface do TikTok"
-        >
-          <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewMode('reels')}
-          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
-            previewMode === 'reels'
-              ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Simular botões e interface do Reels (Facebook & Instagram)"
-        >
-          Reels
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewMode('shorts')}
-          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
-            previewMode === 'shorts'
-              ? 'bg-red-600 text-white shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Simular botões e interface do YouTube Shorts"
-        >
-          Shorts
-        </button>
+      {/* ── Platform Simulation Switcher & Zoom Controls ── */}
+      <div className="w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5">
+        {/* Platform Simulations */}
+        <div className="flex-1 bg-secondary/40 p-0.5 rounded-xl border border-border/60 flex items-center justify-between gap-0.5 text-[10px] shadow-sm">
+          <button
+            type="button"
+            onClick={() => setPreviewMode('clean')}
+            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center ${
+              previewMode === 'clean'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+            }`}
+            title="Visualização limpa sem interface de rede social"
+          >
+            Limpo
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewMode('tiktok')}
+            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
+              previewMode === 'tiktok'
+                ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+            }`}
+            title="Simular interface do TikTok"
+          >
+            <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewMode('reels')}
+            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+              previewMode === 'reels'
+                ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+            }`}
+            title="Simular interface do Reels"
+          >
+            Reels
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewMode('shorts')}
+            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+              previewMode === 'shorts'
+                ? 'bg-red-600 text-white shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+            }`}
+            title="Simular interface do Shorts"
+          >
+            Shorts
+          </button>
+        </div>
+
+        {/* Viewport Fit & Zoom Controls */}
+        <div className="bg-secondary/40 p-0.5 rounded-xl border border-border/60 flex items-center gap-0.5 text-[10px] shrink-0">
+          <button
+            type="button"
+            onClick={() => setCanvasZoom('fit')}
+            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
+              canvasZoom === 'fit' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Ajuste 100% Automático ao Viewport (Tela Toda)"
+          >
+            📱 Auto
+          </button>
+          <button
+            type="button"
+            onClick={() => setCanvasZoom('sm')}
+            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
+              canvasZoom === 'sm' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Compacto (420px)"
+          >
+            P
+          </button>
+          <button
+            type="button"
+            onClick={() => setCanvasZoom('md')}
+            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
+              canvasZoom === 'md' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Médio (500px)"
+          >
+            M
+          </button>
+          <button
+            type="button"
+            onClick={() => setCanvasZoom('lg')}
+            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
+              canvasZoom === 'lg' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+            title="Grande (580px)"
+          >
+            G
+          </button>
+        </div>
       </div>
 
       {/* ── Top Stage Info Bar ── */}
-      <div className="w-full flex items-center justify-between px-1 min-h-[24px]">
+      <div className="w-full flex items-center justify-between px-1 min-h-[20px]">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-[11px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1.5 py-0.5">
-            <Smartphone className="h-3 w-3" /> Vídeo 9:16
+          <Badge variant="outline" className="text-[10px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1 py-0">
+            <Smartphone className="h-2.5 w-2.5" /> 9:16 Live
           </Badge>
           {activeLayer !== 'none' && (
-            <span className="text-[11px] font-semibold text-zinc-300 animate-fadeIn">
+            <span className="text-[10px] font-semibold text-zinc-300 animate-fadeIn truncate max-w-[220px]">
               <strong className="text-primary font-bold">
                 {activeLayer === 'header'
                   ? `Cabeçalho (${headerPadding}px)`
@@ -303,7 +357,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                   : activeLayer === 'subText'
                   ? `Subtítulo (${subTextY}%)`
                   : activeLayer === 'watermark'
-                  ? `Marca D'água (X: ${watermarkX}%, Y: ${watermarkY}%)`
+                  ? `Marca D'água (${watermarkX}%, ${watermarkY}%)`
                   : activeLayer === 'footer'
                   ? `Rodapé / CTA (${footerY}%)`
                   : activeLayer.startsWith('arrow-')
@@ -315,10 +369,23 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
         </div>
       </div>
 
-      {/* ── Pure WYSIWYG 9:16 Artboard Stage ── */}
+      {/* ── Pure WYSIWYG 9:16 Artboard Stage (Auto-Fitting Viewport) ── */}
       <div
         ref={containerRef}
-        className="w-full aspect-[9/16] rounded-[24px] overflow-hidden shadow-2xl border-2 border-zinc-800/90 bg-black relative cursor-default group"
+        style={{
+          height:
+            canvasZoom === 'sm'
+              ? '420px'
+              : canvasZoom === 'md'
+              ? '500px'
+              : canvasZoom === 'lg'
+              ? '580px'
+              : 'min(calc(100vh - 19rem), 520px)',
+          maxHeight: 'calc(100vh - 17rem)',
+          aspectRatio: '9/16',
+          maxWidth: '100%',
+        }}
+        className="rounded-[20px] overflow-hidden shadow-2xl border-2 border-zinc-800/90 bg-black relative cursor-default group shrink-0 transition-all duration-150"
         onClick={() => setActiveLayer('none')}
       >
         {/* The Live Composition */}
