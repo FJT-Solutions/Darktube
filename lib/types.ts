@@ -244,6 +244,11 @@ export interface DarkClipPreset {
     font_size?: number
     fontSize?: number
     color?: string
+    y_offset?: number
+    yOffset?: number
+    text_align?: 'left' | 'center' | 'right'
+    textAlign?: 'left' | 'center' | 'right'
+    scale?: number
   }
   is_default?: boolean
   created_at?: string

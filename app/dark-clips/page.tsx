@@ -36,7 +36,8 @@ import {
   BookmarkCheck,
   CheckCircle2,
   ArrowRight,
-  FolderPlus
+  FolderPlus,
+  Move
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -167,8 +168,11 @@ export default function DarkClipsPage() {
   const [footer, setFooter] = useState({
     showFooter: false,
     text: "Sigam a melhor página de memes!",
-    fontSize: 24,
+    fontSize: 26,
     color: "#9CA3AF",
+    yOffset: 92,
+    textAlign: "center" as "left" | "center" | "right",
+    scale: 100,
   });
 
   // Scheduling State
@@ -302,6 +306,9 @@ export default function DarkClipsPage() {
         text: preset.footer_style.text ?? f.text,
         fontSize: preset.footer_style.font_size ?? preset.footer_style.fontSize ?? f.fontSize,
         color: preset.footer_style.color ?? f.color,
+        yOffset: preset.footer_style.y_offset ?? preset.footer_style.yOffset ?? f.yOffset ?? 92,
+        textAlign: (preset.footer_style.text_align || preset.footer_style.textAlign || f.textAlign) as any,
+        scale: preset.footer_style.scale ?? f.scale ?? 100,
       }));
     }
     toast.success(`Layout "${preset.name}" carregado!`);
@@ -1540,7 +1547,7 @@ export default function DarkClipsPage() {
                         <FileText className="h-4 w-4 text-primary" /> Rodapé & Chamada para Ação (CTA)
                       </CardTitle>
                       <CardDescription className="text-xs">
-                        Adicione texto de conversão no final do vídeo.
+                        Texto de conversão/engajamento com posicionamento livre (arrasto 0% - 98%).
                       </CardDescription>
                     </div>
                     <Switch
@@ -1549,14 +1556,112 @@ export default function DarkClipsPage() {
                     />
                   </CardHeader>
                   {footer.showFooter && (
-                    <CardContent className="p-4 pt-0 space-y-3">
+                    <CardContent className="p-4 pt-0 space-y-4">
+                      {/* Texto do CTA */}
                       <div>
-                        <Label className="text-xs font-semibold">Texto do Rodapé</Label>
+                        <Label className="text-xs font-semibold">Texto do Rodapé / CTA</Label>
                         <Input
                           value={footer.text}
                           onChange={(e) => setFooter((f) => ({ ...f, text: e.target.value }))}
+                          placeholder="Ex: Siga para não perder nenhum vídeo!"
                           className="h-8 text-xs mt-1"
                         />
+                      </div>
+
+                      {/* Presets Rápidos de Posição Vertical */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">Posição Rápida</Label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { pos: 10, label: "Topo (10%)" },
+                            { pos: 48, label: "Centro (48%)" },
+                            { pos: 82, label: "Inferior (82%)" },
+                            { pos: 92, label: "Rodapé (92%)" },
+                          ].map((item) => (
+                            <Button
+                              key={item.pos}
+                              type="button"
+                              size="sm"
+                              variant={footer.yOffset === item.pos ? "default" : "outline"}
+                              onClick={() => setFooter((f) => ({ ...f, yOffset: item.pos }))}
+                              className="text-[11px] h-7"
+                            >
+                              {item.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Slider de Posição Vertical Livre */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold flex items-center gap-1.5">
+                            <Move className="h-3.5 w-3.5 text-primary" /> Posição Vertical no Vídeo (Y)
+                          </span>
+                          <span className="font-mono text-primary">{footer.yOffset ?? 92}%</span>
+                        </div>
+                        <Slider
+                          value={[footer.yOffset ?? 92]}
+                          min={5}
+                          max={98}
+                          step={1}
+                          onValueChange={([yOffset]) => setFooter((f) => ({ ...f, yOffset }))}
+                        />
+                      </div>
+
+                      {/* Tamanho da Fonte & Cor */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold flex items-center gap-1.5">
+                              <Type className="h-3.5 w-3.5 text-yellow-400" /> Tamanho da Fonte
+                            </span>
+                            <span className="font-mono text-yellow-400">{footer.fontSize}px</span>
+                          </div>
+                          <Slider
+                            value={[footer.fontSize]}
+                            min={14}
+                            max={48}
+                            step={1}
+                            onValueChange={([fontSize]) => setFooter((f) => ({ ...f, fontSize }))}
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-semibold">Cor do Texto</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="color"
+                              value={footer.color || "#9CA3AF"}
+                              onChange={(e) => setFooter((f) => ({ ...f, color: e.target.value }))}
+                              className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
+                            />
+                            <Input
+                              value={footer.color || "#9CA3AF"}
+                              onChange={(e) => setFooter((f) => ({ ...f, color: e.target.value }))}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Alinhamento */}
+                      <div>
+                        <Label className="text-xs font-semibold">Alinhamento do Texto</Label>
+                        <div className="flex gap-2 mt-1">
+                          {(["left", "center", "right"] as const).map((align) => (
+                            <Button
+                              key={align}
+                              type="button"
+                              size="sm"
+                              variant={footer.textAlign === align ? "default" : "outline"}
+                              onClick={() => setFooter((f) => ({ ...f, textAlign: align }))}
+                              className="flex-1 text-xs h-8 capitalize"
+                            >
+                              {align === "left" ? "Esquerda" : align === "center" ? "Centro" : "Direita"}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
                     </CardContent>
                   )}
@@ -1643,6 +1748,7 @@ export default function DarkClipsPage() {
                       onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
                       onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
                       onUpdateWatermark={(updates) => setWatermark((w) => ({ ...w, ...updates }))}
+                      onUpdateFooter={(updates) => setFooter((f) => ({ ...f, ...updates }))}
                     />
                   </CardContent>
 

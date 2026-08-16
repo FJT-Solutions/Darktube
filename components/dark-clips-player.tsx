@@ -16,6 +16,7 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number }) => void;
   onUpdateVideoPlacement?: (placement: { yOffset?: number; scale?: number; borderRadius?: number }) => void;
   onUpdateWatermark?: (updates: { xOffset?: number; yOffset?: number; position?: 'custom' }) => void;
+  onUpdateFooter?: (updates: { yOffset?: number; fontSize?: number; text?: string }) => void;
 }
 
 export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
@@ -28,6 +29,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   onUpdateHeadline,
   onUpdateVideoPlacement,
   onUpdateWatermark,
+  onUpdateFooter,
   ...inputProps
 }) => {
   const durationInFrames = Math.max(30, Math.floor((durationInSeconds || 15) * fps));
@@ -35,8 +37,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const playerRef = useRef<PlayerRef>(null);
 
   // Active layer being dragged
-  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark'>('none');
-  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark'>('none');
+  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer'>('none');
+  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer'>('none');
   const [dragging, setDragging] = useState<boolean>(false);
   const [dragStartY, setDragStartY] = useState<number>(0);
   const [dragStartX, setDragStartX] = useState<number>(0);
@@ -48,6 +50,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
     headline = {},
     videoPlacement = {},
     watermark = {},
+    footer = {},
   } = inputProps;
 
   const headerPadding = profileHeader.paddingTop ?? 90;
@@ -57,12 +60,13 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const videoScale = videoPlacement.scale ?? 92;
   const watermarkX = watermark.xOffset ?? 85;
   const watermarkY = watermark.yOffset ?? 92;
+  const footerY = footer.yOffset ?? 92;
 
   // Video Url
   const activeVideoUrl = videoUrl || "";
 
   // Handle Drag Start
-  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark', e: React.PointerEvent) => {
+  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer', e: React.PointerEvent) => {
     e.stopPropagation();
     setActiveLayer(layer);
     setDragging(true);
@@ -80,10 +84,12 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
     } else if (layer === 'watermark') {
       setDragInitialValX(watermarkX);
       setDragInitialValY(watermarkY);
+    } else if (layer === 'footer') {
+      setDragInitialValY(footerY);
     }
   };
 
-  // Handle Pointer Move for Independent Layers (Free Full-Range Positioning 0% - 95%)
+  // Handle Pointer Move for Independent Layers (Free Full-Range Positioning 0% - 98%)
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
       if (!dragging || !containerRef.current) return;
@@ -110,6 +116,9 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
         const newX = Math.max(0, Math.min(100, Math.round(dragInitialValX + percentDeltaX)));
         const newY = Math.max(0, Math.min(100, Math.round(dragInitialValY + percentDeltaY)));
         onUpdateWatermark({ xOffset: newX, yOffset: newY, position: 'custom' });
+      } else if (activeLayer === 'footer' && onUpdateFooter) {
+        const newY = Math.max(0, Math.min(98, Math.round(dragInitialValY + percentDeltaY)));
+        onUpdateFooter({ yOffset: newY });
       }
     };
 
@@ -128,7 +137,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark]);
+  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter]);
 
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-[340px] mx-auto select-none">
@@ -150,6 +159,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                   ? `Subtítulo (${subTextY}%)`
                   : activeLayer === 'watermark'
                   ? `Marca D'água (X: ${watermarkX}%, Y: ${watermarkY}%)`
+                  : activeLayer === 'footer'
+                  ? `Rodapé / CTA (${footerY}%)`
                   : `Vídeo (${videoY}%)`}
               </strong>
             </span>
@@ -188,6 +199,10 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               ...watermark,
               xOffset: watermarkX,
               yOffset: watermarkY,
+            },
+            footer: {
+              ...footer,
+              yOffset: footerY,
             },
             durationInSeconds,
           }}
@@ -351,12 +366,41 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               )}
             </div>
           )}
+
+          {/* 6. Footer / CTA Layer Drag Box */}
+          {footer.showFooter !== false && footer.text && (
+            <div
+              style={{
+                position: 'absolute',
+                top: `${footerY}%`,
+                transform: 'translateY(-50%)',
+                left: '4%',
+                width: '92%',
+                minHeight: '5%',
+                cursor: 'grab',
+              }}
+              className={`pointer-events-auto transition-all rounded-lg ${
+                activeLayer === 'footer'
+                  ? 'ring-2 ring-emerald-400 bg-emerald-400/20 shadow-lg'
+                  : 'hover:ring-1 hover:ring-emerald-400/70 hover:bg-emerald-400/10'
+              }`}
+              onPointerDown={(e) => handlePointerDown('footer', e)}
+              onMouseEnter={() => setHoveredLayer('footer')}
+              onMouseLeave={() => setHoveredLayer('none')}
+            >
+              {(activeLayer === 'footer' || hoveredLayer === 'footer') && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                  <Move className="h-2.5 w-2.5" /> RODAPÉ / CTA (Y: {footerY}%)
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Stage Hint Footer */}
       <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong> ou <strong>Marca D'água</strong> para qualquer posição.
+        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong>, <strong>Marca D'água</strong> ou <strong>Rodapé / CTA</strong> para qualquer posição.
       </p>
     </div>
   );

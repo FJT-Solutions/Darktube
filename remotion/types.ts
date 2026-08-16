@@ -306,6 +306,9 @@ export interface DarkClipsVideoProps {
     text?: string;
     fontSize?: number;
     color?: string;
+    yOffset?: number;
+    textAlign?: 'left' | 'center' | 'right';
+    scale?: number;
   };
 }
 

@@ -99,6 +99,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     text: footerText = 'Sigam a página para os melhores vídeos!',
     fontSize: footerFontSize = 26,
     color: footerColor = '#9CA3AF',
+    yOffset: footerYOffset = 92,
+    textAlign: footerTextAlign = 'center',
+    scale: footerScale = 100,
   } = footer;
 
   const hasVideo = !!(videoUrl && videoUrl.trim().length > 0);
@@ -567,20 +570,23 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           <div
             style={{
               position: 'absolute',
-              bottom: 80,
-              width: '100%',
-              textAlign: 'center',
-              padding: '0 40px',
-              zIndex: 20,
+              top: `${footerYOffset}%`,
+              left: '5%',
+              width: '90%',
+              textAlign: footerTextAlign as any,
+              transform: 'translateY(-50%)',
+              zIndex: 25,
             }}
           >
             <p
               style={{
                 margin: 0,
-                fontSize: `${footerFontSize}px`,
-                fontWeight: 600,
+                fontSize: `${Math.round(footerFontSize * ((footerScale || 100) / 100))}px`,
+                fontWeight: 700,
                 color: footerColor,
-                textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                textShadow: isLightBg ? 'none' : '0 2px 8px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.8)',
+                letterSpacing: '0.01em',
+                lineHeight: 1.25,
               }}
             >
               {footerText}
