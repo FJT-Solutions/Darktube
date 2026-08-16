@@ -24,6 +24,8 @@ import {
   Maximize2,
   Palette,
   ShieldCheck,
+  Shield,
+  Image as ImageIcon,
   Video,
   FileText,
   Users,
@@ -61,8 +63,9 @@ export default function DarkClipsPage() {
   const [urlInput, setUrlInput] = useState("");
   const [importingUrls, setImportingUrls] = useState(false);
 
-  // Avatar Upload Ref
+  // Avatar and Watermark Upload Refs
   const avatarFileInputRef = React.useRef<HTMLInputElement>(null);
+  const watermarkFileInputRef = React.useRef<HTMLInputElement>(null);
 
   // AI Remodel State
   const [remodelingAi, setRemodelingAi] = useState(false);
@@ -78,11 +81,14 @@ export default function DarkClipsPage() {
     showHeader: true,
     paddingTop: 90,
     textAlign: "left" as "left" | "center" | "right",
+    scale: 100,
+    avatarSize: 76,
+    fontSize: 32,
   });
 
   const [headline, setHeadline] = useState({
-    mainText: 'MEU AMIGO: "COMPREI UM MIC NOVO, MANO."',
-    subText: "O DESGRAÇADO ENTRANDO NA CALL:",
+    mainText: 'Meu amigo: "Comprei um mic novo, mano."',
+    subText: "O desgraçado entrando na call:",
     showMainText: true,
     showSubText: true,
     fontFamily: 'Montserrat, Inter, sans-serif',
@@ -93,12 +99,27 @@ export default function DarkClipsPage() {
     mainTextAlign: "center" as "left" | "center" | "right",
     subTextAlign: "center" as "left" | "center" | "right",
     uppercase: true,
+    mainTextUppercase: true,
+    subTextUppercase: true,
     textShadow: true,
     mainTextYOffset: 17,
     subTextYOffset: 25,
   });
 
-
+  const [watermark, setWatermark] = useState({
+    enabled: false,
+    type: "text" as "text" | "image",
+    text: "@darkclips",
+    imageUrl: "",
+    position: "bottom-right" as "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "custom",
+    xOffset: 85,
+    yOffset: 92,
+    opacity: 70,
+    fontSize: 22,
+    scale: 100,
+    color: "#FFFFFF",
+    hasShadow: true,
+  });
 
   const [videoPlacement, setVideoPlacement] = useState({
     yOffset: 54,
@@ -286,6 +307,51 @@ export default function DarkClipsPage() {
     }
   };
 
+  const handleWatermarkFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setWatermark((w) => ({ ...w, imageUrl: result, type: 'image', enabled: true }));
+        toast.success("Logo da marca d'água carregado com sucesso!");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePasteWatermarkFromClipboard = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((t) => t.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const result = event.target?.result as string;
+            if (result) {
+              setWatermark((w) => ({ ...w, imageUrl: result, type: 'image', enabled: true }));
+              toast.success("Logo da marca d'água colado com sucesso!");
+            }
+          };
+          reader.readAsDataURL(blob);
+          return;
+        }
+      }
+      const text = await navigator.clipboard.readText();
+      if (text && (text.startsWith("http") || text.startsWith("data:image"))) {
+        setWatermark((w) => ({ ...w, imageUrl: text.trim(), type: 'image', enabled: true }));
+        toast.success("URL da logo colada com sucesso!");
+      } else {
+        toast.error("Nenhuma imagem encontrada na área de transferência.");
+      }
+    } catch {
+      toast.error("Permissão de clipboard necessária ou use Ctrl+V.");
+    }
+  };
+
   async function handleRemodelWithAi() {
     setRemodelingAi(true);
     try {
@@ -314,7 +380,6 @@ export default function DarkClipsPage() {
     }
   }
 
-
   async function handleRender() {
     if (!selectedClip?.video_url) {
       toast.error("Selecione um clipe de vídeo para renderizar.");
@@ -337,6 +402,7 @@ export default function DarkClipsPage() {
             headline,
             videoPlacement,
             background,
+            watermark,
             footer,
           },
           remodelData: {
@@ -486,13 +552,12 @@ export default function DarkClipsPage() {
               <div className="lg:col-span-7 space-y-6">
                 {/* 1. Cabeçalho do Perfil */}
                 <Card>
-
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Users className="h-4 w-4 text-primary" /> Cabeçalho do Perfil (Autor / Sua Página)
                       </CardTitle>
-                      <CardDescription className="text-xs">Personalize a foto, arroba e selo verificado.</CardDescription>
+                      <CardDescription className="text-xs">Personalize a foto, arroba, tamanho e selo verificado.</CardDescription>
                     </div>
                     <Switch
                       checked={profileHeader.showHeader}
@@ -577,6 +642,48 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
+                      {/* Dimensionamento e Escala do Cabeçalho */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-secondary/10 border border-border/40">
+                        <div>
+                          <Label className="text-[11px] font-semibold block">
+                            Escala Geral ({profileHeader.scale ?? 100}%)
+                          </Label>
+                          <Slider
+                            value={[profileHeader.scale ?? 100]}
+                            min={50}
+                            max={180}
+                            step={5}
+                            onValueChange={([v]) => setProfileHeader((p) => ({ ...p, scale: v }))}
+                            className="mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] font-semibold block">
+                            Tamanho Avatar ({profileHeader.avatarSize ?? 76}px)
+                          </Label>
+                          <Slider
+                            value={[profileHeader.avatarSize ?? 76]}
+                            min={40}
+                            max={140}
+                            step={2}
+                            onValueChange={([v]) => setProfileHeader((p) => ({ ...p, avatarSize: v }))}
+                            className="mt-2"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] font-semibold block">
+                            Fonte do Nome ({profileHeader.fontSize ?? 32}px)
+                          </Label>
+                          <Slider
+                            value={[profileHeader.fontSize ?? 32]}
+                            min={18}
+                            max={52}
+                            step={1}
+                            onValueChange={([v]) => setProfileHeader((p) => ({ ...p, fontSize: v }))}
+                            className="mt-2"
+                          />
+                        </div>
+                      </div>
 
                       {/* Posição Vertical do Cabeçalho */}
                       <div className="pt-1">
@@ -651,7 +758,7 @@ export default function DarkClipsPage() {
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Type className="h-4 w-4 text-primary" /> Título & Textos do Vídeo
                       </CardTitle>
-                      <CardDescription className="text-xs">Edite ou gere a chamada principal e o subtítulo com IA.</CardDescription>
+                      <CardDescription className="text-xs">Edite o texto principal e subtítulo com maiúsculas individuais.</CardDescription>
                     </div>
                     <Button
                       size="sm"
@@ -666,7 +773,7 @@ export default function DarkClipsPage() {
                   <CardContent className="p-4 pt-0 space-y-4">
                     {/* Texto Principal */}
                     <div className="p-3 rounded-xl bg-secondary/10 border border-border/50 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={headline.showMainText}
@@ -676,6 +783,15 @@ export default function DarkClipsPage() {
                         </div>
                         {headline.showMainText && (
                           <div className="flex items-center gap-2">
+                            {/* Toggle Individual Caixa Alta */}
+                            <div className="flex items-center gap-1.5 bg-secondary/30 px-2 py-0.5 rounded-md border border-border/40">
+                              <span className="text-[10px] font-semibold text-muted-foreground">MAIÚSCULAS:</span>
+                              <Switch
+                                checked={headline.mainTextUppercase ?? headline.uppercase ?? true}
+                                onCheckedChange={(v) => setHeadline((h) => ({ ...h, mainTextUppercase: v }))}
+                                className="scale-75 origin-right"
+                              />
+                            </div>
                             <span className="text-[10px] text-muted-foreground">Cor:</span>
                             <input
                               type="color"
@@ -700,7 +816,7 @@ export default function DarkClipsPage() {
                             value={headline.mainText}
                             onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
                             rows={2}
-                            className="text-xs mt-1 font-bold uppercase resize-none"
+                            className="text-xs mt-1 font-bold resize-none"
                             placeholder="Digite a chamada ou título principal..."
                           />
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -745,7 +861,7 @@ export default function DarkClipsPage() {
 
                     {/* Texto Secundário */}
                     <div className="p-3 rounded-xl bg-secondary/10 border border-border/50 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={headline.showSubText}
@@ -755,6 +871,15 @@ export default function DarkClipsPage() {
                         </div>
                         {headline.showSubText && (
                           <div className="flex items-center gap-2">
+                            {/* Toggle Individual Caixa Alta */}
+                            <div className="flex items-center gap-1.5 bg-secondary/30 px-2 py-0.5 rounded-md border border-border/40">
+                              <span className="text-[10px] font-semibold text-muted-foreground">MAIÚSCULAS:</span>
+                              <Switch
+                                checked={headline.subTextUppercase ?? headline.uppercase ?? true}
+                                onCheckedChange={(v) => setHeadline((h) => ({ ...h, subTextUppercase: v }))}
+                                className="scale-75 origin-right"
+                              />
+                            </div>
                             <span className="text-[10px] text-muted-foreground">Cor:</span>
                             <input
                               type="color"
@@ -770,7 +895,7 @@ export default function DarkClipsPage() {
                           <Input
                             value={headline.subText}
                             onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                            className="h-8 text-xs mt-1 font-semibold uppercase"
+                            className="h-8 text-xs mt-1 font-semibold"
                             placeholder="Digite o subtítulo ou desfecho..."
                           />
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
@@ -827,12 +952,12 @@ export default function DarkClipsPage() {
                       </div>
                       <div className="flex items-center justify-between pt-4 sm:pt-2">
                         <div>
-                          <Label className="text-xs font-semibold block">MAIÚSCULAS</Label>
-                          <span className="text-[10px] text-muted-foreground">Transformar todo texto em caixa alta</span>
+                          <Label className="text-xs font-semibold block">Sombra & Contraste 3D</Label>
+                          <span className="text-[10px] text-muted-foreground">Destaque profissional sobre fundos</span>
                         </div>
                         <Switch
-                          checked={headline.uppercase}
-                          onCheckedChange={(v) => setHeadline((h) => ({ ...h, uppercase: v }))}
+                          checked={headline.textShadow}
+                          onCheckedChange={(v) => setHeadline((h) => ({ ...h, textShadow: v }))}
                         />
                       </div>
                     </div>
@@ -915,6 +1040,194 @@ export default function DarkClipsPage() {
                   </CardContent>
                 </Card>
 
+                {/* 4. Marca D'água do Canal */}
+                <Card>
+                  <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-pink-500" /> Marca D'água do Canal (Branding)
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Adicione seu @arroba ou logo com transparência e posicione livremente na tela.
+                      </CardDescription>
+                    </div>
+                    <Switch
+                      checked={watermark.enabled}
+                      onCheckedChange={(v) => setWatermark((w) => ({ ...w, enabled: v }))}
+                    />
+                  </CardHeader>
+                  {watermark.enabled && (
+                    <CardContent className="p-4 pt-0 space-y-4">
+                      {/* Tipo de Marca D'água: Texto vs Imagem */}
+                      <div>
+                        <Label className="text-xs font-semibold">Formato da Marca D'água</Label>
+                        <div className="flex gap-2 mt-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={watermark.type === "text" ? "default" : "outline"}
+                            onClick={() => setWatermark((w) => ({ ...w, type: "text" }))}
+                            className="h-8 text-xs flex-1 gap-1.5"
+                          >
+                            <Type className="h-3.5 w-3.5" /> Texto / @Arroba
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={watermark.type === "image" ? "default" : "outline"}
+                            onClick={() => setWatermark((w) => ({ ...w, type: "image" }))}
+                            className="h-8 text-xs flex-1 gap-1.5"
+                          >
+                            <ImageIcon className="h-3.5 w-3.5" /> Logotipo / Imagem
+                          </Button>
+                        </div>
+                      </div>
+
+                      {watermark.type === "text" ? (
+                        <div className="space-y-3 p-3 rounded-xl bg-secondary/15 border border-border/50">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1">
+                              <Label className="text-xs font-semibold">Texto da Marca D'água</Label>
+                              <Input
+                                value={watermark.text}
+                                onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
+                                placeholder="@darkclips ou Seu Canal"
+                                className="h-8 text-xs mt-1 font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-semibold block mb-1">Cor</Label>
+                              <input
+                                type="color"
+                                value={watermark.color}
+                                onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
+                                className="w-8 h-8 rounded-lg cursor-pointer border border-border bg-transparent p-0.5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 p-3 rounded-xl bg-secondary/15 border border-border/50">
+                          <Label className="text-xs font-semibold">Logo da Marca D'água</Label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="file"
+                              ref={watermarkFileInputRef}
+                              onChange={handleWatermarkFileUpload}
+                              className="hidden"
+                              accept="image/*"
+                            />
+                            {watermark.imageUrl ? (
+                              <div className="w-12 h-12 rounded-lg border border-border bg-black/40 overflow-hidden flex items-center justify-center p-1">
+                                <img src={watermark.imageUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                              </div>
+                            ) : null}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => watermarkFileInputRef.current?.click()}
+                              className="h-8 text-xs gap-1.5 flex-1"
+                            >
+                              <Upload className="h-3.5 w-3.5" /> Enviar Logo PNG
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={handlePasteWatermarkFromClipboard}
+                              className="h-8 text-xs gap-1.5 flex-1"
+                            >
+                              <Copy className="h-3.5 w-3.5" /> Colar Imagem
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Posições Rápidas Predefinidas */}
+                      <div>
+                        <Label className="text-xs font-semibold">Posição na Tela</Label>
+                        <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                          {[
+                            { id: "top-left", label: "Superior Esq", x: 15, y: 5 },
+                            { id: "top-right", label: "Superior Dir", x: 85, y: 5 },
+                            { id: "center", label: "Centro", x: 50, y: 50 },
+                            { id: "bottom-left", label: "Inferior Esq", x: 15, y: 92 },
+                            { id: "bottom-right", label: "Inferior Dir", x: 85, y: 92 },
+                            { id: "custom", label: "Livre / Arrasto", x: watermark.xOffset, y: watermark.yOffset },
+                          ].map((pos) => (
+                            <Button
+                              key={pos.id}
+                              type="button"
+                              size="sm"
+                              variant={watermark.position === pos.id ? "default" : "outline"}
+                              onClick={() =>
+                                setWatermark((w) => ({
+                                  ...w,
+                                  position: pos.id as any,
+                                  xOffset: pos.x,
+                                  yOffset: pos.y,
+                                }))
+                              }
+                              className="h-7 text-[11px]"
+                            >
+                              {pos.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Controles de Opacidade, Escala e Posição X/Y */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <Label className="text-xs font-semibold">Opacidade ({watermark.opacity}%)</Label>
+                          <Slider
+                            value={[watermark.opacity]}
+                            min={10}
+                            max={100}
+                            step={5}
+                            onValueChange={([v]) => setWatermark((w) => ({ ...w, opacity: v }))}
+                            className="mt-2.5"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold">Tamanho / Escala ({watermark.scale}%)</Label>
+                          <Slider
+                            value={[watermark.scale]}
+                            min={50}
+                            max={180}
+                            step={5}
+                            onValueChange={([v]) => setWatermark((w) => ({ ...w, scale: v }))}
+                            className="mt-2.5"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold">Posição Horizontal X ({watermark.xOffset}%)</Label>
+                          <Slider
+                            value={[watermark.xOffset]}
+                            min={0}
+                            max={100}
+                            step={1}
+                            onValueChange={([v]) => setWatermark((w) => ({ ...w, xOffset: v, position: 'custom' }))}
+                            className="mt-2.5"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold">Posição Vertical Y ({watermark.yOffset}%)</Label>
+                          <Slider
+                            value={[watermark.yOffset]}
+                            min={0}
+                            max={100}
+                            step={1}
+                            onValueChange={([v]) => setWatermark((w) => ({ ...w, yOffset: v, position: 'custom' }))}
+                            className="mt-2.5"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+
               </div>
 
               {/* ── Right Column: Pré-visualização do Vídeo (5 cols) ── */}
@@ -973,10 +1286,12 @@ export default function DarkClipsPage() {
                       headline={headline}
                       videoPlacement={videoPlacement}
                       background={background}
+                      watermark={watermark}
                       footer={footer}
                       onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
                       onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
                       onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
+                      onUpdateWatermark={(updates) => setWatermark((w) => ({ ...w, ...updates }))}
                     />
                   </CardContent>
 

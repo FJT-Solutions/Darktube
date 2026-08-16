@@ -8,6 +8,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   headline = {},
   videoPlacement = {},
   background = {},
+  watermark = {},
   footer = {},
 }) => {
   const frame = useCurrentFrame();
@@ -21,7 +22,16 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     showHeader = true,
     paddingTop = 90,
     textAlign: headerTextAlign = 'left',
+    scale: headerScale = 100,
+    avatarSize = 76,
+    fontSize: headerFontSize = 32,
   } = profileHeader;
+
+  const headerMultiplier = (headerScale || 100) / 100;
+  const currentAvatarSize = Math.round((avatarSize || 76) * headerMultiplier);
+  const currentNameSize = Math.round((headerFontSize || 32) * headerMultiplier);
+  const currentHandleSize = Math.max(14, Math.round(currentNameSize * 0.75));
+  const currentBadgeSize = Math.max(16, Math.round(26 * headerMultiplier));
 
   // ── 2. Headline Defaults ──
   const {
@@ -37,10 +47,15 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     mainTextAlign,
     subTextAlign,
     uppercase = true,
+    mainTextUppercase,
+    subTextUppercase,
     textShadow = true,
     mainTextYOffset = 17,
     subTextYOffset = 25,
   } = headline;
+
+  const isMainUpper = typeof mainTextUppercase === 'boolean' ? mainTextUppercase : (uppercase ?? true);
+  const isSubUpper = typeof subTextUppercase === 'boolean' ? subTextUppercase : (uppercase ?? true);
 
   const activeMainAlign = mainTextAlign || textAlign || 'center';
   const activeSubAlign = subTextAlign || textAlign || 'center';
@@ -62,7 +77,23 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     customColor = '#000000',
   } = background;
 
-  // ── 5. Footer Defaults ──
+  // ── 5. Watermark Defaults ──
+  const {
+    enabled: watermarkEnabled = false,
+    type: watermarkType = 'text',
+    text: watermarkText = '@darkclips',
+    imageUrl: watermarkImageUrl = '',
+    position: watermarkPosition = 'bottom-right',
+    xOffset: watermarkX = 85,
+    yOffset: watermarkY = 92,
+    opacity: watermarkOpacity = 70,
+    fontSize: watermarkFontSize = 22,
+    scale: watermarkScale = 100,
+    color: watermarkColor = '#FFFFFF',
+    hasShadow: watermarkHasShadow = true,
+  } = watermark;
+
+  // ── 6. Footer Defaults ──
   const {
     showFooter = false,
     text: footerText = 'Sigam a página para os melhores vídeos!',
@@ -168,7 +199,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           fontFamily,
         }}
       >
-        {/* ── 1. Profile Header Layer (Alinhamento Independente) ── */}
+        {/* ── 1. Profile Header Layer (Alinhamento & Escala Independentes) ── */}
         {showHeader && (
           <div
             style={{
@@ -179,7 +210,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: headerTextAlign === 'center' ? 'center' : headerTextAlign === 'right' ? 'flex-end' : 'flex-start',
-              gap: 18,
+              gap: Math.round(18 * headerMultiplier),
               zIndex: 20,
             }}
           >
@@ -188,8 +219,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 src={avatarUrl}
                 alt="Avatar"
                 style={{
-                  width: 76,
-                  height: 76,
+                  width: currentAvatarSize,
+                  height: currentAvatarSize,
                   borderRadius: '50%',
                   objectFit: 'cover',
                   border: isLightBg ? '2px solid rgba(0, 0, 0, 0.15)' : '2px solid rgba(255, 255, 255, 0.25)',
@@ -199,15 +230,15 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             ) : (
               <div
                 style={{
-                  width: 76,
-                  height: 76,
+                  width: currentAvatarSize,
+                  height: currentAvatarSize,
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)',
                   border: '2px solid rgba(255, 255, 255, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 34,
+                  fontSize: Math.round(currentAvatarSize * 0.45),
                   fontWeight: 900,
                   color: '#ffffff',
                   boxShadow: '0 6px 16px rgba(0,0,0,0.6)',
@@ -218,10 +249,10 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: headerTextAlign === 'right' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * headerMultiplier) }}>
                 <span
                   style={{
-                    fontSize: 32,
+                    fontSize: `${currentNameSize}px`,
                     fontWeight: 800,
                     color: authorNameColor,
                     letterSpacing: '-0.02em',
@@ -233,7 +264,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
 
                 {/* Selo de Verificado Padrão Instagram (Azul) */}
                 {badgeType === 'blue' && (
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                  <svg width={currentBadgeSize} height={currentBadgeSize} viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                     <path
                       d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
                       fill="#38BDF8"
@@ -249,7 +280,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               {handle && (
                 <span
                   style={{
-                    fontSize: 24,
+                    fontSize: `${currentHandleSize}px`,
                     fontWeight: 600,
                     color: authorHandleColor,
                     marginTop: -2,
@@ -282,7 +313,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 fontWeight: 900,
                 color: primaryColor,
                 lineHeight: 1.25,
-                textTransform: uppercase ? 'uppercase' : 'none',
+                textTransform: isMainUpper ? 'uppercase' : 'none',
                 textShadow: computedMainShadow,
                 letterSpacing: '-0.01em',
               }}
@@ -311,7 +342,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 fontWeight: 800,
                 color: computedSecondaryColor,
                 lineHeight: 1.25,
-                textTransform: uppercase ? 'uppercase' : 'none',
+                textTransform: isSubUpper ? 'uppercase' : 'none',
                 textShadow: computedSubShadow,
               }}
             >
@@ -475,7 +506,63 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           )}
         </div>
 
-        {/* ── 5. Footer / CTA Layer ── */}
+        {/* ── 5. Watermark Layer (Marca d'água do Canal) ── */}
+        {watermarkEnabled && (
+          <div
+            style={{
+              position: 'absolute',
+              ...(watermarkPosition === 'custom'
+                ? { top: `${watermarkY}%`, left: `${watermarkX}%`, transform: 'translate(-50%, -50%)' }
+                : watermarkPosition === 'top-left'
+                ? { top: '3%', left: '5%' }
+                : watermarkPosition === 'top-right'
+                ? { top: '3%', right: '5%' }
+                : watermarkPosition === 'bottom-left'
+                ? { bottom: '3%', left: '5%' }
+                : watermarkPosition === 'center'
+                ? { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+                : { bottom: '3%', right: '5%' }),
+              opacity: (watermarkOpacity || 70) / 100,
+              zIndex: 35,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {watermarkType === 'image' && watermarkImageUrl ? (
+              <img
+                src={watermarkImageUrl}
+                alt="Marca d'água"
+                style={{
+                  width: `${Math.round(100 * ((watermarkScale || 100) / 100))}px`,
+                  height: 'auto',
+                  objectFit: 'contain',
+                  filter: watermarkHasShadow ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.85))' : 'none',
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  fontSize: `${Math.round((watermarkFontSize || 22) * ((watermarkScale || 100) / 100))}px`,
+                  fontWeight: 800,
+                  color: isLightBg && watermarkPosition !== 'custom' && (watermarkColor === '#FFFFFF' || watermarkColor === '#ffffff') ? '#09090b' : watermarkColor,
+                  letterSpacing: '0.04em',
+                  textShadow: watermarkHasShadow ? '0 2px 8px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.8)' : 'none',
+                  backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.35)',
+                  padding: '5px 12px',
+                  borderRadius: 10,
+                  backdropFilter: 'blur(6px)',
+                  border: isLightBg ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.12)',
+                }}
+              >
+                {watermarkText || '@darkclips'}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── 6. Footer / CTA Layer ── */}
         {showFooter && footerText && (
           <div
             style={{

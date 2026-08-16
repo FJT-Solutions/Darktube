@@ -15,6 +15,7 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   onUpdateHeaderPadding?: (paddingTop: number) => void;
   onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number }) => void;
   onUpdateVideoPlacement?: (placement: { yOffset?: number; scale?: number; borderRadius?: number }) => void;
+  onUpdateWatermark?: (updates: { xOffset?: number; yOffset?: number; position?: 'custom' }) => void;
 }
 
 export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
@@ -26,6 +27,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   onUpdateHeaderPadding,
   onUpdateHeadline,
   onUpdateVideoPlacement,
+  onUpdateWatermark,
   ...inputProps
 }) => {
   const durationInFrames = Math.max(30, Math.floor((durationInSeconds || 15) * fps));
@@ -33,16 +35,19 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const playerRef = useRef<PlayerRef>(null);
 
   // Active layer being dragged
-  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video'>('none');
-  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video'>('none');
+  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark'>('none');
+  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark'>('none');
   const [dragging, setDragging] = useState<boolean>(false);
   const [dragStartY, setDragStartY] = useState<number>(0);
-  const [dragInitialVal, setDragInitialVal] = useState<number>(0);
+  const [dragStartX, setDragStartX] = useState<number>(0);
+  const [dragInitialValY, setDragInitialValY] = useState<number>(0);
+  const [dragInitialValX, setDragInitialValX] = useState<number>(0);
 
   const {
     profileHeader = {},
     headline = {},
     videoPlacement = {},
+    watermark = {},
   } = inputProps;
 
   const headerPadding = profileHeader.paddingTop ?? 90;
@@ -50,25 +55,31 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const subTextY = headline.subTextYOffset ?? 25;
   const videoY = videoPlacement.yOffset ?? 52;
   const videoScale = videoPlacement.scale ?? 92;
+  const watermarkX = watermark.xOffset ?? 85;
+  const watermarkY = watermark.yOffset ?? 92;
 
   // Video Url
   const activeVideoUrl = videoUrl || "";
 
   // Handle Drag Start
-  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video', e: React.PointerEvent) => {
+  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark', e: React.PointerEvent) => {
     e.stopPropagation();
     setActiveLayer(layer);
     setDragging(true);
     setDragStartY(e.clientY);
+    setDragStartX(e.clientX);
 
     if (layer === 'header') {
-      setDragInitialVal(headerPadding);
+      setDragInitialValY(headerPadding);
     } else if (layer === 'mainText') {
-      setDragInitialVal(mainTextY);
+      setDragInitialValY(mainTextY);
     } else if (layer === 'subText') {
-      setDragInitialVal(subTextY);
+      setDragInitialValY(subTextY);
     } else if (layer === 'video') {
-      setDragInitialVal(videoY);
+      setDragInitialValY(videoY);
+    } else if (layer === 'watermark') {
+      setDragInitialValX(watermarkX);
+      setDragInitialValY(watermarkY);
     }
   };
 
@@ -78,21 +89,27 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       if (!dragging || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const deltaY = e.clientY - dragStartY;
+      const deltaX = e.clientX - dragStartX;
       const percentDeltaY = (deltaY / rect.height) * 100;
+      const percentDeltaX = (deltaX / rect.width) * 100;
 
       if (activeLayer === 'header' && onUpdateHeaderPadding) {
         const scaleFactor = 1920 / rect.height;
-        const newPadding = Math.max(0, Math.min(800, Math.round(dragInitialVal + deltaY * scaleFactor)));
+        const newPadding = Math.max(0, Math.min(800, Math.round(dragInitialValY + deltaY * scaleFactor)));
         onUpdateHeaderPadding(newPadding);
       } else if (activeLayer === 'mainText' && onUpdateHeadline) {
-        const newY = Math.max(0, Math.min(95, Math.round(dragInitialVal + percentDeltaY)));
+        const newY = Math.max(0, Math.min(95, Math.round(dragInitialValY + percentDeltaY)));
         onUpdateHeadline({ mainTextYOffset: newY });
       } else if (activeLayer === 'subText' && onUpdateHeadline) {
-        const newY = Math.max(0, Math.min(95, Math.round(dragInitialVal + percentDeltaY)));
+        const newY = Math.max(0, Math.min(95, Math.round(dragInitialValY + percentDeltaY)));
         onUpdateHeadline({ subTextYOffset: newY });
       } else if (activeLayer === 'video' && onUpdateVideoPlacement) {
-        const newY = Math.max(0, Math.min(95, Math.round(dragInitialVal + percentDeltaY)));
+        const newY = Math.max(0, Math.min(95, Math.round(dragInitialValY + percentDeltaY)));
         onUpdateVideoPlacement({ yOffset: newY });
+      } else if (activeLayer === 'watermark' && onUpdateWatermark) {
+        const newX = Math.max(0, Math.min(100, Math.round(dragInitialValX + percentDeltaX)));
+        const newY = Math.max(0, Math.min(100, Math.round(dragInitialValY + percentDeltaY)));
+        onUpdateWatermark({ xOffset: newX, yOffset: newY, position: 'custom' });
       }
     };
 
@@ -111,7 +128,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [dragging, activeLayer, dragStartY, dragInitialVal, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement]);
+  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark]);
 
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-[340px] mx-auto select-none">
@@ -131,6 +148,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                   ? `Título Principal (${mainTextY}%)`
                   : activeLayer === 'subText'
                   ? `Subtítulo (${subTextY}%)`
+                  : activeLayer === 'watermark'
+                  ? `Marca D'água (X: ${watermarkX}%, Y: ${watermarkY}%)`
                   : `Vídeo (${videoY}%)`}
               </strong>
             </span>
@@ -165,6 +184,11 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               yOffset: videoY,
               scale: videoScale,
             },
+            watermark: {
+              ...watermark,
+              xOffset: watermarkX,
+              yOffset: watermarkY,
+            },
             durationInSeconds,
           }}
           durationInFrames={durationInFrames}
@@ -196,7 +220,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                 top: `${(headerPadding / 1920) * 100}%`,
                 left: '4%',
                 width: '92%',
-                height: '7%',
+                height: `${Math.round(7 * ((profileHeader.scale || 100) / 100))}%`,
                 cursor: 'grab',
               }}
               className={`pointer-events-auto transition-all rounded-lg ${
@@ -298,12 +322,41 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               </div>
             )}
           </div>
+
+          {/* 5. Watermark Layer Drag Box */}
+          {watermark.enabled && (
+            <div
+              style={{
+                position: 'absolute',
+                top: `${watermarkY}%`,
+                left: `${watermarkX}%`,
+                transform: 'translate(-50%, -50%)',
+                minWidth: '28%',
+                height: '5%',
+                cursor: 'grab',
+              }}
+              className={`pointer-events-auto transition-all rounded-lg ${
+                activeLayer === 'watermark'
+                  ? 'ring-2 ring-pink-500 bg-pink-500/20 shadow-lg'
+                  : 'hover:ring-1 hover:ring-pink-400/70 hover:bg-pink-500/10'
+              }`}
+              onPointerDown={(e) => handlePointerDown('watermark', e)}
+              onMouseEnter={() => setHoveredLayer('watermark')}
+              onMouseLeave={() => setHoveredLayer('none')}
+            >
+              {(activeLayer === 'watermark' || hoveredLayer === 'watermark') && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                  <Move className="h-2.5 w-2.5" /> MARCA D'ÁGUA (X: {watermarkX}%, Y: {watermarkY}%)
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Stage Hint Footer */}
       <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, o <strong>Título</strong>, o <strong>Subtítulo</strong> ou o <strong>Vídeo</strong> para qualquer ponto da tela.
+        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong> ou <strong>Marca D'água</strong> para qualquer posição.
       </p>
     </div>
   );

@@ -240,6 +240,9 @@ export interface DarkClipsVideoProps {
     paddingTop?: number;
     yOffset?: number;
     textAlign?: 'left' | 'center' | 'right';
+    scale?: number; // 50 to 180 percentage
+    avatarSize?: number; // px
+    fontSize?: number; // px
   };
 
   // Headline
@@ -256,13 +259,29 @@ export interface DarkClipsVideoProps {
     mainTextAlign?: 'left' | 'center' | 'right';
     subTextAlign?: 'left' | 'center' | 'right';
     uppercase?: boolean;
+    mainTextUppercase?: boolean;
+    subTextUppercase?: boolean;
     textShadow?: boolean;
     yOffset?: number;
     mainTextYOffset?: number; // percentage or px
     subTextYOffset?: number; // percentage or px
   };
 
-
+  // Watermark / Marca d'água
+  watermark?: {
+    enabled?: boolean;
+    type?: 'text' | 'image';
+    text?: string;
+    imageUrl?: string;
+    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom';
+    xOffset?: number; // 0 - 100 percentage
+    yOffset?: number; // 0 - 100 percentage
+    opacity?: number; // 10 - 100 percentage
+    fontSize?: number; // px
+    scale?: number; // 50 - 180 percentage
+    color?: string;
+    hasShadow?: boolean;
+  };
 
   // Video Placement
   videoPlacement?: {
