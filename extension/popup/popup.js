@@ -302,8 +302,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Auto-Miner Action (Infinite Scroll & Session Accumulator)
+  const autoMineBtn = document.getElementById('auto-mine-btn');
+  let isMiningState = false;
+
+  autoMineBtn?.addEventListener('click', async () => {
+    if (isMiningState) {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          chrome.tabs.sendMessage(tab.id, { action: 'STOP_AUTO_MINE' });
+        }
+      } catch {}
+      isMiningState = false;
+      autoMineBtn.classList.remove('mining');
+      autoMineBtn.innerHTML = '<span>🚀 Rastrear Mais</span>';
+      return;
+    }
+
+    isMiningState = true;
+    autoMineBtn.classList.add('mining');
+    autoMineBtn.innerHTML = '<span>⏳ Rastreando...</span>';
+    statusText.textContent = 'Auto-minerando perfil no Instagram...';
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) return;
+
+      chrome.tabs.sendMessage(tab.id, { action: 'START_AUTO_MINE', targetCount: 48 }, () => {
+        let pollCount = 0;
+        const pollInterval = setInterval(() => {
+          pollCount++;
+          chrome.tabs.sendMessage(tab.id, { action: 'GET_PAGE_VIDEOS' }, (response) => {
+            if (response && response.videos) {
+              rawDetectedVideos = response.videos;
+              applyFilterAndRender();
+              statusText.textContent = `🚀 Minerados: ${rawDetectedVideos.length} posts`;
+            }
+          });
+
+          if (pollCount >= 15 || !isMiningState) {
+            clearInterval(pollInterval);
+            isMiningState = false;
+            autoMineBtn.classList.remove('mining');
+            autoMineBtn.innerHTML = '<span>🚀 Rastrear Mais</span>';
+          }
+        }, 800);
+      });
+    } catch (e) {
+      console.error(e);
+      isMiningState = false;
+      autoMineBtn.classList.remove('mining');
+      autoMineBtn.innerHTML = '<span>🚀 Rastrear Mais</span>';
+    }
+  });
+
   refreshBtn.addEventListener('click', scanCurrentTab);
 
   // Initial tab scan
   scanCurrentTab();
+
 });

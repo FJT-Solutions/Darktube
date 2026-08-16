@@ -1,7 +1,12 @@
-// Dark Clips - Instagram Content Script (Robust Grid, Reels & Carousel Scanner)
+// Dark Clips - Instagram Content Script (Continuous Accumulator & Auto-Miner)
 (function () {
   const SCRIPT_NAME = 'DarkClips-Instagram';
   const DEFAULT_API_URL = 'https://darktube.fjt-solutions.com';
+
+  // In-memory persistent map of all posts accumulated during this page session
+  const accumulatedSessionPosts = new Map();
+  let isAutoMining = false;
+  let autoMineInterval = null;
 
   function showToast(message, isError = false) {
     try {
@@ -161,7 +166,6 @@
         caption = captionEl.textContent?.trim() || '';
       }
 
-      // Likes & Comments
       let likes = 0;
       let comments = 0;
 
@@ -178,7 +182,6 @@
       const isVideo = !!video;
       const isCarousel = !!container.querySelector('div[aria-label*="carrossel"], div[aria-label*="carousel"], ul[class*="carousel"]');
 
-      // Best thumbnail resolution
       let thumbUrl = '';
       if (video) {
         thumbUrl = video.getAttribute('poster') || '';
@@ -211,27 +214,18 @@
   }
 
   // Extract ALL visible grid posts on Profile, Feed, or Search (contains `/p/` or `/reel/`)
-  function extractAllVisibleGridPosts() {
-    const posts = [];
-    const seenUrls = new Set();
+  function scanAndAccumulateGridPosts() {
     const profileInfo = getPageProfileInfo();
-
-    // Universal selector: match any anchor that contains /p/, /reel/, /reels/ anywhere in href
     const anchors = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], div[role="presentation"] a, main a[href]');
 
     anchors.forEach((a) => {
       const rawHref = a.getAttribute('href');
       if (!rawHref) return;
 
-      // Filter only post or reel links
       if (!rawHref.includes('/p/') && !rawHref.includes('/reel/')) return;
 
-      // Normalize URL (e.g. /p/C9abc... -> https://www.instagram.com/p/C9abc/)
       const cleanPath = rawHref.split('?')[0].split('#')[0];
       const fullUrl = cleanPath.startsWith('http') ? cleanPath : `https://www.instagram.com${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
-
-      if (seenUrls.has(fullUrl)) return;
-      seenUrls.add(fullUrl);
 
       // Extract Thumbnail
       const img = a.querySelector('img');
@@ -243,7 +237,6 @@
         }
       }
       if (!thumbUrl) {
-        // Check background-image
         const bgDiv = a.querySelector('div[style*="background-image"]');
         if (bgDiv) {
           const match = bgDiv.style.backgroundImage.match(/url\(["']?([^"']+)["']?\)/);
@@ -251,15 +244,12 @@
         }
       }
 
-      // Extract Caption
       const caption = img?.getAttribute('alt') || a.getAttribute('aria-label') || '';
 
-      // Type detection
       const isReel = cleanPath.includes('/reel') || !!a.querySelector('svg[aria-label*="Reel"], svg[aria-label*="Vídeo"], svg[aria-label*="Clip"], svg[aria-label*="Reels"]');
       const isCarousel = !!a.querySelector('svg[aria-label*="Carrossel"], svg[aria-label*="Carousel"], svg[aria-label*="Publicação com várias"]');
       const postType = isReel ? 'reel' : isCarousel ? 'carousel' : 'post';
 
-      // Metrics detection
       let likes = 0;
       let comments = 0;
       let views = 0;
@@ -276,7 +266,6 @@
         if (viewMatch) views = parseMetricNumber(viewMatch[1]);
       }
 
-      // Check inner list elements (on hover or DOM overlay)
       const listItems = a.querySelectorAll('ul li, div[class*="Overlay"] span');
       if (listItems.length >= 1 && likes === 0) {
         likes = parseMetricNumber(listItems[0]?.textContent);
@@ -289,7 +278,7 @@
         views = (likes * 4) + (comments * 15);
       }
 
-      posts.push({
+      const postData = {
         url: fullUrl,
         videoUrl: fullUrl,
         thumbnailUrl: thumbUrl,
@@ -305,16 +294,59 @@
           comments,
           views: views || (likes * 4) || 100
         }
-      });
+      };
+
+      accumulatedSessionPosts.set(fullUrl, postData);
     });
 
-    return posts;
+    return Array.from(accumulatedSessionPosts.values());
+  }
+
+  // Run periodic and scroll listeners to accumulate posts in real-time
+  window.addEventListener('scroll', () => {
+    scanAndAccumulateGridPosts();
+  }, { passive: true });
+
+  // Initial Scan
+  setTimeout(scanAndAccumulateGridPosts, 1000);
+  setInterval(scanAndAccumulateGridPosts, 3000);
+
+  // Auto-Miner: Programmatically scrolls down and collects batches of posts
+  function startAutoMiner(targetCount = 48, onProgress) {
+    if (isAutoMining) return;
+    isAutoMining = true;
+
+    showToast(`Iniciando auto-mineração (alvo: ${targetCount} posts)...`);
+
+    let scrollAttempts = 0;
+    const maxAttempts = 30;
+
+    autoMineInterval = setInterval(() => {
+      window.scrollBy({ top: 1200, behavior: 'smooth' });
+      scanAndAccumulateGridPosts();
+      scrollAttempts++;
+
+      const currentTotal = accumulatedSessionPosts.size;
+      if (onProgress) onProgress(currentTotal);
+
+      if (currentTotal >= targetCount || scrollAttempts >= maxAttempts) {
+        stopAutoMiner();
+        showToast(`Auto-mineração concluída: ${currentTotal} posts coletados!`);
+      }
+    }, 600);
+  }
+
+  function stopAutoMiner() {
+    isAutoMining = false;
+    if (autoMineInterval) {
+      clearInterval(autoMineInterval);
+      autoMineInterval = null;
+    }
   }
 
   // Inject 1 Single Clean Button into Modal / Active Post
   function injectButtons() {
     try {
-      // 1. Check if a Dialog Modal is currently open
       const dialog = document.querySelector('div[role="dialog"]');
       if (dialog) {
         if (!dialog.querySelector('.dark-clips-inject-btn')) {
@@ -334,7 +366,6 @@
         return;
       }
 
-      // 2. Standalone Feed Articles
       const standaloneArticles = document.querySelectorAll('article:not([role="dialog"] article)');
       standaloneArticles.forEach((article) => {
         if (article.querySelector('.dark-clips-inject-btn')) return;
@@ -375,13 +406,14 @@
 
   setInterval(injectButtons, 1500);
 
-  // Message listener for Extension Popup (Scan All Visible Profile Grid Posts)
+  // Message listener for Extension Popup (Scan All Accumulated & Auto-Mine)
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'GET_PAGE_VIDEOS') {
+      scanAndAccumulateGridPosts();
+
       let videos = [];
       const seen = new Set();
 
-      // 1. If inside modal/dialog, put active post first
       const dialog = document.querySelector('div[role="dialog"]');
       if (dialog) {
         const modalPost = extractModalPostData(dialog);
@@ -391,16 +423,13 @@
         }
       }
 
-      // 2. Extract all grid posts on profile or feed
-      const gridPosts = extractAllVisibleGridPosts();
-      gridPosts.forEach((p) => {
-        if (!seen.has(p.url)) {
-          seen.add(p.url);
-          videos.push(p);
+      accumulatedSessionPosts.forEach((post) => {
+        if (!seen.has(post.url)) {
+          seen.add(post.url);
+          videos.push(post);
         }
       });
 
-      // 3. Fallback to current URL if single reel page
       if (videos.length === 0 && window.location.href.includes('/reel/')) {
         const profileInfo = getPageProfileInfo();
         videos.push({
@@ -417,10 +446,18 @@
       sendResponse({
         success: true,
         videos,
+        totalAccumulated: accumulatedSessionPosts.size,
         profile: getPageProfileInfo()
       });
+    } else if (request.action === 'START_AUTO_MINE') {
+      const target = request.targetCount || 48;
+      startAutoMiner(target);
+      sendResponse({ success: true, isMining: true });
+    } else if (request.action === 'STOP_AUTO_MINE') {
+      stopAutoMiner();
+      sendResponse({ success: true, isMining: false });
     }
   });
 
-  console.log(`[${SCRIPT_NAME}] Ativo no Instagram (Varredura Completa de Grade + Perfil)!`);
+  console.log(`[${SCRIPT_NAME}] Ativo no Instagram (Continuous Accumulator & Auto-Miner)!`);
 })();
