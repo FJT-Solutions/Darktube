@@ -1,33 +1,40 @@
 // Dark Clips - YouTube Shorts Content Script
 (function () {
   const SCRIPT_NAME = 'DarkClips-YouTube';
+  const DEFAULT_API_URL = 'https://darktube.fjt-solutions.com';
 
   function showToast(message, isError = false) {
-    const existing = document.querySelector('.dark-clips-toast');
-    if (existing) existing.remove();
+    try {
+      const existing = document.querySelector('.dark-clips-toast');
+      if (existing) existing.remove();
 
-    const toast = document.createElement('div');
-    toast.className = 'dark-clips-toast';
-    if (isError) toast.style.borderLeftColor = '#ef4444';
-    toast.innerHTML = `<span>${isError ? '⚠️' : '⚡'}</span> <span>${message}</span>`;
-    document.body.appendChild(toast);
+      const toast = document.createElement('div');
+      toast.className = 'dark-clips-toast';
+      if (isError) toast.style.borderLeftColor = '#ef4444';
+      toast.innerHTML = `<span>${isError ? '⚠️' : '⚡'}</span> <span>${message}</span>`;
+      document.body.appendChild(toast);
 
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transition = 'opacity 0.4s ease';
-      setTimeout(() => toast.remove(), 400);
-    }, 3500);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    } catch {}
   }
 
   async function getAuthAndApi() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['darktube_api_url', 'darktube_token', 'darktube_user'], (res) => {
-        resolve({
-          baseUrl: res.darktube_api_url || 'http://localhost:3000',
-          token: res.darktube_token || null,
-          user: res.darktube_user || null
+      try {
+        chrome.storage.local.get(['darktube_api_url', 'darktube_token', 'darktube_user'], (res) => {
+          resolve({
+            baseUrl: res?.darktube_api_url || DEFAULT_API_URL,
+            token: res?.darktube_token || null,
+            user: res?.darktube_user || null
+          });
         });
-      });
+      } catch {
+        resolve({ baseUrl: DEFAULT_API_URL, token: null, user: null });
+      }
     });
   }
 
@@ -53,7 +60,6 @@
           userId: user?.id || null
         })
       });
-
 
       const result = await response.json();
 
@@ -86,73 +92,86 @@
           `;
         }, 3000);
       }
-      showToast('Certifique-se de que o DarkTube está rodando em http://localhost:3000', true);
+      showToast('Falha ao conectar com https://darktube.fjt-solutions.com', true);
     }
   }
 
   function extractShortsData(container) {
-    const currentUrl = window.location.href;
+    try {
+      const currentUrl = window.location.href;
 
-    let authorName = 'YouTube Creator';
-    let authorHandle = '@channel';
-    let authorAvatar = '';
+      let authorName = 'YouTube Creator';
+      let authorHandle = '@channel';
+      let authorAvatar = '';
 
-    const channelLink = container.querySelector('a.yt-spec-button-shape-next, a[href^="/@"]');
-    if (channelLink) {
-      authorHandle = channelLink.getAttribute('href')?.replace(/\//g, '') || '@channel';
-      if (!authorHandle.startsWith('@')) authorHandle = `@${authorHandle}`;
-      authorName = channelLink.textContent?.trim() || authorHandle;
+      const channelLink = container.querySelector('a.yt-spec-button-shape-next, a[href^="/@"]');
+      if (channelLink) {
+        authorHandle = channelLink.getAttribute('href')?.replace(/\//g, '') || '@channel';
+        if (!authorHandle.startsWith('@')) authorHandle = `@${authorHandle}`;
+        authorName = channelLink.textContent?.trim() || authorHandle;
+      }
+
+      const avatarImg = container.querySelector('#channel-avatar img, img[alt*="avatar"]');
+      if (avatarImg) {
+        authorAvatar = avatarImg.getAttribute('src') || '';
+      }
+
+      let caption = '';
+      const titleEl = container.querySelector('h2.title, h2[class*="title"], yt-formatted-string[class*="title"]');
+      if (titleEl) {
+        caption = titleEl.textContent?.trim() || '';
+      }
+
+      return {
+        url: currentUrl,
+        videoUrl: currentUrl,
+        authorName,
+        authorHandle,
+        authorAvatar,
+        originalCaption: caption,
+        platform: 'youtube',
+        metrics: {}
+      };
+    } catch {
+      return {
+        url: window.location.href,
+        videoUrl: window.location.href,
+        authorName: 'YouTube Creator',
+        authorHandle: '@channel',
+        platform: 'youtube',
+        metrics: {}
+      };
     }
-
-    const avatarImg = container.querySelector('#channel-avatar img, img[alt*="avatar"]');
-    if (avatarImg) {
-      authorAvatar = avatarImg.getAttribute('src') || '';
-    }
-
-    let caption = '';
-    const titleEl = container.querySelector('h2.title, h2[class*="title"], yt-formatted-string[class*="title"]');
-    if (titleEl) {
-      caption = titleEl.textContent?.trim() || '';
-    }
-
-    return {
-      url: currentUrl,
-      videoUrl: currentUrl,
-      authorName,
-      authorHandle,
-      authorAvatar,
-      originalCaption: caption,
-      platform: 'youtube',
-      metrics: {}
-    };
   }
 
   function injectButtons() {
-    const shortsContainers = document.querySelectorAll('ytd-reel-video-renderer[is-active], ytd-reel-video-renderer, ytd-shorts');
+    try {
+      const shortsContainers = document.querySelectorAll('ytd-reel-video-renderer[is-active], ytd-reel-video-renderer, ytd-shorts');
 
-    shortsContainers.forEach((container) => {
-      if (container.querySelector('.dark-clips-inject-btn')) return;
+      shortsContainers.forEach((container) => {
+        if (container.querySelector('.dark-clips-inject-btn')) return;
 
-      const actionsBar = container.querySelector('#actions, #button-bar');
-      if (!actionsBar) return;
+        const actionsBar = container.querySelector('#actions, #button-bar');
+        if (!actionsBar) return;
 
-      const btn = document.createElement('button');
-      btn.className = 'dark-clips-inject-btn';
-      btn.style.margin = '8px 0';
-      btn.innerHTML = `
-        <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        <span>Dark Clips</span>
-      `;
+        const btn = document.createElement('button');
+        btn.className = 'dark-clips-inject-btn';
+        btn.style.margin = '8px 0';
+        btn.innerHTML = `
+          <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <span>Dark Clips</span>
+        `;
 
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const data = extractShortsData(container);
-        sendToDarkClips(data, btn);
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const data = extractShortsData(container);
+          sendToDarkClips(data, btn);
+        });
+
+        actionsBar.prepend(btn);
       });
-
-      actionsBar.prepend(btn);
-    });
+    } catch {}
   }
 
   setInterval(injectButtons, 1500);
@@ -165,7 +184,6 @@
       }
       sendResponse({ success: true, videos });
     }
-    return true;
   });
 
   console.log(`[${SCRIPT_NAME}] Ativo no YouTube Shorts!`);

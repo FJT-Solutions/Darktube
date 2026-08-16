@@ -1,16 +1,10 @@
-// Dark Clips Popup Logic with User Authentication
+// Dark Clips Popup Logic (Production Connected)
 document.addEventListener('DOMContentLoaded', async () => {
   const videoCountEl = document.getElementById('video-count');
   const captureAllBtn = document.getElementById('capture-all-btn');
   const videosListEl = document.getElementById('videos-list');
   const refreshBtn = document.getElementById('refresh-btn');
   const statusText = document.getElementById('status-text');
-  const statusDot = document.getElementById('status-dot');
-  const settingsToggle = document.getElementById('settings-toggle');
-  const settingsPanel = document.getElementById('settings-panel');
-  const apiUrlInput = document.getElementById('api-url');
-  const saveSettingsBtn = document.getElementById('save-settings-btn');
-  const openStudioLink = document.getElementById('open-studio-link');
 
   // Auth UI elements
   const userLoggedInView = document.getElementById('user-logged-in-view');
@@ -29,12 +23,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentUser = null;
   let currentToken = null;
 
-  // 1. Load initial settings and auth state
-  chrome.storage.local.get(['darktube_api_url', 'darktube_user', 'darktube_token'], (res) => {
-    const url = res.darktube_api_url || 'http://localhost:3000';
-    apiUrlInput.value = url;
-    if (openStudioLink) openStudioLink.href = `${url.replace(/\/$/, '')}/dark-clips`;
+  const DARKTUBE_BASE_URL = 'https://darktube.fjt-solutions.com';
 
+  // 1. Load initial auth state
+  chrome.storage.local.get(['darktube_user', 'darktube_token'], (res) => {
     if (res.darktube_user && res.darktube_token) {
       currentUser = res.darktube_user;
       currentToken = res.darktube_token;
@@ -44,29 +36,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Settings toggle
-  settingsToggle.addEventListener('click', () => {
-    settingsPanel.classList.toggle('hidden');
-  });
-
-  // Save server settings
-  saveSettingsBtn.addEventListener('click', () => {
-    const val = apiUrlInput.value.trim() || 'http://localhost:3000';
-    chrome.storage.local.set({ darktube_api_url: val }, () => {
-      saveSettingsBtn.textContent = 'Salvo!';
-      setTimeout(() => (saveSettingsBtn.textContent = 'Salvar'), 1500);
-      if (openStudioLink) openStudioLink.href = `${val.replace(/\/$/, '')}/dark-clips`;
-    });
-  });
-
-  async function getApiUrl() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get(['darktube_api_url'], (res) => {
-        resolve(res.darktube_api_url || 'http://localhost:3000');
-      });
-    });
-  }
-
   // 2. Auth State Renderer
   function renderAuthState(isLoggedIn) {
     if (isLoggedIn && currentUser) {
@@ -74,8 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       userLoggedOutView.classList.add('hidden');
       userDisplayName.textContent = currentUser.name || 'Minha Conta';
       userDisplayEmail.textContent = currentUser.email || '';
-      userAvatarInitial.textContent = (currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase();
-      statusText.textContent = `Logado como ${currentUser.name || currentUser.email}`;
+      userAvatarInitial.textContent = (currentUser.name || currentUser.email || 'D').charAt(0).toUpperCase();
+      statusText.textContent = `Logado: ${currentUser.name || currentUser.email}`;
     } else {
       userLoggedInView.classList.add('hidden');
       userLoggedOutView.classList.remove('hidden');
@@ -96,8 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loginErrorMsg.classList.add('hidden');
 
     try {
-      const baseUrl = await getApiUrl();
-      const endpoint = `${baseUrl.replace(/\/$/, '')}/api/auth/extension-login`;
+      const endpoint = `${DARKTUBE_BASE_URL}/api/auth/extension-login`;
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -113,7 +81,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         chrome.storage.local.set({
           darktube_user: data.user,
-          darktube_token: data.token
+          darktube_token: data.token,
+          darktube_api_url: DARKTUBE_BASE_URL
         }, () => {
           loginPasswordInput.value = '';
           renderAuthState(true);
@@ -137,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentUser = null;
       currentToken = null;
       renderAuthState(false);
-      statusText.textContent = 'Desconectado';
+      statusText.textContent = 'Pronto para minerar';
     });
   });
 
@@ -178,8 +147,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (detectedVideos.length === 0) {
       videosListEl.innerHTML = `
         <div class="empty-state">
-          <p>Nenhum vídeo detectado nesta aba.</p>
-          <span>Abra Instagram Reels, TikTok, Shorts ou X para minerar clipes.</span>
+          <p class="empty-title">Nenhum vídeo detectado</p>
+          <span class="empty-desc">Abra Instagram Reels, TikTok, Shorts ou X para minerar clipes.</span>
         </div>
       `;
       return;
@@ -214,8 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      const baseUrl = await getApiUrl();
-      const endpoint = `${baseUrl.replace(/\/$/, '')}/api/dark-clips/import`;
+      const endpoint = `${DARKTUBE_BASE_URL}/api/dark-clips/import`;
 
       const headers = { 'Content-Type': 'application/json' };
       if (currentToken) {
