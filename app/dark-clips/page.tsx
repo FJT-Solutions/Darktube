@@ -597,7 +597,7 @@ export default function DarkClipsPage() {
                         <div>
                           <Label className="text-xs font-semibold">Alinhamento do Cabeçalho</Label>
                           <div className="flex gap-1 mt-1.5">
-                            {(["left", "center"] as const).map((a) => (
+                            {(["left", "center", "right"] as const).map((a) => (
                               <Button
                                 key={a}
                                 type="button"
@@ -606,7 +606,7 @@ export default function DarkClipsPage() {
                                 onClick={() => setProfileHeader((p) => ({ ...p, textAlign: a }))}
                                 className="h-8 text-xs flex-1 capitalize"
                               >
-                                {a === "left" ? "Esquerda" : "Centro"}
+                                {a === "left" ? "Esquerda" : a === "center" ? "Centro" : "Direita"}
                               </Button>
                             ))}
                           </div>
