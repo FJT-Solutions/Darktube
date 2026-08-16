@@ -255,7 +255,10 @@ export interface DarkClipsVideoProps {
     uppercase?: boolean;
     textShadow?: boolean;
     yOffset?: number;
+    mainTextYOffset?: number; // percentage or px
+    subTextYOffset?: number; // percentage or px
   };
+
 
 
   // Video Placement

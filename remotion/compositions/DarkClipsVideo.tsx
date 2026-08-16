@@ -35,7 +35,10 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     textAlign = 'center',
     uppercase = true,
     textShadow = true,
+    mainTextYOffset = 17,
+    subTextYOffset = 25,
   } = headline;
+
 
 
   // ── 3. Video Placement Defaults ──
@@ -215,20 +218,18 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           </div>
         )}
 
-        {/* ── Headline Block ── */}
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-            textAlign: textAlign as any,
-            marginTop: showHeader ? 12 : `${paddingTop}px`,
-            padding: '0 20px',
-            zIndex: 10,
-          }}
-        >
-          {showMainText && mainText && (
+        {/* ── 2. Independent Main Text Layer (Setup) ── */}
+        {showMainText && mainText && (
+          <div
+            style={{
+              position: 'absolute',
+              top: `${mainTextYOffset}%`,
+              left: '5%',
+              width: '90%',
+              textAlign: textAlign as any,
+              zIndex: 15,
+            }}
+          >
             <h1
               style={{
                 margin: 0,
@@ -243,13 +244,25 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             >
               {mainText}
             </h1>
-          )}
+          </div>
+        )}
 
-          {showSubText && subText && (
+        {/* ── 3. Independent Sub Text Layer (Punchline) ── */}
+        {showSubText && subText && (
+          <div
+            style={{
+              position: 'absolute',
+              top: `${subTextYOffset}%`,
+              left: '5%',
+              width: '90%',
+              textAlign: textAlign as any,
+              zIndex: 15,
+            }}
+          >
             <h2
               style={{
                 margin: 0,
-                fontSize: `${Math.round(fontSize * 0.9)}px`,
+                fontSize: `${Math.round(fontSize * 0.88)}px`,
                 fontWeight: 800,
                 color: secondaryColor,
                 lineHeight: 1.25,
@@ -259,9 +272,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             >
               {subText}
             </h2>
-          )}
+          </div>
+        )}
 
-        </div>
 
         {/* ── Video Player Container ── */}
         {videoUrl && (

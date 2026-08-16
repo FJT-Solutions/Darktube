@@ -90,7 +90,10 @@ export default function DarkClipsPage() {
     textAlign: "center" as "left" | "center" | "right",
     uppercase: true,
     textShadow: true,
+    mainTextYOffset: 17,
+    subTextYOffset: 25,
   });
+
 
 
   const [videoPlacement, setVideoPlacement] = useState({
@@ -642,13 +645,28 @@ export default function DarkClipsPage() {
                         )}
                       </div>
                       {headline.showMainText ? (
-                        <Textarea
-                          value={headline.mainText}
-                          onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
-                          rows={2}
-                          className="text-xs mt-1 font-bold uppercase resize-none"
-                          placeholder="Digite a chamada principal do meme..."
-                        />
+                        <>
+                          <Textarea
+                            value={headline.mainText}
+                            onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
+                            rows={2}
+                            className="text-xs mt-1 font-bold uppercase resize-none"
+                            placeholder="Digite a chamada principal do meme..."
+                          />
+                          <div className="pt-2">
+                            <Label className="text-[11px] font-medium text-muted-foreground">
+                              Posição Vertical Y ({headline.mainTextYOffset ?? 17}%)
+                            </Label>
+                            <Slider
+                              value={[headline.mainTextYOffset ?? 17]}
+                              min={5}
+                              max={60}
+                              step={1}
+                              onValueChange={([v]) => setHeadline((h) => ({ ...h, mainTextYOffset: v }))}
+                              className="mt-2"
+                            />
+                          </div>
+                        </>
                       ) : (
                         <p className="text-[11px] text-zinc-500 italic">Texto principal desativado no vídeo.</p>
                       )}
@@ -677,12 +695,27 @@ export default function DarkClipsPage() {
                         )}
                       </div>
                       {headline.showSubText ? (
-                        <Input
-                          value={headline.subText}
-                          onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                          className="h-8 text-xs mt-1 font-semibold uppercase"
-                          placeholder="Digite a punchline ou reação..."
-                        />
+                        <>
+                          <Input
+                            value={headline.subText}
+                            onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
+                            className="h-8 text-xs mt-1 font-semibold uppercase"
+                            placeholder="Digite a punchline ou reação..."
+                          />
+                          <div className="pt-2">
+                            <Label className="text-[11px] font-medium text-muted-foreground">
+                              Posição Vertical Y ({headline.subTextYOffset ?? 25}%)
+                            </Label>
+                            <Slider
+                              value={[headline.subTextYOffset ?? 25]}
+                              min={10}
+                              max={75}
+                              step={1}
+                              onValueChange={([v]) => setHeadline((h) => ({ ...h, subTextYOffset: v }))}
+                              className="mt-2"
+                            />
+                          </div>
+                        </>
                       ) : (
                         <p className="text-[11px] text-zinc-500 italic">Texto secundário desativado no vídeo.</p>
                       )}
@@ -740,7 +773,7 @@ export default function DarkClipsPage() {
                         <Label className="text-xs font-semibold">Posição Vertical Y ({videoPlacement.yOffset}%)</Label>
                         <Slider
                           value={[videoPlacement.yOffset]}
-                          min={30}
+                          min={20}
                           max={80}
                           step={1}
                           onValueChange={([v]) => setVideoPlacement((p) => ({ ...p, yOffset: v }))}
@@ -791,18 +824,17 @@ export default function DarkClipsPage() {
 
               </div>
 
-              {/* ── Right Column: Live Remotion Preview Player (5 cols) ── */}
+              {/* ── Right Column: Live Canva Artboard Stage (5 cols) ── */}
               <div className="lg:col-span-5 sticky top-6 space-y-4">
                 <Card className="overflow-hidden border-border bg-card/50 backdrop-blur-md">
                   <CardHeader className="p-4 pb-2 border-b border-border/40 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Film className="h-4 w-4 text-red-500" /> Preview Interativo 9:16
+                        <Film className="h-4 w-4 text-red-500" /> Stage Artboard 9:16
                       </CardTitle>
                       <CardDescription className="text-[11px]">
                         {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Nenhum vídeo selecionado"}
                       </CardDescription>
-
                     </div>
                     {renderedUrl && (
                       <a href={renderedUrl} download={`darkclip_${Date.now()}.mp4`} target="_blank" rel="noreferrer">
@@ -814,20 +846,20 @@ export default function DarkClipsPage() {
                   </CardHeader>
 
                   <CardContent className="p-4 flex flex-col items-center justify-center">
-                    <div className="w-full max-w-[340px] aspect-[9/16] rounded-2xl overflow-hidden shadow-2xl border border-border/60 bg-black">
-                      <DarkClipsPreviewPlayer
-                        videoUrl={selectedClip?.video_url || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
-                        durationInSeconds={selectedClip?.duration || 15}
-                        profileHeader={profileHeader}
-                        headline={headline}
-                        videoPlacement={videoPlacement}
-                        background={background}
-                        footer={footer}
-                        onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
-                        onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
-                      />
-                    </div>
+                    <DarkClipsPreviewPlayer
+                      videoUrl={selectedClip?.video_url || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
+                      durationInSeconds={selectedClip?.duration || 15}
+                      profileHeader={profileHeader}
+                      headline={headline}
+                      videoPlacement={videoPlacement}
+                      background={background}
+                      footer={footer}
+                      onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
+                      onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
+                      onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
+                    />
                   </CardContent>
+
 
                   <div className="p-4 pt-0 border-t border-border/40 flex gap-2 justify-between items-center">
                     <span className="text-[11px] text-muted-foreground">1080 x 1920 (9:16 Vertical HD)</span>
