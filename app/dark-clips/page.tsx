@@ -66,7 +66,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DarkClipsPreviewPlayer } from "@/components/dark-clips-player";
-import { DarkClip, DarkClipPreset, DarkClipPost, BlotatoAccount } from "@/lib/types";
+import { DarkClip, DarkClipPreset, DarkClipPost, BlotatoAccount, DarkClipArrowItem } from "@/lib/types";
 import { getBlotatoAccountsAction } from "@/app/actions";
 import { toast } from "sonner";
 
@@ -176,10 +176,30 @@ export default function DarkClipsPage() {
     scale: 100,
   });
 
-  const [arrows, setArrows] = useState({
-    enabled: false,
-    direction: "right" as "right" | "left" | "up" | "down" | "down-right" | "up-right",
-    style: "trail" as "bounce" | "pulse" | "trail",
+  // Arrows state (supports multiple containers with independent counts and positions)
+  const [arrowsList, setArrowsList] = useState<DarkClipArrowItem[]>([
+    {
+      id: "arrow-1",
+      enabled: false,
+      direction: "right",
+      style: "trail",
+      count: 2,
+      xOffset: 82,
+      yOffset: 65,
+      color: "#FE2C55",
+      size: 40,
+      scale: 100,
+      text: "Siga!",
+      textColor: "#FFFFFF",
+    },
+  ]);
+  const [selectedArrowIndex, setSelectedArrowIndex] = useState<number>(0);
+
+  const currentArrow = arrowsList[selectedArrowIndex] || arrowsList[0] || {
+    id: "arrow-1",
+    enabled: true,
+    direction: "right" as const,
+    style: "trail" as const,
     count: 2,
     xOffset: 82,
     yOffset: 65,
@@ -188,7 +208,92 @@ export default function DarkClipsPage() {
     scale: 100,
     text: "Siga!",
     textColor: "#FFFFFF",
-  });
+  };
+
+  const isAnyArrowEnabled = arrowsList.some((a) => a.enabled !== false);
+
+  function handleToggleAllArrows(enabled: boolean) {
+    setArrowsList((prev) =>
+      prev.map((item) => ({ ...item, enabled }))
+    );
+  }
+
+  function handleUpdateSelectedArrow(updates: Partial<DarkClipArrowItem>) {
+    setArrowsList((prev) =>
+      prev.map((item, idx) => (idx === selectedArrowIndex ? { ...item, ...updates } : item))
+    );
+  }
+
+  function handleAddArrowContainer() {
+    const newId = `arrow-${Date.now()}`;
+    const newIdx = arrowsList.length;
+    const presetsSuggestions = [
+      { dir: "down" as const, x: 50, y: 84, text: "Assista!" },
+      { dir: "up" as const, x: 22, y: 15, text: "Confira!" },
+      { dir: "down-right" as const, x: 80, y: 75, text: "Clique!" },
+    ];
+    const suggestion = presetsSuggestions[newIdx % presetsSuggestions.length];
+
+    const newContainer: DarkClipArrowItem = {
+      id: newId,
+      enabled: true,
+      direction: suggestion.dir,
+      style: "trail",
+      count: 2,
+      xOffset: suggestion.x,
+      yOffset: suggestion.y,
+      color: "#FE2C55",
+      size: 40,
+      scale: 100,
+      text: suggestion.text,
+      textColor: "#FFFFFF",
+    };
+
+    setArrowsList((prev) => [...prev, newContainer]);
+    setSelectedArrowIndex(newIdx);
+    toast.success(`Container de Setas #${newIdx + 1} adicionado!`);
+  }
+
+  function handleDuplicateArrowContainer(index: number) {
+    const target = arrowsList[index];
+    if (!target) return;
+    const newContainer: DarkClipArrowItem = {
+      ...target,
+      id: `arrow-${Date.now()}`,
+      xOffset: Math.min(95, (target.xOffset ?? 82) + 5),
+      yOffset: Math.min(95, (target.yOffset ?? 65) + 5),
+    };
+    const newIdx = arrowsList.length;
+    setArrowsList((prev) => [...prev, newContainer]);
+    setSelectedArrowIndex(newIdx);
+    toast.success(`Container duplicado como #${newIdx + 1}!`);
+  }
+
+  function handleRemoveArrowContainer(index: number) {
+    if (arrowsList.length <= 1) {
+      setArrowsList([
+        {
+          id: "arrow-1",
+          enabled: false,
+          direction: "right",
+          style: "trail",
+          count: 2,
+          xOffset: 82,
+          yOffset: 65,
+          color: "#FE2C55",
+          size: 40,
+          scale: 100,
+          text: "Siga!",
+          textColor: "#FFFFFF",
+        },
+      ]);
+      setSelectedArrowIndex(0);
+      return;
+    }
+    setArrowsList((prev) => prev.filter((_, i) => i !== index));
+    setSelectedArrowIndex((prev) => Math.max(0, Math.min(prev, arrowsList.length - 2)));
+    toast.success(`Container #${index + 1} removido.`);
+  }
 
   // Scheduling State
   const [targetAccounts, setTargetAccounts] = useState<string[]>([]);
@@ -326,21 +431,42 @@ export default function DarkClipsPage() {
         scale: preset.footer_style.scale ?? f.scale ?? 100,
       }));
     }
-    if (preset.arrows_style) {
-      setArrows((a) => ({
-        ...a,
-        enabled: preset.arrows_style?.enabled ?? a.enabled,
-        direction: (preset.arrows_style?.direction || a.direction) as any,
-        style: (preset.arrows_style?.style || a.style) as any,
-        count: preset.arrows_style?.count ?? a.count,
-        xOffset: preset.arrows_style?.x_offset ?? preset.arrows_style?.xOffset ?? a.xOffset,
-        yOffset: preset.arrows_style?.y_offset ?? preset.arrows_style?.yOffset ?? a.yOffset,
-        color: preset.arrows_style?.color ?? a.color,
-        size: preset.arrows_style?.size ?? a.size,
-        scale: preset.arrows_style?.scale ?? a.scale,
-        text: preset.arrows_style?.text ?? a.text,
-        textColor: preset.arrows_style?.text_color ?? preset.arrows_style?.textColor ?? a.textColor,
-      }));
+    if (preset.arrows_list && Array.isArray(preset.arrows_list) && preset.arrows_list.length > 0) {
+      setArrowsList(
+        preset.arrows_list.map((item, i) => ({
+          id: item.id || `arrow-${i + 1}`,
+          enabled: item.enabled ?? true,
+          direction: item.direction || "right",
+          style: item.style || "trail",
+          count: item.count ?? 2,
+          xOffset: item.x_offset ?? item.xOffset ?? 82,
+          yOffset: item.y_offset ?? item.yOffset ?? 65,
+          color: item.color || "#FE2C55",
+          size: item.size ?? 40,
+          scale: item.scale ?? 100,
+          text: item.text ?? "Siga!",
+          textColor: item.text_color ?? item.textColor ?? "#FFFFFF",
+        }))
+      );
+      setSelectedArrowIndex(0);
+    } else if (preset.arrows_style) {
+      setArrowsList([
+        {
+          id: "arrow-1",
+          enabled: preset.arrows_style.enabled ?? false,
+          direction: preset.arrows_style.direction || "right",
+          style: preset.arrows_style.style || "trail",
+          count: preset.arrows_style.count ?? 2,
+          xOffset: preset.arrows_style.x_offset ?? preset.arrows_style.xOffset ?? 82,
+          yOffset: preset.arrows_style.y_offset ?? preset.arrows_style.yOffset ?? 65,
+          color: preset.arrows_style.color || "#FE2C55",
+          size: preset.arrows_style.size ?? 40,
+          scale: preset.arrows_style.scale ?? 100,
+          text: preset.arrows_style.text ?? "Siga!",
+          textColor: preset.arrows_style.text_color ?? preset.arrows_style.textColor ?? "#FFFFFF",
+        },
+      ]);
+      setSelectedArrowIndex(0);
     }
     toast.success(`Layout "${preset.name}" carregado!`);
   }
@@ -368,7 +494,8 @@ export default function DarkClipsPage() {
           background_style: background,
           watermark_style: watermark,
           footer_style: footer,
-          arrows_style: arrows,
+          arrows_style: arrowsList[0] || {},
+          arrows_list: arrowsList,
           is_default: activePreset.is_default,
         }),
       });
@@ -411,7 +538,8 @@ export default function DarkClipsPage() {
           background_style: background,
           watermark_style: watermark,
           footer_style: footer,
-          arrows_style: arrows,
+          arrows_style: arrowsList[0] || {},
+          arrows_list: arrowsList,
           is_default: isDefault,
         }),
       });
@@ -651,7 +779,8 @@ export default function DarkClipsPage() {
             background,
             watermark,
             footer,
-            arrows,
+            arrows: arrowsList[0] || {},
+            arrowsList: arrowsList,
           },
           remodelData: {
             headline_main: headline.mainText,
@@ -1701,7 +1830,7 @@ export default function DarkClipsPage() {
                   )}
                 </Card>
 
-                {/* ── CARD 6: Setas & Indicadores Animados de Ação (CTA Visual) ── */}
+                {/* ── CARD 6: Setas & Indicadores Animados de Ação (CTA Visual Multi-Containers) ── */}
                 <Card className="border-border shadow-sm">
                   <CardHeader className="p-4 pb-3 cursor-pointer select-none">
                     <div className="flex items-center justify-between">
@@ -1712,27 +1841,126 @@ export default function DarkClipsPage() {
                         <div>
                           <CardTitle className="text-sm font-bold flex items-center gap-2">
                             6. Setas & Indicadores de Ação
-                            {arrows.enabled && (
+                            {isAnyArrowEnabled && (
                               <Badge className="text-[10px] bg-rose-500/20 text-rose-300 border-rose-500/30">
-                                Ativado
+                                {arrowsList.length} {arrowsList.length === 1 ? "Container" : "Containers"}
                               </Badge>
                             )}
                           </CardTitle>
                           <CardDescription className="text-xs">
-                            Setas animadas apontando para Seguir, Inscrever-se ou CTA
+                            Crie múltiplos grupos de setas animadas com direções, quantidades e textos independentes
                           </CardDescription>
                         </div>
                       </div>
                       <Switch
-                        checked={arrows.enabled}
-                        onCheckedChange={(v) => setArrows((a) => ({ ...a, enabled: v }))}
+                        checked={isAnyArrowEnabled}
+                        onCheckedChange={(v) => handleToggleAllArrows(v)}
                       />
                     </div>
                   </CardHeader>
 
-                  {arrows.enabled && (
+                  {isAnyArrowEnabled && (
                     <CardContent className="p-4 pt-0 space-y-4 border-t border-border/40 mt-3">
-                      {/* Presets Rápidos de Direção & Posicionamento */}
+                      
+                      {/* Seletor e Gerenciamento de Containers */}
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-foreground">
+                            Containers de Setas ({arrowsList.length})
+                          </Label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleAddArrowContainer}
+                            className="text-[11px] h-7 gap-1 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 font-bold"
+                          >
+                            <Plus className="h-3 w-3" /> Adicionar Outro Container
+                          </Button>
+                        </div>
+
+                        {/* Abas / Botões de seleção dos containers */}
+                        <div className="flex flex-wrap gap-1.5 p-1 bg-secondary/30 rounded-lg border border-border/50">
+                          {arrowsList.map((item, idx) => {
+                            const isSelected = idx === selectedArrowIndex;
+                            const dirIcon =
+                              item.direction === "right"
+                                ? "👉"
+                                : item.direction === "left"
+                                ? "👈"
+                                : item.direction === "up"
+                                ? "👆"
+                                : item.direction === "down"
+                                ? "👇"
+                                : item.direction === "down-right"
+                                ? "↘️"
+                                : "↗️";
+
+                            return (
+                              <button
+                                key={item.id || idx}
+                                type="button"
+                                onClick={() => setSelectedArrowIndex(idx)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
+                                  isSelected
+                                    ? "bg-rose-500 text-white shadow-sm ring-1 ring-white/20"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                                }`}
+                              >
+                                <span>{dirIcon}</span>
+                                <span>Container #{idx + 1}</span>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[9px] px-1 py-0 border-0 ${
+                                    isSelected ? "bg-white/20 text-white" : "bg-secondary text-muted-foreground"
+                                  }`}
+                                >
+                                  {item.count || 2} {item.count === 1 ? "seta" : "setas"}
+                                </Badge>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Header de ações do container selecionado */}
+                      <div className="flex items-center justify-between p-2.5 bg-rose-500/5 rounded-lg border border-rose-500/20">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-extrabold text-rose-400">
+                            Configurando Container #{selectedArrowIndex + 1}
+                          </span>
+                          <Switch
+                            checked={currentArrow.enabled !== false}
+                            onCheckedChange={(v) => handleUpdateSelectedArrow({ enabled: v })}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDuplicateArrowContainer(selectedArrowIndex)}
+                            className="text-[11px] h-7 px-2 text-muted-foreground hover:text-foreground gap-1"
+                            title="Duplicar este container"
+                          >
+                            <Copy className="h-3 w-3" /> Duplicar
+                          </Button>
+                          {arrowsList.length > 1 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRemoveArrowContainer(selectedArrowIndex)}
+                              className="text-[11px] h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 gap-1"
+                              title="Excluir este container"
+                            >
+                              <Trash2 className="h-3 w-3" /> Excluir
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Presets Rápidos de Direção & Posicionamento para o container ativo */}
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold">Atalhos de Posicionamento Rápido</Label>
                         <div className="grid grid-cols-3 gap-2">
@@ -1745,15 +1973,14 @@ export default function DarkClipsPage() {
                               key={p.label}
                               type="button"
                               size="sm"
-                              variant={arrows.xOffset === p.x && arrows.yOffset === p.y ? "default" : "outline"}
+                              variant={currentArrow.xOffset === p.x && currentArrow.yOffset === p.y ? "default" : "outline"}
                               onClick={() =>
-                                setArrows((a) => ({
-                                  ...a,
+                                handleUpdateSelectedArrow({
                                   direction: p.dir as any,
                                   xOffset: p.x,
                                   yOffset: p.y,
                                   text: p.text,
-                                }))
+                                })
                               }
                               className="text-xs h-8 font-bold"
                             >
@@ -1779,8 +2006,8 @@ export default function DarkClipsPage() {
                               key={item.dir}
                               type="button"
                               size="sm"
-                              variant={arrows.direction === item.dir ? "default" : "outline"}
-                              onClick={() => setArrows((a) => ({ ...a, direction: item.dir as any }))}
+                              variant={currentArrow.direction === item.dir ? "default" : "outline"}
+                              onClick={() => handleUpdateSelectedArrow({ direction: item.dir as any })}
                               className="text-xs h-8 font-medium"
                             >
                               {item.label}
@@ -1789,7 +2016,7 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Estilo da Animação & Quantidade */}
+                      {/* Estilo da Animação & Quantidade de Setas no Container */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <Label className="text-xs font-semibold">Efeito da Animação</Label>
@@ -1803,8 +2030,8 @@ export default function DarkClipsPage() {
                                 key={st.id}
                                 type="button"
                                 size="sm"
-                                variant={arrows.style === st.id ? "default" : "outline"}
-                                onClick={() => setArrows((a) => ({ ...a, style: st.id as any }))}
+                                variant={currentArrow.style === st.id ? "default" : "outline"}
+                                onClick={() => handleUpdateSelectedArrow({ style: st.id as any })}
                                 className="text-xs h-8 font-bold"
                               >
                                 {st.label}
@@ -1814,48 +2041,51 @@ export default function DarkClipsPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold">Quantidade de Setas</Label>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {[1, 2, 3].map((num) => (
+                          <div className="flex justify-between text-xs">
+                            <Label className="text-xs font-semibold">Quantidade de Setas</Label>
+                            <span className="font-mono text-rose-400 font-bold">{currentArrow.count || 2} {currentArrow.count === 1 ? "seta" : "setas"}</span>
+                          </div>
+                          <div className="grid grid-cols-5 gap-1">
+                            {[1, 2, 3, 4, 5].map((num) => (
                               <Button
                                 key={num}
                                 type="button"
                                 size="sm"
-                                variant={arrows.count === num ? "default" : "outline"}
-                                onClick={() => setArrows((a) => ({ ...a, count: num }))}
+                                variant={currentArrow.count === num ? "default" : "outline"}
+                                onClick={() => handleUpdateSelectedArrow({ count: num })}
                                 className="text-xs h-8 font-bold"
                               >
-                                {num} {num === 1 ? "Seta" : "Setas"}
+                                {num}
                               </Button>
                             ))}
                           </div>
                         </div>
                       </div>
 
-                      {/* Texto de Ação Opcional */}
+                      {/* Texto de Ação Opcional & Cor da Seta */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <Label className="text-xs font-semibold">Texto da Seta (Opcional)</Label>
                           <Input
-                            value={arrows.text || ""}
-                            onChange={(e) => setArrows((a) => ({ ...a, text: e.target.value }))}
+                            value={currentArrow.text || ""}
+                            onChange={(e) => handleUpdateSelectedArrow({ text: e.target.value })}
                             placeholder="Ex: Siga!, Inscreva-se!"
                             className="text-xs h-8"
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold">Cor da Seta</Label>
+                          <Label className="text-xs font-semibold">Cor das Setas</Label>
                           <div className="flex items-center gap-2">
                             <input
                               type="color"
-                              value={arrows.color || "#FE2C55"}
-                              onChange={(e) => setArrows((a) => ({ ...a, color: e.target.value }))}
+                              value={currentArrow.color || "#FE2C55"}
+                              onChange={(e) => handleUpdateSelectedArrow({ color: e.target.value })}
                               className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
                             />
                             <Input
-                              value={arrows.color || "#FE2C55"}
-                              onChange={(e) => setArrows((a) => ({ ...a, color: e.target.value }))}
+                              value={currentArrow.color || "#FE2C55"}
+                              onChange={(e) => handleUpdateSelectedArrow({ color: e.target.value })}
                               className="h-8 text-xs font-mono"
                             />
                           </div>
@@ -1867,28 +2097,28 @@ export default function DarkClipsPage() {
                         <div className="space-y-1.5">
                           <div className="flex justify-between text-xs">
                             <span className="font-semibold">Posição Horizontal (X)</span>
-                            <span className="font-mono text-primary">{arrows.xOffset}%</span>
+                            <span className="font-mono text-primary">{currentArrow.xOffset}%</span>
                           </div>
                           <Slider
-                            value={[arrows.xOffset]}
+                            value={[currentArrow.xOffset ?? 82]}
                             min={0}
                             max={100}
                             step={1}
-                            onValueChange={([xOffset]) => setArrows((a) => ({ ...a, xOffset }))}
+                            onValueChange={([xOffset]) => handleUpdateSelectedArrow({ xOffset })}
                           />
                         </div>
 
                         <div className="space-y-1.5">
                           <div className="flex justify-between text-xs">
                             <span className="font-semibold">Posição Vertical (Y)</span>
-                            <span className="font-mono text-primary">{arrows.yOffset}%</span>
+                            <span className="font-mono text-primary">{currentArrow.yOffset}%</span>
                           </div>
                           <Slider
-                            value={[arrows.yOffset]}
+                            value={[currentArrow.yOffset ?? 65]}
                             min={0}
                             max={100}
                             step={1}
-                            onValueChange={([yOffset]) => setArrows((a) => ({ ...a, yOffset }))}
+                            onValueChange={([yOffset]) => handleUpdateSelectedArrow({ yOffset })}
                           />
                         </div>
                       </div>
@@ -1897,14 +2127,14 @@ export default function DarkClipsPage() {
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="font-semibold">Tamanho das Setas</span>
-                          <span className="font-mono text-rose-400">{arrows.size}px</span>
+                          <span className="font-mono text-rose-400">{currentArrow.size}px</span>
                         </div>
                         <Slider
-                          value={[arrows.size]}
+                          value={[currentArrow.size ?? 40]}
                           min={20}
                           max={72}
                           step={2}
-                          onValueChange={([size]) => setArrows((a) => ({ ...a, size }))}
+                          onValueChange={([size]) => handleUpdateSelectedArrow({ size })}
                         />
                       </div>
                     </CardContent>
@@ -1988,13 +2218,19 @@ export default function DarkClipsPage() {
                       background={background}
                       watermark={watermark}
                       footer={footer}
-                      arrows={arrows}
+                      arrows={isAnyArrowEnabled ? currentArrow : { enabled: false }}
+                      arrowsList={isAnyArrowEnabled ? arrowsList : []}
                       onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
                       onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
                       onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
                       onUpdateWatermark={(updates) => setWatermark((w) => ({ ...w, ...updates }))}
                       onUpdateFooter={(updates) => setFooter((f) => ({ ...f, ...updates }))}
-                      onUpdateArrows={(updates) => setArrows((a) => ({ ...a, ...updates }))}
+                      onUpdateArrows={(updates) => handleUpdateSelectedArrow(updates)}
+                      onUpdateArrowItem={(index, updates) =>
+                        setArrowsList((prev) =>
+                          prev.map((item, i) => (i === index ? { ...item, ...updates } : item))
+                        )
+                      }
                     />
                   </CardContent>
 

@@ -11,6 +11,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   watermark = {},
   footer = {},
   arrows = {},
+  arrowsList,
 }) => {
   const frame = useCurrentFrame();
 
@@ -630,93 +631,134 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           </div>
         )}
 
-        {/* ── 7. Animated Callout Arrows Layer ── */}
-        {arrowsEnabled && (
-          <div
-            style={{
-              position: 'absolute',
-              top: `${arrowsY}%`,
-              left: `${arrowsX}%`,
-              transform: `translate(-50%, -50%) ${
-                arrowsStyle === 'bounce'
-                  ? arrowsDirection === 'right'
-                    ? `translateX(${bounceDelta}px)`
-                    : arrowsDirection === 'left'
-                    ? `translateX(${-bounceDelta}px)`
-                    : arrowsDirection === 'down' || arrowsDirection === 'down-right'
-                    ? `translateY(${bounceDelta}px)`
-                    : `translateY(${-bounceDelta}px)`
-                  : arrowsStyle === 'pulse'
-                  ? `scale(${pulseScale})`
-                  : ''
-              }`,
-              display: 'flex',
-              flexDirection: arrowsDirection === 'up' || arrowsDirection === 'down' ? 'column' : 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              zIndex: 28,
-              pointerEvents: 'none',
-              filter: isLightBg
-                ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))'
-                : `drop-shadow(0 4px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px ${arrowsColor}80)`,
-            }}
-          >
-            {/* Optional Callout Action Text */}
-            {arrowsText && (
-              <span
-                style={{
-                  fontSize: `${Math.round(arrowEffectiveSize * 0.58)}px`,
-                  fontWeight: 900,
-                  color: arrowsTextColor || '#FFFFFF',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                  whiteSpace: 'nowrap',
-                  textShadow: '0 2px 8px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.8)',
-                  marginRight: arrowsDirection === 'right' || arrowsDirection === 'down-right' ? '4px' : '0px',
-                  marginLeft: arrowsDirection === 'left' ? '4px' : '0px',
-                }}
-              >
-                {arrowsText}
-              </span>
-            )}
+        {/* ── 7. Animated Callout Arrows Layers (Multiple Containers Support) ── */}
+        {(arrowsList && arrowsList.length > 0
+          ? arrowsList.filter((item) => item && item.enabled !== false)
+          : arrows && arrows.enabled !== false
+          ? [arrows]
+          : []
+        ).map((container, cIdx) => {
+          const {
+            direction: cDir = 'right',
+            style: cStyle = 'trail',
+            count: cCount = 2,
+            xOffset: cX = 82,
+            yOffset: cY = 65,
+            color: cColor = '#FE2C55',
+            size: cSize = 42,
+            scale: cScale = 100,
+            text: cText = '',
+            textColor: cTextColor = '#FFFFFF',
+          } = container;
 
-            {/* Arrows Sequence (1 to 3 items) */}
-            {Array.from({ length: Math.max(1, Math.min(3, arrowsCount || 2)) }).map((_, idx) => {
-              let arrowOpacity = 1;
-              if (arrowsStyle === 'trail') {
-                const trailPhase = (frame + idx * 7) % 24;
-                arrowOpacity = 0.35 + (trailPhase / 24) * 0.65;
-              }
+          const cRotation =
+            cDir === 'right'
+              ? 0
+              : cDir === 'left'
+              ? 180
+              : cDir === 'up'
+              ? -90
+              : cDir === 'down'
+              ? 90
+              : cDir === 'down-right'
+              ? 45
+              : cDir === 'up-right'
+              ? -45
+              : 0;
 
-              return (
-                <div
-                  key={idx}
+          const cEffectiveSize = Math.round(cSize * ((cScale || 100) / 100));
+          const cBounceCycle = (frame % 30) / 30;
+          const cBounceDelta = Math.sin(cBounceCycle * Math.PI * 2) * 14;
+          const cPulseScale = 1 + Math.sin(cBounceCycle * Math.PI * 2) * 0.15;
+
+          return (
+            <div
+              key={container.id || `arrow-c-${cIdx}`}
+              style={{
+                position: 'absolute',
+                top: `${cY}%`,
+                left: `${cX}%`,
+                transform: `translate(-50%, -50%) ${
+                  cStyle === 'bounce'
+                    ? cDir === 'right'
+                      ? `translateX(${cBounceDelta}px)`
+                      : cDir === 'left'
+                      ? `translateX(${-cBounceDelta}px)`
+                      : cDir === 'down' || cDir === 'down-right'
+                      ? `translateY(${cBounceDelta}px)`
+                      : `translateY(${-cBounceDelta}px)`
+                    : cStyle === 'pulse'
+                    ? `scale(${cPulseScale})`
+                    : ''
+                }`,
+                display: 'flex',
+                flexDirection: cDir === 'up' || cDir === 'down' ? 'column' : 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                zIndex: 28,
+                pointerEvents: 'none',
+                filter: isLightBg
+                  ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))'
+                  : `drop-shadow(0 4px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px ${cColor}80)`,
+              }}
+            >
+              {/* Optional Callout Action Text */}
+              {cText && (
+                <span
                   style={{
-                    transform: `rotate(${rotationDegrees}deg)`,
-                    opacity: arrowOpacity,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    fontSize: `${Math.round(cEffectiveSize * 0.58)}px`,
+                    fontWeight: 900,
+                    color: cTextColor || '#FFFFFF',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    whiteSpace: 'nowrap',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.8)',
+                    marginRight: cDir === 'right' || cDir === 'down-right' ? '4px' : '0px',
+                    marginLeft: cDir === 'left' ? '4px' : '0px',
                   }}
                 >
-                  <svg
-                    width={arrowEffectiveSize}
-                    height={arrowEffectiveSize}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={arrowsColor}
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  {cText}
+                </span>
+              )}
+
+              {/* Arrows Sequence (1 to 5 items) */}
+              {Array.from({ length: Math.max(1, Math.min(5, cCount || 2)) }).map((_, idx) => {
+                let arrowOpacity = 1;
+                if (cStyle === 'trail') {
+                  const trailPhase = (frame + idx * 7) % 24;
+                  arrowOpacity = 0.35 + (trailPhase / 24) * 0.65;
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      transform: `rotate(${cRotation}deg)`,
+                      opacity: arrowOpacity,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                   >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <svg
+                      width={cEffectiveSize}
+                      height={cEffectiveSize}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={cColor}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </AbsoluteFill>
     </AbsoluteFill>
   );

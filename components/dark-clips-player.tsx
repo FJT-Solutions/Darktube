@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { DarkClipsVideoComposition } from '@/remotion/compositions/DarkClipsVideo';
-import { DarkClipsVideoProps } from '@/remotion/types';
+import { DarkClipsVideoProps, DarkClipArrowItem } from '@/remotion/types';
 import {
   Move,
   Smartphone,
@@ -32,12 +32,14 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   width?: number;
   height?: number;
   className?: string;
+  arrowsList?: DarkClipArrowItem[];
   onUpdateHeaderPadding?: (paddingTop: number) => void;
   onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number }) => void;
   onUpdateVideoPlacement?: (placement: { yOffset?: number; scale?: number; borderRadius?: number }) => void;
   onUpdateWatermark?: (updates: { xOffset?: number; yOffset?: number; position?: 'custom' }) => void;
   onUpdateFooter?: (updates: { yOffset?: number; fontSize?: number; text?: string }) => void;
-  onUpdateArrows?: (updates: { xOffset?: number; yOffset?: number; size?: number; count?: number; direction?: 'left' | 'right' | 'up' | 'down' | 'down-right' | 'up-right' }) => void;
+  onUpdateArrows?: (updates: Partial<DarkClipArrowItem>) => void;
+  onUpdateArrowItem?: (index: number, updates: Partial<DarkClipArrowItem>) => void;
 }
 
 export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
@@ -46,12 +48,14 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   width = 1080,
   height = 1920,
   videoUrl,
+  arrowsList,
   onUpdateHeaderPadding,
   onUpdateHeadline,
   onUpdateVideoPlacement,
   onUpdateWatermark,
   onUpdateFooter,
   onUpdateArrows,
+  onUpdateArrowItem,
   ...inputProps
 }) => {
   const durationInFrames = Math.max(30, Math.floor((durationInSeconds || 15) * fps));
@@ -61,9 +65,9 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   // Platform UI Simulation Mode
   const [previewMode, setPreviewMode] = useState<'clean' | 'tiktok' | 'reels' | 'shorts'>('clean');
 
-  // Active layer being dragged
-  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | 'arrows'>('none');
-  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | 'arrows'>('none');
+  // Active layer being dragged (supports header, mainText, subText, video, watermark, footer, arrows, and arrow-0, arrow-1...)
+  const [activeLayer, setActiveLayer] = useState<string>('none');
+  const [hoveredLayer, setHoveredLayer] = useState<string>('none');
   const [dragging, setDragging] = useState<boolean>(false);
   const [dragStartY, setDragStartY] = useState<number>(0);
   const [dragStartX, setDragStartX] = useState<number>(0);
@@ -87,8 +91,14 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const watermarkX = watermark.xOffset ?? 85;
   const watermarkY = watermark.yOffset ?? 92;
   const footerY = footer.yOffset ?? 92;
-  const arrowsX = arrows.xOffset ?? 82;
-  const arrowsY = arrows.yOffset ?? 65;
+
+  // Normalize arrows containers list
+  const effectiveArrowsList: DarkClipArrowItem[] =
+    arrowsList && arrowsList.length > 0
+      ? arrowsList
+      : arrows && (arrows.enabled || arrows.enabled === undefined)
+      ? [arrows]
+      : [];
 
   // Video Url
   const activeVideoUrl = videoUrl || "";
@@ -99,7 +109,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const displayCaption = headline.mainText || headline.subText || footer.text || 'Assista até o final! 🔥';
 
   // Handle Drag Start
-  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | 'arrows', e: React.PointerEvent) => {
+  const handlePointerDown = (layer: string, e: React.PointerEvent) => {
     e.stopPropagation();
     setActiveLayer(layer);
     setDragging(true);
@@ -119,9 +129,17 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       setDragInitialValY(watermarkY);
     } else if (layer === 'footer') {
       setDragInitialValY(footerY);
+    } else if (layer.startsWith('arrow-')) {
+      const idx = parseInt(layer.replace('arrow-', ''), 10);
+      const targetItem = effectiveArrowsList[idx];
+      if (targetItem) {
+        setDragInitialValX(targetItem.xOffset ?? targetItem.x_offset ?? 82);
+        setDragInitialValY(targetItem.yOffset ?? targetItem.y_offset ?? 65);
+      }
     } else if (layer === 'arrows') {
-      setDragInitialValX(arrowsX);
-      setDragInitialValY(arrowsY);
+      const targetItem = effectiveArrowsList[0] || arrows;
+      setDragInitialValX(targetItem.xOffset ?? targetItem.x_offset ?? 82);
+      setDragInitialValY(targetItem.yOffset ?? targetItem.y_offset ?? 65);
     }
   };
 
@@ -155,10 +173,23 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       } else if (activeLayer === 'footer' && onUpdateFooter) {
         const newY = Math.max(0, Math.min(98, Math.round(dragInitialValY + percentDeltaY)));
         onUpdateFooter({ yOffset: newY });
-      } else if (activeLayer === 'arrows' && onUpdateArrows) {
+      } else if (activeLayer.startsWith('arrow-')) {
+        const idx = parseInt(activeLayer.replace('arrow-', ''), 10);
         const newX = Math.max(0, Math.min(100, Math.round(dragInitialValX + percentDeltaX)));
         const newY = Math.max(0, Math.min(100, Math.round(dragInitialValY + percentDeltaY)));
-        onUpdateArrows({ xOffset: newX, yOffset: newY });
+        if (onUpdateArrowItem) {
+          onUpdateArrowItem(idx, { xOffset: newX, yOffset: newY });
+        } else if (onUpdateArrows && idx === 0) {
+          onUpdateArrows({ xOffset: newX, yOffset: newY });
+        }
+      } else if (activeLayer === 'arrows') {
+        const newX = Math.max(0, Math.min(100, Math.round(dragInitialValX + percentDeltaX)));
+        const newY = Math.max(0, Math.min(100, Math.round(dragInitialValY + percentDeltaY)));
+        if (onUpdateArrowItem && effectiveArrowsList.length > 0) {
+          onUpdateArrowItem(0, { xOffset: newX, yOffset: newY });
+        } else if (onUpdateArrows) {
+          onUpdateArrows({ xOffset: newX, yOffset: newY });
+        }
       }
     };
 
@@ -177,7 +208,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows]);
+  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows, onUpdateArrowItem, effectiveArrowsList]);
 
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-[340px] mx-auto select-none">
@@ -253,8 +284,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                   ? `Marca D'água (X: ${watermarkX}%, Y: ${watermarkY}%)`
                   : activeLayer === 'footer'
                   ? `Rodapé / CTA (${footerY}%)`
-                  : activeLayer === 'arrows'
-                  ? `Setas / CTA (X: ${arrowsX}%, Y: ${arrowsY}%)`
+                  : activeLayer.startsWith('arrow-')
+                  ? `Setas #${parseInt(activeLayer.replace('arrow-', ''), 10) + 1}`
                   : `Vídeo (${videoY}%)`}
               </strong>
             </span>
@@ -298,11 +329,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               ...footer,
               yOffset: footerY,
             },
-            arrows: {
-              ...arrows,
-              xOffset: arrowsX,
-              yOffset: arrowsY,
-            },
+            arrows: effectiveArrowsList[0] || arrows,
+            arrowsList: effectiveArrowsList,
             durationInSeconds,
           }}
           durationInFrames={durationInFrames}
@@ -724,40 +752,49 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
             </div>
           )}
 
-          {/* 7. Arrows / Callout Layer Drag Box */}
-          {arrows.enabled && (
-            <div
-              style={{
-                position: 'absolute',
-                top: `${arrowsY}%`,
-                left: `${arrowsX}%`,
-                transform: 'translate(-50%, -50%)',
-                minWidth: '24%',
-                height: '6%',
-                cursor: 'grab',
-              }}
-              className={`pointer-events-auto transition-all rounded-lg ${
-                activeLayer === 'arrows'
-                  ? 'ring-2 ring-rose-500 bg-rose-500/20 shadow-lg'
-                  : 'hover:ring-1 hover:ring-rose-400/70 hover:bg-rose-500/10'
-              }`}
-              onPointerDown={(e) => handlePointerDown('arrows', e)}
-              onMouseEnter={() => setHoveredLayer('arrows')}
-              onMouseLeave={() => setHoveredLayer('none')}
-            >
-              {(activeLayer === 'arrows' || hoveredLayer === 'arrows') && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
-                  <Move className="h-2.5 w-2.5" /> SETAS / CTA (X: {arrowsX}%, Y: {arrowsY}%)
-                </div>
-              )}
-            </div>
-          )}
+          {/* 7. Multiple Arrows / Callout Containers Drag Boxes */}
+          {effectiveArrowsList.map((item, idx) => {
+            if (item.enabled === false) return null;
+            const itemX = item.xOffset ?? item.x_offset ?? 82;
+            const itemY = item.yOffset ?? item.y_offset ?? 65;
+            const isThisActive = activeLayer === `arrow-${idx}`;
+            const isThisHovered = hoveredLayer === `arrow-${idx}`;
+
+            return (
+              <div
+                key={item.id || `drag-arrow-${idx}`}
+                style={{
+                  position: 'absolute',
+                  top: `${itemY}%`,
+                  left: `${itemX}%`,
+                  transform: 'translate(-50%, -50%)',
+                  minWidth: '22%',
+                  height: '5.5%',
+                  cursor: 'grab',
+                }}
+                className={`pointer-events-auto transition-all rounded-lg ${
+                  isThisActive
+                    ? 'ring-2 ring-rose-500 bg-rose-500/20 shadow-lg'
+                    : 'hover:ring-1 hover:ring-rose-400/70 hover:bg-rose-500/10'
+                }`}
+                onPointerDown={(e) => handlePointerDown(`arrow-${idx}`, e)}
+                onMouseEnter={() => setHoveredLayer(`arrow-${idx}`)}
+                onMouseLeave={() => setHoveredLayer('none')}
+              >
+                {(isThisActive || isThisHovered) && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                    <Move className="h-2.5 w-2.5" /> SETAS #{idx + 1} (X: {itemX}%, Y: {itemY}%)
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Stage Hint Footer */}
       <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong>, <strong>Marca D'água</strong>, <strong>Rodapé</strong> ou <strong>Setas</strong> para qualquer posição.
+        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong>, <strong>Marca D'água</strong>, <strong>Rodapé</strong> ou <strong>Containers de Setas</strong> para qualquer posição.
       </p>
     </div>
   );

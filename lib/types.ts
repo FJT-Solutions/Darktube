@@ -250,25 +250,29 @@ export interface DarkClipPreset {
     textAlign?: 'left' | 'center' | 'right'
     scale?: number
   }
-  arrows_style?: {
-    enabled?: boolean
-    direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right'
-    style?: 'bounce' | 'pulse' | 'trail'
-    count?: number
-    xOffset?: number
-    x_offset?: number
-    yOffset?: number
-    y_offset?: number
-    color?: string
-    size?: number
-    scale?: number
-    text?: string
-    textColor?: string
-    text_color?: string
-  }
+  arrows_style?: DarkClipArrowItem
+  arrows_list?: DarkClipArrowItem[]
   is_default?: boolean
   created_at?: string
   updated_at?: string
+}
+
+export interface DarkClipArrowItem {
+  id?: string
+  enabled?: boolean
+  direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right'
+  style?: 'bounce' | 'pulse' | 'trail'
+  count?: number
+  xOffset?: number
+  x_offset?: number
+  yOffset?: number
+  y_offset?: number
+  color?: string
+  size?: number
+  scale?: number
+  text?: string
+  textColor?: string
+  text_color?: string
 }
 
 export interface DarkClipPost {

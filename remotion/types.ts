@@ -311,19 +311,26 @@ export interface DarkClipsVideoProps {
     scale?: number;
   };
 
-  // Setas Animadas / Indicadores de Ação (Follow/Subscribe/Action Arrows)
-  arrows?: {
-    enabled?: boolean;
-    direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right';
-    style?: 'bounce' | 'pulse' | 'trail';
-    count?: number;
-    xOffset?: number;
-    yOffset?: number;
-    color?: string;
-    size?: number;
-    scale?: number;
-    text?: string;
-    textColor?: string;
-  };
+  // Setas Animadas / Indicadores de Ação (Único ou Múltiplos Containers)
+  arrows?: DarkClipArrowItem;
+  arrowsList?: DarkClipArrowItem[];
+}
+
+export interface DarkClipArrowItem {
+  id?: string;
+  enabled?: boolean;
+  direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right';
+  style?: 'bounce' | 'pulse' | 'trail';
+  count?: number;
+  xOffset?: number;
+  x_offset?: number;
+  yOffset?: number;
+  y_offset?: number;
+  color?: string;
+  size?: number;
+  scale?: number;
+  text?: string;
+  textColor?: string;
+  text_color?: string;
 }
 
