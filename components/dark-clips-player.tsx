@@ -4,7 +4,27 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { DarkClipsVideoComposition } from '@/remotion/compositions/DarkClipsVideo';
 import { DarkClipsVideoProps } from '@/remotion/types';
-import { Move, Smartphone, Sparkles, Eye } from 'lucide-react';
+import {
+  Move,
+  Smartphone,
+  Sparkles,
+  Eye,
+  Heart,
+  MessageCircle,
+  Bookmark,
+  Share2,
+  Music,
+  Disc,
+  Search,
+  MoreVertical,
+  ThumbsUp,
+  ThumbsDown,
+  Plus,
+  Camera,
+  Send,
+  Layers,
+  Check
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
@@ -17,6 +37,7 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   onUpdateVideoPlacement?: (placement: { yOffset?: number; scale?: number; borderRadius?: number }) => void;
   onUpdateWatermark?: (updates: { xOffset?: number; yOffset?: number; position?: 'custom' }) => void;
   onUpdateFooter?: (updates: { yOffset?: number; fontSize?: number; text?: string }) => void;
+  onUpdateArrows?: (updates: { xOffset?: number; yOffset?: number; size?: number; count?: number; direction?: 'left' | 'right' | 'up' | 'down' | 'down-right' | 'up-right' }) => void;
 }
 
 export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
@@ -30,15 +51,19 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   onUpdateVideoPlacement,
   onUpdateWatermark,
   onUpdateFooter,
+  onUpdateArrows,
   ...inputProps
 }) => {
   const durationInFrames = Math.max(30, Math.floor((durationInSeconds || 15) * fps));
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerRef>(null);
 
+  // Platform UI Simulation Mode
+  const [previewMode, setPreviewMode] = useState<'clean' | 'tiktok' | 'reels' | 'shorts'>('clean');
+
   // Active layer being dragged
-  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer'>('none');
-  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer'>('none');
+  const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | 'arrows'>('none');
+  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | 'arrows'>('none');
   const [dragging, setDragging] = useState<boolean>(false);
   const [dragStartY, setDragStartY] = useState<number>(0);
   const [dragStartX, setDragStartX] = useState<number>(0);
@@ -51,6 +76,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
     videoPlacement = {},
     watermark = {},
     footer = {},
+    arrows = {},
   } = inputProps;
 
   const headerPadding = profileHeader.paddingTop ?? 90;
@@ -61,12 +87,19 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const watermarkX = watermark.xOffset ?? 85;
   const watermarkY = watermark.yOffset ?? 92;
   const footerY = footer.yOffset ?? 92;
+  const arrowsX = arrows.xOffset ?? 82;
+  const arrowsY = arrows.yOffset ?? 65;
 
   // Video Url
   const activeVideoUrl = videoUrl || "";
 
+  // Dynamic values for Platform Overlays
+  const displayHandle = profileHeader.handle ? profileHeader.handle.replace(/^@/, '') : 'darkclips';
+  const displayName = profileHeader.name || 'Dark Clips';
+  const displayCaption = headline.mainText || headline.subText || footer.text || 'Assista até o final! 🔥';
+
   // Handle Drag Start
-  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer', e: React.PointerEvent) => {
+  const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | 'arrows', e: React.PointerEvent) => {
     e.stopPropagation();
     setActiveLayer(layer);
     setDragging(true);
@@ -86,6 +119,9 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       setDragInitialValY(watermarkY);
     } else if (layer === 'footer') {
       setDragInitialValY(footerY);
+    } else if (layer === 'arrows') {
+      setDragInitialValX(arrowsX);
+      setDragInitialValY(arrowsY);
     }
   };
 
@@ -119,6 +155,10 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       } else if (activeLayer === 'footer' && onUpdateFooter) {
         const newY = Math.max(0, Math.min(98, Math.round(dragInitialValY + percentDeltaY)));
         onUpdateFooter({ yOffset: newY });
+      } else if (activeLayer === 'arrows' && onUpdateArrows) {
+        const newX = Math.max(0, Math.min(100, Math.round(dragInitialValX + percentDeltaX)));
+        const newY = Math.max(0, Math.min(100, Math.round(dragInitialValY + percentDeltaY)));
+        onUpdateArrows({ xOffset: newX, yOffset: newY });
       }
     };
 
@@ -137,11 +177,63 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter]);
+  }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows]);
 
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-[340px] mx-auto select-none">
       
+      {/* ── Platform Simulation Switcher Bar ── */}
+      <div className="w-full bg-secondary/40 p-1 rounded-xl border border-border/60 flex items-center justify-between gap-1 text-[11px] shadow-sm">
+        <button
+          type="button"
+          onClick={() => setPreviewMode('clean')}
+          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center ${
+            previewMode === 'clean'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Visualização limpa sem interface de rede social"
+        >
+          Limpo
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewMode('tiktok')}
+          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
+            previewMode === 'tiktok'
+              ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Simular botões e interface do TikTok"
+        >
+          <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewMode('reels')}
+          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+            previewMode === 'reels'
+              ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Simular botões e interface do Reels (Facebook & Instagram)"
+        >
+          Reels
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewMode('shorts')}
+          className={`flex-1 py-1 px-1.5 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+            previewMode === 'shorts'
+              ? 'bg-red-600 text-white shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Simular botões e interface do YouTube Shorts"
+        >
+          Shorts
+        </button>
+      </div>
+
       {/* ── Top Stage Info Bar ── */}
       <div className="w-full flex items-center justify-between px-1 min-h-[24px]">
         <div className="flex items-center gap-2">
@@ -161,6 +253,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                   ? `Marca D'água (X: ${watermarkX}%, Y: ${watermarkY}%)`
                   : activeLayer === 'footer'
                   ? `Rodapé / CTA (${footerY}%)`
+                  : activeLayer === 'arrows'
+                  ? `Setas / CTA (X: ${arrowsX}%, Y: ${arrowsY}%)`
                   : `Vídeo (${videoY}%)`}
               </strong>
             </span>
@@ -204,6 +298,11 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               ...footer,
               yOffset: footerY,
             },
+            arrows: {
+              ...arrows,
+              xOffset: arrowsX,
+              yOffset: arrowsY,
+            },
             durationInSeconds,
           }}
           durationInFrames={durationInFrames}
@@ -218,6 +317,235 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           autoPlay={true}
           loop={true}
         />
+
+        {/* ── Platform Simulation Overlays (Non-blocking preview guides) ── */}
+        
+        {/* 1. TIKTOK OVERLAY */}
+        {previewMode === 'tiktok' && (
+          <div className="absolute inset-0 pointer-events-none z-20 select-none">
+            {/* Top Bar */}
+            <div className="absolute top-3.5 inset-x-0 px-4 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <div className="w-6" />
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-white/60 font-semibold">Seguindo</span>
+                <span className="text-white font-bold border-b-2 border-white pb-0.5">Para Você</span>
+              </div>
+              <Search className="h-4 w-4 text-white" />
+            </div>
+
+            {/* Right Action Rail */}
+            <div className="absolute right-2 bottom-5 flex flex-col items-center gap-3.5 text-white">
+              {/* Profile Avatar with Plus button */}
+              <div className="relative mb-1">
+                <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-zinc-800 shadow-md">
+                  {profileHeader.avatarUrl ? (
+                    <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white bg-gradient-to-tr from-pink-500 to-indigo-500">
+                      {displayName[0]?.toUpperCase() || 'D'}
+                    </div>
+                  )}
+                </div>
+                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[#FE2C55] flex items-center justify-center text-white shadow">
+                  <Plus className="h-2.5 w-2.5 stroke-[3]" />
+                </div>
+              </div>
+
+              {/* Likes */}
+              <div className="flex flex-col items-center">
+                <Heart className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">842.1K</span>
+              </div>
+
+              {/* Comments */}
+              <div className="flex flex-col items-center">
+                <MessageCircle className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">14.6K</span>
+              </div>
+
+              {/* Bookmark */}
+              <div className="flex flex-col items-center">
+                <Bookmark className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">52.3K</span>
+              </div>
+
+              {/* Share */}
+              <div className="flex flex-col items-center">
+                <Share2 className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">31.8K</span>
+              </div>
+
+              {/* Spinning Music Vinyl */}
+              <div className="w-7 h-7 rounded-full bg-black/90 border border-zinc-700 flex items-center justify-center mt-1 animate-[spin_4s_linear_infinite] shadow-lg">
+                <Disc className="h-3.5 w-3.5 text-zinc-300" />
+              </div>
+            </div>
+
+            {/* Bottom Left Info */}
+            <div className="absolute left-3 bottom-3 max-w-[70%] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+              <p className="font-bold text-xs">@{displayHandle}</p>
+              <p className="text-[10px] text-zinc-100 line-clamp-2 mt-0.5 leading-snug">
+                {displayCaption} <span className="font-bold text-white">#viral #foryou #fyp</span>
+              </p>
+              <div className="flex items-center gap-1 text-[9px] text-zinc-200 mt-1">
+                <Music className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">Som original - {displayName}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. REELS (FACEBOOK & INSTAGRAM) OVERLAY */}
+        {previewMode === 'reels' && (
+          <div className="absolute inset-0 pointer-events-none z-20 select-none">
+            {/* Top Bar */}
+            <div className="absolute top-3.5 inset-x-0 px-3.5 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <span className="font-extrabold text-sm tracking-wide">Reels</span>
+              <Camera className="h-4 w-4" />
+            </div>
+
+            {/* Right Action Rail */}
+            <div className="absolute right-2.5 bottom-6 flex flex-col items-center gap-4 text-white">
+              {/* Like */}
+              <div className="flex flex-col items-center">
+                <Heart className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">126 mil</span>
+              </div>
+
+              {/* Comment */}
+              <div className="flex flex-col items-center">
+                <MessageCircle className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">3.240</span>
+              </div>
+
+              {/* Share/Send */}
+              <div className="flex flex-col items-center">
+                <Send className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] -rotate-12" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">18,5 mil</span>
+              </div>
+
+              {/* More */}
+              <MoreVertical className="h-4 w-4 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+
+              {/* Audio Square */}
+              <div className="w-5 h-5 rounded-md border border-white/60 bg-zinc-800/90 flex items-center justify-center shadow">
+                <Music className="h-2.5 w-2.5 text-zinc-300" />
+              </div>
+            </div>
+
+            {/* Bottom Left Info */}
+            <div className="absolute left-3 bottom-3 max-w-[70%] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-5 h-5 rounded-full border border-white/60 overflow-hidden bg-zinc-800">
+                  {profileHeader.avatarUrl ? (
+                    <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white bg-primary">
+                      {displayName[0]?.toUpperCase() || 'D'}
+                    </div>
+                  )}
+                </div>
+                <span className="font-bold text-xs truncate">@{displayHandle}</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border border-white/70 bg-white/10 backdrop-blur-sm">
+                  Seguir
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-100 line-clamp-2 leading-snug">
+                {displayCaption}
+              </p>
+              <div className="flex items-center gap-1 text-[9px] text-zinc-200 mt-1">
+                <Music className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">Áudio original • {displayName}</span>
+              </div>
+            </div>
+
+            {/* Bottom Progress Bar */}
+            <div className="absolute bottom-0 inset-x-0 h-[2px] bg-white/70" />
+          </div>
+        )}
+
+        {/* 3. YOUTUBE SHORTS OVERLAY */}
+        {previewMode === 'shorts' && (
+          <div className="absolute inset-0 pointer-events-none z-20 select-none">
+            {/* Top Bar */}
+            <div className="absolute top-3 inset-x-0 px-3.5 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+              <span className="font-black text-[11px] uppercase tracking-wider text-red-500 bg-white/15 px-1.5 py-0.5 rounded">
+                Shorts
+              </span>
+              <div className="flex items-center gap-3">
+                <Search className="h-4 w-4" />
+                <MoreVertical className="h-4 w-4" />
+              </div>
+            </div>
+
+            {/* Right Action Rail */}
+            <div className="absolute right-2 bottom-6 flex flex-col items-center gap-3.5 text-white">
+              {/* Thumbs Up */}
+              <div className="flex flex-col items-center">
+                <ThumbsUp className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">248 mil</span>
+              </div>
+
+              {/* Thumbs Down */}
+              <div className="flex flex-col items-center">
+                <ThumbsDown className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Dislike</span>
+              </div>
+
+              {/* Comments */}
+              <div className="flex flex-col items-center">
+                <MessageCircle className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">4,8 mil</span>
+              </div>
+
+              {/* Share */}
+              <div className="flex flex-col items-center">
+                <Share2 className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Compartilhar</span>
+              </div>
+
+              {/* Remix */}
+              <div className="flex flex-col items-center">
+                <Layers className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Remix</span>
+              </div>
+
+              {/* Audio Thumb Box */}
+              <div className="w-6 h-6 rounded-md border border-white/50 bg-zinc-800 overflow-hidden shadow flex items-center justify-center">
+                <Music className="h-3 w-3 text-white" />
+              </div>
+            </div>
+
+            {/* Bottom Left Info */}
+            <div className="absolute left-3 bottom-3 max-w-[70%] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-5 h-5 rounded-full border border-white/60 overflow-hidden bg-zinc-800">
+                  {profileHeader.avatarUrl ? (
+                    <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white bg-red-600">
+                      {displayName[0]?.toUpperCase() || 'D'}
+                    </div>
+                  )}
+                </div>
+                <span className="font-bold text-xs truncate">@{displayHandle}</span>
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white shadow-sm">
+                  Inscrever-se
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-100 line-clamp-2 leading-snug">
+                {displayCaption} <span className="font-bold text-white">#shorts</span>
+              </p>
+              <div className="flex items-center gap-1 text-[9px] text-zinc-200 mt-1">
+                <Music className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">Som original - {displayName}</span>
+              </div>
+            </div>
+
+            {/* Bottom Red Progress Bar */}
+            <div className="absolute bottom-0 inset-x-0 h-[2.5px] bg-red-600" />
+          </div>
+        )}
 
         {/* ── Sleek Non-Blocking Figma/Canva Interactive Layer Overlays ── */}
         <div className="absolute inset-0 pointer-events-none z-30">
@@ -395,12 +723,41 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
               )}
             </div>
           )}
+
+          {/* 7. Arrows / Callout Layer Drag Box */}
+          {arrows.enabled && (
+            <div
+              style={{
+                position: 'absolute',
+                top: `${arrowsY}%`,
+                left: `${arrowsX}%`,
+                transform: 'translate(-50%, -50%)',
+                minWidth: '24%',
+                height: '6%',
+                cursor: 'grab',
+              }}
+              className={`pointer-events-auto transition-all rounded-lg ${
+                activeLayer === 'arrows'
+                  ? 'ring-2 ring-rose-500 bg-rose-500/20 shadow-lg'
+                  : 'hover:ring-1 hover:ring-rose-400/70 hover:bg-rose-500/10'
+              }`}
+              onPointerDown={(e) => handlePointerDown('arrows', e)}
+              onMouseEnter={() => setHoveredLayer('arrows')}
+              onMouseLeave={() => setHoveredLayer('none')}
+            >
+              {(activeLayer === 'arrows' || hoveredLayer === 'arrows') && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                  <Move className="h-2.5 w-2.5" /> SETAS / CTA (X: {arrowsX}%, Y: {arrowsY}%)
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Stage Hint Footer */}
       <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong>, <strong>Marca D'água</strong> ou <strong>Rodapé / CTA</strong> para qualquer posição.
+        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong>, <strong>Marca D'água</strong>, <strong>Rodapé</strong> ou <strong>Setas</strong> para qualquer posição.
       </p>
     </div>
   );

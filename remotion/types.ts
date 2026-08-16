@@ -310,5 +310,20 @@ export interface DarkClipsVideoProps {
     textAlign?: 'left' | 'center' | 'right';
     scale?: number;
   };
+
+  // Setas Animadas / Indicadores de Ação (Follow/Subscribe/Action Arrows)
+  arrows?: {
+    enabled?: boolean;
+    direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right';
+    style?: 'bounce' | 'pulse' | 'trail';
+    count?: number;
+    xOffset?: number;
+    yOffset?: number;
+    color?: string;
+    size?: number;
+    scale?: number;
+    text?: string;
+    textColor?: string;
+  };
 }
 

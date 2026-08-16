@@ -758,6 +758,7 @@ export async function ensureDarkClipsTablesExist() {
             updated_at TIMESTAMPTZ DEFAULT NOW()
         );
         ALTER TABLE public.dark_clips_presets ADD COLUMN IF NOT EXISTS watermark_style JSONB DEFAULT '{}'::jsonb;
+        ALTER TABLE public.dark_clips_presets ADD COLUMN IF NOT EXISTS arrows_style JSONB DEFAULT '{}'::jsonb;
 
         CREATE TABLE IF NOT EXISTS public.dark_clips_posts (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -850,9 +851,10 @@ export async function saveDarkClipPreset(preset: Partial<DarkClipPreset>): Promi
                 background_style = COALESCE($5, background_style),
                 watermark_style = COALESCE($6, watermark_style),
                 footer_style = COALESCE($7, footer_style),
-                is_default = COALESCE($8, is_default),
+                arrows_style = COALESCE($8, arrows_style),
+                is_default = COALESCE($9, is_default),
                 updated_at = NOW()
-            WHERE id = $9
+            WHERE id = $10
             RETURNING *
         `
         const values = [
@@ -863,6 +865,7 @@ export async function saveDarkClipPreset(preset: Partial<DarkClipPreset>): Promi
             preset.background_style ? JSON.stringify(preset.background_style) : null,
             preset.watermark_style ? JSON.stringify(preset.watermark_style) : null,
             preset.footer_style ? JSON.stringify(preset.footer_style) : null,
+            preset.arrows_style ? JSON.stringify(preset.arrows_style) : null,
             preset.is_default,
             preset.id
         ]
@@ -872,8 +875,8 @@ export async function saveDarkClipPreset(preset: Partial<DarkClipPreset>): Promi
         const query = `
             INSERT INTO public.dark_clips_presets (
                 user_id, name, profile_header, headline_style,
-                video_placement, background_style, watermark_style, footer_style, is_default
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                video_placement, background_style, watermark_style, footer_style, arrows_style, is_default
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
         `
         const values = [
@@ -885,6 +888,7 @@ export async function saveDarkClipPreset(preset: Partial<DarkClipPreset>): Promi
             JSON.stringify(preset.background_style || {}),
             JSON.stringify(preset.watermark_style || {}),
             JSON.stringify(preset.footer_style || {}),
+            JSON.stringify(preset.arrows_style || {}),
             preset.is_default || false
         ]
         const { rows } = await pool.query(query, values)
@@ -909,7 +913,8 @@ export async function getDarkClipPresets(userId?: string): Promise<DarkClipPrese
         video_placement: typeof r.video_placement === 'string' ? JSON.parse(r.video_placement) : (r.video_placement || {}),
         background_style: typeof r.background_style === 'string' ? JSON.parse(r.background_style) : (r.background_style || {}),
         watermark_style: typeof r.watermark_style === 'string' ? JSON.parse(r.watermark_style) : (r.watermark_style || {}),
-        footer_style: typeof r.footer_style === 'string' ? JSON.parse(r.footer_style) : (r.footer_style || {})
+        footer_style: typeof r.footer_style === 'string' ? JSON.parse(r.footer_style) : (r.footer_style || {}),
+        arrows_style: typeof r.arrows_style === 'string' ? JSON.parse(r.arrows_style) : (r.arrows_style || {})
     }))
 }
 

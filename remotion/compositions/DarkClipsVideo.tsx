@@ -10,6 +10,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   background = {},
   watermark = {},
   footer = {},
+  arrows = {},
 }) => {
   const frame = useCurrentFrame();
 
@@ -103,6 +104,41 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     textAlign: footerTextAlign = 'center',
     scale: footerScale = 100,
   } = footer;
+
+  // ── 7. Animated Callout Arrows Defaults ──
+  const {
+    enabled: arrowsEnabled = false,
+    direction: arrowsDirection = 'right',
+    style: arrowsStyle = 'trail',
+    count: arrowsCount = 2,
+    xOffset: arrowsX = 82,
+    yOffset: arrowsY = 65,
+    color: arrowsColor = '#FE2C55',
+    size: arrowsSize = 42,
+    scale: arrowsScale = 100,
+    text: arrowsText = '',
+    textColor: arrowsTextColor = '#FFFFFF',
+  } = arrows;
+
+  const rotationDegrees =
+    arrowsDirection === 'right'
+      ? 0
+      : arrowsDirection === 'left'
+      ? 180
+      : arrowsDirection === 'up'
+      ? -90
+      : arrowsDirection === 'down'
+      ? 90
+      : arrowsDirection === 'down-right'
+      ? 45
+      : arrowsDirection === 'up-right'
+      ? -45
+      : 0;
+
+  const arrowEffectiveSize = Math.round(arrowsSize * ((arrowsScale || 100) / 100));
+  const bounceCycle = (frame % 30) / 30;
+  const bounceDelta = Math.sin(bounceCycle * Math.PI * 2) * 14;
+  const pulseScale = 1 + Math.sin(bounceCycle * Math.PI * 2) * 0.15;
 
   const hasVideo = !!(videoUrl && videoUrl.trim().length > 0);
   const isLightBg = bgType === 'white';
@@ -591,6 +627,94 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             >
               {footerText}
             </p>
+          </div>
+        )}
+
+        {/* ── 7. Animated Callout Arrows Layer ── */}
+        {arrowsEnabled && (
+          <div
+            style={{
+              position: 'absolute',
+              top: `${arrowsY}%`,
+              left: `${arrowsX}%`,
+              transform: `translate(-50%, -50%) ${
+                arrowsStyle === 'bounce'
+                  ? arrowsDirection === 'right'
+                    ? `translateX(${bounceDelta}px)`
+                    : arrowsDirection === 'left'
+                    ? `translateX(${-bounceDelta}px)`
+                    : arrowsDirection === 'down' || arrowsDirection === 'down-right'
+                    ? `translateY(${bounceDelta}px)`
+                    : `translateY(${-bounceDelta}px)`
+                  : arrowsStyle === 'pulse'
+                  ? `scale(${pulseScale})`
+                  : ''
+              }`,
+              display: 'flex',
+              flexDirection: arrowsDirection === 'up' || arrowsDirection === 'down' ? 'column' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              zIndex: 28,
+              pointerEvents: 'none',
+              filter: isLightBg
+                ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))'
+                : `drop-shadow(0 4px 12px rgba(0,0,0,0.95)) drop-shadow(0 0 8px ${arrowsColor}80)`,
+            }}
+          >
+            {/* Optional Callout Action Text */}
+            {arrowsText && (
+              <span
+                style={{
+                  fontSize: `${Math.round(arrowEffectiveSize * 0.58)}px`,
+                  fontWeight: 900,
+                  color: arrowsTextColor || '#FFFFFF',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.8)',
+                  marginRight: arrowsDirection === 'right' || arrowsDirection === 'down-right' ? '4px' : '0px',
+                  marginLeft: arrowsDirection === 'left' ? '4px' : '0px',
+                }}
+              >
+                {arrowsText}
+              </span>
+            )}
+
+            {/* Arrows Sequence (1 to 3 items) */}
+            {Array.from({ length: Math.max(1, Math.min(3, arrowsCount || 2)) }).map((_, idx) => {
+              let arrowOpacity = 1;
+              if (arrowsStyle === 'trail') {
+                const trailPhase = (frame + idx * 7) % 24;
+                arrowOpacity = 0.35 + (trailPhase / 24) * 0.65;
+              }
+
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    transform: `rotate(${rotationDegrees}deg)`,
+                    opacity: arrowOpacity,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg
+                    width={arrowEffectiveSize}
+                    height={arrowEffectiveSize}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={arrowsColor}
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </div>
+              );
+            })}
           </div>
         )}
       </AbsoluteFill>

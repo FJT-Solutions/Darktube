@@ -37,7 +37,8 @@ import {
   CheckCircle2,
   ArrowRight,
   FolderPlus,
-  Move
+  Move,
+  Navigation
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -173,6 +174,20 @@ export default function DarkClipsPage() {
     yOffset: 92,
     textAlign: "center" as "left" | "center" | "right",
     scale: 100,
+  });
+
+  const [arrows, setArrows] = useState({
+    enabled: false,
+    direction: "right" as "right" | "left" | "up" | "down" | "down-right" | "up-right",
+    style: "trail" as "bounce" | "pulse" | "trail",
+    count: 2,
+    xOffset: 82,
+    yOffset: 65,
+    color: "#FE2C55",
+    size: 40,
+    scale: 100,
+    text: "Siga!",
+    textColor: "#FFFFFF",
   });
 
   // Scheduling State
@@ -311,6 +326,22 @@ export default function DarkClipsPage() {
         scale: preset.footer_style.scale ?? f.scale ?? 100,
       }));
     }
+    if (preset.arrows_style) {
+      setArrows((a) => ({
+        ...a,
+        enabled: preset.arrows_style?.enabled ?? a.enabled,
+        direction: (preset.arrows_style?.direction || a.direction) as any,
+        style: (preset.arrows_style?.style || a.style) as any,
+        count: preset.arrows_style?.count ?? a.count,
+        xOffset: preset.arrows_style?.x_offset ?? preset.arrows_style?.xOffset ?? a.xOffset,
+        yOffset: preset.arrows_style?.y_offset ?? preset.arrows_style?.yOffset ?? a.yOffset,
+        color: preset.arrows_style?.color ?? a.color,
+        size: preset.arrows_style?.size ?? a.size,
+        scale: preset.arrows_style?.scale ?? a.scale,
+        text: preset.arrows_style?.text ?? a.text,
+        textColor: preset.arrows_style?.text_color ?? preset.arrows_style?.textColor ?? a.textColor,
+      }));
+    }
     toast.success(`Layout "${preset.name}" carregado!`);
   }
 
@@ -337,6 +368,7 @@ export default function DarkClipsPage() {
           background_style: background,
           watermark_style: watermark,
           footer_style: footer,
+          arrows_style: arrows,
           is_default: activePreset.is_default,
         }),
       });
@@ -379,6 +411,7 @@ export default function DarkClipsPage() {
           background_style: background,
           watermark_style: watermark,
           footer_style: footer,
+          arrows_style: arrows,
           is_default: isDefault,
         }),
       });
@@ -618,6 +651,7 @@ export default function DarkClipsPage() {
             background,
             watermark,
             footer,
+            arrows,
           },
           remodelData: {
             headline_main: headline.mainText,
@@ -1667,6 +1701,216 @@ export default function DarkClipsPage() {
                   )}
                 </Card>
 
+                {/* ── CARD 6: Setas & Indicadores Animados de Ação (CTA Visual) ── */}
+                <Card className="border-border shadow-sm">
+                  <CardHeader className="p-4 pb-3 cursor-pointer select-none">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-md bg-rose-500/10 text-rose-400">
+                          <Navigation className="h-4 w-4 rotate-45" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            6. Setas & Indicadores de Ação
+                            {arrows.enabled && (
+                              <Badge className="text-[10px] bg-rose-500/20 text-rose-300 border-rose-500/30">
+                                Ativado
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            Setas animadas apontando para Seguir, Inscrever-se ou CTA
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={arrows.enabled}
+                        onCheckedChange={(v) => setArrows((a) => ({ ...a, enabled: v }))}
+                      />
+                    </div>
+                  </CardHeader>
+
+                  {arrows.enabled && (
+                    <CardContent className="p-4 pt-0 space-y-4 border-t border-border/40 mt-3">
+                      {/* Presets Rápidos de Direção & Posicionamento */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">Atalhos de Posicionamento Rápido</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { label: "👉 Botão Seguir (Lateral)", dir: "right", x: 82, y: 65, text: "Siga!" },
+                            { label: "👇 CTA Inferior", dir: "down", x: 50, y: 84, text: "Assista!" },
+                            { label: "👆 Perfil Superior", dir: "up", x: 22, y: 15, text: "Confira!" },
+                          ].map((p) => (
+                            <Button
+                              key={p.label}
+                              type="button"
+                              size="sm"
+                              variant={arrows.xOffset === p.x && arrows.yOffset === p.y ? "default" : "outline"}
+                              onClick={() =>
+                                setArrows((a) => ({
+                                  ...a,
+                                  direction: p.dir as any,
+                                  xOffset: p.x,
+                                  yOffset: p.y,
+                                  text: p.text,
+                                }))
+                              }
+                              className="text-xs h-8 font-bold"
+                            >
+                              {p.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Direção da Seta */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">Direção da Seta</Label>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                          {[
+                            { dir: "right", label: "Direita →" },
+                            { dir: "left", label: "← Esquerda" },
+                            { dir: "down", label: "Baixo ↓" },
+                            { dir: "up", label: "Cima ↑" },
+                            { dir: "down-right", label: "Diagonal ↘" },
+                            { dir: "up-right", label: "Diagonal ↗" },
+                          ].map((item) => (
+                            <Button
+                              key={item.dir}
+                              type="button"
+                              size="sm"
+                              variant={arrows.direction === item.dir ? "default" : "outline"}
+                              onClick={() => setArrows((a) => ({ ...a, direction: item.dir as any }))}
+                              className="text-xs h-8 font-medium"
+                            >
+                              {item.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Estilo da Animação & Quantidade */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">Efeito da Animação</Label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              { id: "trail", label: "Cascata 🌊" },
+                              { id: "bounce", label: "Quicar 🦘" },
+                              { id: "pulse", label: "Pulsar 💓" },
+                            ].map((st) => (
+                              <Button
+                                key={st.id}
+                                type="button"
+                                size="sm"
+                                variant={arrows.style === st.id ? "default" : "outline"}
+                                onClick={() => setArrows((a) => ({ ...a, style: st.id as any }))}
+                                className="text-xs h-8 font-bold"
+                              >
+                                {st.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">Quantidade de Setas</Label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[1, 2, 3].map((num) => (
+                              <Button
+                                key={num}
+                                type="button"
+                                size="sm"
+                                variant={arrows.count === num ? "default" : "outline"}
+                                onClick={() => setArrows((a) => ({ ...a, count: num }))}
+                                className="text-xs h-8 font-bold"
+                              >
+                                {num} {num === 1 ? "Seta" : "Setas"}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Texto de Ação Opcional */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">Texto da Seta (Opcional)</Label>
+                          <Input
+                            value={arrows.text || ""}
+                            onChange={(e) => setArrows((a) => ({ ...a, text: e.target.value }))}
+                            placeholder="Ex: Siga!, Inscreva-se!"
+                            className="text-xs h-8"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">Cor da Seta</Label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={arrows.color || "#FE2C55"}
+                              onChange={(e) => setArrows((a) => ({ ...a, color: e.target.value }))}
+                              className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
+                            />
+                            <Input
+                              value={arrows.color || "#FE2C55"}
+                              onChange={(e) => setArrows((a) => ({ ...a, color: e.target.value }))}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Sliders de Posição X e Y */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold">Posição Horizontal (X)</span>
+                            <span className="font-mono text-primary">{arrows.xOffset}%</span>
+                          </div>
+                          <Slider
+                            value={[arrows.xOffset]}
+                            min={0}
+                            max={100}
+                            step={1}
+                            onValueChange={([xOffset]) => setArrows((a) => ({ ...a, xOffset }))}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold">Posição Vertical (Y)</span>
+                            <span className="font-mono text-primary">{arrows.yOffset}%</span>
+                          </div>
+                          <Slider
+                            value={[arrows.yOffset]}
+                            min={0}
+                            max={100}
+                            step={1}
+                            onValueChange={([yOffset]) => setArrows((a) => ({ ...a, yOffset }))}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Slider de Tamanho */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold">Tamanho das Setas</span>
+                          <span className="font-mono text-rose-400">{arrows.size}px</span>
+                        </div>
+                        <Slider
+                          value={[arrows.size]}
+                          min={20}
+                          max={72}
+                          step={2}
+                          onValueChange={([size]) => setArrows((a) => ({ ...a, size }))}
+                        />
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+
                 {/* ── Action Bar at Bottom of Modeler Controls Column ── */}
                 <div className="p-4 rounded-xl border border-border/60 bg-card/60 flex flex-col sm:flex-row gap-3 justify-between items-center shadow-sm">
                   <div className="text-xs text-muted-foreground text-center sm:text-left">
@@ -1744,11 +1988,13 @@ export default function DarkClipsPage() {
                       background={background}
                       watermark={watermark}
                       footer={footer}
+                      arrows={arrows}
                       onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
                       onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
                       onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
                       onUpdateWatermark={(updates) => setWatermark((w) => ({ ...w, ...updates }))}
                       onUpdateFooter={(updates) => setFooter((f) => ({ ...f, ...updates }))}
+                      onUpdateArrows={(updates) => setArrows((a) => ({ ...a, ...updates }))}
                     />
                   </CardContent>
 
