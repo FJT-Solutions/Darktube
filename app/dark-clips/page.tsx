@@ -69,6 +69,7 @@ export default function DarkClipsPage() {
   const [aiThemePrompt, setAiThemePrompt] = useState("");
 
   // Modeler Granular State
+  const [sampleVideoUrl, setSampleVideoUrl] = useState<string>("/sample-oceans.mp4");
   const [profileHeader, setProfileHeader] = useState({
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     name: "Dark Clips",
@@ -108,7 +109,7 @@ export default function DarkClipsPage() {
   });
 
   const [background, setBackground] = useState({
-    type: "black" as "black" | "blur" | "gradient" | "color",
+    type: "black" as "black" | "white" | "blur" | "gradient" | "neon" | "zinc" | "color",
     blurIntensity: 25,
     overlayOpacity: 60,
     customColor: "#000000",
@@ -919,27 +920,54 @@ export default function DarkClipsPage() {
               {/* ── Right Column: Pré-visualização do Vídeo (5 cols) ── */}
               <div className="lg:col-span-5 sticky top-6 space-y-4">
                 <Card className="overflow-hidden border-border bg-card/50 backdrop-blur-md">
-                  <CardHeader className="p-4 pb-2 border-b border-border/40 flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Film className="h-4 w-4 text-red-500" /> Pré-visualização do Vídeo 9:16
-                      </CardTitle>
-                      <CardDescription className="text-[11px]">
-                        {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Vídeo de Exemplo Ativo (1080x1920)"}
-                      </CardDescription>
+                  <CardHeader className="p-4 pb-2 border-b border-border/40 space-y-2">
+                    <div className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle className="text-sm font-bold flex items-center gap-2">
+                          <Film className="h-4 w-4 text-red-500" /> Pré-visualização do Vídeo 9:16
+                        </CardTitle>
+                        <CardDescription className="text-[11px]">
+                          {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Vídeo de Demonstração em Alta Resolução"}
+                        </CardDescription>
+                      </div>
+                      {renderedUrl && (
+                        <a href={renderedUrl} download={`darkclip_${Date.now()}.mp4`} target="_blank" rel="noreferrer">
+                          <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1 text-emerald-400 border-emerald-500/30">
+                            <Download className="h-3 w-3" /> Baixar MP4
+                          </Button>
+                        </a>
+                      )}
                     </div>
-                    {renderedUrl && (
-                      <a href={renderedUrl} download={`darkclip_${Date.now()}.mp4`} target="_blank" rel="noreferrer">
-                        <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1 text-emerald-400 border-emerald-500/30">
-                          <Download className="h-3 w-3" /> Baixar MP4
-                        </Button>
-                      </a>
+
+                    {!selectedClip && (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-border/30">
+                        <span className="text-[10px] text-muted-foreground font-semibold">Trocar Exemplo:</span>
+                        {[
+                          { id: "/sample-oceans.mp4", label: "🌊 Oceano HD" },
+                          { id: "/sample-viral-clip.mp4", label: "🎬 Animação" },
+                          { id: "/sample-nature.mp4", label: "🌿 Natureza" },
+                          { id: "/historia_brasil_santos_dumont.mp4", label: "🎞️ Histórico" },
+                        ].map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => setSampleVideoUrl(s.id)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                              sampleVideoUrl === s.id
+                                ? "bg-red-500/20 text-red-400 border border-red-500/40 shadow-sm"
+                                : "bg-secondary/50 text-muted-foreground hover:text-foreground border border-border/40"
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </CardHeader>
 
                   <CardContent className="p-4 flex flex-col items-center justify-center">
                     <DarkClipsPreviewPlayer
-                      videoUrl={selectedClip?.video_url || "/render_pro_render_v2.mp4"}
+                      videoUrl={selectedClip?.video_url || sampleVideoUrl}
                       durationInSeconds={selectedClip?.duration || 15}
                       profileHeader={profileHeader}
                       headline={headline}
