@@ -19,10 +19,14 @@
     }, 3500);
   }
 
-  async function getApiUrl() {
+  async function getAuthAndApi() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(['darktube_api_url'], (res) => {
-        resolve(res.darktube_api_url || 'http://localhost:3000');
+      chrome.storage.local.get(['darktube_api_url', 'darktube_token', 'darktube_user'], (res) => {
+        resolve({
+          baseUrl: res.darktube_api_url || 'http://localhost:3000',
+          token: res.darktube_token || null,
+          user: res.darktube_user || null
+        });
       });
     });
   }
@@ -34,17 +38,22 @@
     }
 
     try {
-      const baseUrl = await getApiUrl();
+      const { baseUrl, token, user } = await getAuthAndApi();
       const endpoint = `${baseUrl.replace(/\/$/, '')}/api/dark-clips/import`;
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           platform: 'instagram',
-          items: [videoData]
+          items: [videoData],
+          userId: user?.id || null
         })
       });
+
 
       const result = await response.json();
 

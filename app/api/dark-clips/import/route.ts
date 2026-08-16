@@ -71,15 +71,32 @@ export async function GET() {
   }
 }
 
+import { verifyJWT } from '@/lib/crypto';
+
 export async function POST(req: Request) {
   try {
-    const user = await getCurrentUser();
+    let user = await getCurrentUser();
     const body = await req.json();
     const { 
       urls = [], 
       items = [], // direct metadata items from extension
-      platform = 'other' 
+      platform = 'other',
+      userId = null
     } = body;
+
+    // Check token from headers if not found in session cookies
+    if (!user) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7);
+        try {
+          user = await verifyJWT(token) as any;
+        } catch {}
+      }
+    }
+
+    const targetUserId = user?.id || userId || null;
+
 
     const results = [];
     const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
@@ -111,7 +128,7 @@ export async function POST(req: Request) {
           }
 
           const saved = await saveDarkClip({
-            user_id: user?.id,
+            user_id: targetUserId,
             original_url: item.originalUrl || item.url || videoUrl,
             platform: item.platform || platform,
             video_url: videoUrl,
@@ -167,7 +184,7 @@ export async function POST(req: Request) {
           else if (cleanUrl.includes('facebook.com')) detectedPlatform = 'facebook';
 
           const saved = await saveDarkClip({
-            user_id: user?.id,
+            user_id: targetUserId,
             original_url: cleanUrl,
             platform: detectedPlatform,
             video_url: servedVideoUrl,
