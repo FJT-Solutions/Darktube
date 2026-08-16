@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Video, Img, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Video, useCurrentFrame } from 'remotion';
 import { DarkClipsVideoProps } from '../types';
 
 export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
@@ -19,13 +19,14 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     handle = '@darkclips',
     badgeType = 'blue',
     showHeader = true,
-    paddingTop = 100,
+    paddingTop = 90,
+    textAlign: headerTextAlign = 'left',
   } = profileHeader;
 
   // ── 2. Headline Defaults ──
   const {
-    mainText = 'MEU AMIGO: "COMPREI UM MIC NOVO, MANO."',
-    subText = 'O DESGRAÇADO ENTRANDO NA CALL:',
+    mainText = 'QUANDO VOCÊ ACHA QUE FINALIZOU O CÓDIGO:',
+    subText = 'O BUG SURGINDO NO PRIMEIRO TESTE:',
     showMainText = true,
     showSubText = true,
     fontFamily = 'Montserrat, Inter, "Helvetica Neue", sans-serif',
@@ -33,13 +34,16 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     primaryColor = '#FACC15', // Viral Yellow
     secondaryColor = '#FFFFFF',
     textAlign = 'center',
+    mainTextAlign,
+    subTextAlign,
     uppercase = true,
     textShadow = true,
     mainTextYOffset = 17,
     subTextYOffset = 25,
   } = headline;
 
-
+  const activeMainAlign = mainTextAlign || textAlign || 'center';
+  const activeSubAlign = subTextAlign || textAlign || 'center';
 
   // ── 3. Video Placement Defaults ──
   const {
@@ -61,19 +65,18 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   // ── 5. Footer Defaults ──
   const {
     showFooter = false,
-    text: footerText = 'Sigam a melhor página de vídeos virais!',
+    text: footerText = 'Sigam a página para os melhores vídeos!',
     fontSize: footerFontSize = 26,
     color: footerColor = '#9CA3AF',
   } = footer;
 
-  // Subtle entrance animation
-  const opacity = interpolate(frame, [0, 8], [0, 1], { extrapolateRight: 'clamp' });
+  const hasVideo = !!(videoUrl && videoUrl.trim().length > 0);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#000000', opacity, overflow: 'hidden' }}>
+    <AbsoluteFill style={{ backgroundColor: '#000000', opacity: 1, overflow: 'hidden' }}>
       
       {/* ── Background Layer ── */}
-      {bgType === 'blur' && videoUrl ? (
+      {bgType === 'blur' && hasVideo ? (
         <AbsoluteFill style={{ overflow: 'hidden' }}>
           <Video
             src={videoUrl}
@@ -115,30 +118,32 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           fontFamily,
         }}
       >
-        {/* ── Profile Header ── */}
+        {/* ── 1. Profile Header Layer (Alinhamento Independente) ── */}
         {showHeader && (
           <div
             style={{
-              width: '100%',
+              position: 'absolute',
+              top: `${paddingTop}px`,
+              left: '5%',
+              width: '90%',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: textAlign === 'center' ? 'center' : 'flex-start',
+              justifyContent: headerTextAlign === 'center' ? 'center' : headerTextAlign === 'right' ? 'flex-end' : 'flex-start',
               gap: 18,
-              paddingTop: `${paddingTop}px`,
-              paddingBottom: 24,
-              zIndex: 10,
+              zIndex: 20,
             }}
           >
             {avatarUrl ? (
-              <Img
+              <img
                 src={avatarUrl}
+                alt="Avatar"
                 style={{
                   width: 76,
                   height: 76,
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: '2px solid rgba(255, 255, 255, 0.2)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                  border: '2px solid rgba(255, 255, 255, 0.25)',
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.6)',
                 }}
               />
             ) : (
@@ -147,53 +152,42 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   width: 76,
                   height: 76,
                   borderRadius: '50%',
-                  backgroundColor: '#27272a',
-                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 32,
+                  fontSize: 34,
                   fontWeight: 900,
                   color: '#ffffff',
+                  boxShadow: '0 6px 16px rgba(0,0,0,0.6)',
                 }}
               >
-                {name.charAt(0).toUpperCase()}
+                {(name || 'D').charAt(0).toUpperCase()}
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: textAlign === 'center' ? 'flex-start' : 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: headerTextAlign === 'right' ? 'flex-end' : 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span
                   style={{
-                    fontSize: 30,
+                    fontSize: 32,
                     fontWeight: 800,
                     color: '#FFFFFF',
                     letterSpacing: '-0.02em',
+                    textShadow: '0 2px 8px rgba(0,0,0,0.8)',
                   }}
                 >
-                  {name}
+                  {name || 'Dark Clips'}
                 </span>
 
-                {/* Verified Badges */}
+                {/* Selo de Verificado Padrão Instagram (Azul) */}
                 {badgeType === 'blue' && (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
                     <path
                       d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
                       fill="#38BDF8"
                       stroke="#0284C7"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-
-                {badgeType === 'gold' && (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-                    <path
-                      d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
-                      fill="#EAB308"
-                      stroke="#CA8A04"
                       strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -206,9 +200,10 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 <span
                   style={{
                     fontSize: 24,
-                    fontWeight: 500,
+                    fontWeight: 600,
                     color: '#9CA3AF',
                     marginTop: -2,
+                    textShadow: '0 2px 6px rgba(0,0,0,0.8)',
                   }}
                 >
                   {handle.startsWith('@') ? handle : `@${handle}`}
@@ -218,7 +213,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           </div>
         )}
 
-        {/* ── 2. Independent Main Text Layer (Setup) ── */}
+        {/* ── 2. Independent Main Text Layer (Setup / Título) ── */}
         {showMainText && mainText && (
           <div
             style={{
@@ -226,8 +221,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               top: `${mainTextYOffset}%`,
               left: '5%',
               width: '90%',
-              textAlign: textAlign as any,
-              zIndex: 15,
+              textAlign: activeMainAlign as any,
+              zIndex: 20,
             }}
           >
             <h1
@@ -238,7 +233,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 color: primaryColor,
                 lineHeight: 1.25,
                 textTransform: uppercase ? 'uppercase' : 'none',
-                textShadow: textShadow ? '0 4px 16px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.8)' : 'none',
+                textShadow: textShadow ? '0 4px 16px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9)' : 'none',
                 letterSpacing: '-0.01em',
               }}
             >
@@ -247,7 +242,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           </div>
         )}
 
-        {/* ── 3. Independent Sub Text Layer (Punchline) ── */}
+        {/* ── 3. Independent Sub Text Layer (Subtítulo / Punchline) ── */}
         {showSubText && subText && (
           <div
             style={{
@@ -255,8 +250,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               top: `${subTextYOffset}%`,
               left: '5%',
               width: '90%',
-              textAlign: textAlign as any,
-              zIndex: 15,
+              textAlign: activeSubAlign as any,
+              zIndex: 20,
             }}
           >
             <h2
@@ -267,7 +262,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 color: secondaryColor,
                 lineHeight: 1.25,
                 textTransform: uppercase ? 'uppercase' : 'none',
-                textShadow: textShadow ? '0 4px 16px rgba(0,0,0,0.9), 0 1px 3px rgba(0,0,0,0.8)' : 'none',
+                textShadow: textShadow ? '0 4px 16px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9)' : 'none',
               }}
             >
               {subText}
@@ -275,27 +270,26 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           </div>
         )}
 
-
-        {/* ── Video Player Container ── */}
-        {videoUrl && (
-          <div
-            style={{
-              position: 'absolute',
-              top: `${yOffset}%`,
-              transform: 'translateY(-50%)',
-              width: `${scale}%`,
-              borderRadius: `${borderRadius}px`,
-              overflow: 'hidden',
-              boxShadow: hasShadow ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255,255,255,0.1)' : 'none',
-              backgroundColor: '#09090b',
-              aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === '1:1' ? '1/1' : 'auto',
-              maxHeight: '58%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 5,
-            }}
-          >
+        {/* ── 4. Video Player & High-Fidelity Mockup Container ── */}
+        <div
+          style={{
+            position: 'absolute',
+            top: `${yOffset}%`,
+            transform: 'translateY(-50%)',
+            width: `${scale}%`,
+            borderRadius: `${borderRadius}px`,
+            overflow: 'hidden',
+            boxShadow: hasShadow ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255,255,255,0.15)' : 'none',
+            backgroundColor: '#09090b',
+            aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === '1:1' ? '1/1' : 'auto',
+            maxHeight: '58%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+          }}
+        >
+          {hasVideo ? (
             <Video
               src={videoUrl}
               style={{
@@ -304,10 +298,130 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 objectFit: 'contain',
               }}
             />
-          </div>
-        )}
+          ) : (
+            /* Visual Mockup Template when no video is selected */
+            <div
+              style={{
+                width: '100%',
+                minHeight: 360,
+                background: 'linear-gradient(145deg, #18181b 0%, #09090b 60%, #1e1b4b 100%)',
+                border: '2px dashed rgba(255, 255, 255, 0.15)',
+                borderRadius: `${borderRadius}px`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                overflow: 'hidden',
+                padding: '40px 20px',
+                boxSizing: 'border-box',
+              }}
+            >
+              {/* Background ambient glow */}
+              <div
+                style={{
+                  position: 'absolute',
+                  width: 200,
+                  height: 200,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(239,68,68,0.2) 0%, rgba(0,0,0,0) 70%)',
+                  top: '20%',
+                  left: '35%',
+                }}
+              />
 
-        {/* ── Footer / CTA Layer ── */}
+              {/* Play Badge Icon */}
+              <div
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                  boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                  zIndex: 2,
+                }}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                  <polygon points="6 3 20 12 6 21 6 3" />
+                </svg>
+              </div>
+
+              {/* Labels */}
+              <span
+                style={{
+                  fontSize: 24,
+                  fontWeight: 800,
+                  color: '#ffffff',
+                  letterSpacing: '0.02em',
+                  zIndex: 2,
+                  textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                }}
+              >
+                Área do Vídeo Enquadrado
+              </span>
+
+              <span
+                style={{
+                  fontSize: 16,
+                  fontWeight: 600,
+                  color: '#94a3b8',
+                  marginTop: 6,
+                  zIndex: 2,
+                }}
+              >
+                Escala: {scale}% · Curvatura: {borderRadius}px
+              </span>
+
+              {/* Simulated timeline bar */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 16,
+                  left: 20,
+                  right: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  zIndex: 2,
+                }}
+              >
+                <div
+                  style={{
+                    flex: 1,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '45%',
+                      height: '100%',
+                      backgroundColor: '#ef4444',
+                    }}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#cbd5e1',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  00:15 / 00:15 HD
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── 5. Footer / CTA Layer ── */}
         {showFooter && footerText && (
           <div
             style={{
@@ -316,7 +430,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               width: '100%',
               textAlign: 'center',
               padding: '0 40px',
-              zIndex: 10,
+              zIndex: 20,
             }}
           >
             <p

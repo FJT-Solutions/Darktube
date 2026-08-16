@@ -4,9 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { DarkClipsVideoComposition } from '@/remotion/compositions/DarkClipsVideo';
 import { DarkClipsVideoProps } from '@/remotion/types';
-import { Move, Play, Pause, RotateCcw, Smartphone, MousePointer2 } from 'lucide-react';
+import { Move, Smartphone, Sparkles, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 
 interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   fps?: number;
@@ -23,6 +22,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   fps = 30,
   width = 1080,
   height = 1920,
+  videoUrl,
   onUpdateHeaderPadding,
   onUpdateHeadline,
   onUpdateVideoPlacement,
@@ -34,8 +34,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
 
   // Active layer being dragged
   const [activeLayer, setActiveLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video'>('none');
+  const [hoveredLayer, setHoveredLayer] = useState<'none' | 'header' | 'mainText' | 'subText' | 'video'>('none');
   const [dragging, setDragging] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [dragStartY, setDragStartY] = useState<number>(0);
   const [dragInitialVal, setDragInitialVal] = useState<number>(0);
 
@@ -51,24 +51,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const videoY = videoPlacement.yOffset ?? 52;
   const videoScale = videoPlacement.scale ?? 92;
 
-  // Toggle Play / Pause without showing native video player controls
-  const togglePlay = () => {
-    if (!playerRef.current) return;
-    if (playerRef.current.isPlaying()) {
-      playerRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      playerRef.current.play();
-      setIsPlaying(true);
-    }
-  };
-
-  const restartVideo = () => {
-    if (!playerRef.current) return;
-    playerRef.current.seekTo(0);
-    playerRef.current.play();
-    setIsPlaying(true);
-  };
+  // Video Url
+  const activeVideoUrl = videoUrl || "";
 
   // Handle Drag Start
   const handlePointerDown = (layer: 'header' | 'mainText' | 'subText' | 'video', e: React.PointerEvent) => {
@@ -88,7 +72,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
     }
   };
 
-  // Handle Pointer Move for Independent Layers
+  // Handle Pointer Move for Independent Layers (Free Full-Range Positioning 0% - 95%)
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
       if (!dragging || !containerRef.current) return;
@@ -98,16 +82,16 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
 
       if (activeLayer === 'header' && onUpdateHeaderPadding) {
         const scaleFactor = 1920 / rect.height;
-        const newPadding = Math.max(20, Math.min(350, Math.round(dragInitialVal + deltaY * scaleFactor)));
+        const newPadding = Math.max(0, Math.min(800, Math.round(dragInitialVal + deltaY * scaleFactor)));
         onUpdateHeaderPadding(newPadding);
       } else if (activeLayer === 'mainText' && onUpdateHeadline) {
-        const newY = Math.max(5, Math.min(60, Math.round(dragInitialVal + percentDeltaY)));
+        const newY = Math.max(0, Math.min(95, Math.round(dragInitialVal + percentDeltaY)));
         onUpdateHeadline({ mainTextYOffset: newY });
       } else if (activeLayer === 'subText' && onUpdateHeadline) {
-        const newY = Math.max(10, Math.min(75, Math.round(dragInitialVal + percentDeltaY)));
+        const newY = Math.max(0, Math.min(95, Math.round(dragInitialVal + percentDeltaY)));
         onUpdateHeadline({ subTextYOffset: newY });
       } else if (activeLayer === 'video' && onUpdateVideoPlacement) {
-        const newY = Math.max(15, Math.min(85, Math.round(dragInitialVal + percentDeltaY)));
+        const newY = Math.max(0, Math.min(95, Math.round(dragInitialVal + percentDeltaY)));
         onUpdateVideoPlacement({ yOffset: newY });
       }
     };
@@ -132,62 +116,41 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   return (
     <div className="flex flex-col items-center gap-3 w-full max-w-[340px] mx-auto select-none">
       
-      {/* ── Top Stage Bar ── */}
-      <div className="w-full flex items-center justify-between px-1">
+      {/* ── Top Stage Info Bar ── */}
+      <div className="w-full flex items-center justify-between px-1 min-h-[24px]">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-[11px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1.5 py-0.5">
             <Smartphone className="h-3 w-3" /> Canvas 9:16
           </Badge>
           {activeLayer !== 'none' && (
             <span className="text-[11px] font-semibold text-zinc-300 animate-fadeIn">
-              Camada:{' '}
               <strong className="text-primary font-bold">
                 {activeLayer === 'header'
                   ? `Header (${headerPadding}px)`
                   : activeLayer === 'mainText'
-                  ? `Setup (${mainTextY}%)`
+                  ? `Texto Principal (${mainTextY}%)`
                   : activeLayer === 'subText'
-                  ? `Punchline (${subTextY}%)`
+                  ? `Subtítulo (${subTextY}%)`
                   : `Vídeo (${videoY}%)`}
               </strong>
             </span>
           )}
         </div>
-
-        {/* Clean Playback Controls */}
-        <div className="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={restartVideo}
-            className="h-7 w-7 p-0 text-zinc-400 hover:text-white"
-            title="Reiniciar vídeo"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={togglePlay}
-            className="h-7 px-2 text-xs font-bold gap-1 text-white bg-zinc-800 hover:bg-zinc-700"
-          >
-            {isPlaying ? <Pause className="h-3 w-3 fill-white" /> : <Play className="h-3 w-3 fill-white" />}
-            {isPlaying ? 'Pausar' : 'Play'}
-          </Button>
-        </div>
       </div>
 
-      {/* ── Clean 9:16 Smartphone / Canva Artboard Stage ── */}
+      {/* ── Pure WYSIWYG 9:16 Artboard Stage ── */}
       <div
         ref={containerRef}
-        className="w-full aspect-[9/16] rounded-[24px] overflow-hidden shadow-2xl border-2 border-zinc-800/80 bg-black relative cursor-default"
+        className="w-full aspect-[9/16] rounded-[24px] overflow-hidden shadow-2xl border-2 border-zinc-800/90 bg-black relative cursor-default group"
         onClick={() => setActiveLayer('none')}
       >
+        {/* The Live Composition */}
         <Player
           ref={playerRef}
           component={DarkClipsVideoComposition}
           inputProps={{
             ...inputProps,
+            videoUrl: activeVideoUrl,
             profileHeader: {
               ...profileHeader,
               paddingTop: headerPadding,
@@ -211,19 +174,18 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           style={{
             width: '100%',
             height: '100%',
-            pointerEvents: 'none',
           }}
           controls={false}
-          autoPlay={false}
-          loop
+          autoPlay={true}
+          loop={true}
         />
 
-        {/* ── Interactive Layer Overlays (Canva Style) ── */}
-        <div className="absolute inset-0 pointer-events-auto z-30">
+        {/* ── Sleek Non-Blocking Figma/Canva Interactive Layer Overlays ── */}
+        <div className="absolute inset-0 pointer-events-none z-30">
           
-          {/* Snapping Guide Line */}
+          {/* Snapping Center Guide */}
           {dragging && (
-            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-red-500/50 border-l border-dashed border-red-500 z-40 pointer-events-none" />
+            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-red-500/60 border-l border-dashed border-red-500 z-40" />
           )}
 
           {/* 1. Header Layer Drag Box */}
@@ -237,21 +199,24 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                 height: '7%',
                 cursor: 'grab',
               }}
-              className={`group rounded-lg transition-all flex items-center justify-between px-3 ${
+              className={`pointer-events-auto transition-all rounded-lg ${
                 activeLayer === 'header'
-                  ? 'border-2 border-sky-400 bg-sky-500/15 shadow-lg shadow-sky-500/20'
-                  : 'border border-dashed border-transparent hover:border-sky-400/70 hover:bg-sky-500/10'
+                  ? 'ring-2 ring-sky-400 bg-sky-400/10 shadow-lg'
+                  : 'hover:ring-1 hover:ring-sky-400/60 hover:bg-sky-400/5'
               }`}
               onPointerDown={(e) => handlePointerDown('header', e)}
+              onMouseEnter={() => setHoveredLayer('header')}
+              onMouseLeave={() => setHoveredLayer('none')}
             >
-              <span className="text-[9px] font-extrabold text-sky-400 uppercase tracking-wider bg-black/90 px-1.5 py-0.5 rounded border border-sky-500/40">
-                👤 Header Perfil
-              </span>
-              <Move className="h-3.5 w-3.5 text-sky-400 opacity-70 group-hover:opacity-100" />
+              {(activeLayer === 'header' || hoveredLayer === 'header') && (
+                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-sky-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                  <Move className="h-2.5 w-2.5" /> HEADER ({headerPadding}px)
+                </div>
+              )}
             </div>
           )}
 
-          {/* 2. Main Text Layer Drag Box (Setup / Chamada) */}
+          {/* 2. Main Text Layer Drag Box (Texto Principal) */}
           {headline.showMainText !== false && headline.mainText && (
             <div
               style={{
@@ -262,21 +227,24 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                 minHeight: '6%',
                 cursor: 'grab',
               }}
-              className={`group rounded-lg transition-all flex items-center justify-between px-3 py-1 ${
+              className={`pointer-events-auto transition-all rounded-lg ${
                 activeLayer === 'mainText'
-                  ? 'border-2 border-yellow-400 bg-yellow-500/15 shadow-lg shadow-yellow-500/20'
-                  : 'border border-dashed border-transparent hover:border-yellow-400/70 hover:bg-yellow-500/10'
+                  ? 'ring-2 ring-yellow-400 bg-yellow-400/10 shadow-lg'
+                  : 'hover:ring-1 hover:ring-yellow-400/60 hover:bg-yellow-400/5'
               }`}
               onPointerDown={(e) => handlePointerDown('mainText', e)}
+              onMouseEnter={() => setHoveredLayer('mainText')}
+              onMouseLeave={() => setHoveredLayer('none')}
             >
-              <span className="text-[9px] font-extrabold text-yellow-400 uppercase tracking-wider bg-black/90 px-1.5 py-0.5 rounded border border-yellow-500/40">
-                ✍️ Texto Principal ({mainTextY}%)
-              </span>
-              <Move className="h-3.5 w-3.5 text-yellow-400 opacity-70 group-hover:opacity-100" />
+              {(activeLayer === 'mainText' || hoveredLayer === 'mainText') && (
+                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-yellow-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                  <Move className="h-2.5 w-2.5" /> TÍTULO PRINCIPAL ({mainTextY}%)
+                </div>
+              )}
             </div>
           )}
 
-          {/* 3. Sub Text Layer Drag Box (Punchline / Reação) */}
+          {/* 3. Sub Text Layer Drag Box (Subtítulo / Punchline) */}
           {headline.showSubText !== false && headline.subText && (
             <div
               style={{
@@ -287,17 +255,20 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
                 minHeight: '5%',
                 cursor: 'grab',
               }}
-              className={`group rounded-lg transition-all flex items-center justify-between px-3 py-1 ${
+              className={`pointer-events-auto transition-all rounded-lg ${
                 activeLayer === 'subText'
-                  ? 'border-2 border-cyan-400 bg-cyan-500/15 shadow-lg shadow-cyan-500/20'
-                  : 'border border-dashed border-transparent hover:border-cyan-400/70 hover:bg-cyan-500/10'
+                  ? 'ring-2 ring-cyan-400 bg-cyan-400/10 shadow-lg'
+                  : 'hover:ring-1 hover:ring-cyan-400/60 hover:bg-cyan-400/5'
               }`}
               onPointerDown={(e) => handlePointerDown('subText', e)}
+              onMouseEnter={() => setHoveredLayer('subText')}
+              onMouseLeave={() => setHoveredLayer('none')}
             >
-              <span className="text-[9px] font-extrabold text-cyan-400 uppercase tracking-wider bg-black/90 px-1.5 py-0.5 rounded border border-cyan-500/40">
-                💬 Punchline ({subTextY}%)
-              </span>
-              <Move className="h-3.5 w-3.5 text-cyan-400 opacity-70 group-hover:opacity-100" />
+              {(activeLayer === 'subText' || hoveredLayer === 'subText') && (
+                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-cyan-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                  <Move className="h-2.5 w-2.5" /> SUBTÍTULO ({subTextY}%)
+                </div>
+              )}
             </div>
           )}
 
@@ -306,33 +277,33 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
             style={{
               position: 'absolute',
               top: `${videoY}%`,
+              transform: 'translateY(-50%)',
               left: `${(100 - videoScale) / 2}%`,
               width: `${videoScale}%`,
-              height: '40%',
+              height: '38%',
               cursor: 'grab',
             }}
-            className={`group rounded-xl transition-all flex items-center justify-between p-3 ${
+            className={`pointer-events-auto transition-all rounded-xl ${
               activeLayer === 'video'
-                ? 'border-2 border-red-500 bg-red-500/15 shadow-xl shadow-red-500/25'
-                : 'border border-dashed border-transparent hover:border-red-400/70 hover:bg-red-500/10'
+                ? 'ring-2 ring-red-500 bg-red-500/10 shadow-lg'
+                : 'hover:ring-1 hover:ring-red-400/60 hover:bg-red-500/5'
             }`}
             onPointerDown={(e) => handlePointerDown('video', e)}
+            onMouseEnter={() => setHoveredLayer('video')}
+            onMouseLeave={() => setHoveredLayer('none')}
           >
-            <div className="self-start flex items-center gap-1.5">
-              <span className="text-[9px] font-extrabold text-red-400 uppercase tracking-wider bg-black/90 px-1.5 py-0.5 rounded border border-red-500/40">
-                🎬 Vídeo (Y: {videoY}%)
-              </span>
-            </div>
-            <div className="flex items-center justify-center h-7 w-7 rounded-full bg-black/90 border border-red-500/50 text-red-400 shadow-md">
-              <Move className="h-3.5 w-3.5" />
-            </div>
+            {(activeLayer === 'video' || hoveredLayer === 'video') && (
+              <div className="absolute -top-3 left-2 flex items-center gap-1 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                <Move className="h-2.5 w-2.5" /> VÍDEO (Y: {videoY}%)
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Canva Mode Hint Footer */}
+      {/* Stage Hint Footer */}
       <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste o <strong>Header</strong>, o <strong>Texto Principal</strong>, a <strong>Punchline</strong> ou o <strong>Vídeo</strong> para posicionar live!
+        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Header</strong>, o <strong>Título</strong>, o <strong>Subtítulo</strong> ou o <strong>Vídeo</strong> para qualquer ponto da tela.
       </p>
     </div>
   );

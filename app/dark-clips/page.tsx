@@ -73,9 +73,10 @@ export default function DarkClipsPage() {
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     name: "Dark Clips",
     handle: "@darkclips",
-    badgeType: "blue" as "none" | "blue" | "gold" | "gray",
+    badgeType: "blue" as "none" | "blue",
     showHeader: true,
     paddingTop: 90,
+    textAlign: "left" as "left" | "center" | "right",
   });
 
   const [headline, setHeadline] = useState({
@@ -88,6 +89,8 @@ export default function DarkClipsPage() {
     primaryColor: "#FACC15",
     secondaryColor: "#FFFFFF",
     textAlign: "center" as "left" | "center" | "right",
+    mainTextAlign: "center" as "left" | "center" | "right",
+    subTextAlign: "center" as "left" | "center" | "right",
     uppercase: true,
     textShadow: true,
     mainTextYOffset: 17,
@@ -574,20 +577,66 @@ export default function DarkClipsPage() {
                       </div>
 
 
-                      <div>
-                        <Label className="text-xs font-semibold">Selo de Verificado</Label>
-                        <div className="flex gap-2 mt-1">
-                          {(["blue", "gold", "none"] as const).map((b) => (
-                            <Button
-                              key={b}
-                              size="sm"
-                              variant={profileHeader.badgeType === b ? "default" : "outline"}
-                              onClick={() => setProfileHeader((p) => ({ ...p, badgeType: b }))}
-                              className="h-8 text-xs flex-1 capitalize"
-                            >
-                              {b === "blue" ? "Azul" : b === "gold" ? "Dourado" : "Nenhum"}
-                            </Button>
-                          ))}
+                      {/* Posição Vertical do Header */}
+                      <div className="pt-1">
+                        <Label className="text-[11px] font-medium text-muted-foreground">
+                          Posição Vertical do Topo ({profileHeader.paddingTop ?? 90}px)
+                        </Label>
+                        <Slider
+                          value={[profileHeader.paddingTop ?? 90]}
+                          min={0}
+                          max={600}
+                          step={5}
+                          onValueChange={([v]) => setProfileHeader((p) => ({ ...p, paddingTop: v }))}
+                          className="mt-2"
+                        />
+                      </div>
+
+                      {/* Alinhamento e Selo de Verificado */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <Label className="text-xs font-semibold">Alinhamento do Header</Label>
+                          <div className="flex gap-1 mt-1.5">
+                            {(["left", "center"] as const).map((a) => (
+                              <Button
+                                key={a}
+                                type="button"
+                                size="sm"
+                                variant={(profileHeader.textAlign || "left") === a ? "default" : "outline"}
+                                onClick={() => setProfileHeader((p) => ({ ...p, textAlign: a }))}
+                                className="h-8 text-xs flex-1 capitalize"
+                              >
+                                {a === "left" ? "Esquerda" : "Centro"}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-semibold">Selo de Verificado (Azul)</Label>
+                          <div className="flex items-center justify-between mt-1.5 px-3 py-1.5 rounded-md border border-input bg-secondary/15 h-8">
+                            <div className="flex items-center gap-1.5">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                <path
+                                  d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
+                                  fill="#38BDF8"
+                                  stroke="#0284C7"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                              <span className="text-[11px] font-medium">
+                                {profileHeader.badgeType === "blue" ? "Ativado" : "Desativado"}
+                              </span>
+                            </div>
+                            <Switch
+                              checked={profileHeader.badgeType === "blue"}
+                              onCheckedChange={(checked) =>
+                                setProfileHeader((p) => ({ ...p, badgeType: checked ? "blue" : "none" }))
+                              }
+                            />
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -599,9 +648,9 @@ export default function DarkClipsPage() {
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Type className="h-4 w-4 text-primary" /> Headline & Textos do Meme
+                        <Type className="h-4 w-4 text-primary" /> Headline & Textos do Vídeo
                       </CardTitle>
-                      <CardDescription className="text-xs">Edite ou gere a chamada principal e a punchline com IA.</CardDescription>
+                      <CardDescription className="text-xs">Edite ou gere a chamada principal e o subtítulo com IA.</CardDescription>
                     </div>
                     <Button
                       size="sm"
@@ -622,7 +671,7 @@ export default function DarkClipsPage() {
                             checked={headline.showMainText}
                             onCheckedChange={(v) => setHeadline((h) => ({ ...h, showMainText: v }))}
                           />
-                          <Label className="text-xs font-semibold">Texto Principal (Setup / Chamada)</Label>
+                          <Label className="text-xs font-semibold">Texto Principal (Título / Setup)</Label>
                         </div>
                         {headline.showMainText && (
                           <div className="flex items-center gap-2">
@@ -651,20 +700,41 @@ export default function DarkClipsPage() {
                             onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
                             rows={2}
                             className="text-xs mt-1 font-bold uppercase resize-none"
-                            placeholder="Digite a chamada principal do meme..."
+                            placeholder="Digite a chamada ou título principal..."
                           />
-                          <div className="pt-2">
-                            <Label className="text-[11px] font-medium text-muted-foreground">
-                              Posição Vertical Y ({headline.mainTextYOffset ?? 17}%)
-                            </Label>
-                            <Slider
-                              value={[headline.mainTextYOffset ?? 17]}
-                              min={5}
-                              max={60}
-                              step={1}
-                              onValueChange={([v]) => setHeadline((h) => ({ ...h, mainTextYOffset: v }))}
-                              className="mt-2"
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                            <div>
+                              <Label className="text-[11px] font-medium text-muted-foreground">
+                                Alinhamento do Título
+                              </Label>
+                              <div className="flex gap-1 mt-1">
+                                {(["left", "center", "right"] as const).map((a) => (
+                                  <Button
+                                    key={a}
+                                    type="button"
+                                    size="sm"
+                                    variant={(headline.mainTextAlign || headline.textAlign || "center") === a ? "default" : "outline"}
+                                    onClick={() => setHeadline((h) => ({ ...h, mainTextAlign: a }))}
+                                    className="h-7 text-[11px] flex-1 capitalize"
+                                  >
+                                    {a === "left" ? "Esq" : a === "center" ? "Centro" : "Dir"}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-[11px] font-medium text-muted-foreground">
+                                Posição Vertical Y ({headline.mainTextYOffset ?? 17}%)
+                              </Label>
+                              <Slider
+                                value={[headline.mainTextYOffset ?? 17]}
+                                min={0}
+                                max={95}
+                                step={1}
+                                onValueChange={([v]) => setHeadline((h) => ({ ...h, mainTextYOffset: v }))}
+                                className="mt-2.5"
+                              />
+                            </div>
                           </div>
                         </>
                       ) : (
@@ -680,7 +750,7 @@ export default function DarkClipsPage() {
                             checked={headline.showSubText}
                             onCheckedChange={(v) => setHeadline((h) => ({ ...h, showSubText: v }))}
                           />
-                          <Label className="text-xs font-semibold">Texto Secundário (Punchline / Reação)</Label>
+                          <Label className="text-xs font-semibold">Texto Secundário (Subtítulo / Punchline)</Label>
                         </div>
                         {headline.showSubText && (
                           <div className="flex items-center gap-2">
@@ -700,20 +770,41 @@ export default function DarkClipsPage() {
                             value={headline.subText}
                             onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
                             className="h-8 text-xs mt-1 font-semibold uppercase"
-                            placeholder="Digite a punchline ou reação..."
+                            placeholder="Digite o subtítulo ou punchline..."
                           />
-                          <div className="pt-2">
-                            <Label className="text-[11px] font-medium text-muted-foreground">
-                              Posição Vertical Y ({headline.subTextYOffset ?? 25}%)
-                            </Label>
-                            <Slider
-                              value={[headline.subTextYOffset ?? 25]}
-                              min={10}
-                              max={75}
-                              step={1}
-                              onValueChange={([v]) => setHeadline((h) => ({ ...h, subTextYOffset: v }))}
-                              className="mt-2"
-                            />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                            <div>
+                              <Label className="text-[11px] font-medium text-muted-foreground">
+                                Alinhamento do Subtítulo
+                              </Label>
+                              <div className="flex gap-1 mt-1">
+                                {(["left", "center", "right"] as const).map((a) => (
+                                  <Button
+                                    key={a}
+                                    type="button"
+                                    size="sm"
+                                    variant={(headline.subTextAlign || headline.textAlign || "center") === a ? "default" : "outline"}
+                                    onClick={() => setHeadline((h) => ({ ...h, subTextAlign: a }))}
+                                    className="h-7 text-[11px] flex-1 capitalize"
+                                  >
+                                    {a === "left" ? "Esq" : a === "center" ? "Centro" : "Dir"}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-[11px] font-medium text-muted-foreground">
+                                Posição Vertical Y ({headline.subTextYOffset ?? 25}%)
+                              </Label>
+                              <Slider
+                                value={[headline.subTextYOffset ?? 25]}
+                                min={0}
+                                max={95}
+                                step={1}
+                                onValueChange={([v]) => setHeadline((h) => ({ ...h, subTextYOffset: v }))}
+                                className="mt-2.5"
+                              />
+                            </div>
                           </div>
                         </>
                       ) : (
@@ -721,7 +812,7 @@ export default function DarkClipsPage() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border/40">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/40">
                       <div>
                         <Label className="text-xs font-semibold">Tamanho da Fonte ({headline.fontSize}px)</Label>
                         <Slider
@@ -733,24 +824,11 @@ export default function DarkClipsPage() {
                           className="mt-3"
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs font-semibold">Alinhamento</Label>
-                        <div className="flex gap-1 mt-1">
-                          {(["left", "center", "right"] as const).map((a) => (
-                            <Button
-                              key={a}
-                              size="sm"
-                              variant={headline.textAlign === a ? "default" : "outline"}
-                              onClick={() => setHeadline((h) => ({ ...h, textAlign: a }))}
-                              className="h-8 text-xs flex-1 capitalize"
-                            >
-                              {a === "left" ? "Esq" : a === "center" ? "Centro" : "Dir"}
-                            </Button>
-                          ))}
+                      <div className="flex items-center justify-between pt-4 sm:pt-2">
+                        <div>
+                          <Label className="text-xs font-semibold block">MAIÚSCULAS</Label>
+                          <span className="text-[10px] text-muted-foreground">Transformar todo texto em caixa alta</span>
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between pt-4">
-                        <Label className="text-xs font-semibold">MAIÚSCULAS</Label>
                         <Switch
                           checked={headline.uppercase}
                           onCheckedChange={(v) => setHeadline((h) => ({ ...h, uppercase: v }))}
@@ -773,8 +851,8 @@ export default function DarkClipsPage() {
                         <Label className="text-xs font-semibold">Posição Vertical Y ({videoPlacement.yOffset}%)</Label>
                         <Slider
                           value={[videoPlacement.yOffset]}
-                          min={20}
-                          max={80}
+                          min={0}
+                          max={95}
                           step={1}
                           onValueChange={([v]) => setVideoPlacement((p) => ({ ...p, yOffset: v }))}
                           className="mt-3"
@@ -865,10 +943,10 @@ export default function DarkClipsPage() {
                     <span className="text-[11px] text-muted-foreground">1080 x 1920 (9:16 Vertical HD)</span>
                     <Button
                       size="sm"
-                      onClick={() => setActiveTab("schedule")}
+                      onClick={() => setActiveTab("clips")}
                       className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-8"
                     >
-                      Avançar p/ Agendamento <ChevronRight className="h-3.5 w-3.5" />
+                      Avançar para Clipes 🎬 <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </Card>
@@ -953,12 +1031,22 @@ export default function DarkClipsPage() {
 
               {/* Clips Grid */}
               <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold flex items-center gap-2">
-                    <Video className="h-4 w-4 text-primary" /> Biblioteca de Clipes ({clips.length})
-                  </h3>
-                  <Button variant="ghost" size="sm" onClick={fetchInitialData} className="h-8 text-xs gap-1">
-                    <RefreshCw className="h-3 w-3" /> Atualizar
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold flex items-center gap-2">
+                      <Video className="h-4 w-4 text-primary" /> Biblioteca de Clipes ({clips.length})
+                    </h3>
+                    <Button variant="ghost" size="sm" onClick={fetchInitialData} className="h-8 text-xs gap-1">
+                      <RefreshCw className="h-3 w-3" /> Atualizar
+                    </Button>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setActiveTab("schedule")}
+                    className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-8"
+                  >
+                    Avançar para Agendamento 📅 <ChevronRight className="h-3.5 w-3.5" />
                   </Button>
                 </div>
 
@@ -967,7 +1055,7 @@ export default function DarkClipsPage() {
                     <Film className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                     <p className="text-sm font-semibold">Nenhum clipe minerado ainda</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Use o painel ao lado para colar links ou instale a extensão Dark Clips no Chrome.
+                      Use o painel ao lado para colar links ou instale a extensão Dark Clips no seu navegador.
                     </p>
                   </div>
                 ) : (
@@ -977,16 +1065,18 @@ export default function DarkClipsPage() {
                       return (
                         <div
                           key={clip.id}
-                          onClick={() => {
-                            setSelectedClip(clip);
-                            setActiveTab("modeler");
-                          }}
-                          className={`group cursor-pointer rounded-xl border p-3 bg-card transition-all relative overflow-hidden flex flex-col justify-between ${
+                          className={`group rounded-xl border p-3 bg-card transition-all relative overflow-hidden flex flex-col justify-between ${
                             isSelected ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary" : "border-border hover:border-border/80"
                           }`}
                         >
                           <div>
-                            <div className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-black relative mb-2">
+                            <div 
+                              onClick={() => {
+                                setSelectedClip(clip);
+                                setActiveTab("modeler");
+                              }}
+                              className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-black relative mb-2 cursor-pointer group-hover:opacity-95"
+                            >
                               {clip.thumbnail_url ? (
                                 <img src={clip.thumbnail_url} alt="Thumb" className="w-full h-full object-cover" />
                               ) : (
@@ -1009,9 +1099,32 @@ export default function DarkClipsPage() {
                             </p>
                           </div>
 
-                          <Button size="sm" variant={isSelected ? "default" : "outline"} className="w-full text-xs mt-3 h-7">
-                            {isSelected ? "Modelando Agora" : "Modelar este Clipe"}
-                          </Button>
+                          <div className="flex gap-1.5 mt-3">
+                            <Button 
+                              size="sm" 
+                              variant={isSelected ? "default" : "outline"} 
+                              onClick={() => {
+                                setSelectedClip(clip);
+                                setActiveTab("modeler");
+                              }}
+                              className="flex-1 text-[11px] h-7"
+                            >
+                              {isSelected ? "No Modelador" : "Modelar Visual"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setSelectedClip(clip);
+                                handleRender();
+                              }}
+                              disabled={isRendering}
+                              className="text-[11px] h-7 px-2 text-red-400 border border-red-500/30"
+                              title="Produzir clipe com o template ativo"
+                            >
+                              {isRendering && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "🎬 Produzir"}
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}

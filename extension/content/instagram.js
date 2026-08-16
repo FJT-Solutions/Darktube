@@ -1,4 +1,4 @@
-// Dark Clips - Instagram Content Script (Continuous Accumulator & Auto-Miner)
+// Dark Clips - Instagram Content Script (Universal Scanner, Continuous Accumulator & Auto-Miner)
 (function () {
   const SCRIPT_NAME = 'DarkClips-Instagram';
   const DEFAULT_API_URL = 'https://darktube.fjt-solutions.com';
@@ -103,27 +103,25 @@
     }
   }
 
-  // Parse metric strings like "12.5K", "1.2M", "15.430 curtidas"
   function parseMetricNumber(str) {
     if (!str) return 0;
-    const clean = str.replace(/\./g, '').replace(/,/g, '.').toLowerCase();
+    const clean = String(str).replace(/\./g, '').replace(/,/g, '.').toLowerCase();
     if (clean.includes('k') || clean.includes('mil')) {
       return Math.round(parseFloat(clean) * 1000) || 0;
     }
     if (clean.includes('m') || clean.includes('mi')) {
       return Math.round(parseFloat(clean) * 1000000) || 0;
     }
-    const digits = str.replace(/\D/g, '');
+    const digits = String(str).replace(/\D/g, '');
     return digits ? parseInt(digits, 10) : 0;
   }
 
-  // Extract author profile info from page URL
   function getPageProfileInfo() {
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const notProfiles = ['explore', 'reels', 'direct', 'stories', 'p', 'reel'];
+    const notProfiles = ['explore', 'reels', 'direct', 'stories', 'p', 'reel', 'tv'];
     if (pathParts.length > 0 && !notProfiles.includes(pathParts[0])) {
       const handle = `@${pathParts[0]}`;
-      const headerTitle = document.querySelector('header h2, header h1, main h2, main h1')?.textContent?.trim();
+      const headerTitle = document.querySelector('header h2, header h1, main h2, main h1, h2')?.textContent?.trim();
       const avatarImg = document.querySelector('header img, img[alt*="perfil"], img[alt*="profile"]')?.getAttribute('src') || '';
       return {
         handle,
@@ -134,7 +132,6 @@
     return { handle: '@instagram', name: 'Instagram Creator', avatar: '' };
   }
 
-  // Extract single modal/dialog reel or post
   function extractModalPostData(container) {
     try {
       const video = container.querySelector('video');
@@ -213,23 +210,33 @@
     }
   }
 
-  // Extract ALL visible grid posts on Profile, Feed, or Search (contains `/p/` or `/reel/`)
+  // Multi-Layer Universal Scanner for ALL posts on Profile Grid, Explore, Feed, or Search
   function scanAndAccumulateGridPosts() {
     const profileInfo = getPageProfileInfo();
-    const anchors = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], div[role="presentation"] a, main a[href]');
 
-    anchors.forEach((a) => {
-      const rawHref = a.getAttribute('href');
+    // ── LAYER 1: Scan ALL <a> tags on page ──
+    const allAnchors = Array.from(document.querySelectorAll('a'));
+    
+    allAnchors.forEach((a) => {
+      const rawHref = a.getAttribute('href') || a.href || '';
       if (!rawHref) return;
 
-      if (!rawHref.includes('/p/') && !rawHref.includes('/reel/')) return;
+      // Filter only post or reel links
+      if (!rawHref.includes('/p/') && !rawHref.includes('/reel/') && !rawHref.includes('/reels/') && !rawHref.includes('/tv/')) {
+        return;
+      }
 
       const cleanPath = rawHref.split('?')[0].split('#')[0];
-      const fullUrl = cleanPath.startsWith('http') ? cleanPath : `https://www.instagram.com${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+      const match = cleanPath.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+      if (!match) return;
+
+      const postTypeKey = match[1];
+      const shortcode = match[2];
+      const fullUrl = `https://www.instagram.com/${postTypeKey === 'reels' ? 'reel' : postTypeKey}/${shortcode}/`;
 
       // Extract Thumbnail
-      const img = a.querySelector('img');
       let thumbUrl = '';
+      const img = a.querySelector('img') || a.parentElement?.querySelector('img');
       if (img) {
         thumbUrl = img.currentSrc || img.src || img.getAttribute('src') || '';
         if (!thumbUrl && img.getAttribute('srcset')) {
@@ -239,14 +246,14 @@
       if (!thumbUrl) {
         const bgDiv = a.querySelector('div[style*="background-image"]');
         if (bgDiv) {
-          const match = bgDiv.style.backgroundImage.match(/url\(["']?([^"']+)["']?\)/);
-          if (match) thumbUrl = match[1];
+          const m = bgDiv.style.backgroundImage.match(/url\(["']?([^"']+)["']?\)/);
+          if (m) thumbUrl = m[1];
         }
       }
 
       const caption = img?.getAttribute('alt') || a.getAttribute('aria-label') || '';
 
-      const isReel = cleanPath.includes('/reel') || !!a.querySelector('svg[aria-label*="Reel"], svg[aria-label*="Vídeo"], svg[aria-label*="Clip"], svg[aria-label*="Reels"]');
+      const isReel = postTypeKey.includes('reel') || !!a.querySelector('svg[aria-label*="Reel"], svg[aria-label*="Vídeo"], svg[aria-label*="Clip"], svg[aria-label*="Reels"]');
       const isCarousel = !!a.querySelector('svg[aria-label*="Carrossel"], svg[aria-label*="Carousel"], svg[aria-label*="Publicação com várias"]');
       const postType = isReel ? 'reel' : isCarousel ? 'carousel' : 'post';
 
@@ -266,7 +273,7 @@
         if (viewMatch) views = parseMetricNumber(viewMatch[1]);
       }
 
-      const listItems = a.querySelectorAll('ul li, div[class*="Overlay"] span');
+      const listItems = a.querySelectorAll('ul li, div[class*="Overlay"] span, span[class*="html-span"]');
       if (listItems.length >= 1 && likes === 0) {
         likes = parseMetricNumber(listItems[0]?.textContent);
       }
@@ -299,41 +306,67 @@
       accumulatedSessionPosts.set(fullUrl, postData);
     });
 
+    // ── LAYER 2: Scan all images inside main / article whose ancestor is a link ──
+    const gridImgs = document.querySelectorAll('main img, article img, div[role="main"] img');
+    gridImgs.forEach((img) => {
+      const parentLink = img.closest('a');
+      if (parentLink) {
+        const href = parentLink.getAttribute('href') || parentLink.href || '';
+        if (href && (href.includes('/p/') || href.includes('/reel/'))) {
+          const cleanPath = href.split('?')[0];
+          const fullUrl = cleanPath.startsWith('http') ? cleanPath : `https://www.instagram.com${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+          if (!accumulatedSessionPosts.has(fullUrl)) {
+            accumulatedSessionPosts.set(fullUrl, {
+              url: fullUrl,
+              videoUrl: fullUrl,
+              thumbnailUrl: img.currentSrc || img.src || '',
+              duration: href.includes('/reel/') ? 15 : 0,
+              authorName: profileInfo.name,
+              authorHandle: profileInfo.handle,
+              authorAvatar: profileInfo.avatar,
+              originalCaption: img.getAttribute('alt') || '',
+              platform: 'instagram',
+              type: href.includes('/reel/') ? 'reel' : 'post',
+              metrics: { likes: 0, comments: 0, views: 0 }
+            });
+          }
+        }
+      }
+    });
+
     return Array.from(accumulatedSessionPosts.values());
   }
 
-  // Run periodic and scroll listeners to accumulate posts in real-time
+  // Real-time Listeners
   window.addEventListener('scroll', () => {
     scanAndAccumulateGridPosts();
   }, { passive: true });
 
-  // Initial Scan
-  setTimeout(scanAndAccumulateGridPosts, 1000);
-  setInterval(scanAndAccumulateGridPosts, 3000);
+  setTimeout(scanAndAccumulateGridPosts, 500);
+  setInterval(scanAndAccumulateGridPosts, 2500);
 
-  // Auto-Miner: Programmatically scrolls down and collects batches of posts
-  function startAutoMiner(targetCount = 48, onProgress) {
+  // Auto-Miner: Smooth Scroll & Collection
+  function startAutoMiner(targetCount = 48) {
     if (isAutoMining) return;
     isAutoMining = true;
 
     showToast(`Iniciando auto-mineração (alvo: ${targetCount} posts)...`);
 
     let scrollAttempts = 0;
-    const maxAttempts = 30;
+    const maxAttempts = 25;
 
     autoMineInterval = setInterval(() => {
-      window.scrollBy({ top: 1200, behavior: 'smooth' });
+      window.scrollBy({ top: 1100, behavior: 'smooth' });
       scanAndAccumulateGridPosts();
       scrollAttempts++;
 
       const currentTotal = accumulatedSessionPosts.size;
-      if (onProgress) onProgress(currentTotal);
 
       if (currentTotal >= targetCount || scrollAttempts >= maxAttempts) {
         stopAutoMiner();
         showToast(`Auto-mineração concluída: ${currentTotal} posts coletados!`);
       }
-    }, 600);
+    }, 650);
   }
 
   function stopAutoMiner() {
@@ -344,7 +377,6 @@
     }
   }
 
-  // Inject 1 Single Clean Button into Modal / Active Post
   function injectButtons() {
     try {
       const dialog = document.querySelector('div[role="dialog"]');
@@ -406,7 +438,7 @@
 
   setInterval(injectButtons, 1500);
 
-  // Message listener for Extension Popup (Scan All Accumulated & Auto-Mine)
+  // Message listener for Extension Popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'GET_PAGE_VIDEOS') {
       scanAndAccumulateGridPosts();
@@ -459,5 +491,5 @@
     }
   });
 
-  console.log(`[${SCRIPT_NAME}] Ativo no Instagram (Continuous Accumulator & Auto-Miner)!`);
+  console.log(`[${SCRIPT_NAME}] Ativo no Instagram (Multi-Layer Scanner & Auto-Miner Ready)!`);
 })();

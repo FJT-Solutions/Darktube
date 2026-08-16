@@ -239,6 +239,7 @@ export interface DarkClipsVideoProps {
     showHeader?: boolean;
     paddingTop?: number;
     yOffset?: number;
+    textAlign?: 'left' | 'center' | 'right';
   };
 
   // Headline
@@ -252,6 +253,8 @@ export interface DarkClipsVideoProps {
     primaryColor?: string; // e.g. '#FACC15'
     secondaryColor?: string; // e.g. '#FFFFFF'
     textAlign?: 'left' | 'center' | 'right';
+    mainTextAlign?: 'left' | 'center' | 'right';
+    subTextAlign?: 'left' | 'center' | 'right';
     uppercase?: boolean;
     textShadow?: boolean;
     yOffset?: number;

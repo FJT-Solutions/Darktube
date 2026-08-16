@@ -1,4 +1,4 @@
-// Dark Clips Popup Logic (Grid Extraction & Smart Filters)
+// Dark Clips Popup Logic (Grid Extraction, Smart Filters & Auto-Injected Healing)
 document.addEventListener('DOMContentLoaded', async () => {
   const videoCountEl = document.getElementById('video-count');
   const actionCountLabel = document.getElementById('action-count-label');
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentUser = null;
   let currentToken = null;
 
-  const DARKTUBE_BASE_URL = 'https://darktube.fjt-solutions.com';
+  const DARKTUBE_BASE_URL = 'https://darktube.fjt.solutions';
 
   // 1. Load initial auth state
   chrome.storage.local.get(['darktube_user', 'darktube_token'], (res) => {
@@ -115,6 +115,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Helper for Self-Healing Tab Communication (Dynamic Script Injection Fallback)
+  async function sendMessageToTab(tabId, message) {
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, message, async (res) => {
+        if (chrome.runtime.lastError || !res) {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (!tab?.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://') || tab.url.startsWith('vivaldi://')) {
+              return resolve(null);
+            }
+
+            let scriptFile = 'content/instagram.js';
+            if (tab.url.includes('tiktok.com')) scriptFile = 'content/tiktok.js';
+            else if (tab.url.includes('youtube.com')) scriptFile = 'content/youtube.js';
+            else if (tab.url.includes('x.com') || tab.url.includes('twitter.com')) scriptFile = 'content/twitter.js';
+
+            await chrome.scripting.executeScript({
+              target: { tabId },
+              files: [scriptFile]
+            });
+            await chrome.scripting.insertCSS({
+              target: { tabId },
+              files: ['content/content.css']
+            }).catch(() => {});
+
+            // Retry communication after dynamic script injection
+            setTimeout(() => {
+              chrome.tabs.sendMessage(tabId, message, (secondRes) => {
+                if (chrome.runtime.lastError) {
+                  resolve(null);
+                } else {
+                  resolve(secondRes);
+                }
+              });
+            }, 300);
+          } catch {
+            resolve(null);
+          }
+        } else {
+          resolve(res);
+        }
+      });
+    });
+  }
+
   // 5. Scan current active tab
   async function scanCurrentTab() {
     statusText.textContent = 'Escaneando página & perfil...';
@@ -127,22 +172,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      chrome.tabs.sendMessage(tab.id, { action: 'GET_PAGE_VIDEOS' }, (response) => {
-        if (chrome.runtime.lastError || !response || !response.videos) {
-          rawDetectedVideos = [];
-          applyFilterAndRender();
-          statusText.textContent = currentUser ? `Logado: ${currentUser.name}` : 'Pronto para minerar';
-          return;
-        }
+      const response = await sendMessageToTab(tab.id, { action: 'GET_PAGE_VIDEOS' });
 
-        rawDetectedVideos = response.videos || [];
+      if (!response || !response.videos) {
+        rawDetectedVideos = [];
         applyFilterAndRender();
+        statusText.textContent = currentUser ? `Logado: ${currentUser.name}` : 'Pronto para minerar';
+        return;
+      }
 
-        const profileName = response.profile?.handle || response.profile?.name;
-        statusText.textContent = profileName && profileName !== '@instagram'
-          ? `${rawDetectedVideos.length} post(s) em ${profileName}`
-          : `${rawDetectedVideos.length} post(s) detectado(s)`;
-      });
+      rawDetectedVideos = response.videos || [];
+      applyFilterAndRender();
+
+      const profileName = response.profile?.handle || response.profile?.name;
+      statusText.textContent = profileName && profileName !== '@instagram'
+        ? `${rawDetectedVideos.length} post(s) em ${profileName}`
+        : `${rawDetectedVideos.length} post(s) detectado(s)`;
     } catch (err) {
       console.error(err);
       statusText.textContent = 'Erro ao escanear';
@@ -160,7 +205,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (currentFilter === 'views') {
       list.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
     } else if (currentFilter === 'top3') {
-      // Score: likes + (comments * 3) + views
       list.sort((a, b) => {
         const scoreA = (a.metrics?.likes || 0) + ((a.metrics?.comments || 0) * 3) + (a.metrics?.views || 0);
         const scoreB = (b.metrics?.likes || 0) + ((b.metrics?.comments || 0) * 3) + (b.metrics?.views || 0);
@@ -307,13 +351,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   let isMiningState = false;
 
   autoMineBtn?.addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
     if (isMiningState) {
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab?.id) {
-          chrome.tabs.sendMessage(tab.id, { action: 'STOP_AUTO_MINE' });
-        }
-      } catch {}
+      await sendMessageToTab(tab.id, { action: 'STOP_AUTO_MINE' });
       isMiningState = false;
       autoMineBtn.classList.remove('mining');
       autoMineBtn.innerHTML = '<span>🚀 Rastrear Mais</span>';
@@ -326,29 +368,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusText.textContent = 'Auto-minerando perfil no Instagram...';
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) return;
+      await sendMessageToTab(tab.id, { action: 'START_AUTO_MINE', targetCount: 48 });
 
-      chrome.tabs.sendMessage(tab.id, { action: 'START_AUTO_MINE', targetCount: 48 }, () => {
-        let pollCount = 0;
-        const pollInterval = setInterval(() => {
-          pollCount++;
-          chrome.tabs.sendMessage(tab.id, { action: 'GET_PAGE_VIDEOS' }, (response) => {
-            if (response && response.videos) {
-              rawDetectedVideos = response.videos;
-              applyFilterAndRender();
-              statusText.textContent = `🚀 Minerados: ${rawDetectedVideos.length} posts`;
-            }
-          });
+      let pollCount = 0;
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+        const response = await sendMessageToTab(tab.id, { action: 'GET_PAGE_VIDEOS' });
 
-          if (pollCount >= 15 || !isMiningState) {
-            clearInterval(pollInterval);
-            isMiningState = false;
-            autoMineBtn.classList.remove('mining');
-            autoMineBtn.innerHTML = '<span>🚀 Rastrear Mais</span>';
-          }
-        }, 800);
-      });
+        if (response && response.videos) {
+          rawDetectedVideos = response.videos;
+          applyFilterAndRender();
+          statusText.textContent = `🚀 Minerados: ${rawDetectedVideos.length} posts`;
+        }
+
+        if (pollCount >= 15 || !isMiningState) {
+          clearInterval(pollInterval);
+          isMiningState = false;
+          autoMineBtn.classList.remove('mining');
+          autoMineBtn.innerHTML = '<span>🚀 Rastrear Mais</span>';
+        }
+      }, 800);
     } catch (e) {
       console.error(e);
       isMiningState = false;
@@ -361,5 +400,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initial tab scan
   scanCurrentTab();
-
 });
