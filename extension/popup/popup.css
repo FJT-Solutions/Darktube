@@ -43,21 +43,20 @@ body {
 }
 
 .logo-box {
-  width: 32px;
-  height: 32px;
-  background: #dc2626;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  background: #FF0000;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+  box-shadow: 0 4px 14px rgba(255, 0, 0, 0.45);
   flex-shrink: 0;
 }
 
 .logo-icon {
-  width: 18px;
-  height: 18px;
-  fill: #ffffff;
+  width: 20px;
+  height: 20px;
 }
 
 .brand-text {
@@ -66,17 +65,18 @@ body {
 }
 
 .brand-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1;
   color: #ffffff;
   text-transform: uppercase;
 }
 
 .highlight {
-  color: #dc2626;
+  color: #FF0000;
 }
+
 
 .brand-badge {
   font-size: 9px;
