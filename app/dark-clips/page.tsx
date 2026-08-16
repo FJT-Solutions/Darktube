@@ -880,18 +880,32 @@ export default function DarkClipsPage() {
                           className="mt-3"
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs font-semibold">Tipo de Fundo</Label>
-                        <div className="flex gap-1.5 mt-1">
-                          {(["black", "blur", "gradient"] as const).map((t) => (
+                      <div className="sm:col-span-2">
+                        <Label className="text-xs font-semibold">Tipo de Fundo do Vídeo</Label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+                          {[
+                            { id: 'black', label: 'Preto Clássico', icon: '⬛' },
+                            { id: 'white', label: 'Branco Viral', icon: '⬜' },
+                            { id: 'blur', label: 'Vídeo Desfocado', icon: '🌫️' },
+                            { id: 'gradient', label: 'Gradiente Escuro', icon: '🌘' },
+                            { id: 'neon', label: 'Roxo / Neon', icon: '🔮' },
+                            { id: 'zinc', label: 'Cinza Moderno', icon: '🩶' },
+                          ].map((t) => (
                             <Button
-                              key={t}
+                              key={t.id}
+                              type="button"
                               size="sm"
-                              variant={background.type === t ? "default" : "outline"}
-                              onClick={() => setBackground((b) => ({ ...b, type: t }))}
-                              className="h-8 text-xs flex-1 capitalize"
+                              variant={background.type === t.id ? "default" : "outline"}
+                              onClick={() => {
+                                setBackground((b) => ({ ...b, type: t.id as any }));
+                                if (t.id === 'white' && (headline.secondaryColor === '#FFFFFF' || headline.secondaryColor === '#ffffff')) {
+                                  setHeadline((h) => ({ ...h, secondaryColor: '#09090b' }));
+                                }
+                              }}
+                              className="h-8 text-xs flex items-center justify-center gap-1.5 font-medium"
                             >
-                              {t === "black" ? "Preto" : t === "blur" ? "Vídeo Desfocado" : "Gradiente"}
+                              <span>{t.icon}</span>
+                              <span>{t.label}</span>
                             </Button>
                           ))}
                         </div>
@@ -911,7 +925,7 @@ export default function DarkClipsPage() {
                         <Film className="h-4 w-4 text-red-500" /> Pré-visualização do Vídeo 9:16
                       </CardTitle>
                       <CardDescription className="text-[11px]">
-                        {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Nenhum vídeo selecionado"}
+                        {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Vídeo de Exemplo Ativo (1080x1920)"}
                       </CardDescription>
                     </div>
                     {renderedUrl && (
@@ -925,7 +939,7 @@ export default function DarkClipsPage() {
 
                   <CardContent className="p-4 flex flex-col items-center justify-center">
                     <DarkClipsPreviewPlayer
-                      videoUrl={selectedClip?.video_url || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
+                      videoUrl={selectedClip?.video_url || "/render_pro_render_v2.mp4"}
                       durationInSeconds={selectedClip?.duration || 15}
                       profileHeader={profileHeader}
                       headline={headline}

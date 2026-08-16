@@ -275,7 +275,7 @@ export interface DarkClipsVideoProps {
 
   // Background
   background?: {
-    type?: 'black' | 'blur' | 'gradient' | 'color';
+    type?: 'black' | 'white' | 'blur' | 'gradient' | 'neon' | 'zinc' | 'color';
     blurIntensity?: number;
     overlayOpacity?: number;
     customColor?: string;

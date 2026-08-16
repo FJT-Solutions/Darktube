@@ -71,30 +71,80 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   } = footer;
 
   const hasVideo = !!(videoUrl && videoUrl.trim().length > 0);
+  const isLightBg = bgType === 'white';
+
+  // Smart Contrast for Header and Subtitles
+  const authorNameColor = isLightBg ? '#09090b' : '#FFFFFF';
+  const authorHandleColor = isLightBg ? '#52525b' : '#9CA3AF';
+  const authorShadow = isLightBg ? 'none' : '0 2px 8px rgba(0,0,0,0.8)';
+
+  // If background is white and subtitle is white (#ffffff), automatically adapt to dark slate
+  const computedSecondaryColor =
+    isLightBg && (secondaryColor === '#FFFFFF' || secondaryColor.toLowerCase() === '#ffffff')
+      ? '#09090b'
+      : secondaryColor;
+
+  const computedMainShadow = isLightBg
+    ? 'none'
+    : textShadow
+    ? '0 4px 16px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9)'
+    : 'none';
+
+  const computedSubShadow = isLightBg
+    ? 'none'
+    : textShadow
+    ? '0 4px 16px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9)'
+    : 'none';
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#000000', opacity: 1, overflow: 'hidden' }}>
+    <AbsoluteFill style={{ backgroundColor: isLightBg ? '#ffffff' : '#000000', opacity: 1, overflow: 'hidden' }}>
       
       {/* ── Background Layer ── */}
-      {bgType === 'blur' && hasVideo ? (
+      {bgType === 'blur' ? (
         <AbsoluteFill style={{ overflow: 'hidden' }}>
-          <Video
-            src={videoUrl}
-            muted
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              filter: `blur(${blurIntensity}px) brightness(0.6)`,
-              transform: 'scale(1.25)',
-            }}
-          />
+          {hasVideo ? (
+            <Video
+              src={videoUrl}
+              muted
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: `blur(${blurIntensity}px) brightness(0.6)`,
+                transform: 'scale(1.25)',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                background: 'radial-gradient(circle at 50% 50%, #3730a3 0%, #1e1b4b 40%, #09090b 100%)',
+                filter: `blur(${blurIntensity}px)`,
+                transform: 'scale(1.2)',
+              }}
+            />
+          )}
           <AbsoluteFill
             style={{
               backgroundColor: `rgba(0, 0, 0, ${overlayOpacity / 100})`,
             }}
           />
         </AbsoluteFill>
+      ) : bgType === 'white' ? (
+        <AbsoluteFill style={{ backgroundColor: '#ffffff' }} />
+      ) : bgType === 'neon' ? (
+        <AbsoluteFill
+          style={{
+            background: 'linear-gradient(135deg, #090d16 0%, #1e1b4b 50%, #311042 100%)',
+          }}
+        />
+      ) : bgType === 'zinc' ? (
+        <AbsoluteFill
+          style={{
+            background: 'linear-gradient(180deg, #18181b 0%, #27272a 100%)',
+          }}
+        />
       ) : bgType === 'gradient' ? (
         <AbsoluteFill
           style={{
@@ -142,8 +192,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   height: 76,
                   borderRadius: '50%',
                   objectFit: 'cover',
-                  border: '2px solid rgba(255, 255, 255, 0.25)',
-                  boxShadow: '0 6px 16px rgba(0,0,0,0.6)',
+                  border: isLightBg ? '2px solid rgba(0, 0, 0, 0.15)' : '2px solid rgba(255, 255, 255, 0.25)',
+                  boxShadow: isLightBg ? '0 4px 12px rgba(0,0,0,0.1)' : '0 6px 16px rgba(0,0,0,0.6)',
                 }}
               />
             ) : (
@@ -173,9 +223,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   style={{
                     fontSize: 32,
                     fontWeight: 800,
-                    color: '#FFFFFF',
+                    color: authorNameColor,
                     letterSpacing: '-0.02em',
-                    textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                    textShadow: authorShadow,
                   }}
                 >
                   {name || 'Dark Clips'}
@@ -201,9 +251,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   style={{
                     fontSize: 24,
                     fontWeight: 600,
-                    color: '#9CA3AF',
+                    color: authorHandleColor,
                     marginTop: -2,
-                    textShadow: '0 2px 6px rgba(0,0,0,0.8)',
+                    textShadow: authorShadow,
                   }}
                 >
                   {handle.startsWith('@') ? handle : `@${handle}`}
@@ -233,7 +283,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 color: primaryColor,
                 lineHeight: 1.25,
                 textTransform: uppercase ? 'uppercase' : 'none',
-                textShadow: textShadow ? '0 4px 16px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9)' : 'none',
+                textShadow: computedMainShadow,
                 letterSpacing: '-0.01em',
               }}
             >
@@ -259,10 +309,10 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 margin: 0,
                 fontSize: `${Math.round(fontSize * 0.88)}px`,
                 fontWeight: 800,
-                color: secondaryColor,
+                color: computedSecondaryColor,
                 lineHeight: 1.25,
                 textTransform: uppercase ? 'uppercase' : 'none',
-                textShadow: textShadow ? '0 4px 16px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.9)' : 'none',
+                textShadow: computedSubShadow,
               }}
             >
               {subText}
@@ -279,9 +329,13 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             width: `${scale}%`,
             borderRadius: `${borderRadius}px`,
             overflow: 'hidden',
-            boxShadow: hasShadow ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255,255,255,0.15)' : 'none',
+            boxShadow: isLightBg
+              ? '0 20px 45px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.08)'
+              : hasShadow
+              ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255,255,255,0.15)'
+              : 'none',
             backgroundColor: '#09090b',
-            aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === '1:1' ? '1/1' : 'auto',
+            aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === '1:1' ? '1/1' : '16/9',
             maxHeight: '58%',
             display: 'flex',
             alignItems: 'center',
@@ -295,7 +349,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain',
+                objectFit: 'cover',
               }}
             />
           ) : (
