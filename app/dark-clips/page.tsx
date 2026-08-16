@@ -589,7 +589,7 @@ export default function DarkClipsPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => avatarFileInputRef.current?.click()}
-                              className="h-8 text-xs gap-1.5 flex-1"
+                              className="h-9 text-xs gap-1.5 flex-1"
                             >
                               <Upload className="h-3.5 w-3.5" /> Upload Foto
                             </Button>
@@ -598,21 +598,14 @@ export default function DarkClipsPage() {
                               size="sm"
                               variant="secondary"
                               onClick={handlePasteAvatarFromClipboard}
-                              className="h-8 text-xs gap-1.5 flex-1"
+                              className="h-9 text-xs gap-1.5 flex-1"
                             >
                               <Copy className="h-3.5 w-3.5" /> Colar Imagem
                             </Button>
                           </div>
                         </div>
-
-                        {/* Direct URL Input */}
-                        <Input
-                          value={profileHeader.avatarUrl}
-                          onChange={(e) => setProfileHeader((p) => ({ ...p, avatarUrl: e.target.value }))}
-                          className="h-7 text-[11px] font-mono bg-background/60"
-                          placeholder="Ou cole a URL direta: https://..."
-                        />
                       </div>
+
 
                       <div>
                         <Label className="text-xs font-semibold">Selo de Verificado</Label>
