@@ -61,6 +61,9 @@ export default function DarkClipsPage() {
   const [urlInput, setUrlInput] = useState("");
   const [importingUrls, setImportingUrls] = useState(false);
 
+  // Avatar Upload Ref
+  const avatarFileInputRef = React.useRef<HTMLInputElement>(null);
+
   // AI Remodel State
   const [remodelingAi, setRemodelingAi] = useState(false);
   const [aiThemePrompt, setAiThemePrompt] = useState("");
@@ -78,6 +81,8 @@ export default function DarkClipsPage() {
   const [headline, setHeadline] = useState({
     mainText: 'MEU AMIGO: "COMPREI UM MIC NOVO, MANO."',
     subText: "O DESGRAÇADO ENTRANDO NA CALL:",
+    showMainText: true,
+    showSubText: true,
     fontFamily: 'Montserrat, Inter, sans-serif',
     fontSize: 40,
     primaryColor: "#FACC15",
@@ -86,6 +91,7 @@ export default function DarkClipsPage() {
     uppercase: true,
     textShadow: true,
   });
+
 
   const [videoPlacement, setVideoPlacement] = useState({
     yOffset: 54,
@@ -228,6 +234,51 @@ export default function DarkClipsPage() {
     }
   }
 
+  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        setProfileHeader((p) => ({ ...p, avatarUrl: result }));
+        toast.success("Foto de perfil carregada com sucesso!");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePasteAvatarFromClipboard = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((t) => t.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const result = event.target?.result as string;
+            if (result) {
+              setProfileHeader((p) => ({ ...p, avatarUrl: result }));
+              toast.success("Imagem colada da área de transferência!");
+            }
+          };
+          reader.readAsDataURL(blob);
+          return;
+        }
+      }
+      const text = await navigator.clipboard.readText();
+      if (text && (text.startsWith("http") || text.startsWith("data:image"))) {
+        setProfileHeader((p) => ({ ...p, avatarUrl: text.trim() }));
+        toast.success("URL de imagem colada!");
+      } else {
+        toast.error("Nenhuma imagem encontrada na área de transferência.");
+      }
+    } catch {
+      toast.error("Permissão de clipboard necessária ou use Ctrl+V.");
+    }
+  };
+
   async function handleRemodelWithAi() {
     setRemodelingAi(true);
     try {
@@ -243,7 +294,7 @@ export default function DarkClipsPage() {
       const result = await res.json();
       if (result.success && result.data) {
         const { headline_main, headline_sub, cta_text, post_caption, hashtags } = result.data;
-        if (headline_main) setHeadline((h) => ({ ...h, mainText: headline_main, subText: headline_sub || "" }));
+        if (headline_main) setHeadline((h) => ({ ...h, mainText: headline_main, subText: headline_sub || "", showMainText: true, showSubText: !!headline_sub }));
         if (cta_text) setFooter((f) => ({ ...f, text: cta_text, showFooter: true }));
         if (post_caption) setPostCaption(post_caption);
         if (hashtags) setPostHashtags(hashtags);
@@ -255,6 +306,7 @@ export default function DarkClipsPage() {
       setRemodelingAi(false);
     }
   }
+
 
   async function handleRender() {
     if (!selectedClip?.video_url) {
@@ -477,32 +529,91 @@ export default function DarkClipsPage() {
                     />
                   </CardHeader>
                   {profileHeader.showHeader && (
-                    <CardContent className="p-4 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs font-semibold">Nome de Exibição</Label>
-                        <Input
-                          value={profileHeader.name}
-                          onChange={(e) => setProfileHeader((p) => ({ ...p, name: e.target.value }))}
-                          className="h-8 text-xs mt-1"
-                        />
+                    <CardContent className="p-4 pt-0 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs font-semibold">Nome de Exibição</Label>
+                          <Input
+                            value={profileHeader.name}
+                            onChange={(e) => setProfileHeader((p) => ({ ...p, name: e.target.value }))}
+                            className="h-8 text-xs mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs font-semibold">@Username</Label>
+                          <Input
+                            value={profileHeader.handle}
+                            onChange={(e) => setProfileHeader((p) => ({ ...p, handle: e.target.value }))}
+                            className="h-8 text-xs mt-1 font-mono"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <Label className="text-xs font-semibold">@Username</Label>
-                        <Input
-                          value={profileHeader.handle}
-                          onChange={(e) => setProfileHeader((p) => ({ ...p, handle: e.target.value }))}
-                          className="h-8 text-xs mt-1 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold">URL da Foto de Perfil / Avatar</Label>
+
+                      {/* Avatar Image Controls: Upload, Paste, Direct URL */}
+                      <div className="p-3 rounded-xl bg-secondary/20 border border-border/60 space-y-3">
+                        <Label className="text-xs font-semibold flex items-center justify-between">
+                          <span>Foto de Perfil / Avatar</span>
+                          <span className="text-[10px] text-muted-foreground">Upload ou Colar (Ctrl+V)</span>
+                        </Label>
+                        
+                        <div className="flex items-center gap-3">
+                          {/* Circular Avatar Preview */}
+                          <div 
+                            onClick={() => avatarFileInputRef.current?.click()}
+                            className="relative group cursor-pointer w-12 h-12 rounded-full overflow-hidden border-2 border-primary/40 bg-zinc-900 shrink-0 shadow-md"
+                            title="Clique para fazer upload de foto"
+                          >
+                            {profileHeader.avatarUrl ? (
+                              <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
+                                {profileHeader.name.charAt(0)}
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Upload className="h-4 w-4 text-white" />
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex-1 flex flex-wrap gap-2">
+                            <input
+                              type="file"
+                              ref={avatarFileInputRef}
+                              onChange={handleAvatarFileUpload}
+                              className="hidden"
+                              accept="image/*"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => avatarFileInputRef.current?.click()}
+                              className="h-8 text-xs gap-1.5 flex-1"
+                            >
+                              <Upload className="h-3.5 w-3.5" /> Upload Foto
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={handlePasteAvatarFromClipboard}
+                              className="h-8 text-xs gap-1.5 flex-1"
+                            >
+                              <Copy className="h-3.5 w-3.5" /> Colar Imagem
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Direct URL Input */}
                         <Input
                           value={profileHeader.avatarUrl}
                           onChange={(e) => setProfileHeader((p) => ({ ...p, avatarUrl: e.target.value }))}
-                          className="h-8 text-xs mt-1 font-mono"
-                          placeholder="https://..."
+                          className="h-7 text-[11px] font-mono bg-background/60"
+                          placeholder="Ou cole a URL direta: https://..."
                         />
                       </div>
+
                       <div>
                         <Label className="text-xs font-semibold">Selo de Verificado</Label>
                         <div className="flex gap-2 mt-1">
@@ -525,60 +636,99 @@ export default function DarkClipsPage() {
 
                 {/* 2. Headline & Tipografia */}
                 <Card>
-                  <CardHeader className="p-4 pb-3">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Type className="h-4 w-4 text-primary" /> Headline & Textos do Meme
-                    </CardTitle>
-                    <CardDescription className="text-xs">Edite a chamada principal e a punchline do vídeo.</CardDescription>
+                  <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <Type className="h-4 w-4 text-primary" /> Headline & Textos do Meme
+                      </CardTitle>
+                      <CardDescription className="text-xs">Edite ou gere a chamada principal e a punchline com IA.</CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleRemodelWithAi}
+                      disabled={remodelingAi}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-7 shadow-sm shadow-red-600/30"
+                    >
+                      {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      {remodelingAi ? "Gerando..." : "Gerar com IA"}
+                    </Button>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
-                    <div>
+                    {/* Texto Principal */}
+                    <div className="p-3 rounded-xl bg-secondary/10 border border-border/50 space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs font-semibold">Texto Principal (Setup / Chamada)</Label>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground">Cor:</span>
-                          <input
-                            type="color"
-                            value={headline.primaryColor}
-                            onChange={(e) => setHeadline((h) => ({ ...h, primaryColor: e.target.value }))}
-                            className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
+                          <Switch
+                            checked={headline.showMainText}
+                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, showMainText: v }))}
                           />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setHeadline((h) => ({ ...h, primaryColor: "#FACC15" }))}
-                            className="h-5 px-1.5 text-[9px] text-yellow-400 border-yellow-500/30"
-                          >
-                            Amarelo Viral
-                          </Button>
+                          <Label className="text-xs font-semibold">Texto Principal (Setup / Chamada)</Label>
                         </div>
+                        {headline.showMainText && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground">Cor:</span>
+                            <input
+                              type="color"
+                              value={headline.primaryColor}
+                              onChange={(e) => setHeadline((h) => ({ ...h, primaryColor: e.target.value }))}
+                              className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setHeadline((h) => ({ ...h, primaryColor: "#FACC15" }))}
+                              className="h-5 px-1.5 text-[9px] text-yellow-400 border-yellow-500/30"
+                            >
+                              Amarelo Viral
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      <Textarea
-                        value={headline.mainText}
-                        onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
-                        rows={2}
-                        className="text-xs mt-1 font-bold uppercase resize-none"
-                      />
+                      {headline.showMainText ? (
+                        <Textarea
+                          value={headline.mainText}
+                          onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
+                          rows={2}
+                          className="text-xs mt-1 font-bold uppercase resize-none"
+                          placeholder="Digite a chamada principal do meme..."
+                        />
+                      ) : (
+                        <p className="text-[11px] text-zinc-500 italic">Texto principal desativado no vídeo.</p>
+                      )}
                     </div>
 
-                    <div>
+                    {/* Texto Secundário */}
+                    <div className="p-3 rounded-xl bg-secondary/10 border border-border/50 space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs font-semibold">Texto Secundário (Punchline / Reação)</Label>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground">Cor:</span>
-                          <input
-                            type="color"
-                            value={headline.secondaryColor}
-                            onChange={(e) => setHeadline((h) => ({ ...h, secondaryColor: e.target.value }))}
-                            className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
+                          <Switch
+                            checked={headline.showSubText}
+                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, showSubText: v }))}
                           />
+                          <Label className="text-xs font-semibold">Texto Secundário (Punchline / Reação)</Label>
                         </div>
+                        {headline.showSubText && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground">Cor:</span>
+                            <input
+                              type="color"
+                              value={headline.secondaryColor}
+                              onChange={(e) => setHeadline((h) => ({ ...h, secondaryColor: e.target.value }))}
+                              className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
+                            />
+                          </div>
+                        )}
                       </div>
-                      <Input
-                        value={headline.subText}
-                        onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                        className="h-8 text-xs mt-1 font-semibold uppercase"
-                      />
+                      {headline.showSubText ? (
+                        <Input
+                          value={headline.subText}
+                          onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
+                          className="h-8 text-xs mt-1 font-semibold uppercase"
+                          placeholder="Digite a punchline ou reação..."
+                        />
+                      ) : (
+                        <p className="text-[11px] text-zinc-500 italic">Texto secundário desativado no vídeo.</p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border/40">
@@ -716,6 +866,8 @@ export default function DarkClipsPage() {
                         videoPlacement={videoPlacement}
                         background={background}
                         footer={footer}
+                        onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
+                        onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
                       />
                     </div>
                   </CardContent>
@@ -735,6 +887,8 @@ export default function DarkClipsPage() {
 
             </div>
           </TabsContent>
+
+
 
           {/* ══════════════════════════════════════════════════════════
               TAB 2: CLIPES MINERADOS & IMPORTAÇÃO

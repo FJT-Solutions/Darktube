@@ -26,6 +26,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   const {
     mainText = 'MEU AMIGO: "COMPREI UM MIC NOVO, MANO."',
     subText = 'O DESGRAÇADO ENTRANDO NA CALL:',
+    showMainText = true,
+    showSubText = true,
     fontFamily = 'Montserrat, Inter, "Helvetica Neue", sans-serif',
     fontSize = 42,
     primaryColor = '#FACC15', // Viral Yellow
@@ -34,6 +36,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     uppercase = true,
     textShadow = true,
   } = headline;
+
 
   // ── 3. Video Placement Defaults ──
   const {
@@ -225,7 +228,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             zIndex: 10,
           }}
         >
-          {mainText && (
+          {showMainText && mainText && (
             <h1
               style={{
                 margin: 0,
@@ -242,7 +245,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             </h1>
           )}
 
-          {subText && (
+          {showSubText && subText && (
             <h2
               style={{
                 margin: 0,
@@ -257,6 +260,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               {subText}
             </h2>
           )}
+
         </div>
 
         {/* ── Video Player Container ── */}

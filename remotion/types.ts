@@ -238,12 +238,15 @@ export interface DarkClipsVideoProps {
     badgeType?: 'none' | 'blue' | 'gold' | 'gray';
     showHeader?: boolean;
     paddingTop?: number;
+    yOffset?: number;
   };
 
   // Headline
   headline?: {
     mainText?: string;
     subText?: string;
+    showMainText?: boolean;
+    showSubText?: boolean;
     fontFamily?: string;
     fontSize?: number;
     primaryColor?: string; // e.g. '#FACC15'
@@ -251,7 +254,9 @@ export interface DarkClipsVideoProps {
     textAlign?: 'left' | 'center' | 'right';
     uppercase?: boolean;
     textShadow?: boolean;
+    yOffset?: number;
   };
+
 
   // Video Placement
   videoPlacement?: {
