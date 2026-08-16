@@ -83,6 +83,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   const {
     enabled: watermarkEnabled = false,
     type: watermarkType = 'text',
+    shape: watermarkShape = 'circle',
     text: watermarkText = '@darkclips',
     imageUrl: watermarkImageUrl = '',
     position: watermarkPosition = 'bottom-right',
@@ -90,9 +91,12 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     yOffset: watermarkY = 92,
     opacity: watermarkOpacity = 70,
     fontSize: watermarkFontSize = 22,
+    imageSize: watermarkImageSize = 44,
     scale: watermarkScale = 100,
     color: watermarkColor = '#FFFFFF',
     hasShadow: watermarkHasShadow = true,
+    borderWidth: watermarkBorderWidth = 2,
+    borderColor: watermarkBorderColor = 'rgba(255, 255, 255, 0.4)',
   } = watermark;
 
   // ── 6. Footer Defaults ──
@@ -570,18 +574,90 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               justifyContent: 'center',
             }}
           >
-            {watermarkType === 'image' && (watermarkImageUrl || avatarUrl) ? (
-              <img
-                src={watermarkImageUrl || avatarUrl}
-                alt="Marca d'água"
+            {/* 1. MODO COMBINADO: LOGO + TEXTO / @ARROBA */}
+            {watermarkType === 'both' && (
+              <div
                 style={{
-                  width: `${Math.round(100 * ((watermarkScale || 100) / 100))}px`,
-                  height: 'auto',
-                  objectFit: 'contain',
-                  filter: watermarkHasShadow ? 'drop-shadow(0 2px 8px rgba(0,0,0,0.85))' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '4px 14px 4px 6px',
+                  borderRadius: '9999px',
+                  backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.45)',
+                  backdropFilter: 'blur(8px)',
+                  border: isLightBg ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.2)',
+                  boxShadow: watermarkHasShadow ? '0 4px 14px rgba(0,0,0,0.6)' : 'none',
                 }}
-              />
-            ) : (
+              >
+                <div
+                  style={{
+                    width: `${Math.round((watermarkImageSize || 40) * ((watermarkScale || 100) / 100))}px`,
+                    height: `${Math.round((watermarkImageSize || 40) * ((watermarkScale || 100) / 100))}px`,
+                    borderRadius: watermarkShape === 'circle' ? '9999px' : watermarkShape === 'rounded' ? '8px' : '2px',
+                    overflow: 'hidden',
+                    border: `${watermarkBorderWidth || 2}px solid ${watermarkBorderColor || 'rgba(255,255,255,0.6)'}`,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <img
+                    src={watermarkImageUrl || avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200'}
+                    alt="Logo"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontSize: `${Math.round((watermarkFontSize || 20) * ((watermarkScale || 100) / 100))}px`,
+                    fontWeight: 800,
+                    color: isLightBg && (watermarkColor === '#FFFFFF' || watermarkColor === '#ffffff') ? '#09090b' : watermarkColor,
+                    letterSpacing: '0.03em',
+                    whiteSpace: 'nowrap',
+                    textShadow: watermarkHasShadow ? '0 2px 8px rgba(0,0,0,0.9)' : 'none',
+                  }}
+                >
+                  {watermarkText || handle || '@darkclips'}
+                </span>
+              </div>
+            )}
+
+            {/* 2. MODO APENAS LOGO / IMAGEM COM MOLDURA CIRCULAR / PERSONALIZADA */}
+            {watermarkType === 'image' && (
+              <div
+                style={{
+                  width: `${Math.round((watermarkImageSize || 54) * ((watermarkScale || 100) / 100))}px`,
+                  height: `${Math.round((watermarkImageSize || 54) * ((watermarkScale || 100) / 100))}px`,
+                  borderRadius: watermarkShape === 'circle' ? '9999px' : watermarkShape === 'rounded' ? '14px' : '4px',
+                  overflow: 'hidden',
+                  border: `${watermarkBorderWidth || 2}px solid ${watermarkBorderColor || 'rgba(255,255,255,0.6)'}`,
+                  boxShadow: watermarkHasShadow ? '0 4px 16px rgba(0,0,0,0.7)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                }}
+              >
+                <img
+                  src={watermarkImageUrl || avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200'}
+                  alt="Marca d'água"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* 3. MODO APENAS TEXTO / @ARROBA */}
+            {watermarkType === 'text' && (
               <span
                 style={{
                   fontSize: `${Math.round((watermarkFontSize || 22) * ((watermarkScale || 100) / 100))}px`,

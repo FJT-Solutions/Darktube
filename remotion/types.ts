@@ -270,7 +270,8 @@ export interface DarkClipsVideoProps {
   // Watermark / Marca d'água
   watermark?: {
     enabled?: boolean;
-    type?: 'text' | 'image';
+    type?: 'text' | 'image' | 'both';
+    shape?: 'circle' | 'rounded' | 'square';
     text?: string;
     imageUrl?: string;
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom';
@@ -278,9 +279,12 @@ export interface DarkClipsVideoProps {
     yOffset?: number; // 0 - 100 percentage
     opacity?: number; // 10 - 100 percentage
     fontSize?: number; // px
+    imageSize?: number; // px
     scale?: number; // 50 - 180 percentage
     color?: string;
     hasShadow?: boolean;
+    borderWidth?: number; // px
+    borderColor?: string;
   };
 
   // Video Placement

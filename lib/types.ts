@@ -220,7 +220,8 @@ export interface DarkClipPreset {
   }
   watermark_style?: {
     enabled?: boolean
-    type?: 'text' | 'image'
+    type?: 'text' | 'image' | 'both'
+    shape?: 'circle' | 'rounded' | 'square'
     text?: string
     imageUrl?: string
     image_url?: string
@@ -232,10 +233,16 @@ export interface DarkClipPreset {
     opacity?: number
     fontSize?: number
     font_size?: number
+    imageSize?: number
+    image_size?: number
     scale?: number
     color?: string
     hasShadow?: boolean
     has_shadow?: boolean
+    borderWidth?: number
+    border_width?: number
+    borderColor?: string
+    border_color?: string
   }
   footer_style: {
     show_footer?: boolean

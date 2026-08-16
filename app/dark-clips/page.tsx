@@ -138,7 +138,8 @@ export default function DarkClipsPage() {
 
   const [watermark, setWatermark] = useState({
     enabled: false,
-    type: "text" as "text" | "image",
+    type: "text" as "text" | "image" | "both",
+    shape: "circle" as "circle" | "rounded" | "square",
     text: "@darkclips",
     imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     position: "bottom-right" as "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "custom",
@@ -146,10 +147,51 @@ export default function DarkClipsPage() {
     yOffset: 92,
     opacity: 70,
     fontSize: 22,
+    imageSize: 44,
     scale: 100,
     color: "#FFFFFF",
     hasShadow: true,
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.4)",
   });
+
+  // Bi-directional Auto-Scroll & Card Highlight State
+  const [highlightedCard, setHighlightedCard] = useState<string | null>(null);
+
+  const handleLayerFocus = (
+    layer: "header" | "headline" | "video" | "watermark" | "footer" | "arrows",
+    arrowIndex?: number
+  ) => {
+    if (layer === "arrows" && typeof arrowIndex === "number") {
+      setSelectedArrowIndex(arrowIndex);
+    }
+
+    const targetCardId =
+      layer === "header"
+        ? "card-header"
+        : layer === "headline"
+        ? "card-headline"
+        : layer === "video"
+        ? "card-video"
+        : layer === "watermark"
+        ? "card-watermark"
+        : layer === "footer"
+        ? "card-footer"
+        : layer === "arrows"
+        ? "card-arrows"
+        : null;
+
+    if (targetCardId) {
+      setHighlightedCard(targetCardId);
+      const el = document.getElementById(targetCardId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      setTimeout(() => {
+        setHighlightedCard((curr) => (curr === targetCardId ? null : curr));
+      }, 1800);
+    }
+  };
 
   const [videoPlacement, setVideoPlacement] = useState({
     yOffset: 54,
@@ -408,15 +450,20 @@ export default function DarkClipsPage() {
         ...w,
         enabled: preset.watermark_style?.enabled ?? w.enabled,
         type: (preset.watermark_style?.type || w.type) as any,
+        shape: (preset.watermark_style?.shape || w.shape) as any,
         text: preset.watermark_style?.text ?? w.text,
         imageUrl: preset.watermark_style?.imageUrl ?? preset.watermark_style?.image_url ?? w.imageUrl,
         position: (preset.watermark_style?.position || w.position) as any,
         xOffset: preset.watermark_style?.xOffset ?? preset.watermark_style?.x_offset ?? w.xOffset,
         yOffset: preset.watermark_style?.yOffset ?? preset.watermark_style?.y_offset ?? w.yOffset,
         opacity: preset.watermark_style?.opacity ?? w.opacity,
+        fontSize: preset.watermark_style?.fontSize ?? preset.watermark_style?.font_size ?? w.fontSize,
+        imageSize: preset.watermark_style?.imageSize ?? preset.watermark_style?.image_size ?? w.imageSize,
         scale: preset.watermark_style?.scale ?? w.scale,
         color: preset.watermark_style?.color ?? w.color,
         hasShadow: preset.watermark_style?.hasShadow ?? preset.watermark_style?.has_shadow ?? w.hasShadow,
+        borderWidth: preset.watermark_style?.borderWidth ?? preset.watermark_style?.border_width ?? w.borderWidth,
+        borderColor: preset.watermark_style?.borderColor ?? preset.watermark_style?.border_color ?? w.borderColor,
       }));
     }
     if (preset.footer_style) {
@@ -1010,7 +1057,12 @@ export default function DarkClipsPage() {
               {/* ── Left Column: Granular Controls (7 cols) ── */}
               <div className="lg:col-span-7 space-y-6">
                 {/* 1. Cabeçalho do Perfil */}
-                <Card>
+                <Card
+                  id="card-header"
+                  className={`transition-all duration-300 ${
+                    highlightedCard === "card-header" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
+                  }`}
+                >
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -1211,7 +1263,12 @@ export default function DarkClipsPage() {
                 </Card>
 
                 {/* 2. Título & Gancho Viral */}
-                <Card>
+                <Card
+                  id="card-headline"
+                  className={`transition-all duration-300 ${
+                    highlightedCard === "card-headline" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
+                  }`}
+                >
                   <CardHeader className="p-4 pb-3">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
                       <Type className="h-4 w-4 text-primary" /> Títulos, Textos & Gancho Viral
@@ -1424,7 +1481,12 @@ export default function DarkClipsPage() {
                 </Card>
 
                 {/* 3. Enquadramento do Vídeo & Fundo */}
-                <Card>
+                <Card
+                  id="card-video"
+                  className={`transition-all duration-300 ${
+                    highlightedCard === "card-video" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
+                  }`}
+                >
                   <CardHeader className="p-4 pb-3">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
                       <Maximize2 className="h-4 w-4 text-primary" /> Enquadramento do Vídeo & Fundo 9:16
@@ -1508,14 +1570,19 @@ export default function DarkClipsPage() {
                 </Card>
 
                 {/* 4. Marca D'água & Selo Personalizado */}
-                <Card>
+                <Card
+                  id="card-watermark"
+                  className={`transition-all duration-300 ${
+                    highlightedCard === "card-watermark" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
+                  }`}
+                >
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-primary" /> Marca D'água & Logo Personalizada
+                        <Shield className="h-4 w-4 text-primary" /> 4. Marca D'água & Logo Personalizada
                       </CardTitle>
                       <CardDescription className="text-xs">
-                        Adicione texto arroba ou imagem/logo com arrasto interativo e opacidade.
+                        Adicione texto arroba, foto/logo com moldura circular ou ambos combinados.
                       </CardDescription>
                     </div>
                     <Switch
@@ -1525,73 +1592,58 @@ export default function DarkClipsPage() {
                   </CardHeader>
                   {watermark.enabled && (
                     <CardContent className="p-4 pt-0 space-y-4">
-                      {/* Tipo: Texto vs Imagem */}
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={watermark.type === "text" ? "default" : "outline"}
-                          onClick={() => setWatermark((w) => ({ ...w, type: "text" }))}
-                          className="flex-1 text-xs h-8 gap-1.5"
+                      {/* Seletor Unificado do Tipo de Marca D'água */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">Modo de Exibição da Marca D'água</Label>
+                        <Select
+                          value={watermark.type || "text"}
+                          onValueChange={(val: "text" | "image" | "both") => setWatermark((w) => ({ ...w, type: val }))}
                         >
-                          <Type className="h-3.5 w-3.5" /> Texto / @Arroba
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={watermark.type === "image" ? "default" : "outline"}
-                          onClick={() => setWatermark((w) => ({ ...w, type: "image" }))}
-                          className="flex-1 text-xs h-8 gap-1.5"
-                        >
-                          <ImageIcon className="h-3.5 w-3.5" /> Logo / Imagem
-                        </Button>
+                          <SelectTrigger className="h-9 text-xs font-semibold bg-secondary/30">
+                            <SelectValue placeholder="Selecione o formato" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="text" className="text-xs font-medium">
+                              📝 Apenas Texto / @Arroba
+                            </SelectItem>
+                            <SelectItem value="image" className="text-xs font-medium">
+                              ⚪ Logo / Imagem com Moldura
+                            </SelectItem>
+                            <SelectItem value="both" className="text-xs font-medium">
+                              🌟 Logo + Texto / @Arroba (Combinados)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
-                      {watermark.type === "text" ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-xs font-semibold">Texto da Marca D'água</Label>
-                            <Input
-                              value={watermark.text}
-                              onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
-                              placeholder="@meucanal"
-                              className="h-8 text-xs font-mono mt-1"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs font-semibold">Cor do Texto</Label>
-                            <div className="flex items-center gap-2 mt-1">
-                              <input
-                                type="color"
-                                value={watermark.color || "#FFFFFF"}
-                                onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
-                                className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
-                              />
-                              <Input
-                                value={watermark.color || "#FFFFFF"}
-                                onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
-                                className="h-8 text-xs font-mono"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
+                      {/* 1. SEÇÕES DE CONFIGURAÇÃO DE IMAGEM / LOGO (quando image ou both) */}
+                      {(watermark.type === "image" || watermark.type === "both") && (
                         <div className="p-3 rounded-xl bg-secondary/20 border border-border/60 space-y-3">
                           <Label className="text-xs font-semibold flex items-center justify-between">
-                            <span>Logo / Selo em Imagem</span>
-                            <span className="text-[10px] text-muted-foreground">PNG transparente recomendado</span>
+                            <span>Foto / Logo da Marca D'água</span>
+                            <span className="text-[10px] text-muted-foreground">Moldura circular com borda</span>
                           </Label>
 
                           <div className="flex items-center gap-3">
-                            {watermark.imageUrl || profileHeader.avatarUrl ? (
-                              <div className="w-12 h-12 rounded-lg border border-primary/40 bg-zinc-900 p-1 flex items-center justify-center overflow-hidden shrink-0">
-                                <img src={watermark.imageUrl || profileHeader.avatarUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
-                              </div>
-                            ) : (
-                              <div className="w-12 h-12 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
-                                <ImageIcon className="h-5 w-5" />
-                              </div>
-                            )}
+                            <div
+                              className={`w-14 h-14 border-2 border-primary/50 bg-zinc-900 flex items-center justify-center overflow-hidden shrink-0 shadow-md ${
+                                watermark.shape === "square"
+                                  ? "rounded-md"
+                                  : watermark.shape === "rounded"
+                                  ? "rounded-xl"
+                                  : "rounded-full"
+                              }`}
+                            >
+                              <img
+                                src={
+                                  watermark.imageUrl ||
+                                  profileHeader.avatarUrl ||
+                                  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
+                                }
+                                alt="Logo"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
 
                             <div className="flex flex-wrap gap-2">
                               <input
@@ -1608,7 +1660,7 @@ export default function DarkClipsPage() {
                                 onClick={() => watermarkFileInputRef.current?.click()}
                                 className="h-8 text-xs gap-1.5"
                               >
-                                <Upload className="h-3.5 w-3.5 text-primary" /> Carregar Logo
+                                <Upload className="h-3.5 w-3.5 text-primary" /> Carregar Imagem
                               </Button>
                               <Button
                                 type="button"
@@ -1624,8 +1676,13 @@ export default function DarkClipsPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => {
-                                  setWatermark((w) => ({ ...w, imageUrl: profileHeader.avatarUrl, type: 'image' }));
-                                  toast.success("Foto de perfil aplicada à marca d'água!");
+                                  setWatermark((w) => ({
+                                    ...w,
+                                    imageUrl:
+                                      profileHeader.avatarUrl ||
+                                      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                                  }));
+                                  toast.success("Foto do cabeçalho aplicada à marca d'água!");
                                 }}
                                 className="h-8 text-xs gap-1.5 text-primary hover:bg-primary/10 border border-primary/20"
                                 title="Puxar imagem da foto de perfil para a marca d'água"
@@ -1634,10 +1691,145 @@ export default function DarkClipsPage() {
                               </Button>
                             </div>
                           </div>
+
+                          {/* Formato da Moldura & Tamanho da Logo */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/40">
+                            <div>
+                              <Label className="text-xs font-semibold">Formato da Moldura</Label>
+                              <div className="flex gap-1.5 mt-1">
+                                {[
+                                  { id: "circle", label: "Circular ⚪" },
+                                  { id: "rounded", label: "Arredondado 🔲" },
+                                  { id: "square", label: "Quadrado ⬛" },
+                                ].map((shape) => (
+                                  <Button
+                                    key={shape.id}
+                                    type="button"
+                                    size="sm"
+                                    variant={(watermark.shape || "circle") === shape.id ? "default" : "outline"}
+                                    onClick={() => setWatermark((w) => ({ ...w, shape: shape.id as any }))}
+                                    className="flex-1 text-[11px] h-7 px-1 font-bold"
+                                  >
+                                    {shape.label}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="font-semibold">Tamanho da Logo</span>
+                                <span className="font-mono text-primary">{watermark.imageSize || 44}px</span>
+                              </div>
+                              <Slider
+                                value={[watermark.imageSize || 44]}
+                                min={24}
+                                max={100}
+                                step={2}
+                                onValueChange={([imageSize]) => setWatermark((w) => ({ ...w, imageSize }))}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Borda da Moldura */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="font-semibold">Espessura da Borda</span>
+                                <span className="font-mono text-primary">{watermark.borderWidth ?? 2}px</span>
+                              </div>
+                              <Slider
+                                value={[watermark.borderWidth ?? 2]}
+                                min={0}
+                                max={6}
+                                step={1}
+                                onValueChange={([borderWidth]) => setWatermark((w) => ({ ...w, borderWidth }))}
+                              />
+                            </div>
+
+                            <div>
+                              <Label className="text-xs font-semibold">Cor da Borda</Label>
+                              <div className="flex items-center gap-2 mt-1">
+                                <input
+                                  type="color"
+                                  value={watermark.borderColor?.startsWith("#") ? watermark.borderColor : "#FFFFFF"}
+                                  onChange={(e) => setWatermark((w) => ({ ...w, borderColor: e.target.value }))}
+                                  className="h-7 w-9 rounded border border-border bg-transparent cursor-pointer"
+                                />
+                                <Input
+                                  value={watermark.borderColor || "rgba(255,255,255,0.4)"}
+                                  onChange={(e) => setWatermark((w) => ({ ...w, borderColor: e.target.value }))}
+                                  className="h-7 text-xs font-mono"
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
 
-                      {/* Presets Rápidos de Posição */}
+                      {/* 2. SEÇÕES DE CONFIGURAÇÃO DE TEXTO / @ARROBA (quando text ou both) */}
+                      {(watermark.type === "text" || watermark.type === "both") && (
+                        <div className="p-3 rounded-xl bg-secondary/15 border border-border/50 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold">Texto / @Arroba da Marca D'água</Label>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setWatermark((w) => ({
+                                  ...w,
+                                  text: profileHeader.handle || "@darkclips",
+                                }));
+                                toast.success("Arroba do perfil copiado!");
+                              }}
+                              className="h-6 text-[10px] text-primary hover:bg-primary/10 gap-1 px-2"
+                            >
+                              <RefreshCw className="h-2.5 w-2.5" /> Usar @ do Perfil
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <Input
+                              value={watermark.text}
+                              onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
+                              placeholder="@meucanal"
+                              className="h-8 text-xs font-mono"
+                            />
+
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs font-semibold shrink-0">Cor:</Label>
+                              <input
+                                type="color"
+                                value={watermark.color || "#FFFFFF"}
+                                onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
+                                className="h-8 w-9 rounded border border-border bg-transparent cursor-pointer shrink-0"
+                              />
+                              <Input
+                                value={watermark.color || "#FFFFFF"}
+                                onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
+                                className="h-8 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="font-semibold">Tamanho da Fonte</span>
+                              <span className="font-mono text-primary">{watermark.fontSize || 22}px</span>
+                            </div>
+                            <Slider
+                              value={[watermark.fontSize || 22]}
+                              min={12}
+                              max={48}
+                              step={1}
+                              onValueChange={([fontSize]) => setWatermark((w) => ({ ...w, fontSize }))}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 3. POSIÇÃO RÁPIDA */}
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold">Posição Rápida</Label>
                         <div className="grid grid-cols-4 gap-2">
@@ -1668,7 +1860,7 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Opacidade & Escala */}
+                      {/* 4. OPACIDADE, ESCALA & SOMBRA */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                         <div className="space-y-1.5">
                           <div className="flex justify-between text-xs">
@@ -1686,7 +1878,7 @@ export default function DarkClipsPage() {
 
                         <div className="space-y-1.5">
                           <div className="flex justify-between text-xs">
-                            <span className="font-semibold">Tamanho / Escala</span>
+                            <span className="font-semibold">Escala Geral</span>
                             <span className="font-mono text-primary">{watermark.scale || 100}%</span>
                           </div>
                           <Slider
@@ -1698,12 +1890,25 @@ export default function DarkClipsPage() {
                           />
                         </div>
                       </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Switch
+                          checked={watermark.hasShadow !== false}
+                          onCheckedChange={(v) => setWatermark((w) => ({ ...w, hasShadow: v }))}
+                        />
+                        <Label className="text-xs font-medium">Sombra e Contraste Automático</Label>
+                      </div>
                     </CardContent>
                   )}
                 </Card>
 
                 {/* 5. Rodapé & Chamada para Ação */}
-                <Card>
+                <Card
+                  id="card-footer"
+                  className={`transition-all duration-300 ${
+                    highlightedCard === "card-footer" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
+                  }`}
+                >
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -1831,7 +2036,12 @@ export default function DarkClipsPage() {
                 </Card>
 
                 {/* ── CARD 6: Setas & Indicadores Animados de Ação (CTA Visual Multi-Containers) ── */}
-                <Card className="border-border shadow-sm">
+                <Card
+                  id="card-arrows"
+                  className={`border-border shadow-sm transition-all duration-300 ${
+                    highlightedCard === "card-arrows" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
+                  }`}
+                >
                   <CardHeader className="p-4 pb-3 cursor-pointer select-none">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -2170,7 +2380,7 @@ export default function DarkClipsPage() {
               </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
-              <div className="lg:col-span-5 sticky top-6 space-y-4">
+              <div className="lg:col-span-5 sticky top-6 self-start space-y-4">
                 <Card className="border-border shadow-2xl overflow-hidden bg-card">
                   <CardHeader className="p-4 pb-2 border-b border-border/40">
                     <div className="flex items-center justify-between">
@@ -2220,6 +2430,7 @@ export default function DarkClipsPage() {
                       footer={footer}
                       arrows={isAnyArrowEnabled ? currentArrow : { enabled: false }}
                       arrowsList={isAnyArrowEnabled ? arrowsList : []}
+                      onLayerFocus={handleLayerFocus}
                       onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
                       onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
                       onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}

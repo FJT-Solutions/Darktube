@@ -33,6 +33,7 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   height?: number;
   className?: string;
   arrowsList?: DarkClipArrowItem[];
+  onLayerFocus?: (layer: 'header' | 'headline' | 'video' | 'watermark' | 'footer' | 'arrows', arrowIndex?: number) => void;
   onUpdateHeaderPadding?: (paddingTop: number) => void;
   onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number }) => void;
   onUpdateVideoPlacement?: (placement: { yOffset?: number; scale?: number; borderRadius?: number }) => void;
@@ -49,6 +50,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   height = 1920,
   videoUrl,
   arrowsList,
+  onLayerFocus,
   onUpdateHeaderPadding,
   onUpdateHeadline,
   onUpdateVideoPlacement,
@@ -108,13 +110,33 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const displayName = profileHeader.name || 'Dark Clips';
   const displayCaption = headline.mainText || headline.subText || footer.text || 'Assista até o final! 🔥';
 
-  // Handle Drag Start
+  // Handle Drag Start & Layer Selection
   const handlePointerDown = (layer: string, e: React.PointerEvent) => {
     e.stopPropagation();
     setActiveLayer(layer);
     setDragging(true);
     setDragStartY(e.clientY);
     setDragStartX(e.clientX);
+
+    // Bi-directional Auto-Scroll trigger to Left Cards
+    if (onLayerFocus) {
+      if (layer === 'header') {
+        onLayerFocus('header');
+      } else if (layer === 'mainText' || layer === 'subText') {
+        onLayerFocus('headline');
+      } else if (layer === 'video') {
+        onLayerFocus('video');
+      } else if (layer === 'watermark') {
+        onLayerFocus('watermark');
+      } else if (layer === 'footer') {
+        onLayerFocus('footer');
+      } else if (layer.startsWith('arrow-')) {
+        const idx = parseInt(layer.replace('arrow-', ''), 10);
+        onLayerFocus('arrows', isNaN(idx) ? 0 : idx);
+      } else if (layer === 'arrows') {
+        onLayerFocus('arrows', 0);
+      }
+    }
 
     if (layer === 'header') {
       setDragInitialValY(headerPadding);
