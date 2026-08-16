@@ -123,3 +123,92 @@ export interface BlotatoAccount {
   label?: string
   created_at: string
 }
+
+export interface DarkClip {
+  id: string
+  user_id?: string
+  original_url: string
+  platform: string
+  video_url: string
+  thumbnail_url?: string
+  duration: number
+  author_name?: string
+  author_handle?: string
+  author_avatar?: string
+  original_caption?: string
+  original_metrics?: {
+    views?: number
+    likes?: number
+    comments?: number
+    shares?: number
+  }
+  sanitized: boolean
+  created_at: string
+}
+
+export interface DarkClipPreset {
+  id: string
+  user_id?: string
+  name: string
+  profile_header: {
+    avatar_url?: string
+    name?: string
+    handle?: string
+    badge_type?: 'none' | 'blue' | 'gold' | 'gray'
+    show_header?: boolean
+    padding_top?: number
+  }
+  headline_style: {
+    font_family?: string
+    font_size?: number
+    primary_color?: string
+    secondary_color?: string
+    text_align?: 'left' | 'center' | 'right'
+    uppercase?: boolean
+    text_shadow?: boolean
+  }
+  video_placement: {
+    y_offset?: number // percentage 0 - 100
+    scale?: number // percentage 50 - 100
+    border_radius?: number // px 0 - 50
+    has_shadow?: boolean
+    aspect_ratio?: string // 'auto' | '16:9' | '4:3' | '1:1'
+  }
+  background_style: {
+    type?: 'black' | 'blur' | 'gradient' | 'color'
+    blur_intensity?: number // 5 - 50
+    overlay_opacity?: number // 0 - 90
+    custom_color?: string
+  }
+  footer_style: {
+    show_footer?: boolean
+    text?: string
+    font_size?: number
+    color?: string
+  }
+  is_default?: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface DarkClipPost {
+  id: string
+  user_id?: string
+  clip_id?: string
+  title?: string
+  rendered_video_url?: string
+  remodel_data?: {
+    headline_main?: string
+    headline_sub?: string
+    cta_text?: string
+    caption?: string
+    hashtags?: string[]
+  }
+  scheduled_at?: string
+  status?: 'draft' | 'rendered' | 'scheduled' | 'publishing' | 'published' | 'failed'
+  target_accounts?: string[]
+  published_at?: string
+  error_message?: string
+  created_at?: string
+}
+

@@ -13,7 +13,7 @@ export interface SubtitleWord {
 }
 
 /**
- * Estilo de animação Ken Burns por cena.
+ * Estilo de animação Ken Burns e Motion OS por cena.
  */
 export type AnimationStyle =
   | 'kenburns-right'   // zoom + pan direita
@@ -28,7 +28,13 @@ export type AnimationStyle =
   | 'zoom-out'         // zoom out — começa em macro-close e revela
   | 'tilt-3d'          // rotação 3D real no espaço (perspective + rotateX/Y)
   | 'shake-impact'     // tremor de trauma/câmera no clímax
-  | 'spin-in';         // rotação rápida com entrada elástica
+  | 'spin-in'          // rotação rápida com entrada elástica
+  | 'bar-chart'        // gráfico de barras animado
+  | 'line-chart'       // gráfico de linha animado
+  | 'counter-confetti' // contador com confete
+  | 'odometer-digit-roll' // odômetro numérico
+  | 'typing-code-block'// terminal de código digitando
+  | 'terminal-3d';     // terminal 3D
 
 /**
  * Transição de entrada da cena (usada pelo TransitionSeries do @remotion/transitions).
@@ -78,7 +84,7 @@ export type SpringPreset = 'bouncy' | 'smooth' | 'dramatic' | 'gentle';
  */
 export type CaptionStyle = 'pop' | 'karaoke' | 'subtitle';
 
-export type SceneType = 'LETTERING' | 'ILUSTRATIVA' | 'HYBRID';
+export type SceneType = 'LETTERING' | 'ILUSTRATIVA' | 'HYBRID' | 'DATA_VIZ' | 'CODE_TECH' | 'UI_SHOWCASE' | 'MAP_JOURNEY';
 
 export interface LetteringLine {
   text: string;
@@ -90,7 +96,15 @@ export interface LetteringLine {
   badge?: string;
 }
 
-export type LivingBgType = 'dot-grid' | 'concentric-rings' | 'floating-symbols' | 'ambient-particles' | 'gradient-mesh' | 'clean';
+export type LivingBgType =
+  | 'dot-grid'
+  | 'concentric-rings'
+  | 'floating-symbols'
+  | 'ambient-particles'
+  | 'gradient-mesh'
+  | 'grid-mesh'
+  | 'mesh-gradient'
+  | 'clean';
 
 /**
  * Uma cena individual do vídeo.
@@ -207,3 +221,61 @@ export interface ScriptSegmentMedia {
   voiceoverText?: string;
   imagePrompt?: string;
 }
+
+// ─────────────────────────────────────────────
+// Dark Clips Remotion Types
+// ─────────────────────────────────────────────
+
+export interface DarkClipsVideoProps {
+  videoUrl?: string;
+  durationInSeconds?: number;
+  
+  // Header
+  profileHeader?: {
+    avatarUrl?: string;
+    name?: string;
+    handle?: string;
+    badgeType?: 'none' | 'blue' | 'gold' | 'gray';
+    showHeader?: boolean;
+    paddingTop?: number;
+  };
+
+  // Headline
+  headline?: {
+    mainText?: string;
+    subText?: string;
+    fontFamily?: string;
+    fontSize?: number;
+    primaryColor?: string; // e.g. '#FACC15'
+    secondaryColor?: string; // e.g. '#FFFFFF'
+    textAlign?: 'left' | 'center' | 'right';
+    uppercase?: boolean;
+    textShadow?: boolean;
+  };
+
+  // Video Placement
+  videoPlacement?: {
+    yOffset?: number; // 0 - 100 percentage
+    scale?: number; // 50 - 100 percentage
+    borderRadius?: number; // px
+    hasShadow?: boolean;
+    aspectRatio?: string;
+  };
+
+  // Background
+  background?: {
+    type?: 'black' | 'blur' | 'gradient' | 'color';
+    blurIntensity?: number;
+    overlayOpacity?: number;
+    customColor?: string;
+  };
+
+  // Footer / CTA
+  footer?: {
+    showFooter?: boolean;
+    text?: string;
+    fontSize?: number;
+    color?: string;
+  };
+}
+

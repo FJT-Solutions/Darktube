@@ -1,11 +1,68 @@
 import React from 'react';
 import { Composition, registerRoot } from 'remotion';
 import { ShortVideoComposition } from './compositions/ShortVideo';
-import { RemotionShortProps } from './types';
+import { DarkClipsVideoComposition } from './compositions/DarkClipsVideo';
+import { RemotionShortProps, DarkClipsVideoProps } from './types';
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      <Composition
+        id="DarkClipsVideo"
+        component={DarkClipsVideoComposition}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={async ({ props }) => {
+          const clipProps = props as DarkClipsVideoProps;
+          const durationSeconds = clipProps.durationInSeconds || 15;
+          return {
+            durationInFrames: Math.max(30, Math.round(durationSeconds * 30)),
+          };
+        }}
+        defaultProps={{
+          videoUrl: '',
+          durationInSeconds: 15,
+          profileHeader: {
+            avatarUrl: '',
+            name: 'Dark Clips',
+            handle: '@darkclips',
+            badgeType: 'blue',
+            showHeader: true,
+            paddingTop: 100,
+          },
+          headline: {
+            mainText: 'MEU AMIGO: "COMPREI UM MIC NOVO, MANO."',
+            subText: 'O DESGRAÇADO ENTRANDO NA CALL:',
+            fontFamily: 'Montserrat, Inter, sans-serif',
+            fontSize: 42,
+            primaryColor: '#FACC15',
+            secondaryColor: '#FFFFFF',
+            textAlign: 'center',
+            uppercase: true,
+            textShadow: true,
+          },
+          videoPlacement: {
+            yOffset: 52,
+            scale: 92,
+            borderRadius: 24,
+            hasShadow: true,
+            aspectRatio: 'auto',
+          },
+          background: {
+            type: 'black',
+            blurIntensity: 25,
+            overlayOpacity: 60,
+            customColor: '#000000',
+          },
+          footer: {
+            showFooter: false,
+            text: 'Sigam a melhor página de memes!',
+            fontSize: 26,
+            color: '#9CA3AF',
+          },
+        } satisfies DarkClipsVideoProps}
+      />
       <Composition
         id="ShortVideo"
         component={ShortVideoComposition}

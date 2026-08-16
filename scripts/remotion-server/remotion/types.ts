@@ -12,8 +12,14 @@ export interface SubtitleWord {
   endInSeconds: number;
 }
 
+export interface DarkClipsVideoProps {
+  videoUrl?: string;
+  durationInSeconds?: number;
+  endInSeconds: number;
+}
+
 /**
- * Estilo de animação Ken Burns por cena.
+ * Estilo de animação Ken Burns e Motion OS por cena.
  */
 export type AnimationStyle =
   | 'kenburns-right'   // zoom + pan direita
@@ -28,7 +34,13 @@ export type AnimationStyle =
   | 'zoom-out'         // zoom out — começa em macro-close e revela
   | 'tilt-3d'          // rotação 3D real no espaço (perspective + rotateX/Y)
   | 'shake-impact'     // tremor de trauma/câmera no clímax
-  | 'spin-in';         // rotação rápida com entrada elástica
+  | 'spin-in'          // rotação rápida com entrada elástica
+  | 'bar-chart'        // gráfico de barras animado
+  | 'line-chart'       // gráfico de linha animado
+  | 'counter-confetti' // contador com confete
+  | 'odometer-digit-roll' // odômetro numérico
+  | 'typing-code-block'// terminal de código digitando
+  | 'terminal-3d';     // terminal 3D
 
 /**
  * Transição de entrada da cena (usada pelo TransitionSeries do @remotion/transitions).
@@ -78,7 +90,7 @@ export type SpringPreset = 'bouncy' | 'smooth' | 'dramatic' | 'gentle';
  */
 export type CaptionStyle = 'pop' | 'karaoke' | 'subtitle';
 
-export type SceneType = 'LETTERING' | 'ILUSTRATIVA' | 'HYBRID';
+export type SceneType = 'LETTERING' | 'ILUSTRATIVA' | 'HYBRID' | 'DATA_VIZ' | 'CODE_TECH' | 'UI_SHOWCASE' | 'MAP_JOURNEY';
 
 export interface LetteringLine {
   text: string;
@@ -90,7 +102,15 @@ export interface LetteringLine {
   badge?: string;
 }
 
-export type LivingBgType = 'dot-grid' | 'concentric-rings' | 'floating-symbols' | 'ambient-particles' | 'gradient-mesh' | 'clean';
+export type LivingBgType =
+  | 'dot-grid'
+  | 'concentric-rings'
+  | 'floating-symbols'
+  | 'ambient-particles'
+  | 'gradient-mesh'
+  | 'grid-mesh'
+  | 'mesh-gradient'
+  | 'clean';
 
 /**
  * Uma cena individual do vídeo.

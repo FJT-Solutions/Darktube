@@ -38,9 +38,13 @@
   "exclude": [
     "node_modules",
     "scripts",
+    "scratch",
+    "arquivos_externos",
     "v0-mineracao-de-canais-you-tube",
     "provision_user.ts",
     "tmp_check_user.ts",
-    "verify_supabase.ts"
+    "verify_supabase.ts",
+    "remotion/compositions/library",
+    "extension"
   ]
 }

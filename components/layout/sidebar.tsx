@@ -20,17 +20,20 @@ import {
   LayoutTemplate,
   Clapperboard,
   Terminal,
+  Sparkles,
 } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/minerar", label: "Minerar", icon: Search },
+  { href: "/dark-clips", label: "Dark Clips", icon: Sparkles },
   { href: "/tracker", label: "Tracker", icon: Bookmark },
   { href: "/credentials", label: "Credenciais", icon: Key },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/criacao", label: "Criação", icon: Clapperboard },
   { href: "/settings", label: "Configurações", icon: Settings },
 ]
+
 
 interface SidebarProps {
   open: boolean

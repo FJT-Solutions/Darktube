@@ -1,5 +1,5 @@
 import { pool } from "./db-client"
-import type { TrackedChannel, YouTubeChannel, YouTubeVideo, BlotatoAccount } from "./types"
+import type { TrackedChannel, YouTubeChannel, YouTubeVideo, BlotatoAccount, DarkClip, DarkClipPreset, DarkClipPost } from "./types"
 
 /**
  * UTILS
@@ -721,3 +721,283 @@ export async function resetSystemPrompt(id: string): Promise<boolean> {
     await pool.query('DELETE FROM public.system_prompts WHERE id = $1', [id])
     return true
 }
+
+// ─── DARK CLIPS (REMODELAGEM VIRAL & ESTÚDIO 9:16) ──────────────────
+
+export async function ensureDarkClipsTablesExist() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS public.dark_clips (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID,
+            original_url TEXT NOT NULL,
+            platform TEXT NOT NULL,
+            video_url TEXT NOT NULL,
+            thumbnail_url TEXT,
+            duration NUMERIC DEFAULT 0,
+            author_name TEXT,
+            author_handle TEXT,
+            author_avatar TEXT,
+            original_caption TEXT,
+            original_metrics JSONB DEFAULT '{}'::jsonb,
+            sanitized BOOLEAN DEFAULT true,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS public.dark_clips_presets (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID,
+            name TEXT NOT NULL,
+            profile_header JSONB NOT NULL DEFAULT '{}'::jsonb,
+            headline_style JSONB NOT NULL DEFAULT '{}'::jsonb,
+            video_placement JSONB NOT NULL DEFAULT '{}'::jsonb,
+            background_style JSONB NOT NULL DEFAULT '{}'::jsonb,
+            footer_style JSONB NOT NULL DEFAULT '{}'::jsonb,
+            is_default BOOLEAN DEFAULT false,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS public.dark_clips_posts (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID,
+            clip_id UUID,
+            title TEXT,
+            rendered_video_url TEXT,
+            remodel_data JSONB DEFAULT '{}'::jsonb,
+            scheduled_at TIMESTAMPTZ,
+            status TEXT DEFAULT 'draft',
+            target_accounts JSONB DEFAULT '[]'::jsonb,
+            published_at TIMESTAMPTZ,
+            error_message TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+    `)
+}
+
+export async function saveDarkClip(clip: Partial<DarkClip>): Promise<DarkClip> {
+    await ensureDarkClipsTablesExist()
+    const query = `
+        INSERT INTO public.dark_clips (
+            user_id, original_url, platform, video_url, thumbnail_url,
+            duration, author_name, author_handle, author_avatar,
+            original_caption, original_metrics, sanitized
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        RETURNING *
+    `
+    const values = [
+        clip.user_id || null,
+        clip.original_url,
+        clip.platform || 'other',
+        clip.video_url,
+        clip.thumbnail_url || '',
+        clip.duration || 0,
+        clip.author_name || '',
+        clip.author_handle || '',
+        clip.author_avatar || '',
+        clip.original_caption || '',
+        JSON.stringify(clip.original_metrics || {}),
+        clip.sanitized !== false
+    ]
+    const { rows } = await pool.query(query, values)
+    return rows[0]
+}
+
+export async function getDarkClips(userId?: string): Promise<DarkClip[]> {
+    await ensureDarkClipsTablesExist()
+    let query = `SELECT * FROM public.dark_clips`
+    const params: any[] = []
+    if (userId) {
+        query += ` WHERE user_id = $1 OR user_id IS NULL`
+        params.push(userId)
+    }
+    query += ` ORDER BY created_at DESC`
+    const { rows } = await pool.query(query, params)
+    return rows.map((r: any) => ({
+        ...r,
+        duration: Number(r.duration || 0),
+        original_metrics: typeof r.original_metrics === 'string' ? JSON.parse(r.original_metrics) : (r.original_metrics || {})
+    }))
+}
+
+export async function getDarkClipById(id: string): Promise<DarkClip | null> {
+    await ensureDarkClipsTablesExist()
+    const { rows } = await pool.query(`SELECT * FROM public.dark_clips WHERE id = $1`, [id])
+    if (!rows[0]) return null
+    return {
+        ...rows[0],
+        duration: Number(rows[0].duration || 0),
+        original_metrics: typeof rows[0].original_metrics === 'string' ? JSON.parse(rows[0].original_metrics) : (rows[0].original_metrics || {})
+    }
+}
+
+export async function deleteDarkClip(id: string): Promise<boolean> {
+    await ensureDarkClipsTablesExist()
+    await pool.query(`DELETE FROM public.dark_clips WHERE id = $1`, [id])
+    return true
+}
+
+export async function saveDarkClipPreset(preset: Partial<DarkClipPreset>): Promise<DarkClipPreset> {
+    await ensureDarkClipsTablesExist()
+    if (preset.id) {
+        const query = `
+            UPDATE public.dark_clips_presets SET
+                name = COALESCE($1, name),
+                profile_header = COALESCE($2, profile_header),
+                headline_style = COALESCE($3, headline_style),
+                video_placement = COALESCE($4, video_placement),
+                background_style = COALESCE($5, background_style),
+                footer_style = COALESCE($6, footer_style),
+                is_default = COALESCE($7, is_default),
+                updated_at = NOW()
+            WHERE id = $8
+            RETURNING *
+        `
+        const values = [
+            preset.name,
+            preset.profile_header ? JSON.stringify(preset.profile_header) : null,
+            preset.headline_style ? JSON.stringify(preset.headline_style) : null,
+            preset.video_placement ? JSON.stringify(preset.video_placement) : null,
+            preset.background_style ? JSON.stringify(preset.background_style) : null,
+            preset.footer_style ? JSON.stringify(preset.footer_style) : null,
+            preset.is_default,
+            preset.id
+        ]
+        const { rows } = await pool.query(query, values)
+        return rows[0]
+    } else {
+        const query = `
+            INSERT INTO public.dark_clips_presets (
+                user_id, name, profile_header, headline_style,
+                video_placement, background_style, footer_style, is_default
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `
+        const values = [
+            preset.user_id || null,
+            preset.name || 'Layout Padrão',
+            JSON.stringify(preset.profile_header || {}),
+            JSON.stringify(preset.headline_style || {}),
+            JSON.stringify(preset.video_placement || {}),
+            JSON.stringify(preset.background_style || {}),
+            JSON.stringify(preset.footer_style || {}),
+            preset.is_default || false
+        ]
+        const { rows } = await pool.query(query, values)
+        return rows[0]
+    }
+}
+
+export async function getDarkClipPresets(userId?: string): Promise<DarkClipPreset[]> {
+    await ensureDarkClipsTablesExist()
+    let query = `SELECT * FROM public.dark_clips_presets`
+    const params: any[] = []
+    if (userId) {
+        query += ` WHERE user_id = $1 OR user_id IS NULL`
+        params.push(userId)
+    }
+    query += ` ORDER BY is_default DESC, created_at DESC`
+    const { rows } = await pool.query(query, params)
+    return rows.map((r: any) => ({
+        ...r,
+        profile_header: typeof r.profile_header === 'string' ? JSON.parse(r.profile_header) : (r.profile_header || {}),
+        headline_style: typeof r.headline_style === 'string' ? JSON.parse(r.headline_style) : (r.headline_style || {}),
+        video_placement: typeof r.video_placement === 'string' ? JSON.parse(r.video_placement) : (r.video_placement || {}),
+        background_style: typeof r.background_style === 'string' ? JSON.parse(r.background_style) : (r.background_style || {}),
+        footer_style: typeof r.footer_style === 'string' ? JSON.parse(r.footer_style) : (r.footer_style || {})
+    }))
+}
+
+export async function deleteDarkClipPreset(id: string): Promise<boolean> {
+    await ensureDarkClipsTablesExist()
+    await pool.query(`DELETE FROM public.dark_clips_presets WHERE id = $1`, [id])
+    return true
+}
+
+export async function saveDarkClipPost(post: Partial<DarkClipPost>): Promise<DarkClipPost> {
+    await ensureDarkClipsTablesExist()
+    if (post.id) {
+        const query = `
+            UPDATE public.dark_clips_posts SET
+                title = COALESCE($1, title),
+                rendered_video_url = COALESCE($2, rendered_video_url),
+                remodel_data = COALESCE($3, remodel_data),
+                scheduled_at = COALESCE($4, scheduled_at),
+                status = COALESCE($5, status),
+                target_accounts = COALESCE($6, target_accounts),
+                published_at = COALESCE($7, published_at),
+                error_message = COALESCE($8, error_message)
+            WHERE id = $9
+            RETURNING *
+        `
+        const values = [
+            post.title,
+            post.rendered_video_url,
+            post.remodel_data ? JSON.stringify(post.remodel_data) : null,
+            post.scheduled_at,
+            post.status,
+            post.target_accounts ? JSON.stringify(post.target_accounts) : null,
+            post.published_at,
+            post.error_message,
+            post.id
+        ]
+        const { rows } = await pool.query(query, values)
+        return rows[0]
+    } else {
+        const query = `
+            INSERT INTO public.dark_clips_posts (
+                user_id, clip_id, title, rendered_video_url, remodel_data,
+                scheduled_at, status, target_accounts
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `
+        const values = [
+            post.user_id || null,
+            post.clip_id || null,
+            post.title || 'Meme Dark Clips',
+            post.rendered_video_url || null,
+            JSON.stringify(post.remodel_data || {}),
+            post.scheduled_at || null,
+            post.status || 'draft',
+            JSON.stringify(post.target_accounts || [])
+        ]
+        const { rows } = await pool.query(query, values)
+        return rows[0]
+    }
+}
+
+export async function getDarkClipPosts(userId?: string): Promise<DarkClipPost[]> {
+    await ensureDarkClipsTablesExist()
+    let query = `SELECT * FROM public.dark_clips_posts`
+    const params: any[] = []
+    if (userId) {
+        query += ` WHERE user_id = $1 OR user_id IS NULL`
+        params.push(userId)
+    }
+    query += ` ORDER BY scheduled_at ASC NULLS LAST, created_at DESC`
+    const { rows } = await pool.query(query, params)
+    return rows.map((r: any) => ({
+        ...r,
+        remodel_data: typeof r.remodel_data === 'string' ? JSON.parse(r.remodel_data) : (r.remodel_data || {}),
+        target_accounts: typeof r.target_accounts === 'string' ? JSON.parse(r.target_accounts) : (r.target_accounts || [])
+    }))
+}
+
+export async function updateDarkClipPostStatus(id: string, status: string, renderedUrl?: string, errorMsg?: string): Promise<boolean> {
+    await ensureDarkClipsTablesExist()
+    await pool.query(`
+        UPDATE public.dark_clips_posts SET
+            status = $1,
+            rendered_video_url = COALESCE($2, rendered_video_url),
+            error_message = $3,
+            published_at = CASE WHEN $1 = 'published' THEN NOW() ELSE published_at END
+        WHERE id = $4
+    `, [status, renderedUrl || null, errorMsg || null, id])
+    return true
+}
+
+export async function deleteDarkClipPost(id: string): Promise<boolean> {
+    await ensureDarkClipsTablesExist()
+    await pool.query(`DELETE FROM public.dark_clips_posts WHERE id = $1`, [id])
+    return true
+}
+

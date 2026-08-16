@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dark Clips Extractor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-box">
+          <svg class="logo-icon" viewBox="0 0 24 24">
+            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="title">DARK<span class="highlight">CLIPS</span></h1>
+          <p class="subtitle">Extrator Viral</p>
+        </div>
+      </div>
+      <button id="settings-toggle" class="icon-btn" title="Configurações">
+        ⚙️
+      </button>
+    </header>
+
+    <!-- Settings Panel (Collapsible) -->
+    <div id="settings-panel" class="settings-panel hidden">
+      <label class="label" for="api-url">URL do DarkTube:</label>
+      <div class="input-group">
+        <input type="text" id="api-url" placeholder="http://localhost:3000" class="input">
+        <button id="save-settings-btn" class="btn btn-secondary">Salvar</button>
+      </div>
+      <p class="hint">Altere se estiver usando em produção ou outra porta.</p>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-dot"></span>
+      <span id="status-text">Pronto para capturar</span>
+    </div>
+
+    <!-- Bulk Action -->
+    <div class="action-card">
+      <div class="action-info">
+        <span class="count-badge" id="video-count">0</span>
+        <span class="action-label">vídeos detectados nesta página</span>
+      </div>
+      <button id="capture-all-btn" class="btn btn-primary" disabled>
+        🚀 Capturar & Enviar Todos ao DarkTube
+      </button>
+    </div>
+
+    <!-- Videos List -->
+    <div class="list-section">
+      <div class="list-header">
+        <span>Clipes Encontrados</span>
+        <button id="refresh-btn" class="text-btn">🔄 Atualizar</button>
+      </div>
+      <div id="videos-list" class="videos-list">
+        <div class="empty-state">
+          <p>Nenhum vídeo detectado nesta aba.</p>
+          <span>Abra o Instagram Reels, TikTok, Shorts ou X para minerar clipes.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <a href="http://localhost:3000/dark-clips" target="_blank" id="open-studio-link" class="studio-link">
+        🎨 Abrir Estúdio Dark Clips no DarkTube ➔
+      </a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

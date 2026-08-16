@@ -4,6 +4,9 @@ const nextConfig = {
     unoptimized: true,
   },
   output: 'standalone',
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '100mb',

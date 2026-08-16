@@ -180,6 +180,53 @@ CREATE TABLE IF NOT EXISTS public.invites (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     reviewed_at TIMESTAMPTZ
 );
+
+-- 12. Tabelas do Dark Clips (Meme Studio & Remodelagem)
+CREATE TABLE IF NOT EXISTS public.dark_clips (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    original_url TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    video_url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    duration NUMERIC DEFAULT 0,
+    author_name TEXT,
+    author_handle TEXT,
+    author_avatar TEXT,
+    original_caption TEXT,
+    original_metrics JSONB DEFAULT '{}'::jsonb,
+    sanitized BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.dark_clips_presets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    profile_header JSONB NOT NULL DEFAULT '{}'::jsonb,
+    headline_style JSONB NOT NULL DEFAULT '{}'::jsonb,
+    video_placement JSONB NOT NULL DEFAULT '{}'::jsonb,
+    background_style JSONB NOT NULL DEFAULT '{}'::jsonb,
+    footer_style JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_default BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.dark_clips_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    clip_id UUID REFERENCES public.dark_clips(id) ON DELETE SET NULL,
+    title TEXT,
+    rendered_video_url TEXT,
+    remodel_data JSONB DEFAULT '{}'::jsonb,
+    scheduled_at TIMESTAMPTZ,
+    status TEXT DEFAULT 'draft',
+    target_accounts JSONB DEFAULT '[]'::jsonb,
+    published_at TIMESTAMPTZ,
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 `
 
 async function setup() {
