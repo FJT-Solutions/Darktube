@@ -530,9 +530,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               justifyContent: 'center',
             }}
           >
-            {watermarkType === 'image' && watermarkImageUrl ? (
+            {watermarkType === 'image' && (watermarkImageUrl || avatarUrl) ? (
               <img
-                src={watermarkImageUrl}
+                src={watermarkImageUrl || avatarUrl}
                 alt="Marca d'água"
                 style={{
                   width: `${Math.round(100 * ((watermarkScale || 100) / 100))}px`,

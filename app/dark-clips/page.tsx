@@ -138,7 +138,7 @@ export default function DarkClipsPage() {
     enabled: false,
     type: "text" as "text" | "image",
     text: "@darkclips",
-    imageUrl: "",
+    imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     position: "bottom-right" as "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "custom",
     xOffset: 85,
     yOffset: 92,
@@ -452,6 +452,13 @@ export default function DarkClipsPage() {
       const result = event.target?.result as string;
       if (result) {
         setProfileHeader((p) => ({ ...p, avatarUrl: result }));
+        setWatermark((w) => {
+          // Se a marca d'água não tiver imagem customizada ou for a foto antiga, atualiza automaticamente
+          if (!w.imageUrl || w.imageUrl === profileHeader.avatarUrl) {
+            return { ...w, imageUrl: result };
+          }
+          return w;
+        });
         toast.success("Foto de perfil carregada com sucesso!");
       }
     };
@@ -470,6 +477,12 @@ export default function DarkClipsPage() {
             const result = event.target?.result as string;
             if (result) {
               setProfileHeader((p) => ({ ...p, avatarUrl: result }));
+              setWatermark((w) => {
+                if (!w.imageUrl || w.imageUrl === profileHeader.avatarUrl) {
+                  return { ...w, imageUrl: result };
+                }
+                return w;
+              });
               toast.success("Imagem colada da área de transferência!");
             }
           };
@@ -480,7 +493,13 @@ export default function DarkClipsPage() {
       const text = await navigator.clipboard.readText();
       if (text && (text.startsWith("http") || text.startsWith("data:image"))) {
         setProfileHeader((p) => ({ ...p, avatarUrl: text.trim() }));
-        toast.success("URL de imagem colada!");
+        setWatermark((w) => {
+          if (!w.imageUrl || w.imageUrl === profileHeader.avatarUrl) {
+            return { ...w, imageUrl: text.trim() };
+          }
+          return w;
+        });
+        toast.success("Imagem colada da área de transferência!");
       } else {
         toast.error("Nenhuma imagem encontrada na área de transferência.");
       }
@@ -907,16 +926,6 @@ export default function DarkClipsPage() {
                               <Copy className="h-3.5 w-3.5 text-emerald-400" /> Colar Imagem
                             </Button>
                           </div>
-                        </div>
-
-                        {/* Direct URL input fallback */}
-                        <div>
-                          <Input
-                            placeholder="Ou cole a URL direta da imagem (https://...)"
-                            value={profileHeader.avatarUrl}
-                            onChange={(e) => setProfileHeader((p) => ({ ...p, avatarUrl: e.target.value }))}
-                            className="h-7 text-[11px] text-muted-foreground font-mono"
-                          />
                         </div>
                       </div>
 
@@ -1404,9 +1413,9 @@ export default function DarkClipsPage() {
                           </Label>
 
                           <div className="flex items-center gap-3">
-                            {watermark.imageUrl ? (
+                            {watermark.imageUrl || profileHeader.avatarUrl ? (
                               <div className="w-12 h-12 rounded-lg border border-primary/40 bg-zinc-900 p-1 flex items-center justify-center overflow-hidden shrink-0">
-                                <img src={watermark.imageUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                                <img src={watermark.imageUrl || profileHeader.avatarUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
                               </div>
                             ) : (
                               <div className="w-12 h-12 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
@@ -1440,15 +1449,21 @@ export default function DarkClipsPage() {
                               >
                                 <Copy className="h-3.5 w-3.5 text-emerald-400" /> Colar Imagem
                               </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setWatermark((w) => ({ ...w, imageUrl: profileHeader.avatarUrl, type: 'image' }));
+                                  toast.success("Foto de perfil aplicada à marca d'água!");
+                                }}
+                                className="h-8 text-xs gap-1.5 text-primary hover:bg-primary/10 border border-primary/20"
+                                title="Puxar imagem da foto de perfil para a marca d'água"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" /> Usar Foto do Perfil
+                              </Button>
                             </div>
                           </div>
-
-                          <Input
-                            placeholder="Ou cole a URL direta da imagem (https://...)"
-                            value={watermark.imageUrl}
-                            onChange={(e) => setWatermark((w) => ({ ...w, imageUrl: e.target.value }))}
-                            className="h-7 text-[11px] text-muted-foreground font-mono"
-                          />
                         </div>
                       )}
 
