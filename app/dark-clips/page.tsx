@@ -483,15 +483,15 @@ export default function DarkClipsPage() {
               
               {/* ── Left Column: Granular Controls (7 cols) ── */}
               <div className="lg:col-span-7 space-y-6">
-                {/* 1. Header do Perfil */}
+                {/* 1. Cabeçalho do Perfil */}
                 <Card>
 
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Users className="h-4 w-4 text-primary" /> Header do Perfil (Autor / Sua Página)
+                        <Users className="h-4 w-4 text-primary" /> Cabeçalho do Perfil (Autor / Sua Página)
                       </CardTitle>
-                      <CardDescription className="text-xs">Personalize o avatar, arroba e selo verificado.</CardDescription>
+                      <CardDescription className="text-xs">Personalize a foto, arroba e selo verificado.</CardDescription>
                     </div>
                     <Switch
                       checked={profileHeader.showHeader}
@@ -510,7 +510,7 @@ export default function DarkClipsPage() {
                           />
                         </div>
                         <div>
-                          <Label className="text-xs font-semibold">@Username</Label>
+                          <Label className="text-xs font-semibold">@Usuário</Label>
                           <Input
                             value={profileHeader.handle}
                             onChange={(e) => setProfileHeader((p) => ({ ...p, handle: e.target.value }))}
@@ -519,11 +519,11 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Avatar Image Controls: Upload, Paste, Direct URL */}
+                      {/* Foto de Perfil: Envio, Colar, URL */}
                       <div className="p-3 rounded-xl bg-secondary/20 border border-border/60 space-y-3">
                         <Label className="text-xs font-semibold flex items-center justify-between">
-                          <span>Foto de Perfil / Avatar</span>
-                          <span className="text-[10px] text-muted-foreground">Upload ou Colar (Ctrl+V)</span>
+                          <span>Foto de Perfil</span>
+                          <span className="text-[10px] text-muted-foreground">Enviar ou Colar (Ctrl+V)</span>
                         </Label>
                         
                         <div className="flex items-center gap-3">
@@ -531,10 +531,10 @@ export default function DarkClipsPage() {
                           <div 
                             onClick={() => avatarFileInputRef.current?.click()}
                             className="relative group cursor-pointer w-12 h-12 rounded-full overflow-hidden border-2 border-primary/40 bg-zinc-900 shrink-0 shadow-md"
-                            title="Clique para fazer upload de foto"
+                            title="Clique para enviar foto de perfil"
                           >
                             {profileHeader.avatarUrl ? (
-                              <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                              <img src={profileHeader.avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
                                 {profileHeader.name.charAt(0)}
@@ -561,7 +561,7 @@ export default function DarkClipsPage() {
                               onClick={() => avatarFileInputRef.current?.click()}
                               className="h-9 text-xs gap-1.5 flex-1"
                             >
-                              <Upload className="h-3.5 w-3.5" /> Upload Foto
+                              <Upload className="h-3.5 w-3.5" /> Enviar Foto
                             </Button>
                             <Button
                               type="button"
@@ -577,7 +577,7 @@ export default function DarkClipsPage() {
                       </div>
 
 
-                      {/* Posição Vertical do Header */}
+                      {/* Posição Vertical do Cabeçalho */}
                       <div className="pt-1">
                         <Label className="text-[11px] font-medium text-muted-foreground">
                           Posição Vertical do Topo ({profileHeader.paddingTop ?? 90}px)
@@ -595,7 +595,7 @@ export default function DarkClipsPage() {
                       {/* Alinhamento e Selo de Verificado */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <div>
-                          <Label className="text-xs font-semibold">Alinhamento do Header</Label>
+                          <Label className="text-xs font-semibold">Alinhamento do Cabeçalho</Label>
                           <div className="flex gap-1 mt-1.5">
                             {(["left", "center"] as const).map((a) => (
                               <Button
@@ -643,12 +643,12 @@ export default function DarkClipsPage() {
                   )}
                 </Card>
 
-                {/* 2. Headline & Tipografia */}
+                {/* 2. Título & Textos do Vídeo */}
                 <Card>
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Type className="h-4 w-4 text-primary" /> Headline & Textos do Vídeo
+                        <Type className="h-4 w-4 text-primary" /> Título & Textos do Vídeo
                       </CardTitle>
                       <CardDescription className="text-xs">Edite ou gere a chamada principal e o subtítulo com IA.</CardDescription>
                     </div>
@@ -671,7 +671,7 @@ export default function DarkClipsPage() {
                             checked={headline.showMainText}
                             onCheckedChange={(v) => setHeadline((h) => ({ ...h, showMainText: v }))}
                           />
-                          <Label className="text-xs font-semibold">Texto Principal (Título / Setup)</Label>
+                          <Label className="text-xs font-semibold">Texto Principal (Título / Gancho)</Label>
                         </div>
                         {headline.showMainText && (
                           <div className="flex items-center gap-2">
@@ -750,7 +750,7 @@ export default function DarkClipsPage() {
                             checked={headline.showSubText}
                             onCheckedChange={(v) => setHeadline((h) => ({ ...h, showSubText: v }))}
                           />
-                          <Label className="text-xs font-semibold">Texto Secundário (Subtítulo / Punchline)</Label>
+                          <Label className="text-xs font-semibold">Texto Secundário (Subtítulo / Desfecho)</Label>
                         </div>
                         {headline.showSubText && (
                           <div className="flex items-center gap-2">
@@ -770,7 +770,7 @@ export default function DarkClipsPage() {
                             value={headline.subText}
                             onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
                             className="h-8 text-xs mt-1 font-semibold uppercase"
-                            placeholder="Digite o subtítulo ou punchline..."
+                            placeholder="Digite o subtítulo ou desfecho..."
                           />
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                             <div>
@@ -842,7 +842,7 @@ export default function DarkClipsPage() {
                 <Card>
                   <CardHeader className="p-4 pb-3">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Maximize2 className="h-4 w-4 text-primary" /> Enquadramento do Vídeo & Fundo do Canvas
+                      <Maximize2 className="h-4 w-4 text-primary" /> Enquadramento do Vídeo & Fundo da Tela
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
@@ -891,7 +891,7 @@ export default function DarkClipsPage() {
                               onClick={() => setBackground((b) => ({ ...b, type: t }))}
                               className="h-8 text-xs flex-1 capitalize"
                             >
-                              {t === "black" ? "Preto" : t === "blur" ? "Video Blur" : "Gradiente"}
+                              {t === "black" ? "Preto" : t === "blur" ? "Vídeo Desfocado" : "Gradiente"}
                             </Button>
                           ))}
                         </div>
@@ -902,13 +902,13 @@ export default function DarkClipsPage() {
 
               </div>
 
-              {/* ── Right Column: Live Canva Artboard Stage (5 cols) ── */}
+              {/* ── Right Column: Pré-visualização do Vídeo (5 cols) ── */}
               <div className="lg:col-span-5 sticky top-6 space-y-4">
                 <Card className="overflow-hidden border-border bg-card/50 backdrop-blur-md">
                   <CardHeader className="p-4 pb-2 border-b border-border/40 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Film className="h-4 w-4 text-red-500" /> Stage Artboard 9:16
+                        <Film className="h-4 w-4 text-red-500" /> Pré-visualização do Vídeo 9:16
                       </CardTitle>
                       <CardDescription className="text-[11px]">
                         {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Nenhum vídeo selecionado"}
@@ -940,7 +940,7 @@ export default function DarkClipsPage() {
 
 
                   <div className="p-4 pt-0 border-t border-border/40 flex gap-2 justify-between items-center">
-                    <span className="text-[11px] text-muted-foreground">1080 x 1920 (9:16 Vertical HD)</span>
+                    <span className="text-[11px] text-muted-foreground">1080 x 1920 (9:16 Vertical em Alta Definição)</span>
                     <Button
                       size="sm"
                       onClick={() => setActiveTab("clips")}

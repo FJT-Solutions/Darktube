@@ -120,15 +120,15 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       <div className="w-full flex items-center justify-between px-1 min-h-[24px]">
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-[11px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1.5 py-0.5">
-            <Smartphone className="h-3 w-3" /> Canvas 9:16
+            <Smartphone className="h-3 w-3" /> Vídeo 9:16
           </Badge>
           {activeLayer !== 'none' && (
             <span className="text-[11px] font-semibold text-zinc-300 animate-fadeIn">
               <strong className="text-primary font-bold">
                 {activeLayer === 'header'
-                  ? `Header (${headerPadding}px)`
+                  ? `Cabeçalho (${headerPadding}px)`
                   : activeLayer === 'mainText'
-                  ? `Texto Principal (${mainTextY}%)`
+                  ? `Título Principal (${mainTextY}%)`
                   : activeLayer === 'subText'
                   ? `Subtítulo (${subTextY}%)`
                   : `Vídeo (${videoY}%)`}
@@ -210,7 +210,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
             >
               {(activeLayer === 'header' || hoveredLayer === 'header') && (
                 <div className="absolute -top-3 left-2 flex items-center gap-1 bg-sky-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
-                  <Move className="h-2.5 w-2.5" /> HEADER ({headerPadding}px)
+                  <Move className="h-2.5 w-2.5" /> CABEÇALHO ({headerPadding}px)
                 </div>
               )}
             </div>
@@ -303,7 +303,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
 
       {/* Stage Hint Footer */}
       <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Header</strong>, o <strong>Título</strong>, o <strong>Subtítulo</strong> ou o <strong>Vídeo</strong> para qualquer ponto da tela.
+        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, o <strong>Título</strong>, o <strong>Subtítulo</strong> ou o <strong>Vídeo</strong> para qualquer ponto da tela.
       </p>
     </div>
   );
