@@ -1,4 +1,6 @@
-/* Dark Clips Popup CSS with User Authentication */
+/* DarkTube Design System - Dark Clips Extension */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,12 +9,14 @@
 
 body {
   width: 360px;
-  max-height: 580px;
+  max-height: 590px;
   background-color: #09090b;
   color: #f4f4f5;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
   font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
 }
 
 .popup-container {
@@ -28,7 +32,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #27272a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 12px;
 }
 
@@ -41,12 +45,13 @@ body {
 .logo-box {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, #e11d48, #9f1239);
+  background: #dc2626;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(225, 29, 72, 0.4);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+  flex-shrink: 0;
 }
 
 .logo-icon {
@@ -55,62 +60,95 @@ body {
   fill: #ffffff;
 }
 
-.title {
-  font-size: 15px;
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 14px;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   line-height: 1;
+  color: #ffffff;
+  text-transform: uppercase;
 }
 
 .highlight {
-  color: #f43f5e;
+  color: #dc2626;
 }
 
-.subtitle {
-  font-size: 10px;
-  color: #a1a1aa;
-  font-weight: 500;
-  margin-top: 2px;
+.brand-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #71717a;
+  margin-top: 3px;
+  text-transform: uppercase;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
 }
 
 .icon-btn {
-  background: none;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #a1a1aa;
-  transition: all 0.2s;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .icon-btn:hover {
-  background: #27272a;
+  background: #18181b;
   color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.btn-svg {
+  width: 15px;
+  height: 15px;
+}
+
+.btn-svg-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.btn-svg-xs {
+  width: 12px;
+  height: 12px;
+}
+
+/* Card Base */
+.card {
+  background: #121215;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
 }
 
 /* Auth Card */
 .auth-card {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 10px;
-  padding: 10px 12px;
-  transition: all 0.2s;
+  background: linear-gradient(180deg, #141418 0%, #101014 100%);
 }
 
 .user-logged-in {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
-.user-info {
+.user-profile {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -118,17 +156,18 @@ body {
 }
 
 .user-avatar {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #e11d48, #be123c);
+  background: linear-gradient(135deg, #dc2626, #991b1b);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 12px;
+  font-size: 13px;
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .user-text {
@@ -148,61 +187,95 @@ body {
 
 .user-email {
   font-size: 10px;
-  color: #a1a1aa;
+  color: #71717a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .btn-logout {
-  background: #27272a;
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  padding: 4px 8px;
+  background: rgba(220, 38, 38, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .btn-logout:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(220, 38, 38, 0.2);
+  color: #ffffff;
 }
 
 /* Logged Out View */
-.login-header {
+.card-head {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
-.login-title {
+.card-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.title-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.text-red {
+  color: #dc2626;
+}
+
+.card-title {
   font-size: 12px;
   font-weight: 700;
-  color: #f43f5e;
+  color: #ffffff;
 }
 
-.login-desc {
-  font-size: 10px;
-  color: #a1a1aa;
+.card-desc {
+  font-size: 11px;
+  color: #71717a;
+  padding-left: 20px;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.btn-login {
-  margin-top: 2px;
-  padding: 7px 12px;
+/* Inputs */
+.input {
+  width: 100%;
+  background: #09090b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #fafafa;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.input:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+}
+
+.input::placeholder {
+  color: #52525b;
+}
+
+.error-text {
   font-size: 11px;
-}
-
-.error-msg {
-  font-size: 10px;
   color: #ef4444;
   font-weight: 600;
   margin-top: 2px;
@@ -210,25 +283,22 @@ body {
 
 /* Settings Panel */
 .settings-panel {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 8px;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  animation: fadeIn 0.2s ease;
+  gap: 8px;
+  animation: fadeIn 0.15s ease;
 }
 
-.settings-panel.hidden,
-.hidden {
-  display: none !important;
-}
-
-.label {
+.settings-header {
   font-size: 11px;
-  font-weight: 600;
-  color: #d4d4d8;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .input-group {
@@ -236,33 +306,24 @@ body {
   gap: 6px;
 }
 
-.input {
-  flex: 1;
-  background: #09090b;
-  border: 1px solid #3f3f46;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: #ffffff;
-  outline: none;
-}
-
-.input:focus {
-  border-color: #f43f5e;
-}
-
-.hint {
-  font-size: 10px;
-  color: #71717a;
+.hidden {
+  display: none !important;
 }
 
 /* Status Bar */
 .status-bar {
   display: flex;
   align-items: center;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #a1a1aa;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 9999px;
+  padding: 3px 9px;
 }
 
 .status-dot {
@@ -270,37 +331,83 @@ body {
   height: 6px;
   border-radius: 50%;
   background-color: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
-.status-dot.offline {
-  background-color: #ef4444;
-  box-shadow: 0 0 8px #ef4444;
+.status-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #34d399;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-full {
+  width: 100%;
+}
+
+.btn-primary {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  background: #18181b;
+  border: 1px solid #27272a;
+  color: #d4d4d8;
+}
+
+.btn-secondary:hover {
+  background: #27272a;
+  color: #ffffff;
 }
 
 /* Action Card */
 .action-card {
-  background: linear-gradient(180deg, #18181b 0%, #121215 100%);
-  border: 1px solid #27272a;
-  border-radius: 12px;
-  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.action-info {
+.action-meta {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .count-badge {
-  background: #f43f5e;
-  color: #ffffff;
-  font-size: 12px;
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #f87171;
+  font-size: 11px;
   font-weight: 800;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 9999px;
 }
 
@@ -308,45 +415,6 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: #d4d4d8;
-}
-
-.btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 14px;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 12px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #e11d48, #be123c);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.35);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #f43f5e, #e11d48);
-  transform: translateY(-1px);
-}
-
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: #27272a;
-  color: #f4f4f5;
-}
-
-.btn-secondary:hover {
-  background: #3f3f46;
 }
 
 /* List Section */
@@ -359,10 +427,13 @@ body {
   max-height: 160px;
 }
 
-.list-header {
+.list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.section-title {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -377,6 +448,10 @@ body {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
 }
 
 .text-btn:hover {
@@ -389,15 +464,15 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-right: 4px;
+  padding-right: 2px;
 }
 
 .video-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #18181b;
-  border: 1px solid #27272a;
+  background: #141418;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
   padding: 8px 10px;
   gap: 8px;
@@ -412,7 +487,7 @@ body {
 .video-author {
   font-size: 11px;
   font-weight: 700;
-  color: #f43f5e;
+  color: #dc2626;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -428,15 +503,16 @@ body {
 }
 
 .btn-send-single {
-  background: #27272a;
+  background: #18181b;
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  padding: 4px 8px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 4px 9px;
   font-size: 10px;
   font-weight: 700;
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.15s ease;
 }
 
 .btn-send-single:hover {
@@ -445,39 +521,58 @@ body {
 
 .empty-state {
   text-align: center;
-  padding: 18px 10px;
-  color: #71717a;
+  padding: 16px 10px;
+  color: #52525b;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
-.empty-state p {
+.empty-svg {
+  width: 22px;
+  height: 22px;
+  color: #3f3f46;
+  margin-bottom: 2px;
+}
+
+.empty-title {
   font-size: 12px;
   font-weight: 600;
   color: #a1a1aa;
 }
 
-.empty-state span {
+.empty-desc {
   font-size: 10px;
+  color: #71717a;
 }
 
 /* Footer */
 .footer {
-  border-top: 1px solid #27272a;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 10px;
   text-align: center;
 }
 
 .studio-link {
-  color: #f43f5e;
+  color: #a1a1aa;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s ease;
 }
 
 .studio-link:hover {
-  text-decoration: underline;
+  color: #ffffff;
+}
+
+.link-svg {
+  width: 12px;
+  height: 12px;
+  color: #dc2626;
 }
 
 @keyframes fadeIn {
