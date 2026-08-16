@@ -1,10 +1,13 @@
-// Dark Clips Popup Logic (Production Connected)
+// Dark Clips Popup Logic (Grid Extraction & Smart Filters)
 document.addEventListener('DOMContentLoaded', async () => {
   const videoCountEl = document.getElementById('video-count');
+  const actionCountLabel = document.getElementById('action-count-label');
   const captureAllBtn = document.getElementById('capture-all-btn');
+  const captureBtnText = document.getElementById('capture-btn-text');
   const videosListEl = document.getElementById('videos-list');
   const refreshBtn = document.getElementById('refresh-btn');
   const statusText = document.getElementById('status-text');
+  const filterPills = document.querySelectorAll('.filter-pill');
 
   // Auth UI elements
   const userLoggedInView = document.getElementById('user-logged-in-view');
@@ -19,7 +22,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loginSubmitBtn = document.getElementById('login-submit-btn');
   const loginErrorMsg = document.getElementById('login-error-msg');
 
-  let detectedVideos = [];
+  let rawDetectedVideos = [];
+  let displayedVideos = [];
+  let currentFilter = 'all'; // 'all' | 'likes' | 'comments' | 'views' | 'top3'
   let currentUser = null;
   let currentToken = null;
 
@@ -112,8 +117,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 5. Scan current active tab
   async function scanCurrentTab() {
-    statusText.textContent = 'Escaneando página...';
-    videosListEl.innerHTML = '<div class="empty-state"><span>Procurando vídeos na aba atual...</span></div>';
+    statusText.textContent = 'Escaneando página & perfil...';
+    videosListEl.innerHTML = '<div class="empty-state"><span>Procurando posts e reels na página...</span></div>';
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -124,15 +129,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       chrome.tabs.sendMessage(tab.id, { action: 'GET_PAGE_VIDEOS' }, (response) => {
         if (chrome.runtime.lastError || !response || !response.videos) {
-          detectedVideos = [];
-          renderList();
+          rawDetectedVideos = [];
+          applyFilterAndRender();
           statusText.textContent = currentUser ? `Logado: ${currentUser.name}` : 'Pronto para minerar';
           return;
         }
 
-        detectedVideos = response.videos || [];
-        renderList();
-        statusText.textContent = `${detectedVideos.length} vídeo(s) detectado(s)`;
+        rawDetectedVideos = response.videos || [];
+        applyFilterAndRender();
+
+        const profileName = response.profile?.handle || response.profile?.name;
+        statusText.textContent = profileName && profileName !== '@instagram'
+          ? `${rawDetectedVideos.length} post(s) em ${profileName}`
+          : `${rawDetectedVideos.length} post(s) detectado(s)`;
       });
     } catch (err) {
       console.error(err);
@@ -140,28 +149,83 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function renderList() {
-    videoCountEl.textContent = detectedVideos.length;
-    captureAllBtn.disabled = detectedVideos.length === 0;
+  // 6. Filter & Sorting Logic
+  function applyFilterAndRender() {
+    let list = [...rawDetectedVideos];
 
-    if (detectedVideos.length === 0) {
+    if (currentFilter === 'likes') {
+      list.sort((a, b) => (b.metrics?.likes || 0) - (a.metrics?.likes || 0));
+    } else if (currentFilter === 'comments') {
+      list.sort((a, b) => (b.metrics?.comments || 0) - (a.metrics?.comments || 0));
+    } else if (currentFilter === 'views') {
+      list.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
+    } else if (currentFilter === 'top3') {
+      // Score: likes + (comments * 3) + views
+      list.sort((a, b) => {
+        const scoreA = (a.metrics?.likes || 0) + ((a.metrics?.comments || 0) * 3) + (a.metrics?.views || 0);
+        const scoreB = (b.metrics?.likes || 0) + ((b.metrics?.comments || 0) * 3) + (b.metrics?.views || 0);
+        return scoreB - scoreA;
+      });
+      list = list.slice(0, 3);
+    }
+
+    displayedVideos = list;
+    renderList();
+  }
+
+  function formatCount(n) {
+    if (!n || isNaN(n)) return '0';
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
+  }
+
+  function renderList() {
+    videoCountEl.textContent = displayedVideos.length;
+    actionCountLabel.textContent = currentFilter === 'top3'
+      ? 'top 3 posts virais selecionados'
+      : `${rawDetectedVideos.length} post(s) detectado(s)`;
+
+    captureAllBtn.disabled = displayedVideos.length === 0;
+    captureBtnText.textContent = currentFilter === 'top3'
+      ? 'Capturar Top 3 Virais ao DarkTube'
+      : `Capturar ${displayedVideos.length} Posts ao DarkTube`;
+
+    if (displayedVideos.length === 0) {
       videosListEl.innerHTML = `
         <div class="empty-state">
-          <p class="empty-title">Nenhum vídeo detectado</p>
-          <span class="empty-desc">Abra Instagram Reels, TikTok, Shorts ou X para minerar clipes.</span>
+          <p class="empty-title">Nenhum post detectado</p>
+          <span class="empty-desc">Abra qualquer perfil, feed ou reel no Instagram, TikTok, Shorts ou X.</span>
         </div>
       `;
       return;
     }
 
     videosListEl.innerHTML = '';
-    detectedVideos.forEach((video, idx) => {
+    displayedVideos.forEach((post, idx) => {
       const item = document.createElement('div');
       item.className = 'video-item';
+
+      const typeLabel = post.type === 'reel' ? 'Reel' : post.type === 'carousel' ? 'Carrossel' : 'Post';
+      const typeClass = post.type === 'reel' ? 'type-reel' : post.type === 'carousel' ? 'type-carousel' : '';
+
+      const likesCount = formatCount(post.metrics?.likes);
+      const commentsCount = formatCount(post.metrics?.comments);
+
       item.innerHTML = `
-        <div class="video-meta">
-          <span class="video-author">${video.authorHandle || video.authorName || 'Criador Viral'}</span>
-          <span class="video-caption">${video.originalCaption || video.url || 'Vídeo sem legenda'}</span>
+        <div class="video-item-left">
+          ${post.thumbnailUrl ? `<img src="${post.thumbnailUrl}" class="video-thumb" alt="Thumb" />` : '<div class="video-thumb"></div>'}
+          <div class="video-meta">
+            <div class="video-top-row">
+              <span class="video-author">${post.authorHandle || post.authorName || 'Criador'}</span>
+              <span class="type-pill ${typeClass}">${typeLabel}</span>
+            </div>
+            <span class="video-caption">${post.originalCaption || post.url}</span>
+            <div class="metrics-row">
+              <span class="metric-item">❤️ ${likesCount}</span>
+              <span class="metric-item">💬 ${commentsCount}</span>
+            </div>
+          </div>
         </div>
         <button class="btn-send-single" data-idx="${idx}">
           ⚡ Enviar
@@ -169,13 +233,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
 
       const sendBtn = item.querySelector('.btn-send-single');
-      sendBtn.addEventListener('click', () => sendItems([video], sendBtn));
+      sendBtn.addEventListener('click', () => sendItems([post], sendBtn));
 
       videosListEl.appendChild(item);
     });
   }
 
-  // 6. Send Items with User Token
+  // 7. Send Items with User Token
   async function sendItems(items, btnElement) {
     if (btnElement) {
       btnElement.disabled = true;
@@ -194,7 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          platform: items[0]?.platform || 'other',
+          platform: items[0]?.platform || 'instagram',
           items,
           userId: currentUser?.id || null
         })
@@ -208,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           btnElement.style.color = '#10b981';
           btnElement.style.borderColor = '#10b981';
         }
-        statusText.textContent = `✅ Enviado para a conta de ${currentUser ? currentUser.name : 'DarkTube'}!`;
+        statusText.textContent = `✅ ${items.length} post(s) enviado(s) ao DarkTube!`;
       } else {
         throw new Error(data.error || 'Falha ao importar');
       }
@@ -223,9 +287,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   captureAllBtn.addEventListener('click', () => {
-    if (detectedVideos.length > 0) {
-      sendItems(detectedVideos, captureAllBtn);
+    if (displayedVideos.length > 0) {
+      sendItems(displayedVideos, captureAllBtn);
     }
+  });
+
+  // Filter clicks
+  filterPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentFilter = pill.getAttribute('data-filter') || 'all';
+      applyFilterAndRender();
+    });
   });
 
   refreshBtn.addEventListener('click', scanCurrentTab);

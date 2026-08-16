@@ -76,25 +76,34 @@
       </div>
     </div>
 
+    <!-- Filter Tabs (Todos, Mais Curtidos, Mais Comentados, Mais Visualizados, Top 3) -->
+    <div class="filter-row">
+      <button class="filter-pill active" data-filter="all">Todos</button>
+      <button class="filter-pill" data-filter="likes">🔥 Curtidas</button>
+      <button class="filter-pill" data-filter="comments">💬 Comentários</button>
+      <button class="filter-pill" data-filter="views">👁️ Vistos</button>
+      <button class="filter-pill highlight-pill" data-filter="top3">⭐ Top 3 Virais</button>
+    </div>
+
     <!-- Bulk Action Card -->
     <div class="card action-card">
       <div class="action-meta">
         <span class="count-badge" id="video-count">0</span>
-        <span class="action-label">vídeos detectados nesta página</span>
+        <span class="action-label" id="action-count-label">posts detectados na página</span>
       </div>
       <button id="capture-all-btn" class="btn btn-primary btn-full" disabled>
         <svg class="btn-svg-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
           <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
         </svg>
-        Capturar & Enviar Todos ao DarkTube
+        <span id="capture-btn-text">Capturar Todos ao DarkTube</span>
       </button>
     </div>
 
     <!-- Videos List Section -->
     <div class="list-section">
       <div class="list-head">
-        <span class="section-title">Clipes na Página</span>
+        <span class="section-title">Feed / Galeria</span>
         <button id="refresh-btn" class="text-btn">
           <svg class="btn-svg-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
@@ -115,8 +124,8 @@
             <line x1="17" y1="17" x2="22" y2="17"/>
             <line x1="17" y1="7" x2="22" y2="7"/>
           </svg>
-          <p class="empty-title">Nenhum vídeo detectado</p>
-          <span class="empty-desc">Abra Instagram Reels, TikTok, Shorts ou X para minerar clipes.</span>
+          <p class="empty-title">Nenhum post detectado</p>
+          <span class="empty-desc">Abra qualquer perfil, feed ou reel no Instagram, TikTok, Shorts ou X.</span>
         </div>
       </div>
     </div>
