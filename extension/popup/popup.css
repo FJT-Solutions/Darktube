@@ -39,27 +39,53 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.brand-logo-img {
-  height: 26px;
-  width: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 0 12px rgba(255, 0, 0, 0.45));
+.logo-box {
+  width: 32px;
+  height: 32px;
+  background: #FF0000;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px rgba(255, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
 }
 
-.brand-sub-tag {
-  background: rgba(255, 0, 0, 0.15);
-  border: 1px solid rgba(255, 0, 0, 0.35);
-  color: #ff4d4d;
-  font-size: 9px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.08em;
+.logo-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #ffffff;
   text-transform: uppercase;
 }
+
+.highlight {
+  color: #FF0000;
+}
+
+.brand-badge {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #71717a;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
 
 
 .header-actions {
