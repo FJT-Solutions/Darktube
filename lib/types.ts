@@ -132,6 +132,7 @@ export interface DarkClip {
   video_url: string
   thumbnail_url?: string
   duration: number
+  title?: string
   author_name?: string
   author_handle?: string
   author_avatar?: string

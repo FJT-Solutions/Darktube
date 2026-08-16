@@ -535,13 +535,17 @@ export default function DarkClipsPage() {
   };
 
   async function handleRemodelWithAi() {
+    if (!selectedClip) {
+      toast.error("Selecione um clipe na biblioteca para gerar o gancho com IA.");
+      return;
+    }
     setRemodelingAi(true);
     try {
       const res = await fetch("/api/dark-clips/remodel-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          originalCaption: selectedClip?.original_caption || "",
+          originalCaption: selectedClip.original_caption || selectedClip.title || "",
           theme: aiThemePrompt,
           authorHandle: profileHeader.handle,
         }),
@@ -549,14 +553,16 @@ export default function DarkClipsPage() {
       const result = await res.json();
       if (result.success && result.data) {
         const { headline_main, headline_sub, cta_text, post_caption, hashtags } = result.data;
-        if (headline_main) setHeadline((h) => ({ ...h, mainText: headline_main, subText: headline_sub || "", showMainText: true, showSubText: !!headline_sub }));
-        if (cta_text) setFooter((f) => ({ ...f, text: cta_text, showFooter: true }));
+        if (headline_main) setHeadline((h) => ({ ...h, mainText: headline_main, subText: headline_sub || h.subText }));
+        if (cta_text && footer.showFooter) setFooter((f) => ({ ...f, text: cta_text }));
         if (post_caption) setPostCaption(post_caption);
         if (hashtags) setPostHashtags(hashtags);
-        toast.success("✨ Remodelagem com GPT aplicada ao Canvas!");
+        toast.success("✨ Gancho e textos virais gerados com IA!");
+      } else {
+        toast.error(result.error || "Erro ao gerar com IA.");
       }
     } catch {
-      toast.error("Erro ao remodelar com IA.");
+      toast.error("Erro ao comunicar com a IA.");
     } finally {
       setRemodelingAi(false);
     }
@@ -1028,23 +1034,11 @@ export default function DarkClipsPage() {
                 {/* 2. Título & Gancho Viral */}
                 <Card>
                   <CardHeader className="p-4 pb-3">
-                    <CardTitle className="text-sm font-bold flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <Type className="h-4 w-4 text-primary" /> Títulos, Textos & Gancho Viral
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={handleRemodelWithAi}
-                        disabled={remodelingAi}
-                        className="text-xs font-bold gap-1.5 h-7 text-primary border border-primary/20 bg-primary/10"
-                      >
-                        {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                        Remodelar com GPT
-                      </Button>
+                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <Type className="h-4 w-4 text-primary" /> Títulos, Textos & Gancho Viral
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Configure o texto principal (amarelo), texto secundário (branco), posicionamento e alinhamento independente.
+                      Configure as fontes, cores, maiúsculas, sombras e digite textos de exemplo para pré-visualizar o layout.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
@@ -1595,10 +1589,35 @@ export default function DarkClipsPage() {
                     </div>
                   </CardHeader>
 
+                  {/* Seletor de Vídeo de Exemplo Limpo para Teste de Layout */}
+                  <div className="p-3 bg-secondary/20 border-b border-border/40 space-y-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <Film className="h-3.5 w-3.5 text-primary" /> Vídeo de Exemplo (Teste do Layout):
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { url: "/sample-oceans.mp4", label: "🌊 Oceano HD" },
+                        { url: "/sample-viral-clip.mp4", label: "🎬 Animação" },
+                        { url: "/sample-nature.mp4", label: "🌿 Natureza" },
+                      ].map((s) => (
+                        <Button
+                          key={s.url}
+                          type="button"
+                          size="sm"
+                          variant={sampleVideoUrl === s.url ? "default" : "outline"}
+                          onClick={() => setSampleVideoUrl(s.url)}
+                          className="text-xs h-8 font-bold"
+                        >
+                          {s.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
                   <CardContent className="p-4 flex flex-col items-center justify-center bg-black/40">
                     <DarkClipsPreviewPlayer
-                      videoUrl={selectedClip?.video_url || sampleVideoUrl}
-                      durationInSeconds={selectedClip?.duration || 15}
+                      videoUrl={sampleVideoUrl}
+                      durationInSeconds={15}
                       profileHeader={profileHeader}
                       headline={headline}
                       videoPlacement={videoPlacement}
@@ -1872,42 +1891,76 @@ export default function DarkClipsPage() {
 
                     <CardContent className="p-4 space-y-6">
                       
-                      {/* Remodelagem com IA */}
+                      {/* Remodelagem com IA baseada no vídeo selecionado */}
                       <div className="p-3.5 rounded-xl bg-secondary/20 border border-border/50 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs font-bold flex items-center gap-1.5">
-                            <Wand2 className="h-3.5 w-3.5 text-primary" /> Remodelagem Viral com GPT-4o
-                          </Label>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <Label className="text-xs font-bold flex items-center gap-1.5 text-primary">
+                              <Wand2 className="h-3.5 w-3.5" /> Geração de Textos & Gancho Viral com IA (GPT-4o)
+                            </Label>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              A IA analisa a legenda e contexto do clipe ({selectedClip.platform ? `@${selectedClip.author_handle || selectedClip.author_name}` : "Minerado"}) para criar ganchos de alta retenção.
+                            </p>
+                          </div>
                           <Button
                             size="sm"
-                            variant="secondary"
+                            variant="default"
                             onClick={handleRemodelWithAi}
                             disabled={remodelingAi}
-                            className="text-xs font-bold gap-1.5 h-7 text-primary border border-primary/20 bg-primary/10"
+                            className="text-xs font-bold gap-1.5 h-7.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                           >
-                            {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                            Gerar Novo Gancho
+                            {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                            {remodelingAi ? "Gerando com IA..." : "Gerar com IA ✨"}
                           </Button>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-[11px] font-semibold">Tema / Tom Desejado (Opcional)</Label>
-                            <Input
-                              placeholder="Ex: Humor brasileiro, sarcasmo, motivação..."
-                              value={aiThemePrompt}
-                              onChange={(e) => setAiThemePrompt(e.target.value)}
-                              className="h-8 text-xs mt-1"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-[11px] font-semibold">Gancho Atual Gerado</Label>
-                            <Input
-                              value={headline.mainText}
-                              onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
-                              className="h-8 text-xs font-bold mt-1"
-                            />
-                          </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] font-semibold">Tema / Direcionamento do Gancho (Opcional)</Label>
+                          <Input
+                            placeholder="Ex: Humor brasileiro, sarcasmo, reflexão profunda, mistério..."
+                            value={aiThemePrompt}
+                            onChange={(e) => setAiThemePrompt(e.target.value)}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+
+                        {/* Campos de Textos Ativos no Layout */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          {headline.showMainText && (
+                            <div>
+                              <Label className="text-[11px] font-semibold text-yellow-400">Texto Primário / Gancho</Label>
+                              <Input
+                                value={headline.mainText}
+                                onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
+                                placeholder="Gancho principal gerado..."
+                                className="h-8 text-xs font-bold mt-1"
+                              />
+                            </div>
+                          )}
+
+                          {headline.showSubText && (
+                            <div>
+                              <Label className="text-[11px] font-semibold">Texto Secundário / Contexto</Label>
+                              <Input
+                                value={headline.subText}
+                                onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
+                                placeholder="Texto secundário ou contexto..."
+                                className="h-8 text-xs mt-1"
+                              />
+                            </div>
+                          )}
+
+                          {footer.showFooter && (
+                            <div className="sm:col-span-2">
+                              <Label className="text-[11px] font-semibold text-emerald-400">Texto do Rodapé / CTA</Label>
+                              <Input
+                                value={footer.text}
+                                onChange={(e) => setFooter((f) => ({ ...f, text: e.target.value }))}
+                                placeholder="Ex: Siga para mais vídeos diários!"
+                                className="h-8 text-xs mt-1"
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
 
