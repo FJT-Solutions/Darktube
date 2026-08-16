@@ -157,33 +157,91 @@ export interface DarkClipPreset {
     badge_type?: 'none' | 'blue' | 'gold' | 'gray'
     show_header?: boolean
     padding_top?: number
+    scale?: number
+    avatar_size?: number
+    avatarSize?: number
+    font_size?: number
+    fontSize?: number
+    paddingTop?: number
+    textAlign?: 'left' | 'center' | 'right'
+    text_align?: 'left' | 'center' | 'right'
+    badgeType?: 'none' | 'blue' | 'gold' | 'gray'
+    avatarUrl?: string
+    showHeader?: boolean
   }
   headline_style: {
     font_family?: string
     font_size?: number
+    fontSize?: number
     primary_color?: string
+    primaryColor?: string
     secondary_color?: string
+    secondaryColor?: string
     text_align?: 'left' | 'center' | 'right'
+    textAlign?: 'left' | 'center' | 'right'
     uppercase?: boolean
+    main_text_uppercase?: boolean
+    mainTextUppercase?: boolean
+    sub_text_uppercase?: boolean
+    subTextUppercase?: boolean
     text_shadow?: boolean
+    textShadow?: boolean
+    main_text_y_offset?: number
+    mainTextYOffset?: number
+    sub_text_y_offset?: number
+    subTextYOffset?: number
+    main_text_align?: 'left' | 'center' | 'right'
+    mainTextAlign?: 'left' | 'center' | 'right'
+    sub_text_align?: 'left' | 'center' | 'right'
+    subTextAlign?: 'left' | 'center' | 'right'
+    show_main_text?: boolean
+    showMainText?: boolean
+    show_sub_text?: boolean
+    showSubText?: boolean
+    mainText?: string
+    subText?: string
   }
   video_placement: {
     y_offset?: number // percentage 0 - 100
+    yOffset?: number
     scale?: number // percentage 50 - 100
     border_radius?: number // px 0 - 50
+    borderRadius?: number
     has_shadow?: boolean
+    hasShadow?: boolean
     aspect_ratio?: string // 'auto' | '16:9' | '4:3' | '1:1'
   }
   background_style: {
-    type?: 'black' | 'blur' | 'gradient' | 'color'
+    type?: 'black' | 'blur' | 'gradient' | 'color' | 'white' | 'neon' | 'zinc'
     blur_intensity?: number // 5 - 50
     overlay_opacity?: number // 0 - 90
     custom_color?: string
   }
+  watermark_style?: {
+    enabled?: boolean
+    type?: 'text' | 'image'
+    text?: string
+    imageUrl?: string
+    image_url?: string
+    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom'
+    xOffset?: number
+    x_offset?: number
+    yOffset?: number
+    y_offset?: number
+    opacity?: number
+    fontSize?: number
+    font_size?: number
+    scale?: number
+    color?: string
+    hasShadow?: boolean
+    has_shadow?: boolean
+  }
   footer_style: {
     show_footer?: boolean
+    showFooter?: boolean
     text?: string
     font_size?: number
+    fontSize?: number
     color?: string
   }
   is_default?: boolean

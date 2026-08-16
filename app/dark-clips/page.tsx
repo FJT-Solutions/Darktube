@@ -32,7 +32,11 @@ import {
   Film,
   Plus,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  BookmarkCheck,
+  CheckCircle2,
+  ArrowRight,
+  FolderPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,13 +48,31 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DarkClipsPreviewPlayer } from "@/components/dark-clips-player";
 import { DarkClip, DarkClipPreset, DarkClipPost, BlotatoAccount } from "@/lib/types";
 import { getBlotatoAccountsAction } from "@/app/actions";
 import { toast } from "sonner";
 
 export default function DarkClipsPage() {
-  const [activeTab, setActiveTab] = useState<"clips" | "modeler" | "schedule">("modeler");
+  // Main Tab Navigation: "modeler" (🎨 Layout & Templates) | "creation" (🎬 Criação & Clipes)
+  const [activeTab, setActiveTab] = useState<"modeler" | "creation">("modeler");
+  
+  // Data States
   const [clips, setClips] = useState<DarkClip[]>([]);
   const [selectedClip, setSelectedClip] = useState<DarkClip | null>(null);
   const [presets, setPresets] = useState<DarkClipPreset[]>([]);
@@ -58,6 +80,12 @@ export default function DarkClipsPage() {
   const [scheduledPosts, setScheduledPosts] = useState<DarkClipPost[]>([]);
   const [blotatoAccounts, setBlotatoAccounts] = useState<BlotatoAccount[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Preset Save Dialog State
+  const [isSaveLayoutDialogOpen, setIsSaveLayoutDialogOpen] = useState(false);
+  const [layoutNameInput, setLayoutNameInput] = useState("");
+  const [isDefaultLayoutInput, setIsDefaultLayoutInput] = useState(false);
+  const [savingPreset, setSavingPreset] = useState(false);
 
   // Manual URLs Input
   const [urlInput, setUrlInput] = useState("");
@@ -177,7 +205,8 @@ export default function DarkClipsPage() {
       if (presetsRes.success && presetsRes.presets) {
         setPresets(presetsRes.presets);
         if (presetsRes.presets.length > 0) {
-          loadPresetIntoModeler(presetsRes.presets[0]);
+          const defaultPreset = presetsRes.presets.find((p: DarkClipPreset) => p.is_default) || presetsRes.presets[0];
+          loadPresetIntoModeler(defaultPreset);
         }
       }
 
@@ -198,39 +227,192 @@ export default function DarkClipsPage() {
 
   function loadPresetIntoModeler(preset: DarkClipPreset) {
     setActivePreset(preset);
-    if (preset.profile_header) setProfileHeader((p) => ({ ...p, ...preset.profile_header }));
-    if (preset.headline_style) setHeadline((h) => ({ ...h, ...preset.headline_style }));
-    if (preset.video_placement) setVideoPlacement((v) => ({ ...v, ...preset.video_placement }));
-    if (preset.background_style) setBackground((b) => ({ ...b, ...preset.background_style }));
-    if (preset.footer_style) setFooter((f) => ({ ...f, ...preset.footer_style }));
-    toast.success(`Preset "${preset.name}" aplicado!`);
+    if (preset.profile_header) {
+      setProfileHeader((p) => ({
+        ...p,
+        showHeader: preset.profile_header.show_header ?? preset.profile_header.showHeader ?? p.showHeader,
+        name: preset.profile_header.name ?? p.name,
+        handle: preset.profile_header.handle ?? p.handle,
+        avatarUrl: preset.profile_header.avatar_url ?? preset.profile_header.avatarUrl ?? p.avatarUrl,
+        paddingTop: preset.profile_header.padding_top ?? preset.profile_header.paddingTop ?? p.paddingTop,
+        scale: preset.profile_header.scale ?? p.scale,
+        avatarSize: preset.profile_header.avatar_size ?? preset.profile_header.avatarSize ?? p.avatarSize,
+        fontSize: preset.profile_header.font_size ?? preset.profile_header.fontSize ?? p.fontSize,
+        textAlign: (preset.profile_header.textAlign || preset.profile_header.text_align || p.textAlign) as any,
+        badgeType: (preset.profile_header.badge_type || preset.profile_header.badgeType || p.badgeType) as any,
+      }));
+    }
+    if (preset.headline_style) {
+      setHeadline((h) => ({
+        ...h,
+        fontSize: preset.headline_style.font_size ?? preset.headline_style.fontSize ?? h.fontSize,
+        primaryColor: preset.headline_style.primary_color ?? preset.headline_style.primaryColor ?? h.primaryColor,
+        secondaryColor: preset.headline_style.secondary_color ?? preset.headline_style.secondaryColor ?? h.secondaryColor,
+        textAlign: (preset.headline_style.textAlign || preset.headline_style.text_align || h.textAlign) as any,
+        mainTextAlign: (preset.headline_style.mainTextAlign || preset.headline_style.main_text_align || h.mainTextAlign) as any,
+        subTextAlign: (preset.headline_style.subTextAlign || preset.headline_style.sub_text_align || h.subTextAlign) as any,
+        uppercase: preset.headline_style.uppercase ?? h.uppercase,
+        mainTextUppercase: preset.headline_style.mainTextUppercase ?? preset.headline_style.main_text_uppercase ?? h.mainTextUppercase,
+        subTextUppercase: preset.headline_style.subTextUppercase ?? preset.headline_style.sub_text_uppercase ?? h.subTextUppercase,
+        textShadow: preset.headline_style.textShadow ?? preset.headline_style.text_shadow ?? h.textShadow,
+        mainTextYOffset: preset.headline_style.mainTextYOffset ?? preset.headline_style.main_text_y_offset ?? h.mainTextYOffset,
+        subTextYOffset: preset.headline_style.subTextYOffset ?? preset.headline_style.sub_text_y_offset ?? h.subTextYOffset,
+        showMainText: preset.headline_style.showMainText ?? preset.headline_style.show_main_text ?? h.showMainText,
+        showSubText: preset.headline_style.showSubText ?? preset.headline_style.show_sub_text ?? h.showSubText,
+      }));
+    }
+    if (preset.video_placement) {
+      setVideoPlacement((v) => ({
+        ...v,
+        yOffset: preset.video_placement.y_offset ?? preset.video_placement.yOffset ?? v.yOffset,
+        scale: preset.video_placement.scale ?? v.scale,
+        borderRadius: preset.video_placement.border_radius ?? preset.video_placement.borderRadius ?? v.borderRadius,
+        hasShadow: preset.video_placement.has_shadow ?? preset.video_placement.hasShadow ?? v.hasShadow,
+      }));
+    }
+    if (preset.background_style) {
+      setBackground((b) => ({
+        ...b,
+        type: (preset.background_style.type || b.type) as any,
+        blurIntensity: preset.background_style.blur_intensity ?? b.blurIntensity,
+        overlayOpacity: preset.background_style.overlay_opacity ?? b.overlayOpacity,
+        customColor: preset.background_style.custom_color ?? b.customColor,
+      }));
+    }
+    if (preset.watermark_style) {
+      setWatermark((w) => ({
+        ...w,
+        enabled: preset.watermark_style?.enabled ?? w.enabled,
+        type: (preset.watermark_style?.type || w.type) as any,
+        text: preset.watermark_style?.text ?? w.text,
+        imageUrl: preset.watermark_style?.imageUrl ?? preset.watermark_style?.image_url ?? w.imageUrl,
+        position: (preset.watermark_style?.position || w.position) as any,
+        xOffset: preset.watermark_style?.xOffset ?? preset.watermark_style?.x_offset ?? w.xOffset,
+        yOffset: preset.watermark_style?.yOffset ?? preset.watermark_style?.y_offset ?? w.yOffset,
+        opacity: preset.watermark_style?.opacity ?? w.opacity,
+        scale: preset.watermark_style?.scale ?? w.scale,
+        color: preset.watermark_style?.color ?? w.color,
+        hasShadow: preset.watermark_style?.hasShadow ?? preset.watermark_style?.has_shadow ?? w.hasShadow,
+      }));
+    }
+    if (preset.footer_style) {
+      setFooter((f) => ({
+        ...f,
+        showFooter: preset.footer_style.show_footer ?? preset.footer_style.showFooter ?? f.showFooter,
+        text: preset.footer_style.text ?? f.text,
+        fontSize: preset.footer_style.font_size ?? preset.footer_style.fontSize ?? f.fontSize,
+        color: preset.footer_style.color ?? f.color,
+      }));
+    }
+    toast.success(`Layout "${preset.name}" carregado!`);
   }
 
-  async function handleSavePreset() {
-    const name = prompt("Nome para este preset de layout:", activePreset?.name || "Meu Layout Viral");
-    if (!name) return;
+  // Quick save current active preset
+  async function handleQuickSavePreset(showToastNotification = true) {
+    if (!activePreset?.id) {
+      // If no active preset, open modal to name it
+      setLayoutNameInput("Meu Layout 9:16");
+      setIsSaveLayoutDialogOpen(true);
+      return;
+    }
 
+    setSavingPreset(true);
     try {
       const res = await fetch("/api/dark-clips/presets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
+          id: activePreset.id,
+          name: activePreset.name,
           profile_header: profileHeader,
           headline_style: headline,
           video_placement: videoPlacement,
           background_style: background,
+          watermark_style: watermark,
           footer_style: footer,
+          is_default: activePreset.is_default,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("Preset salvo com sucesso!");
+        if (showToastNotification) {
+          toast.success(`Layout "${activePreset.name}" salvo com sucesso! 💾`);
+        }
+        fetchInitialData();
+        return true;
+      } else {
+        toast.error("Erro ao salvar layout.");
+        return false;
+      }
+    } catch {
+      toast.error("Erro ao comunicar com o servidor.");
+      return false;
+    } finally {
+      setSavingPreset(false);
+    }
+  }
+
+  // Save preset with custom name (New or Duplicate)
+  async function handleSavePresetSubmit(customName: string, isDefault = false) {
+    if (!customName.trim()) {
+      toast.error("Digite um nome para o layout.");
+      return;
+    }
+
+    setSavingPreset(true);
+    try {
+      const res = await fetch("/api/dark-clips/presets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: customName.trim(),
+          profile_header: profileHeader,
+          headline_style: headline,
+          video_placement: videoPlacement,
+          background_style: background,
+          watermark_style: watermark,
+          footer_style: footer,
+          is_default: isDefault,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Layout "${customName}" salvo com sucesso! 💾`);
+        if (data.preset) {
+          setActivePreset(data.preset);
+        }
+        setIsSaveLayoutDialogOpen(false);
+        fetchInitialData();
+      } else {
+        toast.error(data.error || "Erro ao salvar layout.");
+      }
+    } catch {
+      toast.error("Erro ao salvar layout.");
+    } finally {
+      setSavingPreset(false);
+    }
+  }
+
+  // Delete preset
+  async function handleDeletePreset(presetId: string) {
+    if (!confirm("Deseja realmente excluir este layout?")) return;
+    try {
+      const res = await fetch(`/api/dark-clips/presets?id=${presetId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Layout excluído.");
         fetchInitialData();
       }
     } catch {
-      toast.error("Erro ao salvar preset.");
+      toast.error("Erro ao excluir layout.");
     }
+  }
+
+  // Proceed from Modeler to Creation Tab
+  async function handleProceedToCreation() {
+    await handleQuickSavePreset(false);
+    setActiveTab("creation");
+    toast.success("Layout ativo aplicado! Avançando para a Criação de Clipes 🎬");
   }
 
   async function handleImportUrls() {
@@ -503,15 +685,18 @@ export default function DarkClipsPage() {
                 Baixar Extensão (.ZIP)
               </Button>
             </a>
+            
             <Button
               variant="outline"
               size="sm"
-              onClick={handleSavePreset}
-              className="border-border hover:bg-secondary/40 text-xs gap-1.5 h-9"
+              onClick={() => handleQuickSavePreset()}
+              disabled={savingPreset}
+              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs gap-1.5 h-9 font-bold"
             >
-              <Layers className="h-3.5 w-3.5" />
-              Salvar Layout
+              {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              Salvar Layout 💾
             </Button>
+
             <Button
               size="sm"
               onClick={handleRender}
@@ -525,27 +710,106 @@ export default function DarkClipsPage() {
 
         </div>
 
-        {/* ── Main Tab Navigation ── */}
+        {/* ── Main Tab Navigation: Layouts vs Criação ── */}
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-6">
-          <TabsList className="bg-secondary/20 p-1 border border-border/50 rounded-xl grid grid-cols-3 max-w-md">
+          <TabsList className="bg-secondary/20 p-1 border border-border/50 rounded-xl grid grid-cols-2 max-w-md">
             <TabsTrigger value="modeler" className="gap-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">
               <Sliders className="h-3.5 w-3.5" />
-              Modelador 9:16
+              🎨 Layout & Templates 9:16
             </TabsTrigger>
-            <TabsTrigger value="clips" className="gap-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">
+            <TabsTrigger value="creation" className="gap-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">
               <Video className="h-3.5 w-3.5" />
-              Clipes ({clips.length})
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">
-              <Calendar className="h-3.5 w-3.5" />
-              Agendamento ({scheduledPosts.length})
+              🎬 Criação & Clipes ({clips.length})
             </TabsTrigger>
           </TabsList>
 
           {/* ══════════════════════════════════════════════════════════
-              TAB 1: MODELADOR VISUAL 9:16 (CANVAS & REALTIME PREVIEW)
+              ABA 1: MODELADOR VISUAL DE LAYOUT & TEMPLATES 9:16
           ══════════════════════════════════════════════════════════ */}
           <TabsContent value="modeler" className="space-y-6">
+            
+            {/* Top Toolbar: Layout Selector & Quick Management */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-card border border-border/60 shadow-sm">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-bold text-foreground">Modelo de Layout Ativo:</span>
+                </div>
+                
+                <div className="w-[200px] sm:w-[260px]">
+                  <Select
+                    value={activePreset?.id || ""}
+                    onValueChange={(val) => {
+                      const found = presets.find((p) => p.id === val);
+                      if (found) loadPresetIntoModeler(found);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs font-semibold">
+                      <SelectValue placeholder="Selecione um layout..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {presets.map((p) => (
+                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                          {p.name} {p.is_default ? "🌟 (Padrão)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLayoutNameInput(`Novo Layout ${presets.length + 1}`);
+                    setIsDefaultLayoutInput(false);
+                    setIsSaveLayoutDialogOpen(true);
+                  }}
+                  className="h-8 text-xs font-semibold gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Novo Layout
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => handleQuickSavePreset()}
+                  disabled={savingPreset}
+                  className="h-8 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                >
+                  {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Salvar Layout 💾
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setLayoutNameInput(activePreset?.name ? `${activePreset.name} (Cópia)` : "Meu Layout 9:16");
+                    setIsDefaultLayoutInput(false);
+                    setIsSaveLayoutDialogOpen(true);
+                  }}
+                  className="h-8 text-xs font-semibold gap-1"
+                >
+                  <Copy className="h-3.5 w-3.5" /> Salvar Como...
+                </Button>
+
+                {activePreset && !activePreset.is_default && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeletePreset(activePreset.id)}
+                    className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/20"
+                    title="Excluir este preset"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
               {/* ── Left Column: Granular Controls (7 cols) ── */}
@@ -557,7 +821,7 @@ export default function DarkClipsPage() {
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Users className="h-4 w-4 text-primary" /> Cabeçalho do Perfil (Autor / Sua Página)
                       </CardTitle>
-                      <CardDescription className="text-xs">Personalize a foto, arroba, tamanho e selo verificado.</CardDescription>
+                      <CardDescription className="text-xs">Personalize a foto, arroba, escala, alinhamento e selo verificado.</CardDescription>
                     </div>
                     <Switch
                       checked={profileHeader.showHeader}
@@ -599,366 +863,388 @@ export default function DarkClipsPage() {
                             className="relative group cursor-pointer w-12 h-12 rounded-full overflow-hidden border-2 border-primary/40 bg-zinc-900 shrink-0 shadow-md"
                             title="Clique para enviar foto de perfil"
                           >
-                            {profileHeader.avatarUrl ? (
-                              <img src={profileHeader.avatarUrl} alt="Foto de perfil" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white">
-                                {profileHeader.name.charAt(0)}
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <img 
+                              src={profileHeader.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"} 
+                              alt="Avatar" 
+                              className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" 
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                               <Upload className="h-4 w-4 text-white" />
                             </div>
                           </div>
 
-                          {/* Action Buttons */}
-                          <div className="flex-1 flex flex-wrap gap-2">
-                            <input
-                              type="file"
-                              ref={avatarFileInputRef}
-                              onChange={handleAvatarFileUpload}
-                              className="hidden"
-                              accept="image/*"
+                          {/* Quick Action Buttons */}
+                          <div className="flex flex-wrap gap-2">
+                            <input 
+                              type="file" 
+                              ref={avatarFileInputRef} 
+                              onChange={handleAvatarFileUpload} 
+                              accept="image/*" 
+                              className="hidden" 
                             />
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
                               onClick={() => avatarFileInputRef.current?.click()}
-                              className="h-9 text-xs gap-1.5 flex-1"
+                              className="h-8 text-xs gap-1.5"
                             >
-                              <Upload className="h-3.5 w-3.5" /> Enviar Foto
+                              <Upload className="h-3.5 w-3.5 text-primary" /> Carregar Foto
                             </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="secondary"
                               onClick={handlePasteAvatarFromClipboard}
-                              className="h-9 text-xs gap-1.5 flex-1"
+                              className="h-8 text-xs gap-1.5"
                             >
-                              <Copy className="h-3.5 w-3.5" /> Colar Imagem
+                              <Copy className="h-3.5 w-3.5 text-emerald-400" /> Colar Imagem
                             </Button>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Dimensionamento e Escala do Cabeçalho */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 rounded-xl bg-secondary/10 border border-border/40">
+                        {/* Direct URL input fallback */}
                         <div>
-                          <Label className="text-[11px] font-semibold block">
-                            Escala Geral ({profileHeader.scale ?? 100}%)
-                          </Label>
-                          <Slider
-                            value={[profileHeader.scale ?? 100]}
-                            min={50}
-                            max={180}
-                            step={5}
-                            onValueChange={([v]) => setProfileHeader((p) => ({ ...p, scale: v }))}
-                            className="mt-2"
+                          <Input
+                            placeholder="Ou cole a URL direta da imagem (https://...)"
+                            value={profileHeader.avatarUrl}
+                            onChange={(e) => setProfileHeader((p) => ({ ...p, avatarUrl: e.target.value }))}
+                            className="h-7 text-[11px] text-muted-foreground font-mono"
                           />
                         </div>
-                        <div>
-                          <Label className="text-[11px] font-semibold block">
-                            Tamanho Avatar ({profileHeader.avatarSize ?? 76}px)
-                          </Label>
+                      </div>
+
+                      {/* Sliders de Escala, Foto e Fonte */}
+                      <div className="p-3 rounded-xl bg-secondary/10 border border-border/40 space-y-3.5">
+                        {/* Escala Geral */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold flex items-center gap-1.5">
+                              <Maximize2 className="h-3.5 w-3.5 text-primary" /> Escala Geral do Cabeçalho
+                            </span>
+                            <span className="font-mono text-primary">{profileHeader.scale || 100}%</span>
+                          </div>
                           <Slider
-                            value={[profileHeader.avatarSize ?? 76]}
+                            value={[profileHeader.scale || 100]}
+                            min={50}
+                            max={180}
+                            step={1}
+                            onValueChange={([scale]) => setProfileHeader((p) => ({ ...p, scale }))}
+                          />
+                        </div>
+
+                        {/* Tamanho da Foto de Perfil */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold flex items-center gap-1.5">
+                              <ImageIcon className="h-3.5 w-3.5 text-emerald-400" /> Tamanho do Avatar
+                            </span>
+                            <span className="font-mono text-emerald-400">{profileHeader.avatarSize || 76}px</span>
+                          </div>
+                          <Slider
+                            value={[profileHeader.avatarSize || 76]}
                             min={40}
                             max={140}
                             step={2}
-                            onValueChange={([v]) => setProfileHeader((p) => ({ ...p, avatarSize: v }))}
-                            className="mt-2"
+                            onValueChange={([avatarSize]) => setProfileHeader((p) => ({ ...p, avatarSize }))}
                           />
                         </div>
-                        <div>
-                          <Label className="text-[11px] font-semibold block">
-                            Fonte do Nome ({profileHeader.fontSize ?? 32}px)
-                          </Label>
+
+                        {/* Tamanho da Fonte do Nome/@ */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold flex items-center gap-1.5">
+                              <Type className="h-3.5 w-3.5 text-yellow-400" /> Tamanho da Tipografia
+                            </span>
+                            <span className="font-mono text-yellow-400">{profileHeader.fontSize || 32}px</span>
+                          </div>
                           <Slider
-                            value={[profileHeader.fontSize ?? 32]}
+                            value={[profileHeader.fontSize || 32]}
                             min={18}
                             max={52}
                             step={1}
-                            onValueChange={([v]) => setProfileHeader((p) => ({ ...p, fontSize: v }))}
-                            className="mt-2"
+                            onValueChange={([fontSize]) => setProfileHeader((p) => ({ ...p, fontSize }))}
                           />
                         </div>
                       </div>
 
-                      {/* Posição Vertical do Cabeçalho */}
-                      <div className="pt-1">
-                        <Label className="text-[11px] font-medium text-muted-foreground">
-                          Posição Vertical do Topo ({profileHeader.paddingTop ?? 90}px)
-                        </Label>
-                        <Slider
-                          value={[profileHeader.paddingTop ?? 90]}
-                          min={0}
-                          max={600}
-                          step={5}
-                          onValueChange={([v]) => setProfileHeader((p) => ({ ...p, paddingTop: v }))}
-                          className="mt-2"
-                        />
-                      </div>
-
-                      {/* Alinhamento e Selo de Verificado */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {/* Selo & Alinhamento */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <Label className="text-xs font-semibold">Alinhamento do Cabeçalho</Label>
-                          <div className="flex gap-1 mt-1.5">
-                            {(["left", "center", "right"] as const).map((a) => (
+                          <Label className="text-xs font-semibold">Selo Verificado</Label>
+                          <div className="flex gap-2 mt-1">
+                            {(["none", "blue"] as const).map((type) => (
                               <Button
-                                key={a}
+                                key={type}
                                 type="button"
                                 size="sm"
-                                variant={(profileHeader.textAlign || "left") === a ? "default" : "outline"}
-                                onClick={() => setProfileHeader((p) => ({ ...p, textAlign: a }))}
-                                className="h-8 text-xs flex-1 capitalize"
+                                variant={profileHeader.badgeType === type ? "default" : "outline"}
+                                onClick={() => setProfileHeader((p) => ({ ...p, badgeType: type }))}
+                                className="flex-1 text-xs h-8"
                               >
-                                {a === "left" ? "Esquerda" : a === "center" ? "Centro" : "Direita"}
+                                {type === "none" ? "Nenhum" : "Azul ✓"}
                               </Button>
                             ))}
                           </div>
                         </div>
 
                         <div>
-                          <Label className="text-xs font-semibold">Selo de Verificado (Azul)</Label>
-                          <div className="flex items-center justify-between mt-1.5 px-3 py-1.5 rounded-md border border-input bg-secondary/15 h-8">
-                            <div className="flex items-center gap-1.5">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                <path
-                                  d="M9 12L11 14L15 10M12 3L14.5 4.5L17.5 4.5L18.5 7.5L21 9L20.5 12L21 15L18.5 16.5L17.5 19.5L14.5 19.5L12 21L9.5 19.5L6.5 19.5L5.5 16.5L3 15L3.5 12L3 9L5.5 7.5L6.5 4.5L9.5 4.5L12 3Z"
-                                  fill="#38BDF8"
-                                  stroke="#0284C7"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                              <span className="text-[11px] font-medium">
-                                {profileHeader.badgeType === "blue" ? "Ativado" : "Desativado"}
-                              </span>
-                            </div>
-                            <Switch
-                              checked={profileHeader.badgeType === "blue"}
-                              onCheckedChange={(checked) =>
-                                setProfileHeader((p) => ({ ...p, badgeType: checked ? "blue" : "none" }))
-                              }
-                            />
+                          <Label className="text-xs font-semibold">Alinhamento do Cabeçalho</Label>
+                          <div className="flex gap-2 mt-1">
+                            {(["left", "center", "right"] as const).map((align) => (
+                              <Button
+                                key={align}
+                                type="button"
+                                size="sm"
+                                variant={profileHeader.textAlign === align ? "default" : "outline"}
+                                onClick={() => setProfileHeader((p) => ({ ...p, textAlign: align }))}
+                                className="flex-1 text-xs h-8 capitalize"
+                              >
+                                {align === "left" ? "Esquerda" : align === "center" ? "Centro" : "Direita"}
+                              </Button>
+                            ))}
                           </div>
                         </div>
+                      </div>
+
+                      {/* Espaçamento Superior (Padding) */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold">Posição Vertical do Topo</span>
+                          <span className="font-mono text-primary">{profileHeader.paddingTop}px</span>
+                        </div>
+                        <Slider
+                          value={[profileHeader.paddingTop]}
+                          min={20}
+                          max={260}
+                          step={2}
+                          onValueChange={([paddingTop]) => setProfileHeader((p) => ({ ...p, paddingTop }))}
+                        />
                       </div>
                     </CardContent>
                   )}
                 </Card>
 
-                {/* 2. Título & Textos do Vídeo */}
+                {/* 2. Título & Gancho Viral */}
                 <Card>
-                  <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Type className="h-4 w-4 text-primary" /> Título & Textos do Vídeo
-                      </CardTitle>
-                      <CardDescription className="text-xs">Edite o texto principal e subtítulo com maiúsculas individuais.</CardDescription>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={handleRemodelWithAi}
-                      disabled={remodelingAi}
-                      className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-7 shadow-sm shadow-red-600/30"
-                    >
-                      {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                      {remodelingAi ? "Gerando..." : "Gerar com IA"}
-                    </Button>
+                  <CardHeader className="p-4 pb-3">
+                    <CardTitle className="text-sm font-bold flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Type className="h-4 w-4 text-primary" /> Títulos, Textos & Gancho Viral
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleRemodelWithAi}
+                        disabled={remodelingAi}
+                        className="text-xs font-bold gap-1.5 h-7 text-primary border border-primary/20 bg-primary/10"
+                      >
+                        {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                        Remodelar com GPT
+                      </Button>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Configure o texto principal (amarelo), texto secundário (branco), posicionamento e alinhamento independente.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
-                    {/* Texto Principal */}
-                    <div className="p-3 rounded-xl bg-secondary/10 border border-border/50 space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
+                    {/* Texto Primário */}
+                    <div className="p-3 rounded-xl bg-secondary/15 border border-border/50 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-yellow-400 flex items-center gap-1.5">
+                          <span>Texto Primário (Destaque)</span>
+                        </Label>
                         <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">Exibir</span>
                           <Switch
                             checked={headline.showMainText}
                             onCheckedChange={(v) => setHeadline((h) => ({ ...h, showMainText: v }))}
                           />
-                          <Label className="text-xs font-semibold">Texto Principal (Título / Gancho)</Label>
                         </div>
-                        {headline.showMainText && (
-                          <div className="flex items-center gap-2">
-                            {/* Toggle Individual Caixa Alta */}
-                            <div className="flex items-center gap-1.5 bg-secondary/30 px-2 py-0.5 rounded-md border border-border/40">
-                              <span className="text-[10px] font-semibold text-muted-foreground">MAIÚSCULAS:</span>
-                              <Switch
-                                checked={headline.mainTextUppercase ?? headline.uppercase ?? true}
-                                onCheckedChange={(v) => setHeadline((h) => ({ ...h, mainTextUppercase: v }))}
-                                className="scale-75 origin-right"
-                              />
-                            </div>
-                            <span className="text-[10px] text-muted-foreground">Cor:</span>
-                            <input
-                              type="color"
-                              value={headline.primaryColor}
-                              onChange={(e) => setHeadline((h) => ({ ...h, primaryColor: e.target.value }))}
-                              className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setHeadline((h) => ({ ...h, primaryColor: "#FACC15" }))}
-                              className="h-5 px-1.5 text-[9px] text-yellow-400 border-yellow-500/30"
-                            >
-                              Amarelo Viral
-                            </Button>
-                          </div>
-                        )}
                       </div>
-                      {headline.showMainText ? (
+                      {headline.showMainText && (
                         <>
                           <Textarea
                             value={headline.mainText}
                             onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
+                            placeholder="Ex: Meu amigo: 'Comprei um mic novo, mano.'"
                             rows={2}
-                            className="text-xs mt-1 font-bold resize-none"
-                            placeholder="Digite a chamada ou título principal..."
+                            className="text-xs font-bold resize-none"
                           />
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            {/* Posição Vertical Independente */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="font-semibold">Posição Vertical (Y)</span>
+                                <span className="font-mono text-primary">{headline.mainTextYOffset}%</span>
+                              </div>
+                              <Slider
+                                value={[headline.mainTextYOffset]}
+                                min={5}
+                                max={50}
+                                step={1}
+                                onValueChange={([mainTextYOffset]) => setHeadline((h) => ({ ...h, mainTextYOffset }))}
+                              />
+                            </div>
+                            {/* Alinhamento Independente */}
                             <div>
-                              <Label className="text-[11px] font-medium text-muted-foreground">
-                                Alinhamento do Título
-                              </Label>
-                              <div className="flex gap-1 mt-1">
-                                {(["left", "center", "right"] as const).map((a) => (
+                              <Label className="text-[11px] font-semibold">Alinhamento</Label>
+                              <div className="flex gap-1.5 mt-1">
+                                {(["left", "center", "right"] as const).map((align) => (
                                   <Button
-                                    key={a}
+                                    key={align}
                                     type="button"
                                     size="sm"
-                                    variant={(headline.mainTextAlign || headline.textAlign || "center") === a ? "default" : "outline"}
-                                    onClick={() => setHeadline((h) => ({ ...h, mainTextAlign: a }))}
-                                    className="h-7 text-[11px] flex-1 capitalize"
+                                    variant={headline.mainTextAlign === align ? "default" : "outline"}
+                                    onClick={() => setHeadline((h) => ({ ...h, mainTextAlign: align }))}
+                                    className="flex-1 text-[11px] h-7"
                                   >
-                                    {a === "left" ? "Esq" : a === "center" ? "Centro" : "Dir"}
+                                    {align === "left" ? "Esq" : align === "center" ? "Centro" : "Dir"}
                                   </Button>
                                 ))}
                               </div>
                             </div>
-                            <div>
-                              <Label className="text-[11px] font-medium text-muted-foreground">
-                                Posição Vertical Y ({headline.mainTextYOffset ?? 17}%)
-                              </Label>
-                              <Slider
-                                value={[headline.mainTextYOffset ?? 17]}
-                                min={0}
-                                max={95}
-                                step={1}
-                                onValueChange={([v]) => setHeadline((h) => ({ ...h, mainTextYOffset: v }))}
-                                className="mt-2.5"
-                              />
-                            </div>
                           </div>
                         </>
-                      ) : (
-                        <p className="text-[11px] text-zinc-500 italic">Texto principal desativado no vídeo.</p>
                       )}
                     </div>
 
                     {/* Texto Secundário */}
-                    <div className="p-3 rounded-xl bg-secondary/10 border border-border/50 space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="p-3 rounded-xl bg-secondary/15 border border-border/50 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <span>Texto Secundário (Contexto)</span>
+                        </Label>
                         <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">Exibir</span>
                           <Switch
                             checked={headline.showSubText}
                             onCheckedChange={(v) => setHeadline((h) => ({ ...h, showSubText: v }))}
                           />
-                          <Label className="text-xs font-semibold">Texto Secundário (Subtítulo / Desfecho)</Label>
                         </div>
-                        {headline.showSubText && (
-                          <div className="flex items-center gap-2">
-                            {/* Toggle Individual Caixa Alta */}
-                            <div className="flex items-center gap-1.5 bg-secondary/30 px-2 py-0.5 rounded-md border border-border/40">
-                              <span className="text-[10px] font-semibold text-muted-foreground">MAIÚSCULAS:</span>
-                              <Switch
-                                checked={headline.subTextUppercase ?? headline.uppercase ?? true}
-                                onCheckedChange={(v) => setHeadline((h) => ({ ...h, subTextUppercase: v }))}
-                                className="scale-75 origin-right"
-                              />
-                            </div>
-                            <span className="text-[10px] text-muted-foreground">Cor:</span>
-                            <input
-                              type="color"
-                              value={headline.secondaryColor}
-                              onChange={(e) => setHeadline((h) => ({ ...h, secondaryColor: e.target.value }))}
-                              className="w-5 h-5 rounded cursor-pointer border-none bg-transparent"
-                            />
-                          </div>
-                        )}
                       </div>
-                      {headline.showSubText ? (
+                      {headline.showSubText && (
                         <>
-                          <Input
+                          <Textarea
                             value={headline.subText}
                             onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                            className="h-8 text-xs mt-1 font-semibold"
-                            placeholder="Digite o subtítulo ou desfecho..."
+                            placeholder="Ex: O desgraçado entrando na call:"
+                            rows={2}
+                            className="text-xs resize-none"
                           />
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            {/* Posição Vertical Independente */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="font-semibold">Posição Vertical (Y)</span>
+                                <span className="font-mono text-primary">{headline.subTextYOffset}%</span>
+                              </div>
+                              <Slider
+                                value={[headline.subTextYOffset]}
+                                min={10}
+                                max={60}
+                                step={1}
+                                onValueChange={([subTextYOffset]) => setHeadline((h) => ({ ...h, subTextYOffset }))}
+                              />
+                            </div>
+                            {/* Alinhamento Independente */}
                             <div>
-                              <Label className="text-[11px] font-medium text-muted-foreground">
-                                Alinhamento do Subtítulo
-                              </Label>
-                              <div className="flex gap-1 mt-1">
-                                {(["left", "center", "right"] as const).map((a) => (
+                              <Label className="text-[11px] font-semibold">Alinhamento</Label>
+                              <div className="flex gap-1.5 mt-1">
+                                {(["left", "center", "right"] as const).map((align) => (
                                   <Button
-                                    key={a}
+                                    key={align}
                                     type="button"
                                     size="sm"
-                                    variant={(headline.subTextAlign || headline.textAlign || "center") === a ? "default" : "outline"}
-                                    onClick={() => setHeadline((h) => ({ ...h, subTextAlign: a }))}
-                                    className="h-7 text-[11px] flex-1 capitalize"
+                                    variant={headline.subTextAlign === align ? "default" : "outline"}
+                                    onClick={() => setHeadline((h) => ({ ...h, subTextAlign: align }))}
+                                    className="flex-1 text-[11px] h-7"
                                   >
-                                    {a === "left" ? "Esq" : a === "center" ? "Centro" : "Dir"}
+                                    {align === "left" ? "Esq" : align === "center" ? "Centro" : "Dir"}
                                   </Button>
                                 ))}
                               </div>
                             </div>
-                            <div>
-                              <Label className="text-[11px] font-medium text-muted-foreground">
-                                Posição Vertical Y ({headline.subTextYOffset ?? 25}%)
-                              </Label>
-                              <Slider
-                                value={[headline.subTextYOffset ?? 25]}
-                                min={0}
-                                max={95}
-                                step={1}
-                                onValueChange={([v]) => setHeadline((h) => ({ ...h, subTextYOffset: v }))}
-                                className="mt-2.5"
-                              />
-                            </div>
                           </div>
                         </>
-                      ) : (
-                        <p className="text-[11px] text-zinc-500 italic">Texto secundário desativado no vídeo.</p>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/40">
-                      <div>
-                        <Label className="text-xs font-semibold">Tamanho da Fonte ({headline.fontSize}px)</Label>
+                    {/* Tamanho da Fonte & Cores */}
+                    <div className="space-y-3 pt-1">
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-semibold">Tamanho da Fonte dos Títulos</span>
+                          <span className="font-mono text-primary">{headline.fontSize}px</span>
+                        </div>
                         <Slider
                           value={[headline.fontSize]}
                           min={24}
-                          max={64}
+                          max={68}
                           step={2}
-                          onValueChange={([v]) => setHeadline((h) => ({ ...h, fontSize: v }))}
-                          className="mt-3"
+                          onValueChange={([fontSize]) => setHeadline((h) => ({ ...h, fontSize }))}
                         />
                       </div>
-                      <div className="flex items-center justify-between pt-4 sm:pt-2">
+
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label className="text-xs font-semibold block">Sombra & Contraste 3D</Label>
-                          <span className="text-[10px] text-muted-foreground">Destaque profissional sobre fundos</span>
+                          <Label className="text-xs font-semibold">Cor Primária (Destaque)</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="color"
+                              value={headline.primaryColor}
+                              onChange={(e) => setHeadline((h) => ({ ...h, primaryColor: e.target.value }))}
+                              className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
+                            />
+                            <Input
+                              value={headline.primaryColor}
+                              onChange={(e) => setHeadline((h) => ({ ...h, primaryColor: e.target.value }))}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
                         </div>
-                        <Switch
-                          checked={headline.textShadow}
-                          onCheckedChange={(v) => setHeadline((h) => ({ ...h, textShadow: v }))}
-                        />
+
+                        <div>
+                          <Label className="text-xs font-semibold">Cor Secundária (Texto)</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="color"
+                              value={headline.secondaryColor}
+                              onChange={(e) => setHeadline((h) => ({ ...h, secondaryColor: e.target.value }))}
+                              className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
+                            />
+                            <Input
+                              value={headline.secondaryColor}
+                              onChange={(e) => setHeadline((h) => ({ ...h, secondaryColor: e.target.value }))}
+                              className="h-8 text-xs font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Switches de Efeitos e Maiúsculas */}
+                      <div className="flex flex-wrap gap-4 pt-2">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={headline.mainTextUppercase}
+                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, mainTextUppercase: v }))}
+                          />
+                          <Label className="text-xs font-medium">Primário Maiúsculas</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={headline.subTextUppercase}
+                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, subTextUppercase: v }))}
+                          />
+                          <Label className="text-xs font-medium">Secundário Maiúsculas</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={headline.textShadow}
+                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, textShadow: v }))}
+                          />
+                          <Label className="text-xs font-medium">Sombra 3D</Label>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -968,87 +1254,95 @@ export default function DarkClipsPage() {
                 <Card>
                   <CardHeader className="p-4 pb-3">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Maximize2 className="h-4 w-4 text-primary" /> Enquadramento do Vídeo & Fundo da Tela
+                      <Maximize2 className="h-4 w-4 text-primary" /> Enquadramento do Vídeo & Fundo 9:16
                     </CardTitle>
+                    <CardDescription className="text-xs">
+                      Posicionamento vertical, escala, cantos arredondados e efeito de fundo do reel/short.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs font-semibold">Posição Vertical Y ({videoPlacement.yOffset}%)</Label>
-                        <Slider
-                          value={[videoPlacement.yOffset]}
-                          min={0}
-                          max={95}
-                          step={1}
-                          onValueChange={([v]) => setVideoPlacement((p) => ({ ...p, yOffset: v }))}
-                          className="mt-3"
-                        />
+                    {/* Posição Y */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold">Posição Vertical do Vídeo (Y)</span>
+                        <span className="font-mono text-primary">{videoPlacement.yOffset}%</span>
                       </div>
-                      <div>
-                        <Label className="text-xs font-semibold">Largura / Escala ({videoPlacement.scale}%)</Label>
-                        <Slider
-                          value={[videoPlacement.scale]}
-                          min={60}
-                          max={100}
-                          step={1}
-                          onValueChange={([v]) => setVideoPlacement((p) => ({ ...p, scale: v }))}
-                          className="mt-3"
-                        />
+                      <Slider
+                        value={[videoPlacement.yOffset]}
+                        min={20}
+                        max={85}
+                        step={1}
+                        onValueChange={([yOffset]) => setVideoPlacement((v) => ({ ...v, yOffset }))}
+                      />
+                    </div>
+
+                    {/* Escala */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold">Tamanho / Escala do Vídeo</span>
+                        <span className="font-mono text-primary">{videoPlacement.scale}%</span>
                       </div>
-                      <div>
-                        <Label className="text-xs font-semibold">Cantos Arredondados ({videoPlacement.borderRadius}px)</Label>
-                        <Slider
-                          value={[videoPlacement.borderRadius]}
-                          min={0}
-                          max={48}
-                          step={2}
-                          onValueChange={([v]) => setVideoPlacement((p) => ({ ...p, borderRadius: v }))}
-                          className="mt-3"
-                        />
+                      <Slider
+                        value={[videoPlacement.scale]}
+                        min={50}
+                        max={100}
+                        step={1}
+                        onValueChange={([scale]) => setVideoPlacement((v) => ({ ...v, scale }))}
+                      />
+                    </div>
+
+                    {/* Bordas Arredondadas */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-semibold">Arredondamento das Bordas (Border Radius)</span>
+                        <span className="font-mono text-primary">{videoPlacement.borderRadius}px</span>
                       </div>
-                      <div className="sm:col-span-2">
-                        <Label className="text-xs font-semibold">Tipo de Fundo do Vídeo</Label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-                          {[
-                            { id: 'black', label: 'Preto Clássico', icon: '⬛' },
-                            { id: 'white', label: 'Branco Viral', icon: '⬜' },
-                            { id: 'blur', label: 'Vídeo Desfocado', icon: '🌫️' },
-                            { id: 'gradient', label: 'Gradiente Escuro', icon: '🌘' },
-                            { id: 'neon', label: 'Roxo / Neon', icon: '🔮' },
-                            { id: 'zinc', label: 'Cinza Moderno', icon: '🩶' },
-                          ].map((t) => (
-                            <Button
-                              key={t.id}
-                              type="button"
-                              size="sm"
-                              variant={background.type === t.id ? "default" : "outline"}
-                              onClick={() => {
-                                setBackground((b) => ({ ...b, type: t.id as any }));
-                                if (t.id === 'white' && (headline.secondaryColor === '#FFFFFF' || headline.secondaryColor === '#ffffff')) {
-                                  setHeadline((h) => ({ ...h, secondaryColor: '#09090b' }));
-                                }
-                              }}
-                              className="h-8 text-xs flex items-center justify-center gap-1.5 font-medium"
-                            >
-                              <span>{t.icon}</span>
-                              <span>{t.label}</span>
-                            </Button>
-                          ))}
-                        </div>
+                      <Slider
+                        value={[videoPlacement.borderRadius]}
+                        min={0}
+                        max={48}
+                        step={2}
+                        onValueChange={([borderRadius]) => setVideoPlacement((v) => ({ ...v, borderRadius }))}
+                      />
+                    </div>
+
+                    {/* Estilo do Fundo */}
+                    <div className="space-y-2 pt-2 border-t border-border/40">
+                      <Label className="text-xs font-semibold">Estilo de Fundo 9:16</Label>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        {[
+                          { id: "black", label: "Preto", bg: "bg-black text-white" },
+                          { id: "blur", label: "Desfoque", bg: "bg-zinc-800 text-white" },
+                          { id: "gradient", label: "Gradiente", bg: "bg-gradient-to-tr from-purple-900 to-black text-white" },
+                          { id: "neon", label: "Neon Dark", bg: "bg-gradient-to-tr from-rose-950 via-zinc-950 to-indigo-950 text-white" },
+                          { id: "zinc", label: "Cinza Dark", bg: "bg-zinc-900 text-white" },
+                          { id: "white", label: "Branco", bg: "bg-zinc-200 text-black" },
+                        ].map((b) => (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => setBackground((prev) => ({ ...prev, type: b.id as any }))}
+                            className={`p-2 rounded-lg border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
+                              background.type === b.id ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border/60 hover:border-border"
+                            } ${b.bg}`}
+                          >
+                            <span>{b.label}</span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* 4. Marca D'água do Canal */}
+                {/* 4. Marca D'água & Selo Personalizado */}
                 <Card>
                   <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-pink-500" /> Marca D'água do Canal (Branding)
+                        <Shield className="h-4 w-4 text-primary" /> Marca D'água & Logo Personalizada
                       </CardTitle>
                       <CardDescription className="text-xs">
-                        Adicione seu @arroba ou logo com transparência e posicione livremente na tela.
+                        Adicione texto arroba ou imagem/logo com arrasto interativo e opacidade.
                       </CardDescription>
                     </div>
                     <Switch
@@ -1058,169 +1352,170 @@ export default function DarkClipsPage() {
                   </CardHeader>
                   {watermark.enabled && (
                     <CardContent className="p-4 pt-0 space-y-4">
-                      {/* Tipo de Marca D'água: Texto vs Imagem */}
-                      <div>
-                        <Label className="text-xs font-semibold">Formato da Marca D'água</Label>
-                        <div className="flex gap-2 mt-1.5">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={watermark.type === "text" ? "default" : "outline"}
-                            onClick={() => setWatermark((w) => ({ ...w, type: "text" }))}
-                            className="h-8 text-xs flex-1 gap-1.5"
-                          >
-                            <Type className="h-3.5 w-3.5" /> Texto / @Arroba
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={watermark.type === "image" ? "default" : "outline"}
-                            onClick={() => setWatermark((w) => ({ ...w, type: "image" }))}
-                            className="h-8 text-xs flex-1 gap-1.5"
-                          >
-                            <ImageIcon className="h-3.5 w-3.5" /> Logotipo / Imagem
-                          </Button>
-                        </div>
+                      {/* Tipo: Texto vs Imagem */}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={watermark.type === "text" ? "default" : "outline"}
+                          onClick={() => setWatermark((w) => ({ ...w, type: "text" }))}
+                          className="flex-1 text-xs h-8 gap-1.5"
+                        >
+                          <Type className="h-3.5 w-3.5" /> Texto / @Arroba
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={watermark.type === "image" ? "default" : "outline"}
+                          onClick={() => setWatermark((w) => ({ ...w, type: "image" }))}
+                          className="flex-1 text-xs h-8 gap-1.5"
+                        >
+                          <ImageIcon className="h-3.5 w-3.5" /> Logo / Imagem
+                        </Button>
                       </div>
 
                       {watermark.type === "text" ? (
-                        <div className="space-y-3 p-3 rounded-xl bg-secondary/15 border border-border/50">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex-1">
-                              <Label className="text-xs font-semibold">Texto da Marca D'água</Label>
-                              <Input
-                                value={watermark.text}
-                                onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
-                                placeholder="@darkclips ou Seu Canal"
-                                className="h-8 text-xs mt-1 font-semibold"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs font-semibold block mb-1">Cor</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs font-semibold">Texto da Marca D'água</Label>
+                            <Input
+                              value={watermark.text}
+                              onChange={(e) => setWatermark((w) => ({ ...w, text: e.target.value }))}
+                              placeholder="@meucanal"
+                              className="h-8 text-xs font-mono mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Cor do Texto</Label>
+                            <div className="flex items-center gap-2 mt-1">
                               <input
                                 type="color"
-                                value={watermark.color}
+                                value={watermark.color || "#FFFFFF"}
                                 onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
-                                className="w-8 h-8 rounded-lg cursor-pointer border border-border bg-transparent p-0.5"
+                                className="h-8 w-10 rounded border border-border bg-transparent cursor-pointer"
+                              />
+                              <Input
+                                value={watermark.color || "#FFFFFF"}
+                                onChange={(e) => setWatermark((w) => ({ ...w, color: e.target.value }))}
+                                className="h-8 text-xs font-mono"
                               />
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-3 p-3 rounded-xl bg-secondary/15 border border-border/50">
-                          <Label className="text-xs font-semibold">Logo da Marca D'água</Label>
+                        <div className="p-3 rounded-xl bg-secondary/20 border border-border/60 space-y-3">
+                          <Label className="text-xs font-semibold flex items-center justify-between">
+                            <span>Logo / Selo em Imagem</span>
+                            <span className="text-[10px] text-muted-foreground">PNG transparente recomendado</span>
+                          </Label>
+
                           <div className="flex items-center gap-3">
-                            <input
-                              type="file"
-                              ref={watermarkFileInputRef}
-                              onChange={handleWatermarkFileUpload}
-                              className="hidden"
-                              accept="image/*"
-                            />
                             {watermark.imageUrl ? (
-                              <div className="w-12 h-12 rounded-lg border border-border bg-black/40 overflow-hidden flex items-center justify-center p-1">
+                              <div className="w-12 h-12 rounded-lg border border-primary/40 bg-zinc-900 p-1 flex items-center justify-center overflow-hidden shrink-0">
                                 <img src={watermark.imageUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
                               </div>
-                            ) : null}
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => watermarkFileInputRef.current?.click()}
-                              className="h-8 text-xs gap-1.5 flex-1"
-                            >
-                              <Upload className="h-3.5 w-3.5" /> Enviar Logo PNG
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={handlePasteWatermarkFromClipboard}
-                              className="h-8 text-xs gap-1.5 flex-1"
-                            >
-                              <Copy className="h-3.5 w-3.5" /> Colar Imagem
-                            </Button>
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
+                                <ImageIcon className="h-5 w-5" />
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                              <input
+                                type="file"
+                                ref={watermarkFileInputRef}
+                                onChange={handleWatermarkFileUpload}
+                                accept="image/*"
+                                className="hidden"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => watermarkFileInputRef.current?.click()}
+                                className="h-8 text-xs gap-1.5"
+                              >
+                                <Upload className="h-3.5 w-3.5 text-primary" /> Carregar Logo
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={handlePasteWatermarkFromClipboard}
+                                className="h-8 text-xs gap-1.5"
+                              >
+                                <Copy className="h-3.5 w-3.5 text-emerald-400" /> Colar Imagem
+                              </Button>
+                            </div>
                           </div>
+
+                          <Input
+                            placeholder="Ou cole a URL direta da imagem (https://...)"
+                            value={watermark.imageUrl}
+                            onChange={(e) => setWatermark((w) => ({ ...w, imageUrl: e.target.value }))}
+                            className="h-7 text-[11px] text-muted-foreground font-mono"
+                          />
                         </div>
                       )}
 
-                      {/* Posições Rápidas Predefinidas */}
-                      <div>
-                        <Label className="text-xs font-semibold">Posição na Tela</Label>
-                        <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+                      {/* Presets Rápidos de Posição */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold">Posição Rápida</Label>
+                        <div className="grid grid-cols-4 gap-2">
                           {[
-                            { id: "top-left", label: "Superior Esq", x: 15, y: 5 },
-                            { id: "top-right", label: "Superior Dir", x: 85, y: 5 },
-                            { id: "center", label: "Centro", x: 50, y: 50 },
-                            { id: "bottom-left", label: "Inferior Esq", x: 15, y: 92 },
-                            { id: "bottom-right", label: "Inferior Dir", x: 85, y: 92 },
-                            { id: "custom", label: "Livre / Arrasto", x: watermark.xOffset, y: watermark.yOffset },
-                          ].map((pos) => (
+                            { pos: "top-left", label: "Sup. Esq.", x: 15, y: 15 },
+                            { pos: "top-right", label: "Sup. Dir.", x: 85, y: 15 },
+                            { pos: "bottom-left", label: "Inf. Esq.", x: 15, y: 92 },
+                            { pos: "bottom-right", label: "Inf. Dir.", x: 85, y: 92 },
+                          ].map((item) => (
                             <Button
-                              key={pos.id}
+                              key={item.pos}
                               type="button"
                               size="sm"
-                              variant={watermark.position === pos.id ? "default" : "outline"}
+                              variant={watermark.position === item.pos ? "default" : "outline"}
                               onClick={() =>
                                 setWatermark((w) => ({
                                   ...w,
-                                  position: pos.id as any,
-                                  xOffset: pos.x,
-                                  yOffset: pos.y,
+                                  position: item.pos as any,
+                                  xOffset: item.x,
+                                  yOffset: item.y,
                                 }))
                               }
-                              className="h-7 text-[11px]"
+                              className="text-[11px] h-7"
                             >
-                              {pos.label}
+                              {item.label}
                             </Button>
                           ))}
                         </div>
                       </div>
 
-                      {/* Controles de Opacidade, Escala e Posição X/Y */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                        <div>
-                          <Label className="text-xs font-semibold">Opacidade ({watermark.opacity}%)</Label>
+                      {/* Opacidade & Escala */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold">Opacidade</span>
+                            <span className="font-mono text-primary">{watermark.opacity}%</span>
+                          </div>
                           <Slider
                             value={[watermark.opacity]}
                             min={10}
                             max={100}
                             step={5}
-                            onValueChange={([v]) => setWatermark((w) => ({ ...w, opacity: v }))}
-                            className="mt-2.5"
+                            onValueChange={([opacity]) => setWatermark((w) => ({ ...w, opacity }))}
                           />
                         </div>
-                        <div>
-                          <Label className="text-xs font-semibold">Tamanho / Escala ({watermark.scale}%)</Label>
+
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-semibold">Tamanho / Escala</span>
+                            <span className="font-mono text-primary">{watermark.scale || 100}%</span>
+                          </div>
                           <Slider
-                            value={[watermark.scale]}
-                            min={50}
-                            max={180}
+                            value={[watermark.scale || 100]}
+                            min={40}
+                            max={200}
                             step={5}
-                            onValueChange={([v]) => setWatermark((w) => ({ ...w, scale: v }))}
-                            className="mt-2.5"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs font-semibold">Posição Horizontal X ({watermark.xOffset}%)</Label>
-                          <Slider
-                            value={[watermark.xOffset]}
-                            min={0}
-                            max={100}
-                            step={1}
-                            onValueChange={([v]) => setWatermark((w) => ({ ...w, xOffset: v, position: 'custom' }))}
-                            className="mt-2.5"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs font-semibold">Posição Vertical Y ({watermark.yOffset}%)</Label>
-                          <Slider
-                            value={[watermark.yOffset]}
-                            min={0}
-                            max={100}
-                            step={1}
-                            onValueChange={([v]) => setWatermark((w) => ({ ...w, yOffset: v, position: 'custom' }))}
-                            className="mt-2.5"
+                            onValueChange={([scale]) => setWatermark((w) => ({ ...w, scale }))}
                           />
                         </div>
                       </div>
@@ -1228,57 +1523,79 @@ export default function DarkClipsPage() {
                   )}
                 </Card>
 
+                {/* 5. Rodapé & Chamada para Ação */}
+                <Card>
+                  <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary" /> Rodapé & Chamada para Ação (CTA)
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Adicione texto de conversão no final do vídeo.
+                      </CardDescription>
+                    </div>
+                    <Switch
+                      checked={footer.showFooter}
+                      onCheckedChange={(v) => setFooter((f) => ({ ...f, showFooter: v }))}
+                    />
+                  </CardHeader>
+                  {footer.showFooter && (
+                    <CardContent className="p-4 pt-0 space-y-3">
+                      <div>
+                        <Label className="text-xs font-semibold">Texto do Rodapé</Label>
+                        <Input
+                          value={footer.text}
+                          onChange={(e) => setFooter((f) => ({ ...f, text: e.target.value }))}
+                          className="h-8 text-xs mt-1"
+                        />
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+
+                {/* ── Action Bar at Bottom of Modeler Controls Column ── */}
+                <div className="p-4 rounded-xl border border-border/60 bg-card/60 flex flex-col sm:flex-row gap-3 justify-between items-center shadow-sm">
+                  <div className="text-xs text-muted-foreground text-center sm:text-left">
+                    Layout pronto? Salve suas customizações e avance para a produção dos vídeos.
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleQuickSavePreset()}
+                      disabled={savingPreset}
+                      className="gap-1.5 text-xs font-bold h-9 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                    >
+                      {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Salvar Layout 💾
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleProceedToCreation()}
+                      className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-9 shadow-md shadow-primary/20"
+                    >
+                      Avançar para Criação 🎬 <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
               </div>
 
-              {/* ── Right Column: Pré-visualização do Vídeo (5 cols) ── */}
+              {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
               <div className="lg:col-span-5 sticky top-6 space-y-4">
-                <Card className="overflow-hidden border-border bg-card/50 backdrop-blur-md">
-                  <CardHeader className="p-4 pb-2 border-b border-border/40 space-y-2">
-                    <div className="flex flex-row items-center justify-between">
-                      <div>
-                        <CardTitle className="text-sm font-bold flex items-center gap-2">
-                          <Film className="h-4 w-4 text-red-500" /> Pré-visualização do Vídeo 9:16
-                        </CardTitle>
-                        <CardDescription className="text-[11px]">
-                          {selectedClip ? `${selectedClip.author_handle || selectedClip.author_name} · ${selectedClip.duration}s` : "Vídeo de Demonstração em Alta Resolução"}
-                        </CardDescription>
-                      </div>
-                      {renderedUrl && (
-                        <a href={renderedUrl} download={`darkclip_${Date.now()}.mp4`} target="_blank" rel="noreferrer">
-                          <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1 text-emerald-400 border-emerald-500/30">
-                            <Download className="h-3 w-3" /> Baixar MP4
-                          </Button>
-                        </a>
-                      )}
+                <Card className="border-border shadow-2xl overflow-hidden bg-card">
+                  <CardHeader className="p-4 pb-2 border-b border-border/40">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <Eye className="h-4 w-4 text-primary" /> Visualização ao Vivo (Canvas 9:16)
+                      </CardTitle>
+                      <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary">
+                        Interativo
+                      </Badge>
                     </div>
-
-                    {!selectedClip && (
-                      <div className="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-border/30">
-                        <span className="text-[10px] text-muted-foreground font-semibold">Trocar Exemplo:</span>
-                        {[
-                          { id: "/sample-oceans.mp4", label: "🌊 Oceano HD" },
-                          { id: "/sample-viral-clip.mp4", label: "🎬 Animação" },
-                          { id: "/sample-nature.mp4", label: "🌿 Natureza" },
-                          { id: "/historia_brasil_santos_dumont.mp4", label: "🎞️ Histórico" },
-                        ].map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => setSampleVideoUrl(s.id)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                              sampleVideoUrl === s.id
-                                ? "bg-red-500/20 text-red-400 border border-red-500/40 shadow-sm"
-                                : "bg-secondary/50 text-muted-foreground hover:text-foreground border border-border/40"
-                            }`}
-                          >
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </CardHeader>
 
-                  <CardContent className="p-4 flex flex-col items-center justify-center">
+                  <CardContent className="p-4 flex flex-col items-center justify-center bg-black/40">
                     <DarkClipsPreviewPlayer
                       videoUrl={selectedClip?.video_url || sampleVideoUrl}
                       durationInSeconds={selectedClip?.duration || 15}
@@ -1295,16 +1612,34 @@ export default function DarkClipsPage() {
                     />
                   </CardContent>
 
+                  {/* Modeler Preview Footer Action Bar */}
+                  <div className="p-4 border-t border-border/40 flex flex-col sm:flex-row gap-3 justify-between items-center bg-card/50">
+                    <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                      <Badge variant="outline" className="text-[10px] border-border bg-secondary/30">
+                        1080 x 1920 (9:16)
+                      </Badge>
+                      <span className="truncate max-w-[140px]">{activePreset?.name || "Layout Atual"}</span>
+                    </div>
 
-                  <div className="p-4 pt-0 border-t border-border/40 flex gap-2 justify-between items-center">
-                    <span className="text-[11px] text-muted-foreground">1080 x 1920 (9:16 Vertical em Alta Definição)</span>
-                    <Button
-                      size="sm"
-                      onClick={() => setActiveTab("clips")}
-                      className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-8"
-                    >
-                      Avançar para Clipes 🎬 <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleQuickSavePreset()}
+                        disabled={savingPreset}
+                        className="gap-1.5 text-xs font-bold h-8 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                      >
+                        {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        Salvar Layout 💾
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleProceedToCreation()}
+                        className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-8 shadow-md shadow-primary/20"
+                      >
+                        Avançar para Criação 🎬 <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               </div>
@@ -1312,351 +1647,476 @@ export default function DarkClipsPage() {
             </div>
           </TabsContent>
 
-
-
           {/* ══════════════════════════════════════════════════════════
-              TAB 2: CLIPES MINERADOS & IMPORTAÇÃO
+              ABA 2: CRIAÇÃO & PRODUÇÃO DOS CLIPES (COM AGENDAMENTO)
           ══════════════════════════════════════════════════════════ */}
-          <TabsContent value="clips" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-              {/* Import Card */}
-              <Card className="lg:col-span-1 border-border">
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <Download className="h-4 w-4 text-primary" /> Importar URLs em Lote
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Cole múltiplos links do Instagram Reels, TikTok, YouTube Shorts ou X (um por linha).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 pt-2 space-y-3">
-                  <Textarea
-                    placeholder="https://www.instagram.com/reel/...&#10;https://www.tiktok.com/@user/video/...&#10;https://youtube.com/shorts/..."
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    rows={6}
-                    className="text-xs font-mono resize-none"
-                  />
-                  <Button
-                    onClick={handleImportUrls}
-                    disabled={importingUrls || !urlInput.trim()}
-                    className="w-full text-xs font-bold gap-1.5 h-9"
-                  >
-                    {importingUrls ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                    {importingUrls ? "Baixando & Sanitizando..." : "Baixar & Sanitizar Clipes"}
-                  </Button>
-
-                  <div className="rounded-lg bg-secondary/30 p-3 border border-border/40 text-[11px] space-y-1 text-muted-foreground">
-                    <p className="font-bold text-foreground flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Sanitização Automática
-                    </p>
-                    <p>Todos os vídeos importados têm metadados EXIF eliminados para proteção anti-shadowban.</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Extension Install Card */}
-              <Card className="lg:col-span-1 border-red-500/20 bg-gradient-to-br from-red-950/10 to-card">
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-400">
-                    <Sparkles className="h-4 w-4" /> Extensão Dark Clips (Vivaldi, Chrome, Edge)
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Minere perfis inteiros de Instagram, TikTok, Shorts e X com 1 clique direto no navegador.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 pt-2 space-y-3">
-                  <a href="/api/extension/download" download="dark-clips-extension.zip" className="block w-full">
-                    <Button className="w-full text-xs font-bold gap-1.5 h-9 bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20">
-                      <Download className="h-3.5 w-3.5" /> Baixar Extensão (.ZIP)
-                    </Button>
-                  </a>
-
-                  <div className="space-y-1.5 text-[11px] text-muted-foreground pt-1">
-                    <p className="font-semibold text-foreground">Como instalar em 10 segundos:</p>
-                    <ol className="list-decimal list-inside space-y-1 pl-1">
-                      <li>Baixe e descompacte o arquivo <code className="text-red-400 font-mono text-[10px]">.zip</code></li>
-                      <li>Acesse <code className="text-foreground font-mono text-[10px]">vivaldi://extensions</code> ou <code className="text-foreground font-mono text-[10px]">chrome://extensions</code></li>
-                      <li>Ative o <strong>"Modo do desenvolvedor"</strong></li>
-                      <li>Clique em <strong>"Carregar desempacotado"</strong> e selecione a pasta descompactada!</li>
-                    </ol>
-                  </div>
-                </CardContent>
-              </Card>
-
-
-              {/* Clips Grid */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold flex items-center gap-2">
-                      <Video className="h-4 w-4 text-primary" /> Biblioteca de Clipes ({clips.length})
-                    </h3>
-                    <Button variant="ghost" size="sm" onClick={fetchInitialData} className="h-8 text-xs gap-1">
-                      <RefreshCw className="h-3 w-3" /> Atualizar
-                    </Button>
-                  </div>
-
-                  <Button
-                    size="sm"
-                    onClick={() => setActiveTab("schedule")}
-                    className="gap-1.5 bg-primary text-primary-foreground font-bold text-xs h-8"
-                  >
-                    Avançar para Agendamento 📅 <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
+          <TabsContent value="creation" className="space-y-6">
+            
+            {/* Top Active Layout Banner */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-red-950/30 via-secondary/20 to-card border border-red-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center font-bold shadow-inner">
+                  🎨
                 </div>
-
-                {clips.length === 0 ? (
-                  <div className="text-center py-16 border rounded-xl bg-card border-dashed">
-                    <Film className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-sm font-semibold">Nenhum clipe minerado ainda</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Use o painel ao lado para colar links ou instale a extensão Dark Clips no seu navegador.
-                    </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">Layout Selecionado para Produção:</span>
+                    <span className="text-sm font-black text-foreground">{activePreset?.name || "Layout Padrão 9:16"}</span>
+                    <Badge variant="outline" className="text-[10px] text-primary border-primary/30">9:16 Vertical</Badge>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {clips.map((clip) => {
-                      const isSelected = selectedClip?.id === clip.id;
-                      return (
-                        <div
-                          key={clip.id}
-                          className={`group rounded-xl border p-3 bg-card transition-all relative overflow-hidden flex flex-col justify-between ${
-                            isSelected ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary" : "border-border hover:border-border/80"
-                          }`}
-                        >
-                          <div>
-                            <div 
-                              onClick={() => {
-                                setSelectedClip(clip);
-                                setActiveTab("modeler");
-                              }}
-                              className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-black relative mb-2 cursor-pointer group-hover:opacity-95"
-                            >
-                              {clip.thumbnail_url ? (
-                                <img src={clip.thumbnail_url} alt="Thumb" className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                  <Play className="h-6 w-6" />
-                                </div>
-                              )}
-                              <Badge className="absolute bottom-1 right-1 text-[9px] px-1 py-0 bg-black/70">
-                                {clip.duration}s
-                              </Badge>
-                              <Badge variant="secondary" className="absolute top-1 left-1 text-[8px] px-1 py-0 uppercase">
-                                {clip.platform}
-                              </Badge>
-                            </div>
-
-                            <p className="font-bold text-xs truncate text-primary">{clip.author_handle || clip.author_name}</p>
-
-                            <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
-                              {clip.original_caption || clip.original_url}
-                            </p>
-                          </div>
-
-                          <div className="flex gap-1.5 mt-3">
-                            <Button 
-                              size="sm" 
-                              variant={isSelected ? "default" : "outline"} 
-                              onClick={() => {
-                                setSelectedClip(clip);
-                                setActiveTab("modeler");
-                              }}
-                              className="flex-1 text-[11px] h-7"
-                            >
-                              {isSelected ? "No Modelador" : "Modelar Visual"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setSelectedClip(clip);
-                                handleRender();
-                              }}
-                              disabled={isRendering}
-                              className="text-[11px] h-7 px-2 text-red-400 border border-red-500/30"
-                              title="Produzir clipe com o template ativo"
-                            >
-                              {isRendering && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "🎬 Produzir"}
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Os clipes produzidos receberão automaticamente esta diagramação, cabeçalho e posicionamento de vídeo.
+                  </p>
+                </div>
               </div>
 
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("modeler")}
+                className="text-xs font-bold gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/10 shrink-0"
+              >
+                <Sliders className="h-3.5 w-3.5" /> Customizar / Trocar Layout
+              </Button>
             </div>
-          </TabsContent>
 
-          {/* ══════════════════════════════════════════════════════════
-              TAB 3: AGENDAMENTO & PUBLICAÇÃO AUTOMÁTICA
-          ══════════════════════════════════════════════════════════ */}
-          <TabsContent value="schedule" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* Form Scheduling (6 cols) */}
-              <div className="lg:col-span-6 space-y-6">
-                <Card>
+              {/* ── Left Column: Importador & Extensão (4 cols) ── */}
+              <div className="lg:col-span-4 space-y-6">
+                
+                {/* Import Card */}
+                <Card className="border-border">
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-primary" /> Programação de Postagem
+                      <Download className="h-4 w-4 text-primary" /> Importar URLs em Lote
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Escolha data, horário e as contas de destino conectadas no Blotato.
+                      Cole links do Instagram Reels, TikTok, Shorts ou X (um por linha).
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="p-4 pt-2 space-y-4">
-                    
-                    {/* Destination Accounts */}
-                    <div>
-                      <Label className="text-xs font-semibold">Contas de Destino (Blotato)</Label>
-                      {blotatoAccounts.length === 0 ? (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Nenhuma conta Blotato conectada em <a href="/credentials" className="text-primary underline">Credenciais</a>.
-                        </p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {blotatoAccounts.map((acc) => {
-                            const isChecked = targetAccounts.includes(acc.id);
-                            return (
-                              <button
-                                key={acc.id}
-                                onClick={() => {
-                                  if (isChecked) setTargetAccounts((prev) => prev.filter((id) => id !== acc.id));
-                                  else setTargetAccounts((prev) => [...prev, acc.id]);
-                                }}
-                                className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                                  isChecked
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "bg-secondary/40 text-muted-foreground border-border"
-                                }`}
-                              >
-                                {isChecked && <Check className="h-3 w-3" />}
-                                {acc.label || acc.page_name || acc.platform}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                  <CardContent className="p-4 pt-2 space-y-3">
+                    <Textarea
+                      placeholder="https://www.instagram.com/reel/...&#10;https://www.tiktok.com/@user/video/...&#10;https://youtube.com/shorts/..."
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      rows={5}
+                      className="text-xs font-mono resize-none"
+                    />
+                    <Button
+                      onClick={handleImportUrls}
+                      disabled={importingUrls || !urlInput.trim()}
+                      className="w-full text-xs font-bold gap-1.5 h-9 bg-primary text-primary-foreground"
+                    >
+                      {importingUrls ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                      {importingUrls ? "Baixando & Sanitizando..." : "Baixar & Sanitizar Clipes"}
+                    </Button>
 
-                    {/* Date & Time */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs font-semibold">Data</Label>
-                        <Input
-                          type="date"
-                          value={scheduleDate}
-                          onChange={(e) => setScheduleDate(e.target.value)}
-                          className="h-8 text-xs mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs font-semibold">Horário</Label>
-                        <Input
-                          type="time"
-                          value={scheduleTime}
-                          onChange={(e) => setScheduleTime(e.target.value)}
-                          className="h-8 text-xs mt-1"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Post Caption */}
-                    <div>
-                      <Label className="text-xs font-semibold">Legenda do Post</Label>
-                      <Textarea
-                        value={postCaption}
-                        onChange={(e) => setPostCaption(e.target.value)}
-                        placeholder="Escreva ou gere com IA a legenda envolvente..."
-                        rows={3}
-                        className="text-xs mt-1 resize-none"
-                      />
-                    </div>
-
-                    {/* Hashtags */}
-                    <div>
-                      <Label className="text-xs font-semibold">Hashtags</Label>
-                      <Input
-                        value={postHashtags.join(" ")}
-                        onChange={(e) => setPostHashtags(e.target.value.split(" ").filter(Boolean))}
-                        className="h-8 text-xs mt-1 font-mono text-primary"
-                      />
-                    </div>
-
-                    {/* Dispatch Actions */}
-                    <div className="flex gap-3 pt-2">
-                      <Button
-                        onClick={() => handleSchedulePost(false)}
-                        className="flex-1 text-xs font-bold gap-1.5 h-9"
-                      >
-                        <Calendar className="h-3.5 w-3.5" />
-                        Agendar Postagem
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => handleSchedulePost(true)}
-                        className="flex-1 text-xs font-bold gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white border-none"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        Publicar Agora
-                      </Button>
+                    <div className="rounded-lg bg-secondary/30 p-3 border border-border/40 text-[11px] space-y-1 text-muted-foreground">
+                      <p className="font-bold text-foreground flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Sanitização Automática Anti-Shadowban
+                      </p>
+                      <p>Vídeos importados têm metadados EXIF eliminados automaticamente para máxima proteção.</p>
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Extension Install Card */}
+                <Card className="border-red-500/20 bg-gradient-to-br from-red-950/10 to-card">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-400">
+                      <Sparkles className="h-4 w-4" /> Extensão Dark Clips (Vivaldi, Chrome, Edge)
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Minere perfis inteiros de Instagram, TikTok e Shorts com 1 clique direto no navegador.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-3">
+                    <a href="/api/extension/download" download="dark-clips-extension.zip" className="block w-full">
+                      <Button className="w-full text-xs font-bold gap-1.5 h-9 bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20">
+                        <Download className="h-3.5 w-3.5" /> Baixar Extensão (.ZIP)
+                      </Button>
+                    </a>
+
+                    <div className="space-y-1.5 text-[11px] text-muted-foreground pt-1">
+                      <p className="font-semibold text-foreground">Como instalar em 10 segundos:</p>
+                      <ol className="list-decimal list-inside space-y-1 pl-1">
+                        <li>Baixe e descompacte o arquivo <code className="text-red-400 font-mono text-[10px]">.zip</code></li>
+                        <li>Acesse <code className="text-foreground font-mono text-[10px]">vivaldi://extensions</code> ou <code className="text-foreground font-mono text-[10px]">chrome://extensions</code></li>
+                        <li>Ative o <strong>"Modo do desenvolvedor"</strong></li>
+                        <li>Clique em <strong>"Carregar desempacotado"</strong> e selecione a pasta!</li>
+                      </ol>
+                    </div>
+                  </CardContent>
+                </Card>
+
               </div>
 
-              {/* Scheduled Posts History (6 cols) */}
-              <div className="lg:col-span-6 space-y-4">
-                <h3 className="text-sm font-bold flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-primary" /> Fila de Postagens ({scheduledPosts.length})
-                </h3>
-
-                {scheduledPosts.length === 0 ? (
-                  <div className="text-center py-16 border rounded-xl bg-card border-dashed">
-                    <Calendar className="h-8 w-8 mx-auto text-muted-foreground mb-2 opacity-50" />
-                    <p className="text-xs text-muted-foreground">Nenhuma postagem agendada no momento.</p>
+              {/* ── Center & Right Column: Clipes Minerados & Estúdio de Produção (8 cols) ── */}
+              <div className="lg:col-span-8 space-y-6">
+                
+                {/* 1. Biblioteca de Clipes Minerados */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold flex items-center gap-2">
+                        <Video className="h-4 w-4 text-primary" /> Clipes Disponíveis para Produção ({clips.length})
+                      </h3>
+                      <Button variant="ghost" size="sm" onClick={fetchInitialData} className="h-8 text-xs gap-1">
+                        <RefreshCw className="h-3 w-3" /> Atualizar
+                      </Button>
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {scheduledPosts.map((post) => (
-                      <div key={post.id} className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-bold text-xs truncate">{post.title}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Post Imediato"}
-                          </p>
+
+                  {clips.length === 0 ? (
+                    <div className="text-center py-12 border rounded-xl bg-card border-dashed">
+                      <Film className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                      <p className="text-sm font-semibold">Nenhum clipe minerado ainda</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use o painel ao lado para colar links ou instale a extensão Dark Clips no seu navegador.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {clips.map((clip) => {
+                        const isSelected = selectedClip?.id === clip.id;
+                        return (
+                          <div
+                            key={clip.id}
+                            className={`group rounded-xl border p-3 bg-card transition-all relative overflow-hidden flex flex-col justify-between ${
+                              isSelected ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary" : "border-border hover:border-border/80"
+                            }`}
+                          >
+                            <div>
+                              <div 
+                                onClick={() => setSelectedClip(clip)}
+                                className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-black relative mb-2 cursor-pointer group-hover:opacity-95"
+                              >
+                                {clip.thumbnail_url ? (
+                                  <img src={clip.thumbnail_url} alt="Thumb" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                    <Play className="h-6 w-6" />
+                                  </div>
+                                )}
+                                <Badge className="absolute bottom-1 right-1 text-[9px] px-1 py-0 bg-black/70">
+                                  {clip.duration}s
+                                </Badge>
+                                <Badge variant="secondary" className="absolute top-1 left-1 text-[8px] px-1 py-0 uppercase">
+                                  {clip.platform}
+                                </Badge>
+                              </div>
+
+                              <p className="font-bold text-xs truncate text-primary">{clip.author_handle || clip.author_name}</p>
+
+                              <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
+                                {clip.original_caption || clip.original_url}
+                              </p>
+                            </div>
+
+                            <div className="flex gap-1.5 mt-3">
+                              <Button 
+                                size="sm" 
+                                variant={isSelected ? "default" : "outline"} 
+                                onClick={() => setSelectedClip(clip)}
+                                className="flex-1 text-[11px] h-7"
+                              >
+                                {isSelected ? "Selecionado ✓" : "Selecionar"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setSelectedClip(clip);
+                                  handleRender();
+                                }}
+                                disabled={isRendering}
+                                className="text-[11px] h-7 px-2.5 text-red-400 border border-red-500/30"
+                                title="Produzir clipe com o layout ativo"
+                              >
+                                {isRendering && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "🎬 Produzir"}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Estúdio de Produção & Agendamento Integrado do Clipe Selecionado */}
+                {selectedClip && (
+                  <Card className="border-border/80 shadow-md">
+                    <CardHeader className="p-4 pb-3 border-b border-border/40">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-sm font-bold flex items-center gap-2">
+                            <Film className="h-4 w-4 text-primary" /> Estúdio de Produção: {selectedClip.author_handle || selectedClip.author_name}
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            Remodele o gancho com IA, renderize o vídeo em 1080x1920 e agende para suas redes.
+                          </CardDescription>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge
-                            variant={post.status === "published" ? "default" : "secondary"}
-                            className="text-[9px] uppercase"
+                        <Button
+                          size="sm"
+                          onClick={handleRender}
+                          disabled={isRendering}
+                          className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-8 shadow-sm"
+                        >
+                          {isRendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+                          {isRendering ? "Renderizando..." : "Renderizar Clipe 9:16"}
+                        </Button>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="p-4 space-y-6">
+                      
+                      {/* Remodelagem com IA */}
+                      <div className="p-3.5 rounded-xl bg-secondary/20 border border-border/50 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold flex items-center gap-1.5">
+                            <Wand2 className="h-3.5 w-3.5 text-primary" /> Remodelagem Viral com GPT-4o
+                          </Label>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={handleRemodelWithAi}
+                            disabled={remodelingAi}
+                            className="text-xs font-bold gap-1.5 h-7 text-primary border border-primary/20 bg-primary/10"
                           >
-                            {post.status}
-                          </Badge>
-                          {post.rendered_video_url && (
-                            <a href={post.rendered_video_url} target="_blank" rel="noreferrer" download>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" title="Baixar Vídeo">
-                                <Download className="h-3.5 w-3.5" />
-                              </Button>
-                            </a>
-                          )}
+                            {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                            Gerar Novo Gancho
+                          </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-[11px] font-semibold">Tema / Tom Desejado (Opcional)</Label>
+                            <Input
+                              placeholder="Ex: Humor brasileiro, sarcasmo, motivação..."
+                              value={aiThemePrompt}
+                              onChange={(e) => setAiThemePrompt(e.target.value)}
+                              className="h-8 text-xs mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[11px] font-semibold">Gancho Atual Gerado</Label>
+                            <Input
+                              value={headline.mainText}
+                              onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
+                              className="h-8 text-xs font-bold mt-1"
+                            />
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Painel de Agendamento & Publicação Automática (Integrado) */}
+                      <div className="space-y-4 pt-2 border-t border-border/40">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-primary" />
+                          <h4 className="text-xs font-bold">Agendamento & Publicação Automática (Blotato)</h4>
+                        </div>
+
+                        {/* Destination Accounts */}
+                        <div>
+                          <Label className="text-xs font-semibold">Contas de Destino</Label>
+                          {blotatoAccounts.length === 0 ? (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Nenhuma conta Blotato conectada em <a href="/credentials" className="text-primary underline">Credenciais</a>.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {blotatoAccounts.map((acc) => {
+                                const isChecked = targetAccounts.includes(acc.id);
+                                return (
+                                  <button
+                                    key={acc.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (isChecked) setTargetAccounts((prev) => prev.filter((id) => id !== acc.id));
+                                      else setTargetAccounts((prev) => [...prev, acc.id]);
+                                    }}
+                                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                      isChecked
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : "bg-secondary/40 text-muted-foreground border-border"
+                                    }`}
+                                  >
+                                    {isChecked && <Check className="h-3 w-3" />}
+                                    {acc.label || acc.page_name || acc.platform}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs font-semibold">Data da Postagem</Label>
+                            <Input
+                              type="date"
+                              value={scheduleDate}
+                              onChange={(e) => setScheduleDate(e.target.value)}
+                              className="h-8 text-xs mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Horário</Label>
+                            <Input
+                              type="time"
+                              value={scheduleTime}
+                              onChange={(e) => setScheduleTime(e.target.value)}
+                              className="h-8 text-xs mt-1"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Post Caption & Hashtags */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs font-semibold">Legenda do Post</Label>
+                            <Textarea
+                              value={postCaption}
+                              onChange={(e) => setPostCaption(e.target.value)}
+                              placeholder="Escreva ou gere com IA a legenda envolvente..."
+                              rows={3}
+                              className="text-xs mt-1 resize-none"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs font-semibold">Hashtags</Label>
+                            <Input
+                              value={postHashtags.join(" ")}
+                              onChange={(e) => setPostHashtags(e.target.value.split(" ").filter(Boolean))}
+                              className="h-8 text-xs mt-1 font-mono text-primary"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Dispatch Actions */}
+                        <div className="flex gap-3 pt-2">
+                          <Button
+                            onClick={() => handleSchedulePost(false)}
+                            className="flex-1 text-xs font-bold gap-1.5 h-9"
+                          >
+                            <Calendar className="h-3.5 w-3.5" />
+                            Agendar Postagem
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => handleSchedulePost(true)}
+                            className="flex-1 text-xs font-bold gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Publicar Agora
+                          </Button>
+                        </div>
+                      </div>
+
+                    </CardContent>
+                  </Card>
                 )}
+
+                {/* 3. Fila de Postagens Agendadas */}
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" /> Fila de Postagens Agendadas ({scheduledPosts.length})
+                  </h3>
+
+                  {scheduledPosts.length === 0 ? (
+                    <div className="text-center py-8 border rounded-xl bg-card border-dashed">
+                      <Calendar className="h-7 w-7 mx-auto text-muted-foreground mb-1.5 opacity-50" />
+                      <p className="text-xs text-muted-foreground">Nenhuma postagem agendada na fila.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {scheduledPosts.map((post) => (
+                        <div key={post.id} className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3 shadow-sm">
+                          <div className="min-w-0">
+                            <p className="font-bold text-xs truncate">{post.title}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Post Imediato"}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge
+                              variant={post.status === "published" ? "default" : "secondary"}
+                              className="text-[9px] uppercase"
+                            >
+                              {post.status}
+                            </Badge>
+                            {post.rendered_video_url && (
+                              <a href={post.rendered_video_url} target="_blank" rel="noreferrer" download>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" title="Baixar Vídeo MP4">
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
 
             </div>
           </TabsContent>
 
         </Tabs>
+
+        {/* ── Save Layout Dialog ── */}
+        <Dialog open={isSaveLayoutDialogOpen} onOpenChange={setIsSaveLayoutDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                <Layers className="h-5 w-5 text-primary" /> Salvar Modelo de Layout 9:16
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Salve este modelo visual com todos os estilos de cabeçalho, tipografia, enquadramento e marca d'água para reutilizar em todos os seus clipes.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Nome do Layout / Template</Label>
+                <Input
+                  value={layoutNameInput}
+                  onChange={(e) => setLayoutNameInput(e.target.value)}
+                  placeholder="Ex: Viral Minimalista, Dark Podcast, Humor..."
+                  className="text-xs"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Switch
+                  checked={isDefaultLayoutInput}
+                  onCheckedChange={setIsDefaultLayoutInput}
+                />
+                <Label className="text-xs">Definir como layout padrão para novos clipes</Label>
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setIsSaveLayoutDialogOpen(false)} className="text-xs">
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleSavePresetSubmit(layoutNameInput, isDefaultLayoutInput)}
+                disabled={savingPreset || !layoutNameInput.trim()}
+                className="text-xs font-bold gap-1.5 bg-primary text-primary-foreground"
+              >
+                {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Salvar Layout
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
