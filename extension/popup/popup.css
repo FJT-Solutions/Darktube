@@ -1,4 +1,4 @@
-/* DarkTube Design System - Dark Clips Extension (Ultra HD Crisp Typography & Premium UI) */
+/* DarkTube Design System - Dark Clips Extension (Ultra HD Responsive Typography & Grid Filters) */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,7 +6,7 @@
 }
 
 body {
-  width: 400px;
+  width: 380px;
   max-height: 600px;
   background-color: #09090b;
   color: #f4f4f5;
@@ -23,7 +23,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 14px;
+  padding: 12px 14px;
   gap: 10px;
 }
 
@@ -274,19 +274,19 @@ body {
   color: #34d399;
 }
 
-/* ── Filter Row ── */
-.filter-row {
+/* ── Filter Section (Responsive Grid) ── */
+.filter-section {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
 }
 
-.filter-row::-webkit-scrollbar {
-  display: none;
+.filter-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  width: 100%;
 }
 
 .filter-pill {
@@ -295,13 +295,17 @@ body {
   color: #a1a1aa;
   font-size: 11px;
   font-weight: 700;
-  padding: 4px 9px;
-  border-radius: 6px;
+  padding: 6px 2px;
+  border-radius: 7px;
   cursor: pointer;
-  white-space: nowrap;
   transition: all 0.15s ease;
   font-family: inherit;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
 }
 
 .filter-pill:hover {
@@ -316,18 +320,31 @@ body {
   border-color: #71717a;
 }
 
+.top3-pill {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 .filter-pill.highlight-pill {
   background: rgba(255, 0, 0, 0.12);
   border-color: rgba(255, 0, 0, 0.4);
   color: #ff6b6b;
-  font-weight: 800;
+}
+
+.filter-pill.highlight-pill:hover {
+  background: rgba(255, 0, 0, 0.22);
+  color: #ffffff;
+  border-color: #FF0000;
 }
 
 .filter-pill.highlight-pill.active {
   background: #FF0000;
   border-color: #FF0000;
   color: #ffffff;
-  box-shadow: 0 0 12px rgba(255, 0, 0, 0.5);
+  box-shadow: 0 0 14px rgba(255, 0, 0, 0.5);
 }
 
 /* Buttons */
@@ -548,7 +565,7 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 190px;
+  max-width: 180px;
 }
 
 .metrics-row {
