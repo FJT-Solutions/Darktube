@@ -71,8 +71,11 @@ export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
           collapsed ? "justify-center px-0" : "justify-between"
         )}>
           <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 shadow-lg shadow-red-600/20">
-              <Youtube className="h-4 w-4 text-white" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-red-600 shadow-[0_0_16px_rgba(220,38,38,0.5)]">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="4" width="20" height="16" rx="4" stroke="#FFFFFF" strokeWidth="2.2" />
+                <path d="M10 8.5L16 12L10 15.5V8.5Z" fill="#FFFFFF"/>
+              </svg>
             </div>
             {!collapsed && (
               <div className="flex flex-col">
@@ -81,6 +84,7 @@ export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
                 </span>
               </div>
             )}
+
           </Link>
           {!collapsed && (
             <button
