@@ -67,8 +67,24 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   // Platform UI Simulation Mode
   const [previewMode, setPreviewMode] = useState<'clean' | 'tiktok' | 'reels' | 'shorts'>('clean');
 
-  // Canvas Viewport Compact Zoom Mode ('fit' auto-responsivo ao display | 'sm' 420px | 'md' 500px | 'lg' 580px)
-  const [canvasZoom, setCanvasZoom] = useState<'fit' | 'sm' | 'md' | 'lg'>('fit');
+  // Track dynamic artboard dimensions to scale platform overlays proportionally
+  const [stageSize, setStageSize] = useState<{ width: number; height: number }>({ width: 300, height: 533 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.height > 0 && rect.width > 0) {
+          setStageSize({ width: rect.width, height: rect.height });
+        }
+      }
+    };
+    updateSize();
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   // Active layer being dragged (supports header, mainText, subText, video, watermark, footer, arrows, and arrow-0, arrow-1...)
   const [activeLayer, setActiveLayer] = useState<string>('none');
@@ -242,103 +258,56 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   return (
     <div className="flex flex-col items-center gap-2 w-full mx-auto select-none">
       
-      {/* ── Platform Simulation Switcher & Zoom Controls ── */}
-      <div className="w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5">
-        {/* Platform Simulations */}
-        <div className="flex-1 bg-secondary/40 p-0.5 rounded-xl border border-border/60 flex items-center justify-between gap-0.5 text-[10px] shadow-sm">
-          <button
-            type="button"
-            onClick={() => setPreviewMode('clean')}
-            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center ${
-              previewMode === 'clean'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-            }`}
-            title="Visualização limpa sem interface de rede social"
-          >
-            Limpo
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewMode('tiktok')}
-            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
-              previewMode === 'tiktok'
-                ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-            }`}
-            title="Simular interface do TikTok"
-          >
-            <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewMode('reels')}
-            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
-              previewMode === 'reels'
-                ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-            }`}
-            title="Simular interface do Reels"
-          >
-            Reels
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewMode('shorts')}
-            className={`flex-1 py-1 px-1 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
-              previewMode === 'shorts'
-                ? 'bg-red-600 text-white shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-            }`}
-            title="Simular interface do Shorts"
-          >
-            Shorts
-          </button>
-        </div>
-
-        {/* Viewport Fit & Zoom Controls */}
-        <div className="bg-secondary/40 p-0.5 rounded-xl border border-border/60 flex items-center gap-0.5 text-[10px] shrink-0">
-          <button
-            type="button"
-            onClick={() => setCanvasZoom('fit')}
-            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
-              canvasZoom === 'fit' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Ajuste 100% Automático ao Viewport (Tela Toda)"
-          >
-            📱 Auto
-          </button>
-          <button
-            type="button"
-            onClick={() => setCanvasZoom('sm')}
-            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
-              canvasZoom === 'sm' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Compacto (420px)"
-          >
-            P
-          </button>
-          <button
-            type="button"
-            onClick={() => setCanvasZoom('md')}
-            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
-              canvasZoom === 'md' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Médio (500px)"
-          >
-            M
-          </button>
-          <button
-            type="button"
-            onClick={() => setCanvasZoom('lg')}
-            className={`px-1.5 py-1 rounded-lg font-bold transition-all ${
-              canvasZoom === 'lg' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Grande (580px)"
-          >
-            G
-          </button>
-        </div>
+      {/* ── Platform Simulation Switcher Bar ── */}
+      <div className="w-full bg-secondary/40 p-0.5 rounded-xl border border-border/60 flex items-center justify-between gap-1 text-[11px] shadow-sm">
+        <button
+          type="button"
+          onClick={() => setPreviewMode('clean')}
+          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center ${
+            previewMode === 'clean'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Visualização limpa sem interface de rede social"
+        >
+          Limpo
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewMode('tiktok')}
+          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
+            previewMode === 'tiktok'
+              ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Simular interface do TikTok"
+        >
+          <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewMode('reels')}
+          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+            previewMode === 'reels'
+              ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Simular interface do Reels (Facebook & Instagram)"
+        >
+          Reels
+        </button>
+        <button
+          type="button"
+          onClick={() => setPreviewMode('shorts')}
+          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+            previewMode === 'shorts'
+              ? 'bg-red-600 text-white shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+          }`}
+          title="Simular interface do YouTube Shorts"
+        >
+          Shorts
+        </button>
       </div>
 
       {/* ── Top Stage Info Bar ── */}
@@ -373,15 +342,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       <div
         ref={containerRef}
         style={{
-          height:
-            canvasZoom === 'sm'
-              ? '420px'
-              : canvasZoom === 'md'
-              ? '500px'
-              : canvasZoom === 'lg'
-              ? '580px'
-              : 'min(calc(100vh - 19rem), 520px)',
-          maxHeight: 'calc(100vh - 17rem)',
+          height: 'min(calc(100vh - 18.5rem), 540px)',
+          maxHeight: 'calc(100vh - 16rem)',
           aspectRatio: '9/16',
           maxWidth: '100%',
         }}
@@ -435,78 +397,88 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           loop={true}
         />
 
-        {/* ── Platform Simulation Overlays (Non-blocking preview guides) ── */}
+        {/* ── Platform Simulation Overlays (Proportionally Scaled with Stage) ── */}
         
         {/* 1. TIKTOK OVERLAY */}
         {previewMode === 'tiktok' && (
-          <div className="absolute inset-0 pointer-events-none z-20 select-none">
-            {/* Top Bar */}
-            <div className="absolute top-3.5 inset-x-0 px-4 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              <div className="w-6" />
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-white/60 font-semibold">Seguindo</span>
-                <span className="text-white font-bold border-b-2 border-white pb-0.5">Para Você</span>
-              </div>
-              <Search className="h-4 w-4 text-white" />
-            </div>
-
-            {/* Right Action Rail */}
-            <div className="absolute right-2 bottom-5 flex flex-col items-center gap-3.5 text-white">
-              {/* Profile Avatar with Plus button */}
-              <div className="relative mb-1">
-                <div className="w-8 h-8 rounded-full border-2 border-white overflow-hidden bg-zinc-800 shadow-md">
-                  {profileHeader.avatarUrl ? (
-                    <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-white bg-gradient-to-tr from-pink-500 to-indigo-500">
-                      {displayName[0]?.toUpperCase() || 'D'}
-                    </div>
-                  )}
+          <div className="absolute inset-0 pointer-events-none z-20 select-none overflow-hidden">
+            <div
+              style={{
+                width: 360,
+                height: 640,
+                transform: `scale(${stageSize.width / 360})`,
+                transformOrigin: 'top left',
+              }}
+              className="relative w-[360px] h-[640px] text-white"
+            >
+              {/* Top Bar */}
+              <div className="absolute top-4 inset-x-0 px-4 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <div className="w-6" />
+                <div className="flex items-center gap-3.5 text-sm font-bold">
+                  <span className="text-white/60">Seguindo</span>
+                  <span className="text-white border-b-2 border-white pb-0.5">Para Você</span>
                 </div>
-                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[#FE2C55] flex items-center justify-center text-white shadow">
-                  <Plus className="h-2.5 w-2.5 stroke-[3]" />
+                <Search className="h-5 w-5 text-white" />
+              </div>
+
+              {/* Right Action Rail */}
+              <div className="absolute right-3 bottom-6 flex flex-col items-center gap-4 text-white">
+                {/* Profile Avatar with Plus button */}
+                <div className="relative mb-1">
+                  <div className="w-11 h-11 rounded-full border-2 border-white overflow-hidden bg-zinc-800 shadow-md">
+                    {profileHeader.avatarUrl ? (
+                      <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white bg-gradient-to-tr from-pink-500 to-indigo-500">
+                        {displayName[0]?.toUpperCase() || 'D'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-[#FE2C55] flex items-center justify-center text-white shadow">
+                    <Plus className="h-3 w-3 stroke-[3]" />
+                  </div>
+                </div>
+
+                {/* Likes */}
+                <div className="flex flex-col items-center">
+                  <Heart className="h-7 w-7 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">842.1K</span>
+                </div>
+
+                {/* Comments */}
+                <div className="flex flex-col items-center">
+                  <MessageCircle className="h-7 w-7 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">14.6K</span>
+                </div>
+
+                {/* Bookmark */}
+                <div className="flex flex-col items-center">
+                  <Bookmark className="h-7 w-7 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">52.3K</span>
+                </div>
+
+                {/* Share */}
+                <div className="flex flex-col items-center">
+                  <Share2 className="h-7 w-7 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">31.8K</span>
+                </div>
+
+                {/* Spinning Music Vinyl */}
+                <div className="w-9 h-9 rounded-full bg-black/90 border border-zinc-700 flex items-center justify-center mt-1 animate-[spin_4s_linear_infinite] shadow-lg">
+                  <Disc className="h-4 w-4 text-zinc-300" />
                 </div>
               </div>
 
-              {/* Likes */}
-              <div className="flex flex-col items-center">
-                <Heart className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">842.1K</span>
-              </div>
-
-              {/* Comments */}
-              <div className="flex flex-col items-center">
-                <MessageCircle className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">14.6K</span>
-              </div>
-
-              {/* Bookmark */}
-              <div className="flex flex-col items-center">
-                <Bookmark className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">52.3K</span>
-              </div>
-
-              {/* Share */}
-              <div className="flex flex-col items-center">
-                <Share2 className="h-6 w-6 fill-white text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">31.8K</span>
-              </div>
-
-              {/* Spinning Music Vinyl */}
-              <div className="w-7 h-7 rounded-full bg-black/90 border border-zinc-700 flex items-center justify-center mt-1 animate-[spin_4s_linear_infinite] shadow-lg">
-                <Disc className="h-3.5 w-3.5 text-zinc-300" />
-              </div>
-            </div>
-
-            {/* Bottom Left Info */}
-            <div className="absolute left-3 bottom-3 max-w-[70%] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
-              <p className="font-bold text-xs">@{displayHandle}</p>
-              <p className="text-[10px] text-zinc-100 line-clamp-2 mt-0.5 leading-snug">
-                {displayCaption} <span className="font-bold text-white">#viral #foryou #fyp</span>
-              </p>
-              <div className="flex items-center gap-1 text-[9px] text-zinc-200 mt-1">
-                <Music className="h-2.5 w-2.5 shrink-0" />
-                <span className="truncate">Som original - {displayName}</span>
+              {/* Bottom Left Info */}
+              <div className="absolute left-3.5 bottom-4 max-w-[245px] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+                <p className="font-bold text-sm">@{displayHandle}</p>
+                <p className="text-xs text-zinc-100 line-clamp-2 mt-1 leading-snug">
+                  {displayCaption} <span className="font-bold text-white">#viral #foryou #fyp</span>
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-200 mt-2">
+                  <Music className="h-3 w-3 shrink-0" />
+                  <span className="truncate">Som original - {displayName}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -514,153 +486,173 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
 
         {/* 2. REELS (FACEBOOK & INSTAGRAM) OVERLAY */}
         {previewMode === 'reels' && (
-          <div className="absolute inset-0 pointer-events-none z-20 select-none">
-            {/* Top Bar */}
-            <div className="absolute top-3.5 inset-x-0 px-3.5 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              <span className="font-extrabold text-sm tracking-wide">Reels</span>
-              <Camera className="h-4 w-4" />
-            </div>
-
-            {/* Right Action Rail */}
-            <div className="absolute right-2.5 bottom-6 flex flex-col items-center gap-4 text-white">
-              {/* Like */}
-              <div className="flex flex-col items-center">
-                <Heart className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">126 mil</span>
+          <div className="absolute inset-0 pointer-events-none z-20 select-none overflow-hidden">
+            <div
+              style={{
+                width: 360,
+                height: 640,
+                transform: `scale(${stageSize.width / 360})`,
+                transformOrigin: 'top left',
+              }}
+              className="relative w-[360px] h-[640px] text-white"
+            >
+              {/* Top Bar */}
+              <div className="absolute top-4 inset-x-0 px-4 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <span className="font-extrabold text-base tracking-wide">Reels</span>
+                <Camera className="h-5 w-5" />
               </div>
 
-              {/* Comment */}
-              <div className="flex flex-col items-center">
-                <MessageCircle className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">3.240</span>
-              </div>
-
-              {/* Share/Send */}
-              <div className="flex flex-col items-center">
-                <Send className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] -rotate-12" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">18,5 mil</span>
-              </div>
-
-              {/* More */}
-              <MoreVertical className="h-4 w-4 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-
-              {/* Audio Square */}
-              <div className="w-5 h-5 rounded-md border border-white/60 bg-zinc-800/90 flex items-center justify-center shadow">
-                <Music className="h-2.5 w-2.5 text-zinc-300" />
-              </div>
-            </div>
-
-            {/* Bottom Left Info */}
-            <div className="absolute left-3 bottom-3 max-w-[70%] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="w-5 h-5 rounded-full border border-white/60 overflow-hidden bg-zinc-800">
-                  {profileHeader.avatarUrl ? (
-                    <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white bg-primary">
-                      {displayName[0]?.toUpperCase() || 'D'}
-                    </div>
-                  )}
+              {/* Right Action Rail */}
+              <div className="absolute right-3.5 bottom-6 flex flex-col items-center gap-4 text-white">
+                {/* Like */}
+                <div className="flex flex-col items-center">
+                  <Heart className="h-7 w-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">126 mil</span>
                 </div>
-                <span className="font-bold text-xs truncate">@{displayHandle}</span>
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border border-white/70 bg-white/10 backdrop-blur-sm">
-                  Seguir
-                </span>
-              </div>
-              <p className="text-[10px] text-zinc-100 line-clamp-2 leading-snug">
-                {displayCaption}
-              </p>
-              <div className="flex items-center gap-1 text-[9px] text-zinc-200 mt-1">
-                <Music className="h-2.5 w-2.5 shrink-0" />
-                <span className="truncate">Áudio original • {displayName}</span>
-              </div>
-            </div>
 
-            {/* Bottom Progress Bar */}
-            <div className="absolute bottom-0 inset-x-0 h-[2px] bg-white/70" />
+                {/* Comment */}
+                <div className="flex flex-col items-center">
+                  <MessageCircle className="h-7 w-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">3.240</span>
+                </div>
+
+                {/* Share/Send */}
+                <div className="flex flex-col items-center">
+                  <Send className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] -rotate-12" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">18,5 mil</span>
+                </div>
+
+                {/* More */}
+                <MoreVertical className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+
+                {/* Audio Square */}
+                <div className="w-7 h-7 rounded-md border border-white/60 bg-zinc-800/90 flex items-center justify-center shadow">
+                  <Music className="h-3 w-3 text-zinc-300" />
+                </div>
+              </div>
+
+              {/* Bottom Left Info */}
+              <div className="absolute left-3.5 bottom-4 max-w-[245px] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-full border border-white/60 overflow-hidden bg-zinc-800">
+                    {profileHeader.avatarUrl ? (
+                      <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white bg-primary">
+                        {displayName[0]?.toUpperCase() || 'D'}
+                      </div>
+                    )}
+                  </div>
+                  <span className="font-bold text-sm truncate">@{displayHandle}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded border border-white/70 bg-white/10 backdrop-blur-sm">
+                    Seguir
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-100 line-clamp-2 leading-snug mt-1">
+                  {displayCaption}
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-200 mt-2">
+                  <Music className="h-3 w-3 shrink-0" />
+                  <span className="truncate">Áudio original • {displayName}</span>
+                </div>
+              </div>
+
+              {/* Bottom Progress Bar */}
+              <div className="absolute bottom-0 inset-x-0 h-[2.5px] bg-white/70" />
+            </div>
           </div>
         )}
 
         {/* 3. YOUTUBE SHORTS OVERLAY */}
         {previewMode === 'shorts' && (
-          <div className="absolute inset-0 pointer-events-none z-20 select-none">
-            {/* Top Bar */}
-            <div className="absolute top-3 inset-x-0 px-3.5 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              <span className="font-black text-[11px] uppercase tracking-wider text-red-500 bg-white/15 px-1.5 py-0.5 rounded">
-                Shorts
-              </span>
-              <div className="flex items-center gap-3">
-                <Search className="h-4 w-4" />
-                <MoreVertical className="h-4 w-4" />
-              </div>
-            </div>
-
-            {/* Right Action Rail */}
-            <div className="absolute right-2 bottom-6 flex flex-col items-center gap-3.5 text-white">
-              {/* Thumbs Up */}
-              <div className="flex flex-col items-center">
-                <ThumbsUp className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">248 mil</span>
-              </div>
-
-              {/* Thumbs Down */}
-              <div className="flex flex-col items-center">
-                <ThumbsDown className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Dislike</span>
-              </div>
-
-              {/* Comments */}
-              <div className="flex flex-col items-center">
-                <MessageCircle className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">4,8 mil</span>
-              </div>
-
-              {/* Share */}
-              <div className="flex flex-col items-center">
-                <Share2 className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Compartilhar</span>
-              </div>
-
-              {/* Remix */}
-              <div className="flex flex-col items-center">
-                <Layers className="h-5 w-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
-                <span className="text-[9px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Remix</span>
-              </div>
-
-              {/* Audio Thumb Box */}
-              <div className="w-6 h-6 rounded-md border border-white/50 bg-zinc-800 overflow-hidden shadow flex items-center justify-center">
-                <Music className="h-3 w-3 text-white" />
-              </div>
-            </div>
-
-            {/* Bottom Left Info */}
-            <div className="absolute left-3 bottom-3 max-w-[70%] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
-              <div className="flex items-center gap-1.5 mb-1">
-                <div className="w-5 h-5 rounded-full border border-white/60 overflow-hidden bg-zinc-800">
-                  {profileHeader.avatarUrl ? (
-                    <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white bg-red-600">
-                      {displayName[0]?.toUpperCase() || 'D'}
-                    </div>
-                  )}
-                </div>
-                <span className="font-bold text-xs truncate">@{displayHandle}</span>
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white shadow-sm">
-                  Inscrever-se
+          <div className="absolute inset-0 pointer-events-none z-20 select-none overflow-hidden">
+            <div
+              style={{
+                width: 360,
+                height: 640,
+                transform: `scale(${stageSize.width / 360})`,
+                transformOrigin: 'top left',
+              }}
+              className="relative w-[360px] h-[640px] text-white"
+            >
+              {/* Top Bar */}
+              <div className="absolute top-4 inset-x-0 px-4 flex items-center justify-between text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <span className="font-black text-xs uppercase tracking-wider text-red-500 bg-white/15 px-2 py-0.5 rounded">
+                  Shorts
                 </span>
+                <div className="flex items-center gap-3.5">
+                  <Search className="h-5 w-5" />
+                  <MoreVertical className="h-5 w-5" />
+                </div>
               </div>
-              <p className="text-[10px] text-zinc-100 line-clamp-2 leading-snug">
-                {displayCaption} <span className="font-bold text-white">#shorts</span>
-              </p>
-              <div className="flex items-center gap-1 text-[9px] text-zinc-200 mt-1">
-                <Music className="h-2.5 w-2.5 shrink-0" />
-                <span className="truncate">Som original - {displayName}</span>
-              </div>
-            </div>
 
-            {/* Bottom Red Progress Bar */}
-            <div className="absolute bottom-0 inset-x-0 h-[2.5px] bg-red-600" />
+              {/* Right Action Rail */}
+              <div className="absolute right-3 bottom-6 flex flex-col items-center gap-4 text-white">
+                {/* Thumbs Up */}
+                <div className="flex flex-col items-center">
+                  <ThumbsUp className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">248 mil</span>
+                </div>
+
+                {/* Thumbs Down */}
+                <div className="flex flex-col items-center">
+                  <ThumbsDown className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Dislike</span>
+                </div>
+
+                {/* Comments */}
+                <div className="flex flex-col items-center">
+                  <MessageCircle className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">4,8 mil</span>
+                </div>
+
+                {/* Share */}
+                <div className="flex flex-col items-center">
+                  <Share2 className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Compartilhar</span>
+                </div>
+
+                {/* Remix */}
+                <div className="flex flex-col items-center">
+                  <Layers className="h-6 w-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" />
+                  <span className="text-[10px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] mt-0.5">Remix</span>
+                </div>
+
+                {/* Audio Thumb Box */}
+                <div className="w-8 h-8 rounded-md border border-white/50 bg-zinc-800 overflow-hidden shadow flex items-center justify-center">
+                  <Music className="h-4 w-4 text-white" />
+                </div>
+              </div>
+
+              {/* Bottom Left Info */}
+              <div className="absolute left-3.5 bottom-4 max-w-[245px] text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-full border border-white/60 overflow-hidden bg-zinc-800">
+                    {profileHeader.avatarUrl ? (
+                      <img src={profileHeader.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-bold text-white bg-red-600">
+                        {displayName[0]?.toUpperCase() || 'D'}
+                      </div>
+                    )}
+                  </div>
+                  <span className="font-bold text-sm truncate">@{displayHandle}</span>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-600 text-white shadow-sm">
+                    Inscrever-se
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-100 line-clamp-2 leading-snug mt-1">
+                  {displayCaption} <span className="font-bold text-white">#shorts</span>
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-200 mt-2">
+                  <Music className="h-3 w-3 shrink-0" />
+                  <span className="truncate">Som original - {displayName}</span>
+                </div>
+              </div>
+
+              {/* Bottom Red Progress Bar */}
+              <div className="absolute bottom-0 inset-x-0 h-[2.5px] bg-red-600" />
+            </div>
           </div>
         )}
 
