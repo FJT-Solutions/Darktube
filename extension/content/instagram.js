@@ -1,4 +1,4 @@
-// Dark Clips - Instagram Robust Content Script (Grid, Reels, Carousels & Profile Scraper)
+// Dark Clips - Instagram Content Script (Robust Grid, Reels & Carousel Scanner)
 (function () {
   const SCRIPT_NAME = 'DarkClips-Instagram';
   const DEFAULT_API_URL = 'https://darktube.fjt-solutions.com';
@@ -51,12 +51,14 @@
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
+      const list = Array.isArray(items) ? items : [items];
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           platform: 'instagram',
-          items: Array.isArray(items) ? items : [items],
+          items: list,
           userId: user?.id || null
         })
       });
@@ -67,7 +69,7 @@
         if (btnElement) {
           btnElement.classList.remove('sending');
           btnElement.classList.add('sent');
-          btnElement.innerHTML = '<span>✅ Enviado!</span>';
+          btnElement.innerHTML = '<span>✅ Enviado ao Dark Clips!</span>';
           setTimeout(() => {
             btnElement.classList.remove('sent');
             btnElement.innerHTML = `
@@ -76,7 +78,7 @@
             `;
           }, 3000);
         }
-        showToast(`${Array.isArray(items) ? items.length : 1} post(s) enviado(s) ao Dark Clips!`);
+        showToast(`${list.length} post(s) enviado(s) ao Dark Clips com sucesso!`);
       } else {
         throw new Error(result.error || 'Erro ao importar');
       }
@@ -96,6 +98,7 @@
     }
   }
 
+  // Parse metric strings like "12.5K", "1.2M", "15.430 curtidas"
   function parseMetricNumber(str) {
     if (!str) return 0;
     const clean = str.replace(/\./g, '').replace(/,/g, '.').toLowerCase();
@@ -109,13 +112,14 @@
     return digits ? parseInt(digits, 10) : 0;
   }
 
+  // Extract author profile info from page URL
   function getPageProfileInfo() {
     const pathParts = window.location.pathname.split('/').filter(Boolean);
-    const notProfiles = ['explore', 'reels', 'direct', 'stories', 'p', 'reel', 'tv', 'accounts'];
+    const notProfiles = ['explore', 'reels', 'direct', 'stories', 'p', 'reel'];
     if (pathParts.length > 0 && !notProfiles.includes(pathParts[0])) {
       const handle = `@${pathParts[0]}`;
-      const headerTitle = document.querySelector('header h2, header h1, section h2, section h1')?.textContent?.trim();
-      const avatarImg = document.querySelector('header img, section img[alt*="perfil"], img[alt*="profile"]')?.getAttribute('src') || '';
+      const headerTitle = document.querySelector('header h2, header h1, main h2, main h1')?.textContent?.trim();
+      const avatarImg = document.querySelector('header img, img[alt*="perfil"], img[alt*="profile"]')?.getAttribute('src') || '';
       return {
         handle,
         name: headerTitle || pathParts[0],
@@ -125,27 +129,7 @@
     return { handle: '@instagram', name: 'Instagram Creator', avatar: '' };
   }
 
-  // Extract best thumbnail image from element
-  function extractThumbnail(el) {
-    if (!el) return '';
-    const img = el.tagName === 'IMG' ? el : el.querySelector('img');
-    if (img) {
-      if (img.currentSrc) return img.currentSrc;
-      if (img.src) return img.src;
-      if (img.srcset) {
-        const parts = img.srcset.split(',');
-        const last = parts[parts.length - 1]?.trim().split(' ')[0];
-        if (last) return last;
-      }
-    }
-    const video = el.tagName === 'VIDEO' ? el : el.querySelector('video');
-    if (video && video.getAttribute('poster')) {
-      return video.getAttribute('poster');
-    }
-    return '';
-  }
-
-  // Extract Modal Dialog post data
+  // Extract single modal/dialog reel or post
   function extractModalPostData(container) {
     try {
       const video = container.querySelector('video');
@@ -159,8 +143,8 @@
       const authorLink = container.querySelector('header a, a[role="link"][href^="/"]');
       if (authorLink) {
         const href = authorLink.getAttribute('href') || '';
-        const handle = href.replace(/\//g, '');
-        if (handle && !['explore', 'reels', 'direct', 'stories', 'p', 'reel'].includes(handle)) {
+        const handle = href.replace(/\//g, '').split('?')[0];
+        if (handle && !['explore', 'reels', 'direct', 'stories'].includes(handle)) {
           authorHandle = `@${handle}`;
           authorName = authorLink.textContent?.trim() || handle;
         }
@@ -177,6 +161,7 @@
         caption = captionEl.textContent?.trim() || '';
       }
 
+      // Likes & Comments
       let likes = 0;
       let comments = 0;
 
@@ -193,10 +178,20 @@
       const isVideo = !!video;
       const isCarousel = !!container.querySelector('div[aria-label*="carrossel"], div[aria-label*="carousel"], ul[class*="carousel"]');
 
+      // Best thumbnail resolution
+      let thumbUrl = '';
+      if (video) {
+        thumbUrl = video.getAttribute('poster') || '';
+      }
+      if (!thumbUrl) {
+        const img = container.querySelector('div[role="dialog"] img, article img');
+        thumbUrl = img?.currentSrc || img?.src || '';
+      }
+
       return {
         url: currentUrl,
         videoUrl: video ? (video.src || video.querySelector('source')?.src || currentUrl) : currentUrl,
-        thumbnailUrl: extractThumbnail(container) || '',
+        thumbnailUrl: thumbUrl,
         duration: video ? Math.round(video.duration || 15) : 15,
         authorName,
         authorHandle,
@@ -205,9 +200,9 @@
         platform: 'instagram',
         type: isVideo ? 'reel' : isCarousel ? 'carousel' : 'post',
         metrics: {
-          likes: likes || 150,
-          comments: comments || 12,
-          views: (likes * 4) || 600
+          likes,
+          comments,
+          views: likes * 5 || 1000
         }
       };
     } catch {
@@ -215,44 +210,61 @@
     }
   }
 
-  // Robust Grid Extractor: scans all post/reel anchors anywhere in the page
+  // Extract ALL visible grid posts on Profile, Feed, or Search (contains `/p/` or `/reel/`)
   function extractAllVisibleGridPosts() {
     const posts = [];
     const seenUrls = new Set();
     const profileInfo = getPageProfileInfo();
 
-    // Universal selector for Instagram post anchors: /p/, /reel/, /reels/, /tv/
-    const links = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], a[href*="/tv/"]');
+    // Universal selector: match any anchor that contains /p/, /reel/, /reels/ anywhere in href
+    const anchors = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], div[role="presentation"] a, main a[href]');
 
-    links.forEach((a) => {
+    anchors.forEach((a) => {
       const rawHref = a.getAttribute('href');
       if (!rawHref) return;
 
-      // Clean full URL
-      let fullUrl = '';
-      try {
-        fullUrl = new URL(rawHref, window.location.origin).origin + new URL(rawHref, window.location.origin).pathname;
-      } catch {
-        fullUrl = `https://www.instagram.com${rawHref.split('?')[0]}`;
-      }
+      // Filter only post or reel links
+      if (!rawHref.includes('/p/') && !rawHref.includes('/reel/')) return;
+
+      // Normalize URL (e.g. /p/C9abc... -> https://www.instagram.com/p/C9abc/)
+      const cleanPath = rawHref.split('?')[0].split('#')[0];
+      const fullUrl = cleanPath.startsWith('http') ? cleanPath : `https://www.instagram.com${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
 
       if (seenUrls.has(fullUrl)) return;
       seenUrls.add(fullUrl);
 
-      const thumbUrl = extractThumbnail(a);
+      // Extract Thumbnail
       const img = a.querySelector('img');
+      let thumbUrl = '';
+      if (img) {
+        thumbUrl = img.currentSrc || img.src || img.getAttribute('src') || '';
+        if (!thumbUrl && img.getAttribute('srcset')) {
+          thumbUrl = img.getAttribute('srcset').split(',')[0].split(' ')[0];
+        }
+      }
+      if (!thumbUrl) {
+        // Check background-image
+        const bgDiv = a.querySelector('div[style*="background-image"]');
+        if (bgDiv) {
+          const match = bgDiv.style.backgroundImage.match(/url\(["']?([^"']+)["']?\)/);
+          if (match) thumbUrl = match[1];
+        }
+      }
+
+      // Extract Caption
       const caption = img?.getAttribute('alt') || a.getAttribute('aria-label') || '';
 
-      const isReel = fullUrl.includes('/reel/') || fullUrl.includes('/reels/') || !!a.querySelector('svg[aria-label*="Reel"], svg[aria-label*="Vídeo"], svg[aria-label*="Clip"]');
+      // Type detection
+      const isReel = cleanPath.includes('/reel') || !!a.querySelector('svg[aria-label*="Reel"], svg[aria-label*="Vídeo"], svg[aria-label*="Clip"], svg[aria-label*="Reels"]');
       const isCarousel = !!a.querySelector('svg[aria-label*="Carrossel"], svg[aria-label*="Carousel"], svg[aria-label*="Publicação com várias"]');
       const postType = isReel ? 'reel' : isCarousel ? 'carousel' : 'post';
 
+      // Metrics detection
       let likes = 0;
       let comments = 0;
       let views = 0;
 
-      // Extract metrics from aria-label
-      const ariaLabel = a.getAttribute('aria-label') || '';
+      const ariaLabel = a.getAttribute('aria-label') || caption;
       if (ariaLabel) {
         const likeMatch = ariaLabel.match(/([\d\.,kKmM]+)\s*(?:curtidas|likes)/i);
         if (likeMatch) likes = parseMetricNumber(likeMatch[1]);
@@ -264,8 +276,8 @@
         if (viewMatch) views = parseMetricNumber(viewMatch[1]);
       }
 
-      // Check inner list elements on hover
-      const listItems = a.querySelectorAll('ul li, div[class*="Overlay"] span, span[class*="html-span"]');
+      // Check inner list elements (on hover or DOM overlay)
+      const listItems = a.querySelectorAll('ul li, div[class*="Overlay"] span');
       if (listItems.length >= 1 && likes === 0) {
         likes = parseMetricNumber(listItems[0]?.textContent);
       }
@@ -285,7 +297,7 @@
         authorName: profileInfo.name,
         authorHandle: profileInfo.handle,
         authorAvatar: profileInfo.avatar,
-        originalCaption: caption || `Post de ${profileInfo.handle}`,
+        originalCaption: caption,
         platform: 'instagram',
         type: postType,
         metrics: {
@@ -299,9 +311,10 @@
     return posts;
   }
 
-  // Inject 1 Single Clean Button into Modal / Active Post (Zero Duplication)
+  // Inject 1 Single Clean Button into Modal / Active Post
   function injectButtons() {
     try {
+      // 1. Check if a Dialog Modal is currently open
       const dialog = document.querySelector('div[role="dialog"]');
       if (dialog) {
         if (!dialog.querySelector('.dark-clips-inject-btn')) {
@@ -321,6 +334,7 @@
         return;
       }
 
+      // 2. Standalone Feed Articles
       const standaloneArticles = document.querySelectorAll('article:not([role="dialog"] article)');
       standaloneArticles.forEach((article) => {
         if (article.querySelector('.dark-clips-inject-btn')) return;
@@ -361,34 +375,39 @@
 
   setInterval(injectButtons, 1500);
 
-  // Message listener for Extension Popup (Scan Profile, Grid & Dialogs)
+  // Message listener for Extension Popup (Scan All Visible Profile Grid Posts)
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'GET_PAGE_VIDEOS') {
       let videos = [];
-      const profile = getPageProfileInfo();
+      const seen = new Set();
 
-      // 1. Check if dialog is open
+      // 1. If inside modal/dialog, put active post first
       const dialog = document.querySelector('div[role="dialog"]');
       if (dialog) {
         const modalPost = extractModalPostData(dialog);
-        if (modalPost) videos.push(modalPost);
+        if (modalPost) {
+          seen.add(modalPost.url);
+          videos.push(modalPost);
+        }
       }
 
-      // 2. Extract all grid posts on profile / feed
+      // 2. Extract all grid posts on profile or feed
       const gridPosts = extractAllVisibleGridPosts();
-      gridPosts.forEach((post) => {
-        if (!videos.some((v) => v.url === post.url)) {
-          videos.push(post);
+      gridPosts.forEach((p) => {
+        if (!seen.has(p.url)) {
+          seen.add(p.url);
+          videos.push(p);
         }
       });
 
       // 3. Fallback to current URL if single reel page
       if (videos.length === 0 && window.location.href.includes('/reel/')) {
+        const profileInfo = getPageProfileInfo();
         videos.push({
           url: window.location.href,
           videoUrl: window.location.href,
-          authorName: profile.name,
-          authorHandle: profile.handle,
+          authorName: profileInfo.name,
+          authorHandle: profileInfo.handle,
           platform: 'instagram',
           type: 'reel',
           metrics: { likes: 0, comments: 0, views: 0 }
@@ -398,10 +417,10 @@
       sendResponse({
         success: true,
         videos,
-        profile
+        profile: getPageProfileInfo()
       });
     }
   });
 
-  console.log(`[${SCRIPT_NAME}] Ativo no Instagram (Full Profile Scanner Ready)!`);
+  console.log(`[${SCRIPT_NAME}] Ativo no Instagram (Varredura Completa de Grade + Perfil)!`);
 })();

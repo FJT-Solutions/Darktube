@@ -160,6 +160,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (currentFilter === 'views') {
       list.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0));
     } else if (currentFilter === 'top3') {
+      // Score: likes + (comments * 3) + views
       list.sort((a, b) => {
         const scoreA = (a.metrics?.likes || 0) + ((a.metrics?.comments || 0) * 3) + (a.metrics?.views || 0);
         const scoreB = (b.metrics?.likes || 0) + ((b.metrics?.comments || 0) * 3) + (b.metrics?.views || 0);
@@ -193,12 +194,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (displayedVideos.length === 0) {
       videosListEl.innerHTML = `
         <div class="empty-state">
-          <svg class="empty-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-            <line x1="7" y1="2" x2="7" y2="22"/>
-            <line x1="17" y1="2" x2="17" y2="22"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-          </svg>
           <p class="empty-title">Nenhum post detectado</p>
           <span class="empty-desc">Abra qualquer perfil, feed ou reel no Instagram, TikTok, Shorts ou X.</span>
         </div>
@@ -211,21 +206,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const item = document.createElement('div');
       item.className = 'video-item';
 
-      const typeLabel = post.type === 'reel' ? 'Reel' : post.type === 'carousel' ? 'Carrossel' : 'Post';
-      const typeClass = post.type === 'reel' ? 'type-reel' : post.type === 'carousel' ? 'type-carousel' : '';
+      const typeLabel = post.type === 'reel' ? '🎬 Reel' : post.type === 'carousel' ? '📸 Carrossel' : '🖼️ Post';
+      const typeClass = post.type === 'reel' ? 'type-reel' : post.type === 'carousel' ? 'type-carousel' : 'type-post';
 
       const likesCount = formatCount(post.metrics?.likes);
       const commentsCount = formatCount(post.metrics?.comments);
 
-      const thumbImgHtml = post.thumbnailUrl
-        ? `<img src="${post.thumbnailUrl}" class="video-thumb" alt="Thumb" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" /><div class="video-thumb" style="display:none; align-items:center; justify-content:center; background:#27272a; font-size:16px;">🎬</div>`
-        : `<div class="video-thumb" style="display:flex; align-items:center; justify-content:center; background:#27272a; font-size:16px;">🎬</div>`;
-
       item.innerHTML = `
         <div class="video-item-left">
-          <div class="video-thumb-container">
-            ${thumbImgHtml}
-          </div>
+          ${post.thumbnailUrl ? `<img src="${post.thumbnailUrl}" class="video-thumb" alt="Thumb" onerror="this.style.display='none'" />` : '<div class="video-thumb"></div>'}
           <div class="video-meta">
             <div class="video-top-row">
               <span class="video-author">${post.authorHandle || post.authorName || 'Criador'}</span>
@@ -233,8 +222,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
             <span class="video-caption" title="${post.originalCaption || ''}">${post.originalCaption || post.url}</span>
             <div class="metrics-row">
-              <span class="metric-item">❤️ ${likesCount}</span>
-              <span class="metric-item">💬 ${commentsCount}</span>
+              <span class="metric-item metric-likes">❤️ ${likesCount}</span>
+              <span class="metric-item metric-comments">💬 ${commentsCount}</span>
             </div>
           </div>
         </div>
