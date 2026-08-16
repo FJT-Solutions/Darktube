@@ -280,6 +280,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
       '--disable-breakpad',
       '--mute-audio',
       '--no-first-run',
+      '--js-flags=--max-old-space-size=2048',
+      '--disable-features=site-per-process,IsolateOrigins',
     ];
 
     const comp = await selectComposition({
@@ -294,17 +296,17 @@ async function renderAsync(historyId, composition, callbackUrl) {
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
-        enableMultiProcessOnLinux: true,
+        enableMultiProcessOnLinux: false,
         gl: null,
       },
-      timeoutInMilliseconds: 300_000,
-      delayRenderTimeoutInMilliseconds: 300_000,
+      timeoutInMilliseconds: 120_000,
+      delayRenderTimeoutInMilliseconds: 120_000,
     });
 
-    // Concorrência estável: 4 a 6 workers é o ideal para evitar lock de CPU e esgotamento de memória em vídeos longos
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 6));
-    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} frames simultâneos em paralelo`);
+    // Concorrência ideal e segura para evitar vazamento de processos e lock de CPU em vídeos longos (>30s)
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '3', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 4));
+    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers seguros`);
 
     let lastPercent = -1;
     await renderMedia({
@@ -313,15 +315,16 @@ async function renderAsync(historyId, composition, callbackUrl) {
       outputLocation: outputFilePath,
       codec: 'h264',
       concurrency,
+      maxRetries: 3,
       imageFormat: 'jpeg',
-      jpegQuality: 82,
+      jpegQuality: 80,
       inputProps,
       gl: null,
       browserExecutable: CHROME_PATH,
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
-        enableMultiProcessOnLinux: true,
+        enableMultiProcessOnLinux: false,
         gl: null,
       },
       onProgress: ({ progress, renderedDoneInFrames }) => {
@@ -332,8 +335,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
       },
-      timeoutInMilliseconds: 300_000,
-      delayRenderTimeoutInMilliseconds: 300_000,
+      timeoutInMilliseconds: 120_000,
+      delayRenderTimeoutInMilliseconds: 120_000,
     });
 
     console.log(`[Remotion Render] Concluído (vídeo silencioso): ${outputFilePath}`);
