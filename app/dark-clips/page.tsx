@@ -368,6 +368,16 @@ export default function DarkClipsPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <a href="/api/extension/download" download="dark-clips-extension.zip">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs gap-1.5 h-9 font-bold"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Baixar Extensão (.ZIP)
+              </Button>
+            </a>
             <Button
               variant="outline"
               size="sm"
@@ -387,6 +397,7 @@ export default function DarkClipsPage() {
               {isRendering ? "Renderizando MP4..." : "Renderizar Vídeo"}
             </Button>
           </div>
+
         </div>
 
         {/* ── Main Tab Navigation ── */}
@@ -766,6 +777,36 @@ export default function DarkClipsPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Extension Install Card */}
+              <Card className="lg:col-span-1 border-red-500/20 bg-gradient-to-br from-red-950/10 to-card">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-red-400">
+                    <Sparkles className="h-4 w-4" /> Extensão Dark Clips (Vivaldi, Chrome, Edge)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Minere perfis inteiros de Instagram, TikTok, Shorts e X com 1 clique direto no navegador.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 pt-2 space-y-3">
+                  <a href="/api/extension/download" download="dark-clips-extension.zip" className="block w-full">
+                    <Button className="w-full text-xs font-bold gap-1.5 h-9 bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20">
+                      <Download className="h-3.5 w-3.5" /> Baixar Extensão (.ZIP)
+                    </Button>
+                  </a>
+
+                  <div className="space-y-1.5 text-[11px] text-muted-foreground pt-1">
+                    <p className="font-semibold text-foreground">Como instalar em 10 segundos:</p>
+                    <ol className="list-decimal list-inside space-y-1 pl-1">
+                      <li>Baixe e descompacte o arquivo <code className="text-red-400 font-mono text-[10px]">.zip</code></li>
+                      <li>Acesse <code className="text-foreground font-mono text-[10px]">vivaldi://extensions</code> ou <code className="text-foreground font-mono text-[10px]">chrome://extensions</code></li>
+                      <li>Ative o <strong>"Modo do desenvolvedor"</strong></li>
+                      <li>Clique em <strong>"Carregar desempacotado"</strong> e selecione a pasta descompactada!</li>
+                    </ol>
+                  </div>
+                </CardContent>
+              </Card>
+
 
               {/* Clips Grid */}
               <div className="lg:col-span-2 space-y-4">
