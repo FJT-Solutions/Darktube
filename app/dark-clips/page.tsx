@@ -38,7 +38,8 @@ import {
   ArrowRight,
   FolderPlus,
   Move,
-  Navigation
+  Navigation,
+  Smartphone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -131,6 +132,7 @@ export default function DarkClipsPage() {
 
   // Modeler Granular State
   const [sampleVideoUrl, setSampleVideoUrl] = useState<string>("/sample-oceans.mp4");
+  const [previewMode, setPreviewMode] = useState<"clean" | "tiktok" | "reels" | "shorts">("clean");
   const [profileHeader, setProfileHeader] = useState({
     avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     name: "Dark Clips",
@@ -1709,8 +1711,97 @@ export default function DarkClipsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
+                    {/* ── 1. SELETOR DE VÍDEO DE EXEMPLO PARA TESTE DO ENQUADRAMENTO ── */}
+                    <div className="p-3.5 rounded-xl bg-secondary/20 border border-border/60 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Film className="h-3.5 w-3.5 text-primary" /> Vídeo de Exemplo (Teste de Layout)
+                        </Label>
+                        <span className="text-[10px] text-muted-foreground">Troque para testar enquadramentos</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { url: "/sample-oceans.mp4", label: "🌊 Oceano" },
+                          { url: "/sample-viral-clip.mp4", label: "🎬 Clipes" },
+                          { url: "/sample-nature.mp4", label: "🌿 Natureza" },
+                        ].map((s) => (
+                          <Button
+                            key={s.url}
+                            type="button"
+                            size="sm"
+                            variant={sampleVideoUrl === s.url ? "default" : "outline"}
+                            onClick={() => setSampleVideoUrl(s.url)}
+                            className="text-xs h-8 font-bold"
+                          >
+                            {s.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ── 2. SIMULAÇÃO DE INTERFACE DA REDE SOCIAL (OVERLAY 9:16) ── */}
+                    <div className="p-3.5 rounded-xl bg-secondary/20 border border-border/60 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Smartphone className="h-3.5 w-3.5 text-primary" /> Simulação de Interface (Overlay)
+                        </Label>
+                        <span className="text-[10px] font-mono text-primary font-bold">
+                          {previewMode === "clean" ? "Limpo" : previewMode.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={previewMode === "clean" ? "default" : "outline"}
+                          onClick={() => setPreviewMode("clean")}
+                          className="text-xs h-8 font-bold"
+                        >
+                          📱 Limpo
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={previewMode === "tiktok" ? "default" : "outline"}
+                          onClick={() => setPreviewMode("tiktok")}
+                          className={`text-xs h-8 font-bold ${
+                            previewMode === "tiktok" ? "bg-black text-white ring-1 ring-white/30" : ""
+                          }`}
+                        >
+                          <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={previewMode === "reels" ? "default" : "outline"}
+                          onClick={() => setPreviewMode("reels")}
+                          className={`text-xs h-8 font-bold ${
+                            previewMode === "reels"
+                              ? "bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white"
+                              : ""
+                          }`}
+                        >
+                          📸 Reels
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={previewMode === "shorts" ? "default" : "outline"}
+                          onClick={() => setPreviewMode("shorts")}
+                          className={`text-xs h-8 font-bold ${
+                            previewMode === "shorts" ? "bg-red-600 text-white" : ""
+                          }`}
+                        >
+                          ▶️ Shorts
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-tight">
+                        Simule como seu clipe ficará por trás dos botões de like, comentários e barra lateral de cada rede social.
+                      </p>
+                    </div>
+
                     {/* Posição Y */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-1 border-t border-border/40">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold">Posição Vertical do Vídeo (Y)</span>
                         <div className="flex items-center gap-1">
@@ -2846,11 +2937,11 @@ export default function DarkClipsPage() {
               </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
-              <div className="lg:col-span-5 lg:sticky lg:top-3 self-start space-y-2">
-                <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col max-h-[calc(100vh-1.5rem)]">
-                  <CardHeader className="p-2.5 px-3 border-b border-border/40 shrink-0">
+              <div className="lg:col-span-5 lg:sticky lg:top-6 self-start space-y-2">
+                <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col">
+                  <CardHeader className="p-3 px-4 border-b border-border/40 shrink-0">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Eye className="h-4 w-4 text-primary" /> Visualização ao Vivo (Canvas 9:16)
                       </CardTitle>
                       <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary py-0">
@@ -2859,33 +2950,9 @@ export default function DarkClipsPage() {
                     </div>
                   </CardHeader>
 
-                  {/* Seletor de Vídeo de Exemplo Limpo para Teste de Layout */}
-                  <div className="px-3 py-1.5 bg-secondary/20 border-b border-border/40 shrink-0 flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 shrink-0">
-                      <Film className="h-3 w-3 text-primary" /> Exemplo:
-                    </span>
-                    <div className="flex items-center gap-1 flex-1 justify-end">
-                      {[
-                        { url: "/sample-oceans.mp4", label: "🌊 Oceano" },
-                        { url: "/sample-viral-clip.mp4", label: "🎬 Clipes" },
-                        { url: "/sample-nature.mp4", label: "🌿 Natureza" },
-                      ].map((s) => (
-                        <Button
-                          key={s.url}
-                          type="button"
-                          size="sm"
-                          variant={sampleVideoUrl === s.url ? "default" : "outline"}
-                          onClick={() => setSampleVideoUrl(s.url)}
-                          className="text-[10px] h-6 font-bold px-2 py-0"
-                        >
-                          {s.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <CardContent className="p-2 flex-1 flex flex-col items-center justify-center bg-black/40 overflow-hidden min-h-0">
+                  <CardContent className="p-3 flex-1 flex flex-col items-center justify-center bg-black/40 overflow-hidden min-h-0">
                     <DarkClipsPreviewPlayer
+                      previewMode={previewMode}
                       videoUrl={sampleVideoUrl}
                       durationInSeconds={15}
                       profileHeader={profileHeader}
@@ -2911,34 +2978,15 @@ export default function DarkClipsPage() {
                     />
                   </CardContent>
 
-                  {/* Modeler Preview Footer Action Bar */}
-                  <div className="p-2.5 px-3 border-t border-border/40 flex flex-row gap-2 justify-between items-center bg-card/50 shrink-0">
+                  {/* Rodapé Clean da Visualização */}
+                  <div className="p-2.5 px-3 border-t border-border/40 flex flex-row justify-between items-center bg-card/50 shrink-0">
                     <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
                       <Badge variant="outline" className="text-[9px] border-border bg-secondary/30 py-0">
                         1080x1920 (9:16)
                       </Badge>
-                      <span className="truncate max-w-[110px] text-[11px] font-medium">{activePreset?.name || "Layout Atual"}</span>
+                      <span className="truncate max-w-[150px] text-[11px] font-medium">{activePreset?.name || "Layout Atual"}</span>
                     </div>
-
-                    <div className="flex items-center gap-1.5 justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleQuickSavePreset()}
-                        disabled={savingPreset}
-                        className="gap-1 text-xs font-bold h-7 px-2.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-                      >
-                        {savingPreset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                        Salvar 💾
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleProceedToCreation()}
-                        className="gap-1 bg-primary text-primary-foreground font-bold text-xs h-7 px-3 shadow-md shadow-primary/20"
-                      >
-                        Avançar 🎬 <ChevronRight className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <span className="text-[10px] text-muted-foreground">Arraste os elementos no canvas para ajustar</span>
                   </div>
                 </Card>
               </div>

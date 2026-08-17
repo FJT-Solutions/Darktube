@@ -33,6 +33,7 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   height?: number;
   className?: string;
   arrowsList?: DarkClipArrowItem[];
+  previewMode?: 'clean' | 'tiktok' | 'reels' | 'shorts';
   onLayerFocus?: (layer: 'header' | 'headline' | 'video' | 'watermark' | 'footer' | 'arrows', arrowIndex?: number) => void;
   onUpdateHeaderPadding?: (paddingTop: number) => void;
   onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number; mainTextFontSize?: number; subTextFontSize?: number }) => void;
@@ -50,6 +51,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   height = 1920,
   videoUrl,
   arrowsList,
+  previewMode = 'clean',
   onLayerFocus,
   onUpdateHeaderPadding,
   onUpdateHeadline,
@@ -63,9 +65,6 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   const durationInFrames = Math.max(30, Math.floor((durationInSeconds || 15) * fps));
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<PlayerRef>(null);
-
-  // Platform UI Simulation Mode
-  const [previewMode, setPreviewMode] = useState<'clean' | 'tiktok' | 'reels' | 'shorts'>('clean');
 
   // Track dynamic artboard dimensions to scale platform overlays proportionally
   const [stageSize, setStageSize] = useState<{ width: number; height: number }>({ width: 300, height: 533 });
@@ -256,60 +255,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows, onUpdateArrowItem, effectiveArrowsList]);
 
   return (
-    <div className="flex flex-col items-center gap-1.5 w-full mx-auto select-none overflow-hidden">
-      
-      {/* ── Platform Simulation Switcher Bar ── */}
-      <div className="w-full bg-secondary/40 p-0.5 rounded-lg border border-border/60 flex items-center justify-between gap-1 text-[10px] shadow-sm shrink-0">
-        <button
-          type="button"
-          onClick={() => setPreviewMode('clean')}
-          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center ${
-            previewMode === 'clean'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Visualização limpa sem interface de rede social"
-        >
-          Limpo
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewMode('tiktok')}
-          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
-            previewMode === 'tiktok'
-              ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Simular interface do TikTok"
-        >
-          <span className="text-[#25F4EE]">Tik</span><span className="text-[#FE2C55]">Tok</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewMode('reels')}
-          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center flex items-center justify-center gap-1 ${
-            previewMode === 'reels'
-              ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Simular interface do Reels (Facebook & Instagram)"
-        >
-          Reels
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreviewMode('shorts')}
-          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center flex items-center justify-center gap-1 ${
-            previewMode === 'shorts'
-              ? 'bg-red-600 text-white shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
-          }`}
-          title="Simular interface do YouTube Shorts"
-        >
-          Shorts
-        </button>
-      </div>
-
+    <div className="flex flex-col items-center gap-1 w-full mx-auto select-none overflow-hidden">
       {/* ── Top Stage Info Bar ── */}
       <div className="w-full flex items-center justify-between px-1 min-h-[16px] shrink-0">
         <div className="flex items-center gap-2">
@@ -342,8 +288,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       <div
         ref={containerRef}
         style={{
-          height: 'min(calc(100vh - 20.5rem), 430px)',
-          maxHeight: 'min(calc(100vh - 20.5rem), 430px)',
+          height: 'min(calc(100vh - 10rem), 540px)',
+          maxHeight: 'min(calc(100vh - 10rem), 540px)',
           aspectRatio: '9/16',
           maxWidth: '100%',
         }}
