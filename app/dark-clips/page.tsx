@@ -122,6 +122,11 @@ export default function DarkClipsPage() {
   const [urlInput, setUrlInput] = useState("");
   const [importingUrls, setImportingUrls] = useState(false);
 
+  // Direct Video Upload State & Refs
+  const [uploadingDirectVideos, setUploadingDirectVideos] = useState(false);
+  const [isDraggingVideo, setIsDraggingVideo] = useState(false);
+  const videoFileInputRef = React.useRef<HTMLInputElement>(null);
+
   // Avatar and Watermark Upload Refs
   const avatarFileInputRef = React.useRef<HTMLInputElement>(null);
   const watermarkFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -700,6 +705,53 @@ export default function DarkClipsPage() {
       toast.error("Falha ao comunicar com o servidor.");
     } finally {
       setImportingUrls(false);
+    }
+  }
+
+  async function handleDirectVideoUpload(files: FileList | File[] | null) {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files).filter((f) =>
+      f.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi)$/i.test(f.name)
+    );
+    if (fileArray.length === 0) {
+      toast.error("Por favor, selecione arquivos de vídeo válidos (.mp4, .mov, .webm, .mkv).");
+      return;
+    }
+
+    setUploadingDirectVideos(true);
+    const toastId = toast.loading(`Enviando e sanitizando ${fileArray.length} vídeo(s)...`);
+
+    try {
+      const formData = new FormData();
+      fileArray.forEach((f) => formData.append("files", f));
+
+      const res = await fetch("/api/dark-clips/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (data.success && data.clips && data.clips.length > 0) {
+        toast.success(
+          `${data.clips.length} vídeo(s) importado(s) com sucesso!`,
+          { id: toastId }
+        );
+        setClips((prev) => [...data.clips, ...prev]);
+        setSelectedClip(data.clips[0]);
+        if (data.clips[0].video_url) {
+          setSampleVideoUrl(data.clips[0].video_url);
+        }
+      } else {
+        toast.error(data.error || "Erro ao processar upload do vídeo.", { id: toastId });
+      }
+    } catch (err: any) {
+      console.error("Direct upload error:", err);
+      toast.error("Falha no upload do vídeo.", { id: toastId });
+    } finally {
+      setUploadingDirectVideos(false);
+      if (videoFileInputRef.current) {
+        videoFileInputRef.current.value = "";
+      }
     }
   }
 
@@ -1719,7 +1771,7 @@ export default function DarkClipsPage() {
                         </Label>
                         <span className="text-[10px] text-muted-foreground">Troque para testar enquadramentos</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {[
                           { url: "/sample-oceans.mp4", label: "🌊 Oceano" },
                           { url: "/sample-viral-clip.mp4", label: "🎬 Clipes" },
@@ -1736,6 +1788,16 @@ export default function DarkClipsPage() {
                             {s.label}
                           </Button>
                         ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={!["/sample-oceans.mp4", "/sample-viral-clip.mp4", "/sample-nature.mp4"].includes(sampleVideoUrl) ? "default" : "outline"}
+                          onClick={() => videoFileInputRef.current?.click()}
+                          className="text-xs h-8 font-bold gap-1"
+                          title="Fazer upload de vídeo do computador para testar no canvas"
+                        >
+                          <Upload className="h-3 w-3" /> {uploadingDirectVideos ? "Enviando..." : "Meu Vídeo"}
+                        </Button>
                       </div>
                     </div>
 
@@ -3029,10 +3091,94 @@ export default function DarkClipsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* ── Left Column: Importador & Extensão (4 cols) ── */}
+              {/* ── Left Column: Importador, Upload & Extensão (4 cols) ── */}
               <div className="lg:col-span-4 space-y-6">
                 
-                {/* Import Card */}
+                {/* 1. Direct Video Upload Card */}
+                <Card className="border-primary/40 bg-gradient-to-br from-primary/5 to-card shadow-sm">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-bold flex items-center gap-2 text-foreground">
+                      <Upload className="h-4 w-4 text-primary" /> Upload Direto de Vídeos
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Envie vídeos (.mp4, .mov, .webm) do seu computador para aplicar o template 9:16 imediatamente.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-3">
+                    <input
+                      type="file"
+                      ref={videoFileInputRef}
+                      multiple
+                      accept="video/*,.mp4,.mov,.webm,.mkv,.avi"
+                      className="hidden"
+                      onChange={(e) => handleDirectVideoUpload(e.target.files)}
+                    />
+
+                    {/* Drag and Drop Zone */}
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDraggingVideo(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setIsDraggingVideo(false);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDraggingVideo(false);
+                        handleDirectVideoUpload(e.dataTransfer.files);
+                      }}
+                      onClick={() => videoFileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 ${
+                        isDraggingVideo
+                          ? "border-primary bg-primary/10 scale-[0.99]"
+                          : "border-border/70 hover:border-primary/60 bg-secondary/15 hover:bg-secondary/30"
+                      }`}
+                    >
+                      <div className="p-2.5 rounded-full bg-primary/10 text-primary">
+                        {uploadingDirectVideos ? (
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                        ) : (
+                          <Upload className="h-6 w-6" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-foreground">
+                          {uploadingDirectVideos ? "Processando e Sanitizando Vídeo..." : "Arraste seus vídeos ou clique aqui"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Suporta MP4, MOV, WEBM e MKV (Múltiplos arquivos)
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={() => videoFileInputRef.current?.click()}
+                      disabled={uploadingDirectVideos}
+                      className="w-full text-xs font-bold gap-1.5 h-9 bg-primary text-primary-foreground shadow-sm"
+                    >
+                      {uploadingDirectVideos ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FolderPlus className="h-3.5 w-3.5" />
+                      )}
+                      {uploadingDirectVideos ? "Enviando Vídeos..." : "Selecionar Vídeos do Computador 📁"}
+                    </Button>
+
+                    <div className="rounded-lg bg-secondary/30 p-2.5 border border-border/40 text-[11px] space-y-1 text-muted-foreground">
+                      <p className="font-bold text-foreground flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" /> Sanitização Anti-Shadowban Ativa
+                      </p>
+                      <p className="text-[10px]">
+                        Metadados e assinaturas anteriores são limpos para garantir originalidade nas redes.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 2. Import Card */}
                 <Card className="border-border">
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -3149,8 +3295,13 @@ export default function DarkClipsPage() {
                                 <Badge className="absolute bottom-1 right-1 text-[9px] px-1 py-0 bg-black/70">
                                   {clip.duration}s
                                 </Badge>
-                                <Badge variant="secondary" className="absolute top-1 left-1 text-[8px] px-1 py-0 uppercase">
-                                  {clip.platform}
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`absolute top-1 left-1 text-[8px] px-1 py-0 uppercase ${
+                                    clip.platform === 'upload' ? 'bg-primary/20 text-primary border-primary/40' : ''
+                                  }`}
+                                >
+                                  {clip.platform === 'upload' ? '📁 UPLOAD' : clip.platform}
                                 </Badge>
                               </div>
 
@@ -3165,10 +3316,27 @@ export default function DarkClipsPage() {
                               <Button 
                                 size="sm" 
                                 variant={isSelected ? "default" : "outline"} 
-                                onClick={() => setSelectedClip(clip)}
+                                onClick={() => {
+                                  setSelectedClip(clip);
+                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                }}
                                 className="flex-1 text-[11px] h-7"
                               >
                                 {isSelected ? "Selecionado ✓" : "Selecionar"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedClip(clip);
+                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  setActiveTab('modeler');
+                                  toast.info('Clipe carregado no Canvas de Modelagem!');
+                                }}
+                                className="text-[11px] h-7 px-2 text-zinc-300"
+                                title="Visualizar este clipe no Canvas de Modelagem"
+                              >
+                                <Eye className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
