@@ -2124,10 +2124,11 @@ export default function DarkClipsPage() {
                       {/* 3. POSIÇÃO RÁPIDA */}
                       <div className="space-y-1.5">
                         <Label className="text-xs font-semibold">Posição Rápida</Label>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-5 gap-1.5">
                           {[
                             { pos: "top-left", label: "Sup. Esq.", x: 15, y: 15 },
                             { pos: "top-right", label: "Sup. Dir.", x: 85, y: 15 },
+                            { pos: "center", label: "Centro", x: 50, y: 50 },
                             { pos: "bottom-left", label: "Inf. Esq.", x: 15, y: 92 },
                             { pos: "bottom-right", label: "Inf. Dir.", x: 85, y: 92 },
                           ].map((item) => (
@@ -2144,7 +2145,7 @@ export default function DarkClipsPage() {
                                   yOffset: item.y,
                                 }))
                               }
-                              className="text-[11px] h-7"
+                              className="text-[11px] h-7 px-1 font-bold"
                             >
                               {item.label}
                             </Button>
