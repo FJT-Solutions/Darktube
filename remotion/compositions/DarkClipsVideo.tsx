@@ -1,6 +1,88 @@
 import React from 'react';
 import { AbsoluteFill, Video, useCurrentFrame } from 'remotion';
-import { DarkClipsVideoProps } from '../types';
+import { DarkClipsVideoProps, DarkClipArrowType } from '../types';
+
+export const renderArrowShape = (
+  type: DarkClipArrowType = 'chevron',
+  size: number,
+  color: string
+) => {
+  switch (type) {
+    case 'stem':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <polyline points="14 5 21 12 14 19" />
+        </svg>
+      );
+    case 'block':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="1" strokeLinejoin="round">
+          <polygon points="3 8 13 8 13 4 22 12 13 20 13 16 3 16" />
+        </svg>
+      );
+    case 'curved':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 18c0-5.5 4.5-9 10-9h7" />
+          <polyline points="15 4 21 9 15 14" />
+        </svg>
+      );
+    case 'pointer':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
+          <path d="M12.5 4a1.5 1.5 0 0 1 1.5 1.5v6.2l3.4-3.4a1.5 1.5 0 0 1 2.1 2.1l-6.5 6.5a2.5 2.5 0 0 1-3.5 0l-4.5-4.5a1.5 1.5 0 0 1 2.1-2.1L10 13.8V5.5A1.5 1.5 0 0 1 11.5 4h1z" transform="rotate(-90 12 12)" />
+        </svg>
+      );
+    case 'target':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.8">
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" strokeWidth="2" />
+          <circle cx="12" cy="12" r="2.2" fill={color} />
+          <line x1="12" y1="1" x2="12" y2="5" strokeLinecap="round" />
+          <line x1="12" y1="19" x2="12" y2="23" strokeLinecap="round" />
+          <line x1="1" y1="12" x2="5" y2="12" strokeLinecap="round" />
+          <line x1="19" y1="12" x2="23" y2="12" strokeLinecap="round" />
+        </svg>
+      );
+    case 'cursor':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" strokeLinejoin="round">
+          <polygon points="3 3 10 21 13 14 20 11" />
+        </svg>
+      );
+    case 'double':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
+          <polygon points="3 5 11 12 3 19" />
+          <polygon points="12 5 20 12 12 19" />
+        </svg>
+      );
+    case 'doodle':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12c5-1.5 11 1 17-0.5" />
+          <path d="M14 6c2 2 4.5 4.5 6.5 6-2 2-4.5 4.5-6.5 6.5" />
+        </svg>
+      );
+    case 'circle-arrow':
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9.5" />
+          <polyline points="10 8 14 12 10 16" />
+          <line x1="6" y1="12" x2="14" y2="12" />
+        </svg>
+      );
+    case 'chevron':
+    default:
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      );
+  }
+};
 
 export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   videoUrl,
@@ -730,6 +812,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           : []
         ).map((container, cIdx) => {
           const {
+            arrowType = 'chevron',
+            arrow_type,
             direction: cDir = 'right',
             style: cStyle = 'trail',
             count: cCount = 2,
@@ -741,6 +825,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             text: cText = '',
             textColor: cTextColor = '#FFFFFF',
           } = container;
+
+          const cArrowType = arrowType || arrow_type || 'chevron';
 
           const cRotation =
             cDir === 'right'
@@ -813,7 +899,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 </span>
               )}
 
-              {/* Arrows Sequence (1 to 5 items) */}
+              {/* Arrows / Indicators Sequence (1 to 5 items) */}
               {Array.from({ length: Math.max(1, Math.min(5, cCount || 2)) }).map((_, idx) => {
                 let arrowOpacity = 1;
                 if (cStyle === 'trail') {
@@ -832,18 +918,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                       justifyContent: 'center',
                     }}
                   >
-                    <svg
-                      width={cEffectiveSize}
-                      height={cEffectiveSize}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke={cColor}
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    {renderArrowShape(cArrowType, cEffectiveSize, cColor)}
                   </div>
                 );
               })}

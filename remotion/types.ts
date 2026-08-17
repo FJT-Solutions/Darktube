@@ -325,9 +325,23 @@ export interface DarkClipsVideoProps {
   arrowsList?: DarkClipArrowItem[];
 }
 
+export type DarkClipArrowType = 
+  | 'chevron'
+  | 'stem'
+  | 'block'
+  | 'curved'
+  | 'pointer'
+  | 'target'
+  | 'cursor'
+  | 'double'
+  | 'doodle'
+  | 'circle-arrow';
+
 export interface DarkClipArrowItem {
   id?: string;
   enabled?: boolean;
+  arrowType?: DarkClipArrowType;
+  arrow_type?: DarkClipArrowType;
   direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right';
   style?: 'bounce' | 'pulse' | 'trail';
   count?: number;

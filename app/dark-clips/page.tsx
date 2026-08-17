@@ -71,20 +71,32 @@ import { getBlotatoAccountsAction } from "@/app/actions";
 import { toast } from "sonner";
 
 const FONT_OPTIONS = [
-  { id: "Montserrat, Inter, sans-serif", name: "Montserrat", label: "Montserrat (Padrão Viral)", style: "font-sans font-black" },
-  { id: "Anton, sans-serif", name: "Anton", label: "Anton (Impacto Extremo)", style: "font-black tracking-wide" },
-  { id: "Impact, sans-serif", name: "Impact", label: "Impact (Meme Clássico)", style: "font-black" },
-  { id: "Bebas Neue, sans-serif", name: "Bebas Neue", label: "Bebas Neue (Condensada Alta)", style: "font-bold tracking-wider" },
-  { id: "Oswald, sans-serif", name: "Oswald", label: "Oswald (Dramática)", style: "font-bold" },
-  { id: "Poppins, sans-serif", name: "Poppins", label: "Poppins (Geométrica Limpa)", style: "font-bold" },
-  { id: "Inter, sans-serif", name: "Inter", label: "Inter (Minimalista Elegante)", style: "font-semibold" },
-  { id: "Rubik, sans-serif", name: "Rubik", label: "Rubik (Gamer / Tech)", style: "font-bold" },
-  { id: "Outfit, sans-serif", name: "Outfit", label: "Outfit (Ultra Moderna)", style: "font-black" },
-  { id: "Cinzel, serif", name: "Cinzel", label: "Cinzel (Cinematográfica / Luxo)", style: "font-serif font-bold" },
-  { id: "Playfair Display, serif", name: "Playfair Display", label: "Playfair Display (Editorial)", style: "font-serif italic font-bold" },
-  { id: "JetBrains Mono, monospace", name: "JetBrains Mono", label: "JetBrains Mono (Código / Tech)", style: "font-mono font-bold" },
-  { id: "custom", name: "Personalizada", label: "✏️ Personalizada (Digitar Fonte...)", style: "font-sans" },
+  { id: "Montserrat, Inter, sans-serif", name: "Montserrat", label: "Montserrat (Padrão Viral)" },
+  { id: "Anton, sans-serif", name: "Anton", label: "Anton (Impacto Bold)" },
+  { id: "Impact, sans-serif", name: "Impact", label: "Impact (Meme Clássico)" },
+  { id: "Bebas Neue, sans-serif", name: "Bebas Neue", label: "Bebas Neue (Condensada)" },
+  { id: "Oswald, sans-serif", name: "Oswald", label: "Oswald (Dramática)" },
+  { id: "Poppins, sans-serif", name: "Poppins", label: "Poppins (Geométrica Limpa)" },
+  { id: "Inter, sans-serif", name: "Inter", label: "Inter (Minimalista Clean)" },
+  { id: "Rubik, sans-serif", name: "Rubik", label: "Rubik (Gamer / Tech)" },
+  { id: "Outfit, sans-serif", name: "Outfit", label: "Outfit (Ultra Moderna)" },
+  { id: "Cinzel, serif", name: "Cinzel", label: "Cinzel (Cinematográfica)" },
+  { id: "Playfair Display, serif", name: "Playfair Display", label: "Playfair Display (Editorial)" },
+  { id: "JetBrains Mono, monospace", name: "JetBrains Mono", label: "JetBrains Mono (Código / Tech)" },
 ];
+
+const ARROW_SHAPE_OPTIONS = [
+  { id: "chevron", label: "Chevron Viral", icon: "⚡" },
+  { id: "stem", label: "Flecha com Haste", icon: "➡️" },
+  { id: "block", label: "Seta Grossa / Sticker", icon: "🔺" },
+  { id: "curved", label: "Seta Curva Viral", icon: "⤴️" },
+  { id: "pointer", label: "Dedo / Mão", icon: "👉" },
+  { id: "target", label: "Alvo / Radar", icon: "🎯" },
+  { id: "cursor", label: "Cursor de Clique", icon: "👆" },
+  { id: "double", label: "Avanço Rápido", icon: "⏩" },
+  { id: "doodle", label: "Doodle Rabiscado", icon: "✏️" },
+  { id: "circle-arrow", label: "Botão Circular", icon: "🔘" },
+] as const;
 
 export default function DarkClipsPage() {
   // Main Tab Navigation: "modeler" (🎨 Layout & Templates) | "creation" (🎬 Criação & Clipes)
@@ -299,6 +311,7 @@ export default function DarkClipsPage() {
     const newContainer: DarkClipArrowItem = {
       id: newId,
       enabled: true,
+      arrowType: "chevron",
       direction: suggestion.dir,
       style: "trail",
       count: 2,
@@ -508,6 +521,7 @@ export default function DarkClipsPage() {
         preset.arrows_list.map((item, i) => ({
           id: item.id || `arrow-${i + 1}`,
           enabled: item.enabled ?? true,
+          arrowType: item.arrow_type ?? item.arrowType ?? "chevron",
           direction: item.direction || "right",
           style: item.style || "trail",
           count: item.count ?? 2,
@@ -526,6 +540,7 @@ export default function DarkClipsPage() {
         {
           id: "arrow-1",
           enabled: preset.arrows_style.enabled ?? false,
+          arrowType: preset.arrows_style.arrow_type ?? preset.arrows_style.arrowType ?? "chevron",
           direction: preset.arrows_style.direction || "right",
           style: preset.arrows_style.style || "trail",
           count: preset.arrows_style.count ?? 2,
@@ -1369,43 +1384,25 @@ export default function DarkClipsPage() {
                               </span>
                             </Label>
                             <Select
-                              value={
-                                FONT_OPTIONS.some((f) => f.id === headline.mainTextFontFamily)
-                                  ? headline.mainTextFontFamily
-                                  : "custom"
-                              }
-                              onValueChange={(val) => {
-                                if (val !== "custom") {
-                                  setHeadline((h) => ({ ...h, mainTextFontFamily: val }));
-                                }
-                              }}
+                              value={headline.mainTextFontFamily || "Montserrat, Inter, sans-serif"}
+                              onValueChange={(val) => setHeadline((h) => ({ ...h, mainTextFontFamily: val }))}
                             >
                               <SelectTrigger className="h-8 text-xs bg-background/90 border-border/80">
                                 <SelectValue placeholder="Selecione a fonte do texto primário" />
                               </SelectTrigger>
-                              <SelectContent className="max-h-60">
+                              <SelectContent className="max-h-64">
                                 {FONT_OPTIONS.map((font) => (
-                                  <SelectItem key={font.id} value={font.id} className="text-xs">
-                                    <div className="flex items-center justify-between w-full gap-2">
-                                      <span style={{ fontFamily: font.id !== "custom" ? font.id : undefined }} className="font-bold">
-                                        {font.label}
+                                  <SelectItem key={font.id} value={font.id} className="text-xs py-1.5 cursor-pointer">
+                                    <div className="flex items-center justify-between w-full gap-3 font-sans">
+                                      <span className="font-medium text-foreground">{font.label}</span>
+                                      <span style={{ fontFamily: font.id }} className="text-[11px] px-1.5 py-0.5 rounded bg-secondary text-primary border border-border/50 shrink-0 font-normal">
+                                        Aa Clipes
                                       </span>
                                     </div>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-
-                            {/* Input para Fonte Personalizada caso queira digitar */}
-                            {(!FONT_OPTIONS.some((f) => f.id === headline.mainTextFontFamily) ||
-                              headline.mainTextFontFamily === "custom") && (
-                              <Input
-                                value={headline.mainTextFontFamily === "custom" ? "" : headline.mainTextFontFamily}
-                                onChange={(e) => setHeadline((h) => ({ ...h, mainTextFontFamily: e.target.value }))}
-                                placeholder="Digite o nome da fonte (ex: Arial, Impact, Poppins, Roboto...)"
-                                className="h-7 text-xs font-mono mt-1"
-                              />
-                            )}
                           </div>
 
                           {/* Tamanho da Fonte Primária (px) e Posição Y (%) */}
@@ -1532,43 +1529,25 @@ export default function DarkClipsPage() {
                               </span>
                             </Label>
                             <Select
-                              value={
-                                FONT_OPTIONS.some((f) => f.id === headline.subTextFontFamily)
-                                  ? headline.subTextFontFamily
-                                  : "custom"
-                              }
-                              onValueChange={(val) => {
-                                if (val !== "custom") {
-                                  setHeadline((h) => ({ ...h, subTextFontFamily: val }));
-                                }
-                              }}
+                              value={headline.subTextFontFamily || "Inter, sans-serif"}
+                              onValueChange={(val) => setHeadline((h) => ({ ...h, subTextFontFamily: val }))}
                             >
                               <SelectTrigger className="h-8 text-xs bg-background/90 border-border/80">
                                 <SelectValue placeholder="Selecione a fonte do texto secundário" />
                               </SelectTrigger>
-                              <SelectContent className="max-h-60">
+                              <SelectContent className="max-h-64">
                                 {FONT_OPTIONS.map((font) => (
-                                  <SelectItem key={font.id} value={font.id} className="text-xs">
-                                    <div className="flex items-center justify-between w-full gap-2">
-                                      <span style={{ fontFamily: font.id !== "custom" ? font.id : undefined }} className="font-bold">
-                                        {font.label}
+                                  <SelectItem key={font.id} value={font.id} className="text-xs py-1.5 cursor-pointer">
+                                    <div className="flex items-center justify-between w-full gap-3 font-sans">
+                                      <span className="font-medium text-foreground">{font.label}</span>
+                                      <span style={{ fontFamily: font.id }} className="text-[11px] px-1.5 py-0.5 rounded bg-secondary text-primary border border-border/50 shrink-0 font-normal">
+                                        Aa Clipes
                                       </span>
                                     </div>
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-
-                            {/* Input para Fonte Personalizada caso queira digitar */}
-                            {(!FONT_OPTIONS.some((f) => f.id === headline.subTextFontFamily) ||
-                              headline.subTextFontFamily === "custom") && (
-                              <Input
-                                value={headline.subTextFontFamily === "custom" ? "" : headline.subTextFontFamily}
-                                onChange={(e) => setHeadline((h) => ({ ...h, subTextFontFamily: e.target.value }))}
-                                placeholder="Digite o nome da fonte (ex: Arial, Poppins, Roboto, Inter...)"
-                                className="h-7 text-xs font-mono mt-1"
-                              />
-                            )}
                           </div>
 
                           {/* Tamanho da Fonte Secundária (px) e Posição Y (%) */}
@@ -2559,6 +2538,38 @@ export default function DarkClipsPage() {
                               {p.label}
                             </Button>
                           ))}
+                        </div>
+                      </div>
+
+                      {/* Modelos de Setas & Indicadores Visuais */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold flex items-center gap-1.5">
+                            <span>🎯 Modelo da Seta / Indicador Visual</span>
+                          </Label>
+                          <Badge variant="outline" className="text-[9px] font-mono border-rose-500/30 text-rose-400 py-0">
+                            10 Estilos
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                          {ARROW_SHAPE_OPTIONS.map((shape) => {
+                            const isSelected = (currentArrow.arrowType || currentArrow.arrow_type || "chevron") === shape.id;
+                            return (
+                              <button
+                                key={shape.id}
+                                type="button"
+                                onClick={() => handleUpdateSelectedArrow({ arrowType: shape.id as any })}
+                                className={`flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-bold transition-all gap-0.5 ${
+                                  isSelected
+                                    ? "bg-rose-500/20 text-rose-300 border-rose-500 ring-1 ring-rose-500 shadow-sm"
+                                    : "bg-secondary/30 text-muted-foreground border-border hover:bg-secondary/60 hover:text-foreground"
+                                }`}
+                              >
+                                <span className="text-base">{shape.icon}</span>
+                                <span className="text-[10px] leading-tight text-center truncate w-full font-semibold">{shape.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 
