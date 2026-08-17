@@ -30,8 +30,18 @@ export const renderArrowShape = (
       );
     case 'pointer':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-          <path d="M12.5 4a1.5 1.5 0 0 1 1.5 1.5v6.2l3.4-3.4a1.5 1.5 0 0 1 2.1 2.1l-6.5 6.5a2.5 2.5 0 0 1-3.5 0l-4.5-4.5a1.5 1.5 0 0 1 2.1-2.1L10 13.8V5.5A1.5 1.5 0 0 1 11.5 4h1z" transform="rotate(-90 12 12)" />
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill={color}
+          stroke="rgba(0,0,0,0.6)"
+          strokeWidth="0.8"
+          strokeLinejoin="round"
+        >
+          {/* Mão com Dedo Indicador Apontando para a Direita (👉) */}
+          <path d="M22 10.5H13.2V8.5c0-1.24-.86-2.28-2.07-2.47-1.29-.21-2.43.79-2.43 2.05v2.9L6.5 9.4c-.7-.52-1.68-.42-2.25.24-.62.72-.54 1.8.18 2.42l3.3 2.8c.45.39.77.93.77 1.54v2.1c0 1.38 1.12 2.5 2.5 2.5h6.35c1.77 0 3.29-1.23 3.66-2.96l1.24-5.83c.15-.68.23-1.37.23-2.07v-.64c0-.83-.67-1.5-1.5-1.5z" />
+          <rect x="2" y="10.5" width="3" height="7.5" rx="1" fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth="0.8" />
         </svg>
       );
     case 'target':
@@ -48,8 +58,17 @@ export const renderArrowShape = (
       );
     case 'cursor':
       return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth="1.5" strokeLinejoin="round">
-          <polygon points="3 3 10 21 13 14 20 11" />
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill={color}
+          stroke="rgba(0,0,0,0.7)"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        >
+          {/* Mãozinha de Clique / Pointer */}
+          <path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zM18.84 15.25l-4.28-2.14c-.46-.23-1-.23-1.46 0L11.5 13.9v-6.4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v9.84l-3.32-2.08c-.69-.43-1.6-.28-2.11.35-.58.71-.5 1.76.18 2.37l5.3 4.74c.95.85 2.18 1.32 3.45 1.32h5.5c2.21 0 4-1.79 4-4v-3.24c0-.76-.43-1.45-1.1-1.75z" />
         </svg>
       );
     case 'double':
