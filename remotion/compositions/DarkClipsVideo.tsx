@@ -179,6 +179,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     text: watermarkText = '@darkclips',
     imageUrl: watermarkImageUrl = '',
     position: watermarkPosition = 'bottom-right',
+    textPosition: watermarkTextPosition = 'right',
     xOffset: watermarkX = 85,
     yOffset: watermarkY = 92,
     opacity: watermarkOpacity = 70,
@@ -676,10 +677,26 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               <div
                 style={{
                   display: 'flex',
+                  flexDirection:
+                    watermarkTextPosition === 'left'
+                      ? 'row-reverse'
+                      : watermarkTextPosition === 'top'
+                      ? 'column-reverse'
+                      : watermarkTextPosition === 'bottom'
+                      ? 'column'
+                      : 'row',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '4px 14px 4px 6px',
-                  borderRadius: '9999px',
+                  justifyContent: 'center',
+                  gap: watermarkTextPosition === 'top' || watermarkTextPosition === 'bottom' ? '5px' : '8px',
+                  padding:
+                    watermarkTextPosition === 'left'
+                      ? '4px 6px 4px 14px'
+                      : watermarkTextPosition === 'top'
+                      ? '8px 12px 6px 12px'
+                      : watermarkTextPosition === 'bottom'
+                      ? '6px 12px 8px 12px'
+                      : '4px 14px 4px 6px',
+                  borderRadius: watermarkTextPosition === 'top' || watermarkTextPosition === 'bottom' ? '18px' : '9999px',
                   backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.45)',
                   backdropFilter: 'blur(8px)',
                   border: isLightBg ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.2)',
@@ -718,6 +735,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                     letterSpacing: '0.03em',
                     whiteSpace: 'nowrap',
                     textShadow: watermarkHasShadow ? '0 2px 8px rgba(0,0,0,0.9)' : 'none',
+                    textAlign: 'center',
                   }}
                 >
                   {watermarkText || handle || '@darkclips'}

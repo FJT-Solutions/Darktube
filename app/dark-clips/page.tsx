@@ -175,6 +175,7 @@ export default function DarkClipsPage() {
     text: "@darkclips",
     imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     position: "bottom-right" as "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center" | "custom",
+    textPosition: "right" as "right" | "left" | "top" | "bottom",
     xOffset: 85,
     yOffset: 92,
     opacity: 70,
@@ -492,6 +493,7 @@ export default function DarkClipsPage() {
         text: preset.watermark_style?.text ?? w.text,
         imageUrl: preset.watermark_style?.imageUrl ?? preset.watermark_style?.image_url ?? w.imageUrl,
         position: (preset.watermark_style?.position || w.position) as any,
+        textPosition: (preset.watermark_style?.textPosition || preset.watermark_style?.text_position || w.textPosition || "right") as any,
         xOffset: preset.watermark_style?.xOffset ?? preset.watermark_style?.x_offset ?? w.xOffset,
         yOffset: preset.watermark_style?.yOffset ?? preset.watermark_style?.y_offset ?? w.yOffset,
         opacity: preset.watermark_style?.opacity ?? w.opacity,
@@ -2118,6 +2120,43 @@ export default function DarkClipsPage() {
                               onValueChange={([fontSize]) => setWatermark((w) => ({ ...w, fontSize }))}
                             />
                           </div>
+
+                          {/* Posição Relativa do Texto perante a Logo (apenas no modo Combinado) */}
+                          {watermark.type === "both" && (
+                            <div className="space-y-1.5 pt-2 border-t border-border/40">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs font-semibold">Posição do Texto perante a Logo</Label>
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {watermark.textPosition === "left"
+                                    ? "Esquerda"
+                                    : watermark.textPosition === "top"
+                                    ? "Em Cima (Topo)"
+                                    : watermark.textPosition === "bottom"
+                                    ? "Em Baixo"
+                                    : "Direita (Padrão)"}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                {[
+                                  { id: "right", label: "Direita ➡️" },
+                                  { id: "left", label: "Esquerda ⬅️" },
+                                  { id: "top", label: "Em Cima ⬆️" },
+                                  { id: "bottom", label: "Em Baixo ⬇️" },
+                                ].map((pos) => (
+                                  <Button
+                                    key={pos.id}
+                                    type="button"
+                                    size="sm"
+                                    variant={(watermark.textPosition || "right") === pos.id ? "default" : "outline"}
+                                    onClick={() => setWatermark((w) => ({ ...w, textPosition: pos.id as any }))}
+                                    className="text-xs h-8 font-bold"
+                                  >
+                                    {pos.label}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 

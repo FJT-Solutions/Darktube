@@ -280,6 +280,7 @@ export interface DarkClipsVideoProps {
     text?: string;
     imageUrl?: string;
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom';
+    textPosition?: 'right' | 'left' | 'top' | 'bottom';
     xOffset?: number; // 0 - 100 percentage
     yOffset?: number; // 0 - 100 percentage
     opacity?: number; // 10 - 100 percentage

@@ -235,6 +235,8 @@ export interface DarkClipPreset {
     imageUrl?: string
     image_url?: string
     position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom'
+    textPosition?: 'right' | 'left' | 'top' | 'bottom'
+    text_position?: 'right' | 'left' | 'top' | 'bottom'
     xOffset?: number
     x_offset?: number
     yOffset?: number
