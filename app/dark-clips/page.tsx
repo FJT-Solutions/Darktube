@@ -1801,17 +1801,20 @@ export default function DarkClipsPage() {
                           { id: "gradient", label: "Gradiente", bg: "bg-gradient-to-tr from-purple-900 to-black text-white" },
                           { id: "neon", label: "Neon Dark", bg: "bg-gradient-to-tr from-rose-950 via-zinc-950 to-indigo-950 text-white" },
                           { id: "zinc", label: "Cinza Dark", bg: "bg-zinc-900 text-white" },
-                          { id: "white", label: "Branco", bg: "bg-zinc-200 text-black" },
+                          { id: "white", label: "Branco", bg: "bg-white !text-black border-zinc-300 shadow-sm" },
                         ].map((b) => (
                           <button
                             key={b.id}
                             type="button"
                             onClick={() => setBackground((prev) => ({ ...prev, type: b.id as any }))}
+                            style={b.id === "white" ? { color: "#000000", backgroundColor: "#ffffff" } : undefined}
                             className={`p-2 rounded-lg border text-xs font-bold flex flex-col items-center justify-center gap-1 transition-all ${
                               background.type === b.id ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border/60 hover:border-border"
                             } ${b.bg}`}
                           >
-                            <span>{b.label}</span>
+                            <span style={b.id === "white" ? { color: "#000000", fontWeight: 900 } : undefined}>
+                              {b.label}
+                            </span>
                           </button>
                         ))}
                       </div>
