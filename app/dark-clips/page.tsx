@@ -22,6 +22,7 @@ import {
   Sliders,
   Type,
   Maximize2,
+  Minimize2,
   Palette,
   ShieldCheck,
   Shield,
@@ -134,6 +135,19 @@ export default function DarkClipsPage() {
   // AI Remodel State
   const [remodelingAi, setRemodelingAi] = useState(false);
   const [aiThemePrompt, setAiThemePrompt] = useState("");
+
+  // Fullscreen Preview State
+  const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullscreenPreview(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // Modeler Granular State
   const [sampleVideoUrl, setSampleVideoUrl] = useState<string>("/sample-oceans.mp4");
@@ -2769,29 +2783,141 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Direção da Seta */}
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold">Direção da Seta</Label>
-                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {/* Seletor de Tom do Emoji (quando for Dedo / Mão ou Cursor) */}
+                      {((currentArrow.arrowType || currentArrow.arrow_type) === "pointer" ||
+                        (currentArrow.arrowType || currentArrow.arrow_type) === "cursor") && (
+                        <div className="space-y-1.5 p-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 animate-fadeIn">
+                          <div className="flex items-center justify-between text-xs">
+                            <Label className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                              <span>👉 Tom / Cor do Dedo (Emoji)</span>
+                            </Label>
+                            <span className="text-[10px] text-muted-foreground">Selecione o tom do emoji</span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-1">
+                            {[
+                              { id: "default", label: "🟡 Padrão", icon: "👉" },
+                              { id: "light", label: "🏻 Claro", icon: "👉🏻" },
+                              { id: "medium-light", label: "🏼 Médio 1", icon: "👉🏼" },
+                              { id: "medium", label: "🏽 Médio 2", icon: "👉🏽" },
+                              { id: "medium-dark", label: "🏾 Escuro 1", icon: "👉🏾" },
+                              { id: "dark", label: "🏿 Escuro 2", icon: "👉🏿" },
+                            ].map((tone) => (
+                              <Button
+                                key={tone.id}
+                                type="button"
+                                size="sm"
+                                variant={(currentArrow.emojiSkinTone || "default") === tone.id ? "default" : "outline"}
+                                onClick={() => handleUpdateSelectedArrow({ emojiSkinTone: tone.id as any })}
+                                className={`text-xs h-8 px-1 flex items-center justify-center font-bold ${
+                                  (currentArrow.emojiSkinTone || "default") === tone.id ? "bg-amber-500 text-black border-amber-400" : ""
+                                }`}
+                                title={tone.label}
+                              >
+                                <span className="text-sm">{tone.icon}</span>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Direção da Seta & Rotação Livre */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold">Direção da Seta</Label>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {currentArrow.rotation !== undefined
+                              ? `${currentArrow.rotation}°`
+                              : currentArrow.direction === "left"
+                              ? "180°"
+                              : currentArrow.direction === "down"
+                              ? "90°"
+                              : currentArrow.direction === "up"
+                              ? "270°"
+                              : currentArrow.direction === "down-right"
+                              ? "45°"
+                              : currentArrow.direction === "up-right"
+                              ? "315°"
+                              : "0°"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                           {[
-                            { dir: "right", label: "Direita →" },
-                            { dir: "left", label: "← Esquerda" },
-                            { dir: "down", label: "Baixo ↓" },
-                            { dir: "up", label: "Cima ↑" },
-                            { dir: "down-right", label: "Diagonal ↘" },
-                            { dir: "up-right", label: "Diagonal ↗" },
+                            { dir: "right", label: "Direita →", angle: 0 },
+                            { dir: "left", label: "← Esquerda", angle: 180 },
+                            { dir: "down", label: "Baixo ↓", angle: 90 },
+                            { dir: "up", label: "Cima ↑", angle: 270 },
+                            { dir: "down-right", label: "Diagonal ↘", angle: 45 },
+                            { dir: "up-right", label: "Diagonal ↗", angle: 315 },
                           ].map((item) => (
                             <Button
                               key={item.dir}
                               type="button"
                               size="sm"
-                              variant={currentArrow.direction === item.dir ? "default" : "outline"}
-                              onClick={() => handleUpdateSelectedArrow({ direction: item.dir as any })}
-                              className="text-xs h-8 font-medium"
+                              variant={currentArrow.direction === item.dir && (currentArrow.rotation === undefined || currentArrow.rotation === item.angle) ? "default" : "outline"}
+                              onClick={() => handleUpdateSelectedArrow({ direction: item.dir as any, rotation: item.angle })}
+                              className="text-xs h-8 font-medium px-1"
                             >
                               {item.label}
                             </Button>
                           ))}
+                        </div>
+
+                        {/* Slider e Input de Rotação Livre em Graus (0° a 360°) */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold flex items-center gap-1">
+                              🔄 Rotação Livre (0° a 360°)
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={360}
+                                value={
+                                  currentArrow.rotation ??
+                                  (currentArrow.direction === "left"
+                                    ? 180
+                                    : currentArrow.direction === "down"
+                                    ? 90
+                                    : currentArrow.direction === "up"
+                                    ? 270
+                                    : currentArrow.direction === "down-right"
+                                    ? 45
+                                    : currentArrow.direction === "up-right"
+                                    ? 315
+                                    : 0)
+                                }
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? 0 : Number(e.target.value);
+                                  handleUpdateSelectedArrow({
+                                    rotation: ((val % 360) + 360) % 360,
+                                  });
+                                }}
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-rose-400 font-bold">°</span>
+                            </div>
+                          </div>
+                          <Slider
+                            value={[
+                              currentArrow.rotation ??
+                                (currentArrow.direction === "left"
+                                  ? 180
+                                  : currentArrow.direction === "down"
+                                  ? 90
+                                  : currentArrow.direction === "up"
+                                  ? 270
+                                  : currentArrow.direction === "down-right"
+                                  ? 45
+                                  : currentArrow.direction === "up-right"
+                                  ? 315
+                                  : 0),
+                            ]}
+                            min={0}
+                            max={360}
+                            step={1}
+                            onValueChange={([rotation]) => handleUpdateSelectedArrow({ rotation })}
+                          />
                         </div>
                       </div>
 
@@ -3006,9 +3132,21 @@ export default function DarkClipsPage() {
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Eye className="h-4 w-4 text-primary" /> Visualização ao Vivo (Canvas 9:16)
                       </CardTitle>
-                      <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary py-0">
-                        Interativo
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsFullscreenPreview(true)}
+                          className="h-6 px-2 text-[11px] font-bold gap-1 text-zinc-300 hover:text-white hover:bg-zinc-800"
+                          title="Expandir Visualização em Tela Cheia"
+                        >
+                          <Maximize2 className="h-3 w-3 text-primary" /> Fullscreen
+                        </Button>
+                        <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary py-0">
+                          Interativo
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
 
@@ -3025,6 +3163,8 @@ export default function DarkClipsPage() {
                       footer={footer}
                       arrows={isAnyArrowEnabled ? currentArrow : { enabled: false }}
                       arrowsList={isAnyArrowEnabled ? arrowsList : []}
+                      isFullscreen={false}
+                      onToggleFullscreen={() => setIsFullscreenPreview(true)}
                       onLayerFocus={handleLayerFocus}
                       onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
                       onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
@@ -3666,6 +3806,115 @@ export default function DarkClipsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* ── Fullscreen Theater Mode Modal ── */}
+        {isFullscreenPreview && (
+          <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-3 sm:p-5 animate-fadeIn select-none">
+            {/* Top Bar Controls */}
+            <div className="w-full max-w-5xl flex items-center justify-between px-2 py-1 gap-2 shrink-0">
+              <div className="flex items-center gap-3">
+                <Badge className="bg-primary text-primary-foreground font-bold text-xs gap-1.5 py-1 px-3">
+                  <Smartphone className="h-3.5 w-3.5" /> Canvas 9:16 Fullscreen
+                </Badge>
+                <span className="text-xs text-zinc-400 hidden sm:inline">
+                  Pressione <kbd className="bg-zinc-800 px-1.5 py-0.5 rounded text-[11px] font-mono border border-zinc-700 text-zinc-200">ESC</kbd> para sair
+                </span>
+              </div>
+
+              {/* Simulation Mode Switcher */}
+              <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-800 p-1 rounded-lg">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={previewMode === "clean" ? "default" : "ghost"}
+                  onClick={() => setPreviewMode("clean")}
+                  className="h-7 text-xs px-2.5 font-bold"
+                >
+                  📱 Limpo
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={previewMode === "tiktok" ? "default" : "ghost"}
+                  onClick={() => setPreviewMode("tiktok")}
+                  className={`h-7 text-xs px-2.5 font-bold ${previewMode === "tiktok" ? "bg-zinc-800 text-white" : ""}`}
+                >
+                  🎵 TikTok
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={previewMode === "reels" ? "default" : "ghost"}
+                  onClick={() => setPreviewMode("reels")}
+                  className={`h-7 text-xs px-2.5 font-bold ${previewMode === "reels" ? "bg-pink-600 text-white" : ""}`}
+                >
+                  📸 Reels
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={previewMode === "shorts" ? "default" : "ghost"}
+                  onClick={() => setPreviewMode("shorts")}
+                  className={`h-7 text-xs px-2.5 font-bold ${previewMode === "shorts" ? "bg-red-600 text-white" : ""}`}
+                >
+                  ▶️ Shorts
+                </Button>
+              </div>
+
+              {/* Exit Fullscreen Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFullscreenPreview(false)}
+                className="h-8 px-3 text-xs font-bold gap-1.5 border-zinc-700 hover:bg-zinc-800 text-zinc-200"
+              >
+                <Minimize2 className="h-3.5 w-3.5" /> Sair da Tela Cheia
+              </Button>
+            </div>
+
+            {/* Canvas Container Center */}
+            <div className="flex-1 w-full max-h-[86vh] flex items-center justify-center py-1 overflow-hidden">
+              <div className="h-full max-h-[86vh] aspect-[9/16] shadow-2xl rounded-2xl overflow-hidden border-2 border-zinc-800 bg-black relative flex items-center justify-center">
+                <DarkClipsPreviewPlayer
+                  previewMode={previewMode}
+                  videoUrl={sampleVideoUrl}
+                  durationInSeconds={15}
+                  profileHeader={profileHeader}
+                  headline={headline}
+                  videoPlacement={videoPlacement}
+                  background={background}
+                  watermark={watermark}
+                  footer={footer}
+                  arrows={isAnyArrowEnabled ? currentArrow : { enabled: false }}
+                  arrowsList={isAnyArrowEnabled ? arrowsList : []}
+                  isFullscreen={true}
+                  onToggleFullscreen={() => setIsFullscreenPreview(false)}
+                  onLayerFocus={handleLayerFocus}
+                  onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
+                  onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
+                  onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
+                  onUpdateWatermark={(updates) => setWatermark((w) => ({ ...w, ...updates }))}
+                  onUpdateFooter={(updates) => setFooter((f) => ({ ...f, ...updates }))}
+                  onUpdateArrows={(updates) => handleUpdateSelectedArrow(updates)}
+                  onUpdateArrowItem={(index, updates) =>
+                    setArrowsList((prev) =>
+                      prev.map((item, i) => (i === index ? { ...item, ...updates } : item))
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Footer Information */}
+            <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-2 shrink-0">
+              <span>{profileHeader.name}</span>
+              <span>•</span>
+              <span>@{profileHeader.handle.replace('@', '')}</span>
+              <span>•</span>
+              <span>1080x1920 Full HD (9:16)</span>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

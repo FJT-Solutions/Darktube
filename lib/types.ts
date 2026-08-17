@@ -293,6 +293,7 @@ export interface DarkClipArrowItem {
   arrowType?: DarkClipArrowType
   arrow_type?: DarkClipArrowType
   direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right'
+  rotation?: number
   style?: 'bounce' | 'pulse' | 'trail'
   count?: number
   xOffset?: number
@@ -300,6 +301,7 @@ export interface DarkClipArrowItem {
   yOffset?: number
   y_offset?: number
   color?: string
+  emojiSkinTone?: 'default' | 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark'
   size?: number
   scale?: number
   text?: string

@@ -5,7 +5,8 @@ import { DarkClipsVideoProps, DarkClipArrowType } from '../types';
 export const renderArrowShape = (
   type: DarkClipArrowType = 'chevron',
   size: number,
-  color: string
+  color: string,
+  emojiSkinTone?: string
 ) => {
   switch (type) {
     case 'stem':
@@ -28,22 +29,30 @@ export const renderArrowShape = (
           <polyline points="15 4 21 9 15 14" />
         </svg>
       );
-    case 'pointer':
+    case 'pointer': {
+      let emoji = '👉';
+      if (emojiSkinTone === 'light') emoji = '👉🏻';
+      else if (emojiSkinTone === 'medium-light') emoji = '👉🏼';
+      else if (emojiSkinTone === 'medium') emoji = '👉🏽';
+      else if (emojiSkinTone === 'medium-dark') emoji = '👉🏾';
+      else if (emojiSkinTone === 'dark') emoji = '👉🏿';
+
       return (
-        <svg
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill={color}
-          stroke="rgba(0,0,0,0.6)"
-          strokeWidth="0.8"
-          strokeLinejoin="round"
+        <span
+          style={{
+            fontSize: `${size}px`,
+            lineHeight: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+            userSelect: 'none',
+          }}
         >
-          {/* Mão com Dedo Indicador Apontando para a Direita (👉) */}
-          <path d="M22 10.5H13.2V8.5c0-1.24-.86-2.28-2.07-2.47-1.29-.21-2.43.79-2.43 2.05v2.9L6.5 9.4c-.7-.52-1.68-.42-2.25.24-.62.72-.54 1.8.18 2.42l3.3 2.8c.45.39.77.93.77 1.54v2.1c0 1.38 1.12 2.5 2.5 2.5h6.35c1.77 0 3.29-1.23 3.66-2.96l1.24-5.83c.15-.68.23-1.37.23-2.07v-.64c0-.83-.67-1.5-1.5-1.5z" />
-          <rect x="2" y="10.5" width="3" height="7.5" rx="1" fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth="0.8" />
-        </svg>
+          {emoji}
+        </span>
       );
+    }
     case 'target':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.8">
@@ -56,21 +65,30 @@ export const renderArrowShape = (
           <line x1="19" y1="12" x2="23" y2="12" strokeLinecap="round" />
         </svg>
       );
-    case 'cursor':
+    case 'cursor': {
+      let emoji = '👆';
+      if (emojiSkinTone === 'light') emoji = '👆🏻';
+      else if (emojiSkinTone === 'medium-light') emoji = '👆🏼';
+      else if (emojiSkinTone === 'medium') emoji = '👆🏽';
+      else if (emojiSkinTone === 'medium-dark') emoji = '👆🏾';
+      else if (emojiSkinTone === 'dark') emoji = '👆🏿';
+
       return (
-        <svg
-          width={size}
-          height={size}
-          viewBox="0 0 24 24"
-          fill={color}
-          stroke="rgba(0,0,0,0.7)"
-          strokeWidth="1.2"
-          strokeLinejoin="round"
+        <span
+          style={{
+            fontSize: `${size}px`,
+            lineHeight: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))',
+            userSelect: 'none',
+          }}
         >
-          {/* Mãozinha de Clique / Pointer */}
-          <path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zM18.84 15.25l-4.28-2.14c-.46-.23-1-.23-1.46 0L11.5 13.9v-6.4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v9.84l-3.32-2.08c-.69-.43-1.6-.28-2.11.35-.58.71-.5 1.76.18 2.37l5.3 4.74c.95.85 2.18 1.32 3.45 1.32h5.5c2.21 0 4-1.79 4-4v-3.24c0-.76-.43-1.45-1.1-1.75z" />
-        </svg>
+          {emoji}
+        </span>
       );
+    }
     case 'double':
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
@@ -852,11 +870,13 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             arrowType = 'chevron',
             arrow_type,
             direction: cDir = 'right',
+            rotation: cRotationCustom,
             style: cStyle = 'trail',
             count: cCount = 2,
             xOffset: cX = 82,
             yOffset: cY = 65,
             color: cColor = '#FE2C55',
+            emojiSkinTone: cSkinTone = 'default',
             size: cSize = 42,
             scale: cScale = 100,
             text: cText = '',
@@ -865,7 +885,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
 
           const cArrowType = arrowType || arrow_type || 'chevron';
 
-          const cRotation =
+          const baseDirectionRotation =
             cDir === 'right'
               ? 0
               : cDir === 'left'
@@ -880,6 +900,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               ? -45
               : 0;
 
+          const cFinalRotation = typeof cRotationCustom === 'number' ? cRotationCustom : baseDirectionRotation;
           const cEffectiveSize = Math.round(cSize * ((cScale || 100) / 100));
           const cBounceCycle = (frame % 30) / 30;
           const cBounceDelta = Math.sin(cBounceCycle * Math.PI * 2) * 14;
@@ -948,14 +969,14 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   <div
                     key={idx}
                     style={{
-                      transform: `rotate(${cRotation}deg)`,
+                      transform: `rotate(${cFinalRotation}deg)`,
                       opacity: arrowOpacity,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    {renderArrowShape(cArrowType, cEffectiveSize, cColor)}
+                    {renderArrowShape(cArrowType, cEffectiveSize, cColor, cSkinTone)}
                   </div>
                 );
               })}
