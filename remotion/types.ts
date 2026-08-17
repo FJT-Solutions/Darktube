@@ -229,6 +229,7 @@ export interface ScriptSegmentMedia {
 export interface DarkClipsVideoProps {
   videoUrl?: string;
   durationInSeconds?: number;
+  muted?: boolean;
   
   // Header
   profileHeader?: {

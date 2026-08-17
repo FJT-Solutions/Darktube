@@ -4,6 +4,7 @@ import { DarkClipsVideoProps } from '../types';
 
 export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   videoUrl,
+  muted = true,
   profileHeader = {},
   headline = {},
   videoPlacement = {},
@@ -190,6 +191,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             <Video
               src={videoUrl}
               muted
+              volume={0}
               style={{
                 width: '100%',
                 height: '100%',
@@ -432,6 +434,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           {hasVideo ? (
             <Video
               src={videoUrl}
+              muted={muted !== false}
+              volume={muted === false ? 1 : 0}
               style={{
                 width: '100%',
                 height: '100%',

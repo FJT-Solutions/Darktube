@@ -356,6 +356,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           component={DarkClipsVideoComposition}
           inputProps={{
             ...inputProps,
+            muted: true,
             videoUrl: activeVideoUrl,
             profileHeader: {
               ...profileHeader,
@@ -395,6 +396,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           controls={false}
           autoPlay={true}
           loop={true}
+          muted={true}
+          volume={0}
         />
 
         {/* ── Platform Simulation Overlays (Proportionally Scaled with Stage) ── */}
