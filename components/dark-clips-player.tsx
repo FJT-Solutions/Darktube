@@ -23,7 +23,9 @@ import {
   Camera,
   Send,
   Layers,
-  Check
+  Check,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -34,6 +36,8 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   className?: string;
   arrowsList?: DarkClipArrowItem[];
   previewMode?: 'clean' | 'tiktok' | 'reels' | 'shorts';
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onLayerFocus?: (layer: 'header' | 'headline' | 'video' | 'watermark' | 'footer' | 'arrows', arrowIndex?: number) => void;
   onUpdateHeaderPadding?: (paddingTop: number) => void;
   onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number; mainTextFontSize?: number; subTextFontSize?: number }) => void;
@@ -52,6 +56,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   videoUrl,
   arrowsList,
   previewMode = 'clean',
+  isFullscreen = false,
+  onToggleFullscreen,
   onLayerFocus,
   onUpdateHeaderPadding,
   onUpdateHeadline,
@@ -282,14 +288,25 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
             </span>
           )}
         </div>
+        {onToggleFullscreen && (
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            className="text-zinc-400 hover:text-white transition-colors p-0.5 rounded hover:bg-zinc-800 flex items-center gap-1 text-[10px]"
+            title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia (Fullscreen)"}
+          >
+            {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            <span className="text-[9px] hidden sm:inline">{isFullscreen ? "Sair" : "Fullscreen"}</span>
+          </button>
+        )}
       </div>
 
       {/* ── Pure WYSIWYG 9:16 Artboard Stage (Auto-Fitting Viewport) ── */}
       <div
         ref={containerRef}
         style={{
-          height: 'min(calc(100vh - 10rem), 540px)',
-          maxHeight: 'min(calc(100vh - 10rem), 540px)',
+          height: isFullscreen ? 'min(calc(100vh - 8rem), 850px)' : 'min(calc(100vh - 10rem), 540px)',
+          maxHeight: isFullscreen ? 'min(calc(100vh - 8rem), 850px)' : 'min(calc(100vh - 10rem), 540px)',
           aspectRatio: '9/16',
           maxWidth: '100%',
         }}
