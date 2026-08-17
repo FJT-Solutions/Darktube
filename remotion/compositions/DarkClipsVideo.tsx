@@ -42,7 +42,11 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     showMainText = true,
     showSubText = true,
     fontFamily = 'Montserrat, Inter, "Helvetica Neue", sans-serif',
+    mainTextFontFamily,
+    subTextFontFamily,
     fontSize = 42,
+    mainTextFontSize,
+    subTextFontSize,
     primaryColor = '#FACC15', // Viral Yellow
     secondaryColor = '#FFFFFF',
     textAlign = 'center',
@@ -55,6 +59,11 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     mainTextYOffset = 17,
     subTextYOffset = 25,
   } = headline;
+
+  const resolvedMainFontFamily = mainTextFontFamily || fontFamily || 'Montserrat, Inter, "Helvetica Neue", sans-serif';
+  const resolvedSubFontFamily = subTextFontFamily || fontFamily || 'Inter, "Helvetica Neue", sans-serif';
+  const resolvedMainFontSize = mainTextFontSize ?? fontSize ?? 42;
+  const resolvedSubFontSize = subTextFontSize ?? (fontSize ? Math.round(fontSize * 0.88) : 34);
 
   const isMainUpper = typeof mainTextUppercase === 'boolean' ? mainTextUppercase : (uppercase ?? true);
   const isSubUpper = typeof subTextUppercase === 'boolean' ? subTextUppercase : (uppercase ?? true);
@@ -353,7 +362,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             <h1
               style={{
                 margin: 0,
-                fontSize: `${fontSize}px`,
+                fontFamily: resolvedMainFontFamily,
+                fontSize: `${resolvedMainFontSize}px`,
                 fontWeight: 900,
                 color: primaryColor,
                 lineHeight: 1.25,
@@ -382,7 +392,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
             <h2
               style={{
                 margin: 0,
-                fontSize: `${Math.round(fontSize * 0.88)}px`,
+                fontFamily: resolvedSubFontFamily,
+                fontSize: `${resolvedSubFontSize}px`,
                 fontWeight: 800,
                 color: computedSecondaryColor,
                 lineHeight: 1.25,

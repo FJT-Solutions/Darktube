@@ -252,7 +252,11 @@ export interface DarkClipsVideoProps {
     showMainText?: boolean;
     showSubText?: boolean;
     fontFamily?: string;
+    mainTextFontFamily?: string;
+    subTextFontFamily?: string;
     fontSize?: number;
+    mainTextFontSize?: number;
+    subTextFontSize?: number;
     primaryColor?: string; // e.g. '#FACC15'
     secondaryColor?: string; // e.g. '#FFFFFF'
     textAlign?: 'left' | 'center' | 'right';

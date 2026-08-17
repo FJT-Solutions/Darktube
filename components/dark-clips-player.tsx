@@ -35,7 +35,7 @@ interface DarkClipsPreviewPlayerProps extends DarkClipsVideoProps {
   arrowsList?: DarkClipArrowItem[];
   onLayerFocus?: (layer: 'header' | 'headline' | 'video' | 'watermark' | 'footer' | 'arrows', arrowIndex?: number) => void;
   onUpdateHeaderPadding?: (paddingTop: number) => void;
-  onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number }) => void;
+  onUpdateHeadline?: (updates: { mainTextYOffset?: number; subTextYOffset?: number; fontSize?: number; mainTextFontSize?: number; subTextFontSize?: number }) => void;
   onUpdateVideoPlacement?: (placement: { yOffset?: number; scale?: number; borderRadius?: number }) => void;
   onUpdateWatermark?: (updates: { xOffset?: number; yOffset?: number; position?: 'custom' }) => void;
   onUpdateFooter?: (updates: { yOffset?: number; fontSize?: number; text?: string }) => void;

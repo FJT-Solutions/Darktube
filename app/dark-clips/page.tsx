@@ -70,6 +70,22 @@ import { DarkClip, DarkClipPreset, DarkClipPost, BlotatoAccount, DarkClipArrowIt
 import { getBlotatoAccountsAction } from "@/app/actions";
 import { toast } from "sonner";
 
+const FONT_OPTIONS = [
+  { id: "Montserrat, Inter, sans-serif", name: "Montserrat", label: "Montserrat (Padrão Viral)", style: "font-sans font-black" },
+  { id: "Anton, sans-serif", name: "Anton", label: "Anton (Impacto Extremo)", style: "font-black tracking-wide" },
+  { id: "Impact, sans-serif", name: "Impact", label: "Impact (Meme Clássico)", style: "font-black" },
+  { id: "Bebas Neue, sans-serif", name: "Bebas Neue", label: "Bebas Neue (Condensada Alta)", style: "font-bold tracking-wider" },
+  { id: "Oswald, sans-serif", name: "Oswald", label: "Oswald (Dramática)", style: "font-bold" },
+  { id: "Poppins, sans-serif", name: "Poppins", label: "Poppins (Geométrica Limpa)", style: "font-bold" },
+  { id: "Inter, sans-serif", name: "Inter", label: "Inter (Minimalista Elegante)", style: "font-semibold" },
+  { id: "Rubik, sans-serif", name: "Rubik", label: "Rubik (Gamer / Tech)", style: "font-bold" },
+  { id: "Outfit, sans-serif", name: "Outfit", label: "Outfit (Ultra Moderna)", style: "font-black" },
+  { id: "Cinzel, serif", name: "Cinzel", label: "Cinzel (Cinematográfica / Luxo)", style: "font-serif font-bold" },
+  { id: "Playfair Display, serif", name: "Playfair Display", label: "Playfair Display (Editorial)", style: "font-serif italic font-bold" },
+  { id: "JetBrains Mono, monospace", name: "JetBrains Mono", label: "JetBrains Mono (Código / Tech)", style: "font-mono font-bold" },
+  { id: "custom", name: "Personalizada", label: "✏️ Personalizada (Digitar Fonte...)", style: "font-sans" },
+];
+
 export default function DarkClipsPage() {
   // Main Tab Navigation: "modeler" (🎨 Layout & Templates) | "creation" (🎬 Criação & Clipes)
   const [activeTab, setActiveTab] = useState<"modeler" | "creation">("modeler");
@@ -122,7 +138,11 @@ export default function DarkClipsPage() {
     showMainText: true,
     showSubText: true,
     fontFamily: 'Montserrat, Inter, sans-serif',
+    mainTextFontFamily: 'Montserrat, Inter, sans-serif',
+    subTextFontFamily: 'Inter, sans-serif',
     fontSize: 40,
+    mainTextFontSize: 42,
+    subTextFontSize: 34,
     primaryColor: "#FACC15",
     secondaryColor: "#FFFFFF",
     textAlign: "center" as "left" | "center" | "right",
@@ -411,7 +431,12 @@ export default function DarkClipsPage() {
     if (preset.headline_style) {
       setHeadline((h) => ({
         ...h,
+        fontFamily: preset.headline_style.font_family ?? preset.headline_style.fontFamily ?? h.fontFamily,
+        mainTextFontFamily: preset.headline_style.main_text_font_family ?? preset.headline_style.mainTextFontFamily ?? preset.headline_style.font_family ?? preset.headline_style.fontFamily ?? h.mainTextFontFamily,
+        subTextFontFamily: preset.headline_style.sub_text_font_family ?? preset.headline_style.subTextFontFamily ?? preset.headline_style.font_family ?? preset.headline_style.fontFamily ?? h.subTextFontFamily,
         fontSize: preset.headline_style.font_size ?? preset.headline_style.fontSize ?? h.fontSize,
+        mainTextFontSize: preset.headline_style.main_text_font_size ?? preset.headline_style.mainTextFontSize ?? preset.headline_style.font_size ?? preset.headline_style.fontSize ?? h.mainTextFontSize,
+        subTextFontSize: preset.headline_style.sub_text_font_size ?? preset.headline_style.subTextFontSize ?? (preset.headline_style.font_size ? Math.round(preset.headline_style.font_size * 0.85) : h.subTextFontSize),
         primaryColor: preset.headline_style.primary_color ?? preset.headline_style.primaryColor ?? h.primaryColor,
         secondaryColor: preset.headline_style.secondary_color ?? preset.headline_style.secondaryColor ?? h.secondaryColor,
         textAlign: (preset.headline_style.textAlign || preset.headline_style.text_align || h.textAlign) as any,
@@ -1151,20 +1176,28 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Sliders de Escala, Foto e Fonte */}
+                      {/* Sliders de Escala, Foto e Fonte com Inputs Numéricos Livres */}
                       <div className="p-3 rounded-xl bg-secondary/10 border border-border/40 space-y-3.5">
                         {/* Escala Geral */}
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold flex items-center gap-1.5">
                               <Maximize2 className="h-3.5 w-3.5 text-primary" /> Escala Geral do Cabeçalho
                             </span>
-                            <span className="font-mono text-primary">{profileHeader.scale || 100}%</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={profileHeader.scale || 100}
+                                onChange={(e) => setProfileHeader((p) => ({ ...p, scale: e.target.value === "" ? 0 : Number(e.target.value) }))}
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[profileHeader.scale || 100]}
-                            min={50}
-                            max={180}
+                            value={[Math.min(250, Math.max(20, profileHeader.scale || 100))]}
+                            min={20}
+                            max={250}
                             step={1}
                             onValueChange={([scale]) => setProfileHeader((p) => ({ ...p, scale }))}
                           />
@@ -1172,16 +1205,24 @@ export default function DarkClipsPage() {
 
                         {/* Tamanho da Foto de Perfil */}
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold flex items-center gap-1.5">
                               <ImageIcon className="h-3.5 w-3.5 text-emerald-400" /> Tamanho do Avatar
                             </span>
-                            <span className="font-mono text-emerald-400">{profileHeader.avatarSize || 76}px</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={profileHeader.avatarSize || 76}
+                                onChange={(e) => setProfileHeader((p) => ({ ...p, avatarSize: e.target.value === "" ? 0 : Number(e.target.value) }))}
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-emerald-400 font-bold">px</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[profileHeader.avatarSize || 76]}
-                            min={40}
-                            max={140}
+                            value={[Math.min(200, Math.max(20, profileHeader.avatarSize || 76))]}
+                            min={20}
+                            max={200}
                             step={2}
                             onValueChange={([avatarSize]) => setProfileHeader((p) => ({ ...p, avatarSize }))}
                           />
@@ -1189,16 +1230,24 @@ export default function DarkClipsPage() {
 
                         {/* Tamanho da Fonte do Nome/@ */}
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold flex items-center gap-1.5">
                               <Type className="h-3.5 w-3.5 text-yellow-400" /> Tamanho da Tipografia
                             </span>
-                            <span className="font-mono text-yellow-400">{profileHeader.fontSize || 32}px</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={profileHeader.fontSize || 32}
+                                onChange={(e) => setProfileHeader((p) => ({ ...p, fontSize: e.target.value === "" ? 0 : Number(e.target.value) }))}
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-yellow-400 font-bold">px</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[profileHeader.fontSize || 32]}
-                            min={18}
-                            max={52}
+                            value={[Math.min(100, Math.max(10, profileHeader.fontSize || 32))]}
+                            min={10}
+                            max={100}
                             step={1}
                             onValueChange={([fontSize]) => setProfileHeader((p) => ({ ...p, fontSize }))}
                           />
@@ -1246,14 +1295,22 @@ export default function DarkClipsPage() {
 
                       {/* Espaçamento Superior (Padding) */}
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="font-semibold">Posição Vertical do Topo</span>
-                          <span className="font-mono text-primary">{profileHeader.paddingTop}px</span>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold">Posição Vertical do Topo (Padding)</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={profileHeader.paddingTop}
+                              onChange={(e) => setProfileHeader((p) => ({ ...p, paddingTop: e.target.value === "" ? 0 : Number(e.target.value) }))}
+                              className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[11px] font-mono text-primary font-bold">px</span>
+                          </div>
                         </div>
                         <Slider
-                          value={[profileHeader.paddingTop]}
-                          min={20}
-                          max={260}
+                          value={[Math.min(400, Math.max(0, profileHeader.paddingTop))]}
+                          min={0}
+                          max={400}
                           step={2}
                           onValueChange={([paddingTop]) => setProfileHeader((p) => ({ ...p, paddingTop }))}
                         />
@@ -1274,15 +1331,16 @@ export default function DarkClipsPage() {
                       <Type className="h-4 w-4 text-primary" /> Títulos, Textos & Gancho Viral
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Configure as fontes, cores, maiúsculas, sombras e digite textos de exemplo para pré-visualizar o layout.
+                      Fontes, tamanhos em pixels e alinhamentos 100% independentes para Texto Primário e Secundário.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-4">
-                    {/* Texto Primário */}
-                    <div className="p-3 rounded-xl bg-secondary/15 border border-border/50 space-y-2.5">
+                    
+                    {/* ── 1. BLOCO TEXTO PRIMÁRIO (DESTAQUE) ── */}
+                    <div className="p-3.5 rounded-xl bg-yellow-500/5 border border-yellow-500/20 space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold text-yellow-400 flex items-center gap-1.5">
-                          <span>Texto Primário (Destaque)</span>
+                          <span>Texto Primário (Destaque Principal)</span>
                         </Label>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-muted-foreground">Exibir</span>
@@ -1297,26 +1355,120 @@ export default function DarkClipsPage() {
                           <Textarea
                             value={headline.mainText}
                             onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
-                            placeholder="Ex: Meu amigo: 'Comprei um mic novo, mano.'"
+                            placeholder="Ex: MEU AMIGO: 'COMPREI UM MIC NOVO, MANO.'"
                             rows={2}
-                            className="text-xs font-bold resize-none"
+                            className="text-xs font-bold resize-none bg-background/80"
                           />
+
+                          {/* Seletor de Fonte do Texto Primário */}
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                              <span>Família da Fonte (Primário)</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {headline.mainTextFontFamily?.split(",")[0] || "Montserrat"}
+                              </span>
+                            </Label>
+                            <Select
+                              value={
+                                FONT_OPTIONS.some((f) => f.id === headline.mainTextFontFamily)
+                                  ? headline.mainTextFontFamily
+                                  : "custom"
+                              }
+                              onValueChange={(val) => {
+                                if (val !== "custom") {
+                                  setHeadline((h) => ({ ...h, mainTextFontFamily: val }));
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs bg-background/90 border-border/80">
+                                <SelectValue placeholder="Selecione a fonte do texto primário" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {FONT_OPTIONS.map((font) => (
+                                  <SelectItem key={font.id} value={font.id} className="text-xs">
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <span style={{ fontFamily: font.id !== "custom" ? font.id : undefined }} className="font-bold">
+                                        {font.label}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {/* Input para Fonte Personalizada caso queira digitar */}
+                            {(!FONT_OPTIONS.some((f) => f.id === headline.mainTextFontFamily) ||
+                              headline.mainTextFontFamily === "custom") && (
+                              <Input
+                                value={headline.mainTextFontFamily === "custom" ? "" : headline.mainTextFontFamily}
+                                onChange={(e) => setHeadline((h) => ({ ...h, mainTextFontFamily: e.target.value }))}
+                                placeholder="Digite o nome da fonte (ex: Arial, Impact, Poppins, Roboto...)"
+                                className="h-7 text-xs font-mono mt-1"
+                              />
+                            )}
+                          </div>
+
+                          {/* Tamanho da Fonte Primária (px) e Posição Y (%) */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            {/* Posição Vertical Independente */}
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="font-semibold">Posição Vertical (Y)</span>
-                                <span className="font-mono text-primary">{headline.mainTextYOffset}%</span>
+                            {/* Tamanho da Fonte Primária */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-yellow-400">Tamanho da Fonte</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={headline.mainTextFontSize ?? headline.fontSize ?? 42}
+                                    onChange={(e) =>
+                                      setHeadline((h) => ({
+                                        ...h,
+                                        mainTextFontSize: e.target.value === "" ? 0 : Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                  />
+                                  <span className="text-[10px] font-mono text-yellow-400 font-bold">px</span>
+                                </div>
                               </div>
                               <Slider
-                                value={[headline.mainTextYOffset]}
-                                min={5}
-                                max={50}
+                                value={[Math.min(150, Math.max(12, headline.mainTextFontSize ?? headline.fontSize ?? 42))]}
+                                min={12}
+                                max={150}
+                                step={1}
+                                onValueChange={([mainTextFontSize]) => setHeadline((h) => ({ ...h, mainTextFontSize }))}
+                              />
+                            </div>
+
+                            {/* Posição Vertical (Y) */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold">Posição Vertical (Y)</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={headline.mainTextYOffset}
+                                    onChange={(e) =>
+                                      setHeadline((h) => ({
+                                        ...h,
+                                        mainTextYOffset: e.target.value === "" ? 0 : Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                  />
+                                  <span className="text-[10px] font-mono text-primary font-bold">%</span>
+                                </div>
+                              </div>
+                              <Slider
+                                value={[Math.min(100, Math.max(0, headline.mainTextYOffset))]}
+                                min={0}
+                                max={100}
                                 step={1}
                                 onValueChange={([mainTextYOffset]) => setHeadline((h) => ({ ...h, mainTextYOffset }))}
                               />
                             </div>
-                            {/* Alinhamento Independente */}
+                          </div>
+
+                          {/* Alinhamento e Maiúsculas do Primário */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 items-center">
                             <div>
                               <Label className="text-[11px] font-semibold">Alinhamento</Label>
                               <div className="flex gap-1.5 mt-1">
@@ -1334,16 +1486,24 @@ export default function DarkClipsPage() {
                                 ))}
                               </div>
                             </div>
+
+                            <div className="flex items-center gap-2 pt-4 sm:pt-4">
+                              <Switch
+                                checked={headline.mainTextUppercase}
+                                onCheckedChange={(v) => setHeadline((h) => ({ ...h, mainTextUppercase: v }))}
+                              />
+                              <Label className="text-xs font-medium">Primário em Maiúsculas</Label>
+                            </div>
                           </div>
                         </>
                       )}
                     </div>
 
-                    {/* Texto Secundário */}
-                    <div className="p-3 rounded-xl bg-secondary/15 border border-border/50 space-y-2.5">
+                    {/* ── 2. BLOCO TEXTO SECUNDÁRIO (CONTEXTO / PUNCHLINE) ── */}
+                    <div className="p-3.5 rounded-xl bg-cyan-500/5 border border-cyan-500/20 space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                          <span>Texto Secundário (Contexto)</span>
+                        <Label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                          <span>Texto Secundário (Contexto / Punchline)</span>
                         </Label>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] text-muted-foreground">Exibir</span>
@@ -1358,26 +1518,120 @@ export default function DarkClipsPage() {
                           <Textarea
                             value={headline.subText}
                             onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                            placeholder="Ex: O desgraçado entrando na call:"
+                            placeholder="Ex: O DESGRAÇADO ENTRANDO NA CALL:"
                             rows={2}
-                            className="text-xs resize-none"
+                            className="text-xs resize-none bg-background/80"
                           />
+
+                          {/* Seletor de Fonte do Texto Secundário Independente */}
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] font-semibold text-foreground flex items-center justify-between">
+                              <span>Família da Fonte (Secundário)</span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {headline.subTextFontFamily?.split(",")[0] || "Inter"}
+                              </span>
+                            </Label>
+                            <Select
+                              value={
+                                FONT_OPTIONS.some((f) => f.id === headline.subTextFontFamily)
+                                  ? headline.subTextFontFamily
+                                  : "custom"
+                              }
+                              onValueChange={(val) => {
+                                if (val !== "custom") {
+                                  setHeadline((h) => ({ ...h, subTextFontFamily: val }));
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs bg-background/90 border-border/80">
+                                <SelectValue placeholder="Selecione a fonte do texto secundário" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {FONT_OPTIONS.map((font) => (
+                                  <SelectItem key={font.id} value={font.id} className="text-xs">
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <span style={{ fontFamily: font.id !== "custom" ? font.id : undefined }} className="font-bold">
+                                        {font.label}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {/* Input para Fonte Personalizada caso queira digitar */}
+                            {(!FONT_OPTIONS.some((f) => f.id === headline.subTextFontFamily) ||
+                              headline.subTextFontFamily === "custom") && (
+                              <Input
+                                value={headline.subTextFontFamily === "custom" ? "" : headline.subTextFontFamily}
+                                onChange={(e) => setHeadline((h) => ({ ...h, subTextFontFamily: e.target.value }))}
+                                placeholder="Digite o nome da fonte (ex: Arial, Poppins, Roboto, Inter...)"
+                                className="h-7 text-xs font-mono mt-1"
+                              />
+                            )}
+                          </div>
+
+                          {/* Tamanho da Fonte Secundária (px) e Posição Y (%) */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            {/* Posição Vertical Independente */}
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-[11px]">
-                                <span className="font-semibold">Posição Vertical (Y)</span>
-                                <span className="font-mono text-primary">{headline.subTextYOffset}%</span>
+                            {/* Tamanho da Fonte Secundária */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold text-cyan-400">Tamanho da Fonte</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={headline.subTextFontSize ?? Math.round((headline.fontSize || 40) * 0.85)}
+                                    onChange={(e) =>
+                                      setHeadline((h) => ({
+                                        ...h,
+                                        subTextFontSize: e.target.value === "" ? 0 : Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                  />
+                                  <span className="text-[10px] font-mono text-cyan-400 font-bold">px</span>
+                                </div>
                               </div>
                               <Slider
-                                value={[headline.subTextYOffset]}
-                                min={10}
-                                max={60}
+                                value={[Math.min(150, Math.max(12, headline.subTextFontSize ?? Math.round((headline.fontSize || 40) * 0.85)))]}
+                                min={12}
+                                max={150}
+                                step={1}
+                                onValueChange={([subTextFontSize]) => setHeadline((h) => ({ ...h, subTextFontSize }))}
+                              />
+                            </div>
+
+                            {/* Posição Vertical (Y) */}
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="font-semibold">Posição Vertical (Y)</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={headline.subTextYOffset}
+                                    onChange={(e) =>
+                                      setHeadline((h) => ({
+                                        ...h,
+                                        subTextYOffset: e.target.value === "" ? 0 : Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                  />
+                                  <span className="text-[10px] font-mono text-primary font-bold">%</span>
+                                </div>
+                              </div>
+                              <Slider
+                                value={[Math.min(100, Math.max(0, headline.subTextYOffset))]}
+                                min={0}
+                                max={100}
                                 step={1}
                                 onValueChange={([subTextYOffset]) => setHeadline((h) => ({ ...h, subTextYOffset }))}
                               />
                             </div>
-                            {/* Alinhamento Independente */}
+                          </div>
+
+                          {/* Alinhamento e Maiúsculas do Secundário */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 items-center">
                             <div>
                               <Label className="text-[11px] font-semibold">Alinhamento</Label>
                               <div className="flex gap-1.5 mt-1">
@@ -1395,27 +1649,21 @@ export default function DarkClipsPage() {
                                 ))}
                               </div>
                             </div>
+
+                            <div className="flex items-center gap-2 pt-4 sm:pt-4">
+                              <Switch
+                                checked={headline.subTextUppercase}
+                                onCheckedChange={(v) => setHeadline((h) => ({ ...h, subTextUppercase: v }))}
+                              />
+                              <Label className="text-xs font-medium">Secundário em Maiúsculas</Label>
+                            </div>
                           </div>
                         </>
                       )}
                     </div>
 
-                    {/* Tamanho da Fonte & Cores */}
+                    {/* ── 3. CORES E EFEITOS GERAIS ── */}
                     <div className="space-y-3 pt-1">
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
-                          <span className="font-semibold">Tamanho da Fonte dos Títulos</span>
-                          <span className="font-mono text-primary">{headline.fontSize}px</span>
-                        </div>
-                        <Slider
-                          value={[headline.fontSize]}
-                          min={24}
-                          max={68}
-                          step={2}
-                          onValueChange={([fontSize]) => setHeadline((h) => ({ ...h, fontSize }))}
-                        />
-                      </div>
-
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label className="text-xs font-semibold">Cor Primária (Destaque)</Label>
@@ -1452,29 +1700,13 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Switches de Efeitos e Maiúsculas */}
-                      <div className="flex flex-wrap gap-4 pt-2">
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={headline.mainTextUppercase}
-                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, mainTextUppercase: v }))}
-                          />
-                          <Label className="text-xs font-medium">Primário Maiúsculas</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={headline.subTextUppercase}
-                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, subTextUppercase: v }))}
-                          />
-                          <Label className="text-xs font-medium">Secundário Maiúsculas</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={headline.textShadow}
-                            onCheckedChange={(v) => setHeadline((h) => ({ ...h, textShadow: v }))}
-                          />
-                          <Label className="text-xs font-medium">Sombra 3D</Label>
-                        </div>
+                      {/* Sombra 3D */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Switch
+                          checked={headline.textShadow}
+                          onCheckedChange={(v) => setHeadline((h) => ({ ...h, textShadow: v }))}
+                        />
+                        <Label className="text-xs font-medium">Sombra 3D e Alto Contraste</Label>
                       </div>
                     </div>
                   </CardContent>
@@ -1498,14 +1730,27 @@ export default function DarkClipsPage() {
                   <CardContent className="p-4 pt-0 space-y-4">
                     {/* Posição Y */}
                     <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
+                      <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold">Posição Vertical do Vídeo (Y)</span>
-                        <span className="font-mono text-primary">{videoPlacement.yOffset}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={videoPlacement.yOffset}
+                            onChange={(e) =>
+                              setVideoPlacement((v) => ({
+                                ...v,
+                                yOffset: e.target.value === "" ? 0 : Number(e.target.value),
+                              }))
+                            }
+                            className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                          />
+                          <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                        </div>
                       </div>
                       <Slider
-                        value={[videoPlacement.yOffset]}
-                        min={20}
-                        max={85}
+                        value={[Math.min(100, Math.max(0, videoPlacement.yOffset))]}
+                        min={0}
+                        max={100}
                         step={1}
                         onValueChange={([yOffset]) => setVideoPlacement((v) => ({ ...v, yOffset }))}
                       />
@@ -1513,14 +1758,27 @@ export default function DarkClipsPage() {
 
                     {/* Escala */}
                     <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
+                      <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold">Tamanho / Escala do Vídeo</span>
-                        <span className="font-mono text-primary">{videoPlacement.scale}%</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={videoPlacement.scale}
+                            onChange={(e) =>
+                              setVideoPlacement((v) => ({
+                                ...v,
+                                scale: e.target.value === "" ? 0 : Number(e.target.value),
+                              }))
+                            }
+                            className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                          />
+                          <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                        </div>
                       </div>
                       <Slider
-                        value={[videoPlacement.scale]}
-                        min={50}
-                        max={100}
+                        value={[Math.min(200, Math.max(20, videoPlacement.scale))]}
+                        min={20}
+                        max={200}
                         step={1}
                         onValueChange={([scale]) => setVideoPlacement((v) => ({ ...v, scale }))}
                       />
@@ -1528,15 +1786,28 @@ export default function DarkClipsPage() {
 
                     {/* Bordas Arredondadas */}
                     <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs">
+                      <div className="flex items-center justify-between text-xs">
                         <span className="font-semibold">Arredondamento das Bordas (Border Radius)</span>
-                        <span className="font-mono text-primary">{videoPlacement.borderRadius}px</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={videoPlacement.borderRadius}
+                            onChange={(e) =>
+                              setVideoPlacement((v) => ({
+                                ...v,
+                                borderRadius: e.target.value === "" ? 0 : Number(e.target.value),
+                              }))
+                            }
+                            className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                          />
+                          <span className="text-[11px] font-mono text-primary font-bold">px</span>
+                        </div>
                       </div>
                       <Slider
-                        value={[videoPlacement.borderRadius]}
+                        value={[Math.min(100, Math.max(0, videoPlacement.borderRadius))]}
                         min={0}
-                        max={48}
-                        step={2}
+                        max={100}
+                        step={1}
                         onValueChange={([borderRadius]) => setVideoPlacement((v) => ({ ...v, borderRadius }))}
                       />
                     </div>
@@ -1717,14 +1988,27 @@ export default function DarkClipsPage() {
                             </div>
 
                             <div className="space-y-1">
-                              <div className="flex justify-between text-xs">
+                              <div className="flex items-center justify-between text-xs">
                                 <span className="font-semibold">Tamanho da Logo</span>
-                                <span className="font-mono text-primary">{watermark.imageSize || 44}px</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={watermark.imageSize || 44}
+                                    onChange={(e) =>
+                                      setWatermark((w) => ({
+                                        ...w,
+                                        imageSize: e.target.value === "" ? 0 : Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                  />
+                                  <span className="text-[11px] font-mono text-primary font-bold">px</span>
+                                </div>
                               </div>
                               <Slider
-                                value={[watermark.imageSize || 44]}
-                                min={24}
-                                max={100}
+                                value={[Math.min(250, Math.max(10, watermark.imageSize || 44))]}
+                                min={10}
+                                max={250}
                                 step={2}
                                 onValueChange={([imageSize]) => setWatermark((w) => ({ ...w, imageSize }))}
                               />
@@ -1734,14 +2018,27 @@ export default function DarkClipsPage() {
                           {/* Borda da Moldura */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                             <div className="space-y-1">
-                              <div className="flex justify-between text-xs">
+                              <div className="flex items-center justify-between text-xs">
                                 <span className="font-semibold">Espessura da Borda</span>
-                                <span className="font-mono text-primary">{watermark.borderWidth ?? 2}px</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={watermark.borderWidth ?? 2}
+                                    onChange={(e) =>
+                                      setWatermark((w) => ({
+                                        ...w,
+                                        borderWidth: e.target.value === "" ? 0 : Number(e.target.value),
+                                      }))
+                                    }
+                                    className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                  />
+                                  <span className="text-[11px] font-mono text-primary font-bold">px</span>
+                                </div>
                               </div>
                               <Slider
-                                value={[watermark.borderWidth ?? 2]}
+                                value={[Math.min(30, Math.max(0, watermark.borderWidth ?? 2))]}
                                 min={0}
-                                max={6}
+                                max={30}
                                 step={1}
                                 onValueChange={([borderWidth]) => setWatermark((w) => ({ ...w, borderWidth }))}
                               />
@@ -1814,14 +2111,27 @@ export default function DarkClipsPage() {
                           </div>
 
                           <div className="space-y-1 pt-1">
-                            <div className="flex justify-between text-xs">
+                            <div className="flex items-center justify-between text-xs">
                               <span className="font-semibold">Tamanho da Fonte</span>
-                              <span className="font-mono text-primary">{watermark.fontSize || 22}px</span>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  value={watermark.fontSize || 22}
+                                  onChange={(e) =>
+                                    setWatermark((w) => ({
+                                      ...w,
+                                      fontSize: e.target.value === "" ? 0 : Number(e.target.value),
+                                    }))
+                                  }
+                                  className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                />
+                                <span className="text-[11px] font-mono text-primary font-bold">px</span>
+                              </div>
                             </div>
                             <Slider
-                              value={[watermark.fontSize || 22]}
-                              min={12}
-                              max={48}
+                              value={[Math.min(100, Math.max(10, watermark.fontSize || 22))]}
+                              min={10}
+                              max={100}
                               step={1}
                               onValueChange={([fontSize]) => setWatermark((w) => ({ ...w, fontSize }))}
                             />
@@ -1863,13 +2173,26 @@ export default function DarkClipsPage() {
                       {/* 4. OPACIDADE, ESCALA & SOMBRA */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold">Opacidade</span>
-                            <span className="font-mono text-primary">{watermark.opacity}%</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={watermark.opacity}
+                                onChange={(e) =>
+                                  setWatermark((w) => ({
+                                    ...w,
+                                    opacity: e.target.value === "" ? 0 : Number(e.target.value),
+                                  }))
+                                }
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[watermark.opacity]}
-                            min={10}
+                            value={[Math.min(100, Math.max(0, watermark.opacity))]}
+                            min={0}
                             max={100}
                             step={5}
                             onValueChange={([opacity]) => setWatermark((w) => ({ ...w, opacity }))}
@@ -1877,14 +2200,27 @@ export default function DarkClipsPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold">Escala Geral</span>
-                            <span className="font-mono text-primary">{watermark.scale || 100}%</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={watermark.scale || 100}
+                                onChange={(e) =>
+                                  setWatermark((w) => ({
+                                    ...w,
+                                    scale: e.target.value === "" ? 0 : Number(e.target.value),
+                                  }))
+                                }
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[watermark.scale || 100]}
-                            min={40}
-                            max={200}
+                            value={[Math.min(250, Math.max(20, watermark.scale || 100))]}
+                            min={20}
+                            max={250}
                             step={5}
                             onValueChange={([scale]) => setWatermark((w) => ({ ...w, scale }))}
                           />
@@ -1962,16 +2298,29 @@ export default function DarkClipsPage() {
 
                       {/* Slider de Posição Vertical Livre */}
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
+                        <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold flex items-center gap-1.5">
                             <Move className="h-3.5 w-3.5 text-primary" /> Posição Vertical no Vídeo (Y)
                           </span>
-                          <span className="font-mono text-primary">{footer.yOffset ?? 92}%</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={footer.yOffset ?? 92}
+                              onChange={(e) =>
+                                setFooter((f) => ({
+                                  ...f,
+                                  yOffset: e.target.value === "" ? 0 : Number(e.target.value),
+                                }))
+                              }
+                              className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                          </div>
                         </div>
                         <Slider
-                          value={[footer.yOffset ?? 92]}
-                          min={5}
-                          max={98}
+                          value={[Math.min(100, Math.max(0, footer.yOffset ?? 92))]}
+                          min={0}
+                          max={100}
                           step={1}
                           onValueChange={([yOffset]) => setFooter((f) => ({ ...f, yOffset }))}
                         />
@@ -1980,16 +2329,29 @@ export default function DarkClipsPage() {
                       {/* Tamanho da Fonte & Cor */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold flex items-center gap-1.5">
                               <Type className="h-3.5 w-3.5 text-yellow-400" /> Tamanho da Fonte
                             </span>
-                            <span className="font-mono text-yellow-400">{footer.fontSize}px</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={footer.fontSize}
+                                onChange={(e) =>
+                                  setFooter((f) => ({
+                                    ...f,
+                                    fontSize: e.target.value === "" ? 0 : Number(e.target.value),
+                                  }))
+                                }
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-yellow-400 font-bold">px</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[footer.fontSize]}
-                            min={14}
-                            max={48}
+                            value={[Math.min(120, Math.max(10, footer.fontSize))]}
+                            min={10}
+                            max={120}
                             step={1}
                             onValueChange={([fontSize]) => setFooter((f) => ({ ...f, fontSize }))}
                           />
@@ -2251,9 +2613,23 @@ export default function DarkClipsPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <Label className="text-xs font-semibold">Quantidade de Setas</Label>
-                            <span className="font-mono text-rose-400 font-bold">{currentArrow.count || 2} {currentArrow.count === 1 ? "seta" : "setas"}</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={currentArrow.count || 2}
+                                onChange={(e) =>
+                                  handleUpdateSelectedArrow({
+                                    count: Math.max(1, e.target.value === "" ? 1 : Number(e.target.value)),
+                                  })
+                                }
+                                className="w-14 h-6 text-xs font-mono text-right px-1 py-0 bg-background/80"
+                              />
+                              <span className="text-[10px] font-mono text-rose-400 font-bold">setas</span>
+                            </div>
                           </div>
                           <div className="grid grid-cols-5 gap-1">
                             {[1, 2, 3, 4, 5].map((num) => (
@@ -2302,15 +2678,27 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Sliders de Posição X e Y */}
+                      {/* Sliders de Posição X e Y com Inputs Numéricos Livres */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold">Posição Horizontal (X)</span>
-                            <span className="font-mono text-primary">{currentArrow.xOffset}%</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={currentArrow.xOffset ?? 82}
+                                onChange={(e) =>
+                                  handleUpdateSelectedArrow({
+                                    xOffset: e.target.value === "" ? 0 : Number(e.target.value),
+                                  })
+                                }
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[currentArrow.xOffset ?? 82]}
+                            value={[Math.min(100, Math.max(0, currentArrow.xOffset ?? 82))]}
                             min={0}
                             max={100}
                             step={1}
@@ -2319,12 +2707,24 @@ export default function DarkClipsPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs">
                             <span className="font-semibold">Posição Vertical (Y)</span>
-                            <span className="font-mono text-primary">{currentArrow.yOffset}%</span>
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                value={currentArrow.yOffset ?? 65}
+                                onChange={(e) =>
+                                  handleUpdateSelectedArrow({
+                                    yOffset: e.target.value === "" ? 0 : Number(e.target.value),
+                                  })
+                                }
+                                className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                              />
+                              <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                            </div>
                           </div>
                           <Slider
-                            value={[currentArrow.yOffset ?? 65]}
+                            value={[Math.min(100, Math.max(0, currentArrow.yOffset ?? 65))]}
                             min={0}
                             max={100}
                             step={1}
@@ -2333,16 +2733,28 @@ export default function DarkClipsPage() {
                         </div>
                       </div>
 
-                      {/* Slider de Tamanho */}
+                      {/* Slider de Tamanho com Input Numérico Livre */}
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs">
+                        <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold">Tamanho das Setas</span>
-                          <span className="font-mono text-rose-400">{currentArrow.size}px</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={currentArrow.size ?? 40}
+                              onChange={(e) =>
+                                handleUpdateSelectedArrow({
+                                  size: e.target.value === "" ? 0 : Number(e.target.value),
+                                })
+                              }
+                              className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[11px] font-mono text-rose-400 font-bold">px</span>
+                          </div>
                         </div>
                         <Slider
-                          value={[currentArrow.size ?? 40]}
-                          min={20}
-                          max={72}
+                          value={[Math.min(150, Math.max(10, currentArrow.size ?? 40))]}
+                          min={10}
+                          max={150}
                           step={2}
                           onValueChange={([size]) => handleUpdateSelectedArrow({ size })}
                         />

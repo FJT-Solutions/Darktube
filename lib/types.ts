@@ -172,8 +172,17 @@ export interface DarkClipPreset {
   }
   headline_style: {
     font_family?: string
+    fontFamily?: string
     font_size?: number
     fontSize?: number
+    main_text_font_size?: number
+    mainTextFontSize?: number
+    sub_text_font_size?: number
+    subTextFontSize?: number
+    main_text_font_family?: string
+    mainTextFontFamily?: string
+    sub_text_font_family?: string
+    subTextFontFamily?: string
     primary_color?: string
     primaryColor?: string
     secondary_color?: string
