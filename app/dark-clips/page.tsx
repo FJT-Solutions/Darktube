@@ -2792,11 +2792,11 @@ export default function DarkClipsPage() {
               </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
-              <div className="lg:col-span-5 sticky top-4 self-start space-y-3">
-                <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col">
-                  <CardHeader className="p-3 pb-2 border-b border-border/40">
+              <div className="lg:col-span-5 lg:sticky lg:top-3 self-start space-y-2">
+                <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col max-h-[calc(100vh-1.5rem)]">
+                  <CardHeader className="p-2.5 px-3 border-b border-border/40 shrink-0">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                      <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2">
                         <Eye className="h-4 w-4 text-primary" /> Visualização ao Vivo (Canvas 9:16)
                       </CardTitle>
                       <Badge variant="outline" className="text-[10px] font-mono border-primary/30 text-primary py-0">
@@ -2806,11 +2806,11 @@ export default function DarkClipsPage() {
                   </CardHeader>
 
                   {/* Seletor de Vídeo de Exemplo Limpo para Teste de Layout */}
-                  <div className="px-3 py-2 bg-secondary/20 border-b border-border/40 space-y-1.5">
-                    <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5">
-                      <Film className="h-3 w-3 text-primary" /> Vídeo de Exemplo:
+                  <div className="px-3 py-1.5 bg-secondary/20 border-b border-border/40 shrink-0 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 shrink-0">
+                      <Film className="h-3 w-3 text-primary" /> Exemplo:
                     </span>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="flex items-center gap-1 flex-1 justify-end">
                       {[
                         { url: "/sample-oceans.mp4", label: "🌊 Oceano" },
                         { url: "/sample-viral-clip.mp4", label: "🎬 Clipes" },
@@ -2822,7 +2822,7 @@ export default function DarkClipsPage() {
                           size="sm"
                           variant={sampleVideoUrl === s.url ? "default" : "outline"}
                           onClick={() => setSampleVideoUrl(s.url)}
-                          className="text-[11px] h-7 font-bold px-1"
+                          className="text-[10px] h-6 font-bold px-2 py-0"
                         >
                           {s.label}
                         </Button>
@@ -2830,7 +2830,7 @@ export default function DarkClipsPage() {
                     </div>
                   </div>
 
-                  <CardContent className="p-2.5 flex flex-col items-center justify-center bg-black/40 overflow-hidden">
+                  <CardContent className="p-2 flex-1 flex flex-col items-center justify-center bg-black/40 overflow-hidden min-h-0">
                     <DarkClipsPreviewPlayer
                       videoUrl={sampleVideoUrl}
                       durationInSeconds={15}
@@ -2858,21 +2858,21 @@ export default function DarkClipsPage() {
                   </CardContent>
 
                   {/* Modeler Preview Footer Action Bar */}
-                  <div className="p-3 border-t border-border/40 flex flex-col sm:flex-row gap-2 justify-between items-center bg-card/50">
+                  <div className="p-2.5 px-3 border-t border-border/40 flex flex-row gap-2 justify-between items-center bg-card/50 shrink-0">
                     <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
                       <Badge variant="outline" className="text-[9px] border-border bg-secondary/30 py-0">
                         1080x1920 (9:16)
                       </Badge>
-                      <span className="truncate max-w-[120px] text-[11px]">{activePreset?.name || "Layout Atual"}</span>
+                      <span className="truncate max-w-[110px] text-[11px] font-medium">{activePreset?.name || "Layout Atual"}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+                    <div className="flex items-center gap-1.5 justify-end">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleQuickSavePreset()}
                         disabled={savingPreset}
-                        className="gap-1 text-xs font-bold h-7 px-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                        className="gap-1 text-xs font-bold h-7 px-2.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
                       >
                         {savingPreset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                         Salvar 💾
@@ -2880,7 +2880,7 @@ export default function DarkClipsPage() {
                       <Button
                         size="sm"
                         onClick={() => handleProceedToCreation()}
-                        className="gap-1 bg-primary text-primary-foreground font-bold text-xs h-7 px-2.5 shadow-md shadow-primary/20"
+                        className="gap-1 bg-primary text-primary-foreground font-bold text-xs h-7 px-3 shadow-md shadow-primary/20"
                       >
                         Avançar 🎬 <ChevronRight className="h-3 w-3" />
                       </Button>

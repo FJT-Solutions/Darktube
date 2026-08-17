@@ -256,14 +256,14 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows, onUpdateArrowItem, effectiveArrowsList]);
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full mx-auto select-none">
+    <div className="flex flex-col items-center gap-1.5 w-full mx-auto select-none overflow-hidden">
       
       {/* ── Platform Simulation Switcher Bar ── */}
-      <div className="w-full bg-secondary/40 p-0.5 rounded-xl border border-border/60 flex items-center justify-between gap-1 text-[11px] shadow-sm">
+      <div className="w-full bg-secondary/40 p-0.5 rounded-lg border border-border/60 flex items-center justify-between gap-1 text-[10px] shadow-sm shrink-0">
         <button
           type="button"
           onClick={() => setPreviewMode('clean')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center ${
+          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center ${
             previewMode === 'clean'
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
@@ -275,7 +275,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
         <button
           type="button"
           onClick={() => setPreviewMode('tiktok')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
+          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center flex items-center justify-center gap-0.5 ${
             previewMode === 'tiktok'
               ? 'bg-black text-white ring-1 ring-white/30 shadow-sm'
               : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
@@ -287,7 +287,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
         <button
           type="button"
           onClick={() => setPreviewMode('reels')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center flex items-center justify-center gap-1 ${
             previewMode === 'reels'
               ? 'bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F77737] text-white shadow-sm'
               : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
@@ -299,7 +299,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
         <button
           type="button"
           onClick={() => setPreviewMode('shorts')}
-          className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1 ${
+          className={`flex-1 py-1 px-1.5 rounded-md font-bold transition-all text-center flex items-center justify-center gap-1 ${
             previewMode === 'shorts'
               ? 'bg-red-600 text-white shadow-sm'
               : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
@@ -311,13 +311,13 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       </div>
 
       {/* ── Top Stage Info Bar ── */}
-      <div className="w-full flex items-center justify-between px-1 min-h-[20px]">
+      <div className="w-full flex items-center justify-between px-1 min-h-[16px] shrink-0">
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-[10px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1 py-0">
+          <Badge variant="outline" className="text-[9px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1 py-0 px-1.5 h-4">
             <Smartphone className="h-2.5 w-2.5" /> 9:16 Live
           </Badge>
           {activeLayer !== 'none' && (
-            <span className="text-[10px] font-semibold text-zinc-300 animate-fadeIn truncate max-w-[220px]">
+            <span className="text-[9px] font-semibold text-zinc-300 animate-fadeIn truncate max-w-[200px]">
               <strong className="text-primary font-bold">
                 {activeLayer === 'header'
                   ? `Cabeçalho (${headerPadding}px)`
@@ -342,12 +342,12 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       <div
         ref={containerRef}
         style={{
-          height: 'min(calc(100vh - 18.5rem), 540px)',
-          maxHeight: 'calc(100vh - 16rem)',
+          height: 'min(calc(100vh - 20.5rem), 430px)',
+          maxHeight: 'min(calc(100vh - 20.5rem), 430px)',
           aspectRatio: '9/16',
           maxWidth: '100%',
         }}
-        className="rounded-[20px] overflow-hidden shadow-2xl border-2 border-zinc-800/90 bg-black relative cursor-default group shrink-0 transition-all duration-150"
+        className="rounded-[18px] overflow-hidden shadow-2xl border-2 border-zinc-800/90 bg-black relative cursor-default group shrink-0 transition-all duration-150"
         onClick={() => setActiveLayer('none')}
       >
         {/* The Live Composition */}
@@ -877,8 +877,8 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
       </div>
 
       {/* Stage Hint Footer */}
-      <p className="text-[11px] text-zinc-500 text-center font-medium">
-        💡 <strong>Editor Visual:</strong> Arraste livremente o <strong>Cabeçalho</strong>, <strong>Título</strong>, <strong>Subtítulo</strong>, <strong>Vídeo</strong>, <strong>Marca D'água</strong>, <strong>Rodapé</strong> ou <strong>Containers de Setas</strong> para qualquer posição.
+      <p className="text-[10px] text-zinc-500 text-center font-medium leading-tight shrink-0">
+        💡 <strong>Editor Visual:</strong> Arraste os elementos no Canvas para reposicionar.
       </p>
     </div>
   );
