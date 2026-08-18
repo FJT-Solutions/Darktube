@@ -180,8 +180,14 @@ async function preloadAndProcessAllAssets(scenes) {
           }
         }
         if (fs.existsSync(filePath)) {
-          scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
-          console.log(`[Remotion Assets] ✅ Cena ${i + 1} imagem local: /storage/${fileName}`);
+          const fileBuf = fs.readFileSync(filePath);
+          const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
+          if (!isVideo) {
+            scene.imageUrl = `data:${mimeType};base64,${fileBuf.toString('base64')}`;
+            console.log(`[Remotion Assets] ✅ Cena ${i + 1} em memória RAM (base64 data-uri ${Math.round(fileBuf.length / 1024)}KB)`);
+          } else {
+            scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+          }
         } else {
           scene.imageUrl = ''; // Remove URL quebrada para não travar o Remotion
         }
@@ -217,7 +223,8 @@ async function preloadAndProcessAllAssets(scenes) {
           }
         }
         if (fs.existsSync(filePath)) {
-          scene.foregroundUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+          const fgBuf = fs.readFileSync(filePath);
+          scene.foregroundUrl = `data:image/png;base64,${fgBuf.toString('base64')}`;
         }
       } catch (err) {
         console.error(`[Remotion Assets] ⚠️ Falha ao baixar foreground da cena ${i + 1}:`, err.message);
@@ -235,7 +242,8 @@ async function preloadAndProcessAllAssets(scenes) {
 
           if (fs.existsSync(fgPath)) {
             console.log(`[Remotion Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-            scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+            const cachedBuf = fs.readFileSync(fgPath);
+            scene.subjectImageUrl = `data:image/png;base64,${cachedBuf.toString('base64')}`;
             continue;
           }
 
@@ -255,8 +263,8 @@ async function preloadAndProcessAllAssets(scenes) {
 
           fs.writeFileSync(fgPath, buffer);
 
-          scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
-          console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D pronta: /storage/${fgFileName}`);
+          scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+          console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D em memória RAM (base64)`);
         } catch (err) {
           console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
         }
@@ -407,8 +415,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    // Concorrência dinâmica: respeita RENDER_CONCURRENCY (.env) ou payload (padrão: 10, máx: 16)
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '10', 10);
+    // Concorrência dinâmica: respeita RENDER_CONCURRENCY (.env) ou payload (padrão: 6, máx: 16)
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '6', 10);
     const concurrency = Math.max(1, Math.min(rawConcurrency, 16));
     console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 12288MB, SHM: 12GB)`);
 
