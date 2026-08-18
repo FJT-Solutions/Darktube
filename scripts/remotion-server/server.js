@@ -407,9 +407,9 @@ async function renderAsync(historyId, composition, callbackUrl) {
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    // Concorrência: respeita RENDER_CONCURRENCY do .env (padrão 12), cap em 16 para segurança
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '12', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 16));
+    // Concorrência estável: 6 workers para evitar esgotamento de memória/shm no Docker
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '6', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 6));
     console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 4096MB)`);
 
     let lastPercent = -1;
