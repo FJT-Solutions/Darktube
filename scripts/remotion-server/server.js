@@ -406,10 +406,10 @@ async function renderAsync(historyId, composition, callbackUrl) {
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    // Concorrência estável: 4 workers para equilíbrio perfeito entre CPU e throughput
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 4));
-    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 12288MB)`);
+    // Concorrência dinâmica: respeita RENDER_CONCURRENCY (.env) ou payload (padrão: 10, máx: 16)
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '10', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 16));
+    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 12288MB, SHM: 12GB)`);
 
     let lastPercent = -1;
     await renderMedia({
