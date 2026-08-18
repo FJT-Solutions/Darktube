@@ -216,12 +216,71 @@ async function preloadAndProcessAllAssets(scenes) {
 }
 
 // ──────────────────────────────────────────────
-// RENDER ASSÍNCRONO
+// WATCHDOG: Mata Chromium zumbi após render (sucesso ou falha)
+// ──────────────────────────────────────────────
+function killZombieChromium() {
+  try {
+    execSync('killall -9 chromium 2>/dev/null || true', { stdio: 'pipe', timeout: 5000 });
+    execSync('killall -9 chrome_crashpad_handler 2>/dev/null || true', { stdio: 'pipe', timeout: 5000 });
+    console.log('[Remotion Watchdog] Chromium cleanup executado.');
+  } catch (_) {
+    // Silencioso — pode não haver processos para matar
+  }
+}
+
+// ──────────────────────────────────────────────
+// RENDER ASSÍNCRONO (com watchdog triplo)
 // ──────────────────────────────────────────────
 async function renderAsync(historyId, composition, callbackUrl) {
   const outputFilePath = path.join(OUTPUT_DIR, `render_${historyId || Date.now()}.mp4`);
 
   console.log(`[Remotion Render] Iniciando job: ${historyId}`);
+
+  // ── WATCHDOG 1: Timeout global absoluto (baseado no número de frames) ──
+  // Regra: máximo de 3 segundos de render por frame, mínimo 10 min, máximo 60 min
+  const scenesList = composition.scenes || [];
+  let estimatedFrames = 0;
+  const fps = 30;
+  const DEFAULT_TRANSITION_FRAMES = 18;
+  for (let i = 0; i < scenesList.length; i++) {
+    const scene = scenesList[i];
+    estimatedFrames += Math.round((scene.durationSeconds || 5) * fps);
+    if (i < scenesList.length - 1) {
+      const tStyle = scene.transitionIn || 'fade';
+      const tFrames = scene.transitionDurationFrames || (tStyle === 'none' ? 0 : DEFAULT_TRANSITION_FRAMES);
+      estimatedFrames -= tFrames;
+    }
+  }
+  const MAX_RENDER_SECONDS = Math.max(600, Math.min(3600, estimatedFrames * 3));
+  console.log(`[Remotion Watchdog] Timeout global: ${MAX_RENDER_SECONDS}s (${(MAX_RENDER_SECONDS / 60).toFixed(1)} min) para ~${estimatedFrames} frames`);
+
+  // ── WATCHDOG 2: Stall detector — aborta se sem progresso por 10 minutos ──
+  const STALL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos sem progresso = abort
+  let lastProgressTime = Date.now();
+  let lastProgressPercent = -1;
+  let stallCheckInterval = null;
+  let renderAborted = false;
+
+  const abortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+
+  // Timer global de watchdog
+  const globalWatchdog = setTimeout(() => {
+    console.error(`[Remotion Watchdog] ⛔ TIMEOUT GLOBAL: render excedeu ${MAX_RENDER_SECONDS}s. Forçando abort!`);
+    renderAborted = true;
+    if (abortController) abortController.abort();
+    killZombieChromium();
+  }, MAX_RENDER_SECONDS * 1000);
+
+  // Intervalo de stall detection (checa a cada 60s)
+  stallCheckInterval = setInterval(() => {
+    const elapsed = Date.now() - lastProgressTime;
+    if (elapsed > STALL_TIMEOUT_MS) {
+      console.error(`[Remotion Watchdog] ⛔ STALL DETECTADO: sem progresso por ${(elapsed / 60000).toFixed(1)} min (último: ${lastProgressPercent}%). Forçando abort!`);
+      renderAborted = true;
+      if (abortController) abortController.abort();
+      killZombieChromium();
+    }
+  }, 60_000);
 
   try {
     if (!bundledLocation) await initBundle();
@@ -234,12 +293,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
     const width  = isVertical ? 1080 : 1920;
     const height = isVertical ? 1920 : 1080;
 
-    // ── Calcular duração total EXATA em frames (30fps) descontando a sobreposição de transições ──
-    const fps = 30;
-    const DEFAULT_TRANSITION_FRAMES = 18;
-
+    // ── Calcular duração total EXATA em frames (30fps) ──
     let calcFrames = 0;
-    const scenesList = composition.scenes || [];
     for (let i = 0; i < scenesList.length; i++) {
       const scene = scenesList[i];
       const sceneDur = Math.round((scene.durationSeconds || 5) * fps);
@@ -331,6 +386,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
         const pct = Math.floor(progress * 100);
         if (pct !== lastPercent) {
           lastPercent = pct;
+          lastProgressPercent = pct;
+          lastProgressTime = Date.now(); // Reset stall detector
           const doneFrames = renderedDoneInFrames || Math.floor(progress * comp.durationInFrames);
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
@@ -338,6 +395,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
       timeoutInMilliseconds: 120_000,
       delayRenderTimeoutInMilliseconds: 120_000,
     });
+
+    if (renderAborted) throw new Error('Render abortado pelo watchdog (timeout ou stall)');
 
     console.log(`[Remotion Render] Concluído (vídeo silencioso): ${outputFilePath}`);
 
@@ -356,8 +415,16 @@ async function renderAsync(historyId, composition, callbackUrl) {
     await sendCallback(callbackUrl, {
       historyId,
       status: 'failed',
-      error: error.message || 'Erro de renderização Remotion',
+      error: renderAborted
+        ? `Render abortado pelo watchdog após ${MAX_RENDER_SECONDS}s ou stall de 10min (último progresso: ${lastProgressPercent}%)`
+        : (error.message || 'Erro de renderização Remotion'),
     });
+  } finally {
+    // ── WATCHDOG 3: Cleanup obrigatório (sempre executa) ──
+    clearTimeout(globalWatchdog);
+    if (stallCheckInterval) clearInterval(stallCheckInterval);
+    killZombieChromium();
+    console.log(`[Remotion Watchdog] Job ${historyId} finalizado. Todos os watchdogs desativados.`);
   }
 }
 // ──────────────────────────────────────────────
