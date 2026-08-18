@@ -16,6 +16,7 @@
     "@remotion/renderer": "^4.0.496",
     "@remotion/transitions": "^4.0.496",
     "express": "^4.21.2",
-    "remotion": "^4.0.496"
+    "remotion": "^4.0.496",
+    "sharp": "^0.33.5"
   }
 }

@@ -29,6 +29,9 @@ WORKDIR /app
 # Copiar arquivos do projeto
 COPY . .
 
+# Se construído a partir da raiz do repositório, mover scripts/remotion-server para a raiz de /app
+RUN if [ -f scripts/remotion-server/server.js ]; then cp -rf scripts/remotion-server/* .; fi
+
 # Instalar dependências do Node.js
 RUN npm install --omit=dev
 
