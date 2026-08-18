@@ -1,3 +1,4 @@
+try { require('dotenv').config(); } catch (_) {}
 const express = require('express');
 const { bundle } = require('@remotion/bundler');
 const { renderMedia, selectComposition } = require('@remotion/renderer');
