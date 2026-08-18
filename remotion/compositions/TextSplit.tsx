@@ -14,7 +14,7 @@ const SPRING_PRESETS: Record<SpringPreset, { damping: number; stiffness: number;
   gentle:   { damping: 30, stiffness: 80,  mass: 1.5 },
 };
 
-// ─── Split-bounce: cada letra entra com spring staggered ─────────────────────
+// ─── Split-bounce: cada letra/palavra entra com spring staggered ─────────────────────
 export const SplitBounceText: React.FC<{
   text: string;
   primaryColor: string;
@@ -36,7 +36,9 @@ export const SplitBounceText: React.FC<{
   const { fps } = useVideoConfig();
   const config = SPRING_PRESETS[springPreset] ?? SPRING_PRESETS.bouncy;
 
-  const letters = text.split('');
+  // Se o texto for longo (frase inteira), divide por palavras. Se for palavra curta, por letras.
+  const isSingleWord = text.length <= 16;
+  const items = isSingleWord ? text.split('') : text.split(' ');
 
   return (
     <div
@@ -45,21 +47,24 @@ export const SplitBounceText: React.FC<{
         flexWrap: 'wrap',
         justifyContent: 'center',
         alignItems: 'flex-end',
-        gap: '0px',
+        gap: isSingleWord ? '0px' : '14px',
+        maxWidth: '92%',
       }}
     >
-      {letters.map((letter, i) => {
-        const letterFrame = Math.max(0, frame - i * staggerFrames);
+      {items.map((item, i) => {
+        const itemFrame = Math.max(0, frame - i * staggerFrames);
 
         const progress = spring({
-          frame: letterFrame,
+          frame: itemFrame,
           fps,
           config,
         });
 
-        const translateY = interpolate(progress, [0, 1], [80, 0]);
+        const translateY = interpolate(progress, [0, 1], [60, 0]);
         const opacity = interpolate(progress, [0, 0.4], [0, 1], { extrapolateRight: 'clamp' });
-        const scaleY = interpolate(progress, [0, 0.6, 1], [0.3, 1.15, 1.0], { extrapolateRight: 'clamp' });
+        const scale = interpolate(progress, [0, 0.6, 1], [0.5, 1.12, 1.0], { extrapolateRight: 'clamp' });
+
+        const isHighlight = i % 2 === 0;
 
         return (
           <span
@@ -70,19 +75,19 @@ export const SplitBounceText: React.FC<{
               fontWeight,
               fontFamily: 'Montserrat, Inter, Impact, sans-serif',
               textTransform: 'uppercase',
-              color: letter === ' ' ? 'transparent' : (i % 2 === 0 ? primaryColor : color),
-              WebkitTextStroke: letter === ' ' ? 'none' : '4px #000000',
+              color: isHighlight ? primaryColor : color,
+              WebkitTextStroke: '4px #000000',
               paintOrder: 'stroke fill',
-              textShadow: letter === ' ' ? 'none' : `0 8px 24px rgba(0,0,0,0.95), 0 0 35px ${primaryColor}88`,
-              transform: `translateY(${translateY}px) scaleY(${scaleY})`,
+              textShadow: '0 6px 18px rgba(0,0,0,0.9)',
+              transform: `translateY(${translateY}px) scale(${scale})`,
               opacity,
               willChange: 'transform, opacity',
               transformOrigin: 'bottom center',
-              whiteSpace: letter === ' ' ? 'pre' : 'normal',
-              minWidth: letter === ' ' ? '0.3em' : undefined,
+              whiteSpace: isSingleWord && item === ' ' ? 'pre' : 'normal',
+              minWidth: isSingleWord && item === ' ' ? '0.3em' : undefined,
             }}
           >
-            {letter}
+            {item}
           </span>
         );
       })}
