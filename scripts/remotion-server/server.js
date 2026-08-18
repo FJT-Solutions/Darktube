@@ -351,7 +351,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
-        enableMultiProcessOnLinux: false,
+        enableMultiProcessOnLinux: true,
         gl: null,
       },
       timeoutInMilliseconds: 120_000,
@@ -379,7 +379,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
-        enableMultiProcessOnLinux: false,
+        enableMultiProcessOnLinux: true,
         gl: null,
       },
       onProgress: ({ progress, renderedDoneInFrames }) => {
