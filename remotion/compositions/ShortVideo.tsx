@@ -212,45 +212,66 @@ const SceneLayer: React.FC<{
     );
   }
 
-  // 4. CENA ILUSTRATIVA / PERSONAGEM RECORTADO 2.5D (Sem Fundo Poluído)
-  if (scene.sceneType === 'ILUSTRATIVA' || scene.sceneType === 'UI_SHOWCASE' || scene.subjectImageUrl || scene.foregroundUrl) {
-    return (
-      <AbsoluteFill>
+  // 4. CENA PADRÃO / CINEMÁTICA (2.5D Parallax ou Ken Burns + Overlays + Legendas Sincronizadas)
+  const fgImage = scene.subjectImageUrl || scene.foregroundUrl;
+  const bgImage = scene.imageUrl;
+  const intensity = scene.intensity ?? 0.8;
+
+  return (
+    <AbsoluteFill>
+      {/* CAMADA DE FUNDO / IMAGEM / 2.5D */}
+      {fgImage && bgImage ? (
+        <Parallax25DImage
+          bgUrl={bgImage}
+          fgUrl={fgImage}
+          durationFrames={durationFrames}
+          animationStyle={scene.animationStyle || 'parallax-up'}
+          colorGrading={scene.colorGrading}
+          format={format}
+        />
+      ) : bgImage ? (
+        <KenBurnsImage
+          imgUrl={bgImage}
+          durationFrames={durationFrames}
+          animationStyle={scene.animationStyle || 'kenburns-right'}
+          colorGrading={scene.colorGrading}
+        />
+      ) : (
         <LivingBackground
           type={scene.livingBgType || (sceneIndex % 2 === 0 ? 'concentric-rings' : 'ambient-particles')}
           baseColor={scene.emotionColor || '#070B19'}
           accentColor={primaryColor}
         />
-        <IllustrativeScene
-          subjectImageUrl={scene.subjectImageUrl || scene.foregroundUrl}
-          bgImageUrl={scene.imageUrl}
-          headlineText={scene.captionText}
-          badgeText={scene.badgeText}
-          badgeColor={scene.badgeColor || primaryColor}
-          primaryColor={primaryColor}
-          exitDirection={exitDirection}
-        />
-      </AbsoluteFill>
-    );
-  }
-
-  // 3. FALLBACK DINÂMICO
-  const intensity = scene.intensity ?? 0.8;
-  return (
-    <AbsoluteFill>
-      <LivingBackground
-        type={scene.livingBgType || 'dot-grid'}
-        baseColor={scene.emotionColor || '#0B132B'}
-        accentColor={primaryColor}
-      />
-      {scene.imageUrl && (
-        <KenBurnsImage
-          imgUrl={scene.imageUrl}
-          durationFrames={durationFrames}
-          animationStyle={scene.animationStyle || 'kenburns-right'}
-          colorGrading={scene.colorGrading}
-        />
       )}
+
+      {/* OVERLAYS VISUAIS (Light leak, Glitch, Flash, Partículas) */}
+      <OverlayLayer scene={scene} intensity={intensity} durationFrames={durationFrames} />
+
+      {/* BADGE DA CENA (se houver) */}
+      {scene.badgeText && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '12%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: scene.badgeColor || primaryColor,
+            color: '#000000',
+            fontWeight: 900,
+            fontSize: 28,
+            padding: '10px 24px',
+            borderRadius: 999,
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            zIndex: 35,
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}
+        >
+          {scene.badgeText}
+        </div>
+      )}
+
+      {/* LEGENDAS SINCRONIZADAS DINÂMICAS PALAVRA A PALAVRA / CHUNKS */}
       <CaptionLayer
         scene={scene}
         captionStyle={captionStyle}
@@ -260,6 +281,27 @@ const SceneLayer: React.FC<{
         format={format}
       />
     </AbsoluteFill>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OVERLAY LAYER — Efeitos de luz, glitch, flash e partículas
+// ─────────────────────────────────────────────────────────────────────────────
+const OverlayLayer: React.FC<{
+  scene: SceneSegment;
+  intensity: number;
+  durationFrames: number;
+}> = ({ scene, intensity, durationFrames }) => {
+  const overlay = scene.overlayEffect;
+  if (!overlay || overlay === 'none') return null;
+
+  return (
+    <>
+      {overlay === 'glitch' && <GlitchOverlay intensity={intensity} durationFrames={20} />}
+      {overlay === 'light-leak' && <LightLeakOverlay intensity={intensity} durationFrames={25} />}
+      {overlay === 'flash' && <FlashOverlay intensity={intensity} durationFrames={10} />}
+      {overlay === 'particles' && <ParticlesOverlay intensity={intensity} durationFrames={durationFrames} />}
+    </>
   );
 };
 
@@ -546,12 +588,14 @@ const CaptionLayer: React.FC<{
 
   // ── POP: cada palavra aparece e desaparece individualmente ──────────────────
   if (captionStyle === 'pop') {
-    const currentWord = words.find(
-      (w) => currentTimeInScene >= w.startInSeconds && currentTimeInScene < w.endInSeconds
-    );
+    const activeIndex = words.findIndex((w, i) => {
+      const nextWord = words[i + 1];
+      const end = nextWord ? nextWord.startInSeconds : (w.endInSeconds + 0.35);
+      return currentTimeInScene >= w.startInSeconds && currentTimeInScene < end;
+    });
 
-    if (!currentWord) return null;
-
+    if (activeIndex === -1) return null;
+    const currentWord = words[activeIndex];
     const wordFrame = frame - Math.round(currentWord.startInSeconds * fps);
 
     return (
