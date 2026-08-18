@@ -1,5 +1,5 @@
 FROM node:20-slim
-ENV NODE_OPTIONS="--dns-result-order=ipv4first"
+ENV NODE_OPTIONS="--dns-result-order=ipv4first --max-old-space-size=12288"
 RUN echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
 # Instalar dependências do Chromium e FFmpeg para o Remotion headless
 RUN apt-get update && apt-get install -y \

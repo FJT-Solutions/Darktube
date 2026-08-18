@@ -382,7 +382,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       '--disable-breakpad',
       '--mute-audio',
       '--no-first-run',
-      '--js-flags=--max-old-space-size=4096',
+      '--js-flags=--max-old-space-size=12288',
       '--disable-features=site-per-process,IsolateOrigins',
       '--enable-features=SharedArrayBuffer',
     ];
@@ -409,7 +409,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
     // Concorrência estável: 4 workers para equilíbrio perfeito entre CPU e throughput
     const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
     const concurrency = Math.max(1, Math.min(rawConcurrency, 4));
-    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 4096MB)`);
+    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 12288MB)`);
 
     let lastPercent = -1;
     await renderMedia({
