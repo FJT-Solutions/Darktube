@@ -281,13 +281,13 @@ export const ColorGradingLayer: React.FC<{
 function getGradingTint(grading: string): string {
   switch (grading) {
     case 'cinematic':     return 'linear-gradient(135deg, #0a0a2a 0%, #1a0e3a 100%)';
-    case 'warm':          return 'linear-gradient(135deg, #3d1a00 0%, #6b2e00 100%)';
+    case 'warm':
+    case 'warm-cinema':   return 'linear-gradient(135deg, #2d1500 0%, #4a2000 100%)';
     case 'cold':          return 'linear-gradient(135deg, #001a3d 0%, #002b5e 100%)';
     case 'vintage':       return 'linear-gradient(135deg, #3d2b00 0%, #5e3a00 100%)';
     case 'hdr':           return 'linear-gradient(135deg, #1a001a 0%, #0a1a0a 100%)';
     case 'dark-academia': return 'linear-gradient(135deg, #1a1000 0%, #2d1f00 100%)';
     case 'cyberpunk':     return 'linear-gradient(135deg, #0d001a 0%, #00001a 100%)';
-    case 'warm-cinema':   return 'linear-gradient(135deg, #2d1500 0%, #4a2000 100%)';
     case 'dramatic-bw':   return 'linear-gradient(135deg, #000000 0%, #1a1a1a 100%)';
     case 'vibrant-gold':  return 'linear-gradient(135deg, #2d2000 0%, #4a3500 100%)';
     default:              return 'transparent';
