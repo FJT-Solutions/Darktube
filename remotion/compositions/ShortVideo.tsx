@@ -164,20 +164,31 @@ const SceneLayer: React.FC<{
   }
 
   // 2. CENA DATA_VIZ (Gráficos, Métricas, Contadores)
-  if (scene.sceneType === 'DATA_VIZ' || (scene.animationStyle && ['bar-chart', 'line-chart', 'odometer-digit-roll'].includes(scene.animationStyle))) {
+  // O Diretor pode usar imagens como fundo e sobrepor gráficos/dados
+  if (scene.sceneType === 'DATA_VIZ' || (scene.animationStyle && ['bar-chart', 'line-chart', 'counter-confetti', 'odometer-digit-roll'].includes(scene.animationStyle))) {
+    const bgImage = scene.imageUrl;
     return (
       <AbsoluteFill>
-        <LivingBackground
-          type={scene.livingBgType || 'concentric-rings'}
-          baseColor={scene.emotionColor || '#0B132B'}
-          accentColor={primaryColor}
-        />
+        {/* Fundo: imagem do usuário (se houver) ou LivingBackground */}
+        {bgImage ? (
+          <KenBurnsImage
+            imgUrl={bgImage}
+            durationFrames={durationFrames}
+            animationStyle="kenburns-up"
+            colorGrading={scene.colorGrading}
+          />
+        ) : (
+          <LivingBackground
+            type={scene.livingBgType || 'concentric-rings'}
+            baseColor={scene.emotionColor || '#0B132B'}
+            accentColor={primaryColor}
+          />
+        )}
+        {/* Overlay escuro para legibilidade quando há imagem de fundo */}
+        {bgImage && (
+          <AbsoluteFill style={{ background: 'rgba(0,0,0,0.55)', zIndex: 5 }} />
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 40px', zIndex: 30 }}>
-          {scene.captionText && (
-            <div style={{ fontSize: 44, fontWeight: 900, color: '#FFFFFF', textAlign: 'center', marginBottom: 40, textShadow: '0 4px 12px rgba(0,0,0,0.6)' }}>
-              {scene.captionText}
-            </div>
-          )}
           {scene.animationStyle === 'bar-chart' ? (
             <AnimatedBarChart isVertical={format === 'vertical'} />
           ) : (
@@ -189,25 +200,52 @@ const SceneLayer: React.FC<{
             </div>
           )}
         </div>
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
       </AbsoluteFill>
     );
   }
 
   // 3. CENA CODE_TECH (Terminal, Código, Hacker)
+  // O Diretor pode usar imagens como fundo e sobrepor terminal
   if (scene.sceneType === 'CODE_TECH' || scene.animationStyle === 'typing-code-block' || scene.animationStyle === 'terminal-3d') {
+    const bgImage = scene.imageUrl;
     return (
       <AbsoluteFill>
-        <LivingBackground
-          type={scene.livingBgType || 'mesh-gradient'}
-          baseColor={scene.emotionColor || '#050811'}
-          accentColor={primaryColor}
-        />
-        <CodeTerminalOverlay primaryColor={primaryColor} />
-        {scene.captionText && (
-          <div style={{ position: 'absolute', bottom: 180, width: '100%', textAlign: 'center', fontSize: 38, fontWeight: 900, color: '#FFFFFF', textShadow: '0 4px 12px rgba(0,0,0,0.8)', zIndex: 40 }}>
-            {scene.captionText}
-          </div>
+        {bgImage ? (
+          <KenBurnsImage
+            imgUrl={bgImage}
+            durationFrames={durationFrames}
+            animationStyle="kenburns-down"
+            colorGrading={scene.colorGrading}
+          />
+        ) : (
+          <LivingBackground
+            type={scene.livingBgType || 'mesh-gradient'}
+            baseColor={scene.emotionColor || '#050811'}
+            accentColor={primaryColor}
+          />
         )}
+        {bgImage && (
+          <AbsoluteFill style={{ background: 'rgba(0,0,0,0.65)', zIndex: 5 }} />
+        )}
+        <CodeTerminalOverlay primaryColor={primaryColor} />
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
       </AbsoluteFill>
     );
   }
