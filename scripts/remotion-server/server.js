@@ -335,7 +335,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       '--disable-breakpad',
       '--mute-audio',
       '--no-first-run',
-      '--js-flags=--max-old-space-size=2048',
+      '--js-flags=--max-old-space-size=4096',
       '--disable-features=site-per-process,IsolateOrigins',
     ];
 
@@ -358,10 +358,10 @@ async function renderAsync(historyId, composition, callbackUrl) {
       delayRenderTimeoutInMilliseconds: 120_000,
     });
 
-    // Concorrência ideal e segura para evitar vazamento de processos e lock de CPU em vídeos longos (>30s)
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '3', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 4));
-    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers seguros`);
+    // Concorrência: respeita RENDER_CONCURRENCY do .env (padrão 12), cap em 16 para segurança
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '12', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 16));
+    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 4096MB)`);
 
     let lastPercent = -1;
     await renderMedia({
