@@ -137,7 +137,8 @@ async function preloadAndProcessAllAssets(scenes) {
       try {
         const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
         const clean = scene.imageUrl.toLowerCase().split('?')[0];
-        const ext = clean.endsWith('.png') ? 'png' : clean.endsWith('.webp') ? 'webp' : clean.endsWith('.mp4') ? 'mp4' : 'jpg';
+        const isVideo = clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov');
+        const ext = isVideo ? (clean.endsWith('.webm') ? 'webm' : 'mp4') : 'jpg';
         const fileName = `media_${hash}.${ext}`;
         const filePath = path.join(OUTPUT_DIR, fileName);
 
@@ -152,12 +153,13 @@ async function preloadAndProcessAllAssets(scenes) {
             });
             if (res.ok) {
               let buf = Buffer.from(await res.arrayBuffer());
-              if (sharp && ext !== 'mp4') {
+              if (sharp && !isVideo) {
                 try {
                   buf = await sharp(buf)
                     .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                    .jpeg({ quality: 85, mozjpeg: true })
                     .toBuffer();
-                  console.log(`[Remotion Assets] ✅ Cena ${i + 1} otimizada com sharp (${Math.round(buf.length / 1024)}KB)`);
+                  console.log(`[Remotion Assets] ✅ Cena ${i + 1} otimizada com sharp (${Math.round(buf.length / 1024)}KB JPEG)`);
                 } catch (err) {
                   console.warn(`[Remotion Assets] Aviso sharp cena ${i + 1}:`, err.message);
                 }
@@ -168,7 +170,7 @@ async function preloadAndProcessAllAssets(scenes) {
               if (sharp) {
                 const fallbackBuf = await sharp({
                   create: { width: 1080, height: 1080, channels: 4, background: { r: 15, g: 23, b: 42, alpha: 1 } }
-                }).png().toBuffer();
+                }).jpeg({ quality: 85 }).toBuffer();
                 fs.writeFileSync(filePath, fallbackBuf);
               }
             }
@@ -206,6 +208,7 @@ async function preloadAndProcessAllAssets(scenes) {
               try {
                 buf = await sharp(buf)
                   .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                  .png({ compressionLevel: 9 })
                   .toBuffer();
               } catch (_) {}
             }
@@ -243,7 +246,7 @@ async function preloadAndProcessAllAssets(scenes) {
             try {
               buffer = await sharp(buffer)
                 .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
-                .png({ compressionLevel: 8 })
+                .png({ compressionLevel: 9, effort: 7 })
                 .toBuffer();
               console.log(`[Remotion Cutout] ✅ Cutout otimizado com sharp (${Math.round(buffer.length / 1024)}KB)`);
             } catch (_) {}
@@ -374,7 +377,6 @@ async function renderAsync(historyId, composition, callbackUrl) {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-software-rasterizer',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
@@ -383,6 +385,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       '--no-first-run',
       '--js-flags=--max-old-space-size=4096',
       '--disable-features=site-per-process,IsolateOrigins',
+      '--enable-features=SharedArrayBuffer',
     ];
 
     const comp = await selectComposition({
@@ -400,8 +403,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
         enableMultiProcessOnLinux: true,
         gl: null,
       },
-      timeoutInMilliseconds: 120_000,
-      delayRenderTimeoutInMilliseconds: 120_000,
+      timeoutInMilliseconds: 300_000,
+      delayRenderTimeoutInMilliseconds: 300_000,
     });
 
     // Concorrência: respeita RENDER_CONCURRENCY do .env (padrão 12), cap em 16 para segurança
@@ -416,9 +419,9 @@ async function renderAsync(historyId, composition, callbackUrl) {
       outputLocation: outputFilePath,
       codec: 'h264',
       concurrency,
-      maxRetries: 3,
+      maxRetries: 5,
       imageFormat: 'jpeg',
-      jpegQuality: 80,
+      jpegQuality: 85,
       inputProps,
       gl: null,
       browserExecutable: CHROME_PATH,
@@ -438,8 +441,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
       },
-      timeoutInMilliseconds: 120_000,
-      delayRenderTimeoutInMilliseconds: 120_000,
+      timeoutInMilliseconds: 300_000,
+      delayRenderTimeoutInMilliseconds: 300_000,
     });
 
     if (renderAborted) throw new Error('Render abortado pelo watchdog (timeout ou stall)');
