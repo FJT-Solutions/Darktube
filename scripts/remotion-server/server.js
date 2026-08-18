@@ -116,11 +116,16 @@ try {
 
 // ──────────────────────────────────────────────
 // PRÉ-DOWNLOAD E RECORTE 2.5D DE TODOS OS ASSETS
-// Garante 0% de requisições externas durante a renderização do Remotion
+// Otimiza com sharp (max 1080x1920) para 0% lag no Chromium
 // ──────────────────────────────────────────────
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch (_) {}
+
 async function preloadAndProcessAllAssets(scenes) {
   if (!scenes || scenes.length === 0) return;
-  console.log('[Remotion Assets] Pré-carregando e baixando todas as mídias localmente...');
+  console.log('[Remotion Assets] Pré-carregando, otimizando e baixando todas as mídias localmente...');
 
   const crypto = require('crypto');
 
@@ -145,7 +150,18 @@ async function preloadAndProcessAllAssets(scenes) {
             }
           });
           if (res.ok) {
-            const buf = Buffer.from(await res.arrayBuffer());
+            let buf = Buffer.from(await res.arrayBuffer());
+            // Redimensionar para max 1080x1920 se for imagem
+            if (sharp && ext !== 'mp4') {
+              try {
+                buf = await sharp(buf)
+                  .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                  .toBuffer();
+                console.log(`[Remotion Assets] ✅ Cena ${i + 1} otimizada com sharp (${Math.round(buf.length / 1024)}KB)`);
+              } catch (err) {
+                console.warn(`[Remotion Assets] Aviso sharp cena ${i + 1}:`, err.message);
+              }
+            }
             fs.writeFileSync(filePath, buf);
           } else {
             console.warn(`[Remotion Assets] ⚠️ Servidor remoto retornou HTTP ${res.status} para cena ${i + 1}`);
@@ -174,7 +190,15 @@ async function preloadAndProcessAllAssets(scenes) {
             }
           });
           if (res.ok) {
-            fs.writeFileSync(filePath, Buffer.from(await res.arrayBuffer()));
+            let buf = Buffer.from(await res.arrayBuffer());
+            if (sharp) {
+              try {
+                buf = await sharp(buf)
+                  .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                  .toBuffer();
+              } catch (_) {}
+            }
+            fs.writeFileSync(filePath, buf);
           }
         }
         if (fs.existsSync(filePath)) {
@@ -202,7 +226,18 @@ async function preloadAndProcessAllAssets(scenes) {
 
           console.log(`[Remotion Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
           const blob = await removeBackground(scene.imageUrl);
-          const buffer = Buffer.from(await blob.arrayBuffer());
+          let buffer = Buffer.from(await blob.arrayBuffer());
+
+          if (sharp) {
+            try {
+              buffer = await sharp(buffer)
+                .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                .png({ compressionLevel: 8 })
+                .toBuffer();
+              console.log(`[Remotion Cutout] ✅ Cutout otimizado com sharp (${Math.round(buffer.length / 1024)}KB)`);
+            } catch (_) {}
+          }
+
           fs.writeFileSync(fgPath, buffer);
 
           scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
