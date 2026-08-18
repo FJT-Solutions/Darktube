@@ -164,7 +164,7 @@ const SceneLayer: React.FC<{
   }
 
   // 2. CENA DATA_VIZ (Gráficos, Métricas, Contadores)
-  if (scene.sceneType === 'DATA_VIZ' || (scene.animationStyle && ['bar-chart', 'line-chart', 'counter-confetti', 'odometer-digit-roll'].includes(scene.animationStyle))) {
+  if (scene.sceneType === 'DATA_VIZ' || (scene.animationStyle && ['bar-chart', 'line-chart', 'odometer-digit-roll'].includes(scene.animationStyle))) {
     return (
       <AbsoluteFill>
         <LivingBackground
@@ -587,10 +587,12 @@ const CaptionLayer: React.FC<{
   const fontSize = isVertical ? 72 : 56;
 
   // ── POP: cada palavra aparece e desaparece individualmente ──────────────────
-  if (captionStyle === 'pop') {
+  // Usa pop quando: captionStyle='pop' OU quando há words disponíveis (priority: sync words)
+  const usePopMode = (captionStyle === 'pop' || words.length > 0) && words.length > 0;
+  if (usePopMode) {
     const activeIndex = words.findIndex((w, i) => {
       const nextWord = words[i + 1];
-      const end = nextWord ? nextWord.startInSeconds : (w.endInSeconds + 0.35);
+      const end = nextWord ? nextWord.startInSeconds : (w.endInSeconds + 0.5);
       return currentTimeInScene >= w.startInSeconds && currentTimeInScene < end;
     });
 
