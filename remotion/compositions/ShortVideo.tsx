@@ -448,7 +448,7 @@ const Parallax25DImage: React.FC<{
         }}
       />
 
-      {/* Camada 2: Sujeito Recortado com Sombra de Contato Realista */}
+      {/* Camada 2: Sujeito Recortado — sem drop-shadow (caro em SW rendering) */}
       <div
         style={{
           position: 'absolute',
@@ -457,10 +457,21 @@ const Parallax25DImage: React.FC<{
           justifyContent: isVertical ? 'center' : 'flex-end',
           alignItems: 'center',
           transform: fgTransform,
-          willChange: 'transform',
           paddingRight: isVertical ? 0 : 60,
         }}
       >
+        {/* Sombra de contato simplificada — gradient overlay em vez de drop-shadow */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: isVertical ? '10%' : '25%',
+            right: 0,
+            height: '25%',
+            background: 'radial-gradient(ellipse at bottom center, rgba(0,0,0,0.6) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }}
+        />
         <Img
           src={fgUrl}
           style={{
@@ -468,9 +479,7 @@ const Parallax25DImage: React.FC<{
             height: '100%',
             objectFit: 'contain',
             objectPosition: 'center bottom',
-            filter: gradingFilter
-              ? `${gradingFilter} drop-shadow(0 25px 45px rgba(0,0,0,0.85))`
-              : 'drop-shadow(0 25px 45px rgba(0,0,0,0.85))',
+            filter: gradingFilter || 'none',
           }}
         />
       </div>
