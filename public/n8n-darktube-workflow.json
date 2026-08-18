@@ -1,6 +1,108 @@
 {
   "nodes": [
     {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2992,
+        4576
+      ],
+      "id": "4be872ac-5546-446d-8625-27e4129e506c",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -992,
+        4592
+      ],
+      "id": "add21fe8-0935-4b13-8375-bfea5a0fac34",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Nb5Mlro9i6fjrNZa",
+          "name": "OpenAi account | Jordan"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json._selectorPrompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Você é um Seletor de Engine de Renderização de Vídeo. Analise o conteúdo do vídeo e decida qual engine usar.\n\nRESPONDA APENAS COM JSON PURO, sem markdown, sem explicação:\n{\"engine\":\"hyperframes\",\"reason\":\"motivo em 1 frase\"}\nou\n{\"engine\":\"remotion\",\"reason\":\"motivo em 1 frase\"}\n\nUSE HYPERFRAMES quando:\n- Vídeo tem imagens de fundo com efeitos cinematográficos pesados\n- Pede transições visuais: glitch, light leak, whip pan, cinematic zoom\n- Estilo de legenda 'subtitle' (caixa de texto clássica)\n- Tema documental, informativo, histórico, filosófico\n- 4 ou mais cenas com imagens diferentes\n- Estética sombria, cinematográfica, épica\n\nUSE REMOTION quando:\n- Palavras explodem na tela (estilo viral TikTok/Reels)\n- Karaoke sincronizado palavra-a-palavra\n- Estilo emocional/motivacional com spring physics\n- 1 a 3 cenas com alto impacto por texto\n- Ritmo rápido baseado em música\n- Legenda 'pop' ou 'karaoke'"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1872,
+        4080
+      ],
+      "id": "2f0a497a-c0ce-47a9-ae8c-8b4d39d4eded",
+      "name": "AI Agent — Engine Selector"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json._directorPrompt.toJsonString() }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Você é um Diretor de Cena especializado em HyperFrames (HTML + GSAP globalTimeline).\n\nCRIE DIREÇÃO CINEMATOGRÁFICA variada para cada cena. Nunca use o mesmo estilo para todas.\n\nANIMAÇÕES DE IMAGEM (animationStyle):\n- kenburns-right: zoom + pan suave para direita (clássico, documental)\n- kenburns-left: zoom + pan suave para esquerda (variedade)\n- zoom-punch: zoom dramático de entrada, depois sutil (impacto inicial)\n- parallax-up: câmera sobe enquanto cena avança (revelação, ascensão)\n- zoom-out: começa no detalhe e revela o todo (contexto, grandeza)\n\nTRANSIÇÕES DE ENTRADA (transitionIn):\n- fade: suave, elegante, universal\n- light-leak: luminosidade quente, nostálgico, cinematográfico\n- glitch: distorção digital, viral, tech, urgência\n- whip-pan: movimento lateral veloz, energético, esportivo\n- cinematic-zoom: escala + desfoque na entrada, dramático, épico\n- flash: corte brusco com flash branco, surpresa, impacto\n\nEFEITOS DE LEGENDA (captionEffect):\n- bounce: entrada com bounce e rotação (pop, energético)\n- clip-wipe: wipe da esquerda (elegante, editorial)\n- glitch-rgb: aberração cromática (tech, urgência)\n- editorial: tamanho contrastante com ênfase (profissional)\n\nEscolha baseado na emoção da cena. Varie sempre.\nResponda APENAS com JSON array (sem markdown, sem explicações)."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -848,
+        4224
+      ],
+      "id": "b6eab98b-6ae8-4dde-b237-e1814d417aa7",
+      "name": "AI Agent — Director HyperFrames"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json._directorPrompt.toJsonString() }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Você é o Diretor Cinematográfico Mestre do Darktube (Padrão VERBO Motion O.S. v8.0, Remotion Skills, Shotpack, Remocn e RVE Templates).\n\nMISSÃO SUPREMA:\nTransformar cada cena em experiência visual de alta retenção viral (estilo Vox, Johnny Harris, Duolingo, Fireship).\nNUNCA gere legendas longas estáticas com imagens chapadas. VISUALIZE O CONCEITO E ORQUESTRE CADA ELEMENTO!\n\n═══════════════════════════════════════════\nREGRA FUNDAMENTAL — IMAGENS SÃO SEMPRE PARTE DO ESCOPO\n═══════════════════════════════════════════\nCada cena possui uma imageUrl com a imagem fornecida pelo usuário.\nEla é SEMPRE exibida — sua função como Diretor é escolher COMO ela é apresentada,\nanimada e combinada com os demais elementos. Nunca ignore as imagens.\nQuando usar animationStyle de dados (bar-chart, counter-confetti etc.), a imagem\nserá usada como fundo cinematográfico com o gráfico/dado sobreposto.\n\n═══════════════════════════════════════════\nARSENAL COMPLETO DO REMOTION\n═══════════════════════════════════════════\n\n▶ animationStyle — CÂMERA E MOVIMENTO (imagem é sempre o fundo):\n\n  MOVIMENTO DE CÂMERA (imagem em destaque total):\n  \"parallax-up\"    — câmera sobe com profundidade (revelação, ascensão)\n  \"parallax-down\"  — câmera desce com profundidade (peso, queda)\n  \"parallax-left\"  — câmera desliza para a esquerda\n  \"parallax-right\" — câmera desliza para a direita\n  \"zoom-punch\"     — snap rápido com mola, impacto visual forte (viral)\n  \"zoom-out\"       — revela escala, contexto, grandeza\n  \"tilt-3d\"        — perspectiva 3D real em eixos X/Y (profundidade, drama)\n  \"shake-impact\"   — tremor de câmera estilo trauma/clímax emocional\n  \"spin-in\"        — entrada giratória com mola (energia, surpresa)\n  \"kenburns-right\" — Ken Burns: pan suave para direita (documental, clássico)\n  \"kenburns-left\"  — Ken Burns: pan suave para esquerda (variedade)\n  \"kenburns-up\"    — Ken Burns: pan suave para cima (revelação)\n  \"kenburns-down\"  — Ken Burns: pan suave para baixo (introspecção)\n\n  DATA E MÉTRICAS (imagem como fundo cinematográfico, dado sobreposto):\n  \"bar-chart\"           — gráfico de barras animadas SOBRE a imagem\n  \"line-chart\"          — gráfico de linha vetorial SOBRE a imagem\n  \"counter-confetti\"    — contador numérico com confete SOBRE a imagem\n  \"odometer-digit-roll\" — odômetro numérico rolando SOBRE a imagem\n\n  TECH E CÓDIGO (imagem como fundo escuro, terminal sobreposto):\n  \"typing-code-block\" — terminal de código digitando SOBRE a imagem\n  \"terminal-3d\"       — terminal 3D holográfico SOBRE a imagem\n\n▶ transitionIn (transição de entrada da cena):\n  \"fade\"        — dissolve suave (elegante, universal)\n  \"slide-right\" — entra da esquerda (energético, padrão)\n  \"slide-left\"  — entra da direita (alternado, dinamismo)\n  \"slide-up\"    — entra de baixo (revelação, ascensão)\n  \"slide-down\"  — entra de cima (queda, surpresa)\n  \"wipe\"        — cortina horizontal (editorial, profissional)\n  \"flip\"        — virada 3D (impacto, mudança)\n  \"rotate\"      — giro de entrada (energia, viral)\n  \"clock-wipe\"  — cortina horária (dramático, countdown)\n  \"none\"        — corte direto (ritmo rápido)\n\n▶ transitionDurationFrames: 8 a 30 frames @ 30fps\n  12 = ritmo rápido/urgente | 18 = padrão | 24 = dramático/cinematográfico\n\n▶ textEffect (estilo das legendas sincronizadas palavra-por-palavra):\n  \"split-bounce\" — letras com mola e sombra neon (After Effects) — MÁXIMO IMPACTO VIRAL\n  \"glitch\"       — glitch digital RGB (tech, urgência)\n  \"typewriter\"   — letra a letra como máquina de escrever (suspense)\n  \"pop\"          — escala 0→1.15→1.0 com bounce (viral, padrão TikTok)\n  \"kinetic\"      — texto cinético com fade e escala simultâneos (sofisticado)\n  \"editorial\"    — texto limpo com barra neon (premium, profissional)\n  \"none\"         — sem efeito (texto estático)\n\n▶ springPreset (física da animação de texto):\n  \"bouncy\"   — elástico, energético (padrão viral) — USE NA MAIORIA\n  \"gentle\"   — suave, fluido (reflexivo, calmo)\n  \"smooth\"   — equilibrado (versátil)\n  \"dramatic\" — impacto máximo, entrada rápida e decisiva\n\n▶ overlayEffect (efeito visual SOBRE a imagem):\n  \"light-leak\" — vazamento de luz anamórfico (filme 35mm, nostálgico, quente)\n  \"glitch\"     — interferência digital RGB (tech, urgência, viral)\n  \"flash\"      — flash branco no corte (energético, ação, surpresa)\n  \"particles\"  — partículas luminosas flutuando (mágico, inspiracional)\n  \"none\"       — sem overlay (limpo, minimalista)\n\n▶ colorGrading (gradação de cor sobre a imagem):\n  \"cinematic\"    — contraste alto, tons frios e escuros (blockbuster, épico)\n  \"warm\"         — tons quentes, dourados (acolhedor, inspiracional)\n  \"cold\"         — tons frios e azulados (sério, tecnológico)\n  \"vintage\"      — desbotado, grão de filme (memória, nostálgico)\n  \"hdr\"          — alto contraste, cores saturadas (vibrante, impactante)\n  \"dark-academia\"— sépia escuro, literário (filosófico, profundo)\n  \"cyberpunk\"    — violeta/azul com alto contraste (futurista, tech)\n  \"dramatic-bw\"  — preto e branco dramático (clássico, impacto máximo)\n  \"vibrant-gold\" — dourado vibrante (sucesso, conquista, premium)\n  \"none\"         — sem gradação\n\n▶ intensity: 0.0 a 1.0\n  0.6 = sutil/atmosférico | 0.8 = padrão | 0.9–1.0 = máximo impacto\n\n▶ emotionColor: cor hexadecimal alinhada com a emoção da cena\n  Urgência: \"#FF6B35\" | Mistério: \"#7C3AED\" | Esperança: \"#10B981\"\n  Tristeza: \"#1E40AF\" | Conquista: \"#F59E0B\" | Introspecção: \"#1E1B4B\"\n  Calma: \"#0F4C75\" | Escuridão: \"#0F172A\" | Raiva: \"#DC2626\"\n\n═══════════════════════════════════════════\nREGRAS DE DIREÇÃO — NUNCA IGNORE\n═══════════════════════════════════════════\n1. IMAGENS SEMPRE PRESENTES — você orquestra COMO são exibidas, nunca ignora\n2. VARIE animationStyle — NUNCA repita o mesmo em cenas consecutivas\n3. ALTERNE transitionIn em direções opostas: slide-right→slide-up→slide-left→slide-down\n4. URGÊNCIA/CHOQUE: zoom-punch ou shake-impact + flash + intensity 0.9+\n5. REFLEXÃO/CALMA: kenburns + light-leak + gentle spring + intensity 0.6\n6. MISTÉRIO/PROFUNDIDADE: tilt-3d + glitch + cold ou dark-academia grading\n7. DADOS/MÉTRICAS: counter-confetti ou bar-chart (imagem como fundo)\n8. CALL TO ACTION (última cena): spin-in + flash + split-bounce + intensity 1.0\n9. textEffect \"split-bounce\" é o mais viral — use em pelo menos metade das cenas\n10. emotionColor deve ter relação cromática com a emoção — pense em paletas\n\nRESPONDA APENAS COM JSON ARRAY PURO (sem markdown, sem explicações):\n[{\n  \"index\": 0,\n  \"animationStyle\": \"zoom-punch\",\n  \"transitionIn\": \"slide-right\",\n  \"transitionDurationFrames\": 18,\n  \"textEffect\": \"split-bounce\",\n  \"springPreset\": \"bouncy\",\n  \"overlayEffect\": \"light-leak\",\n  \"colorGrading\": \"cinematic\",\n  \"intensity\": 0.9,\n  \"emotionColor\": \"#FF6B35\"\n}]"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -848,
+        3824
+      ],
+      "id": "7575ad4c-cb18-43d9-a7b4-5f5e86830c8c",
+      "name": "AI Agent — Director Remotion"
+    },
+    {
       "parameters": {
         "httpMethod": "POST",
         "path": "darktube_producao",
@@ -10,24 +112,24 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        208,
-        1968
+        -2992,
+        4272
       ],
-      "id": "8ccccbd5-e9b1-4e54-b0f3-f20e291ab6b5",
+      "id": "b9c00b66-bbef-44e5-873a-c0c920a1933c",
       "webhookId": "7b04b8bf-2535-478f-b156-f3bd7209d180"
     },
     {
       "parameters": {
-        "jsCode": "// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst format       = tpl.format       || 'vertical';\n\n// ── Normalização de Voz (mapeia categorias do Gemini para vozes Edge-TTS válidas) ──\nfunction getValidEdgeVoice(rawVoice, lang) {\n  if (!rawVoice) return lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural';\n  const str = String(rawVoice).trim();\n  const lower = str.toLowerCase();\n  if (lower.includes('neural') || lower.includes('pt-br-') || lower.includes('en-us-')) {\n    return str;\n  }\n  const map = {\n    'masculine_br': 'pt-BR-AntonioNeural',\n    'masculine-br': 'pt-BR-AntonioNeural',\n    'masculino_br': 'pt-BR-AntonioNeural',\n    'homem_br':     'pt-BR-AntonioNeural',\n    'narrator':     'pt-BR-AntonioNeural',\n    'feminine_br':  'pt-BR-FranciscaNeural',\n    'feminine-br':  'pt-BR-FranciscaNeural',\n    'feminino_br':  'pt-BR-FranciscaNeural',\n    'mulher_br':    'pt-BR-FranciscaNeural',\n    'masculine_en': 'en-US-ChristopherNeural',\n    'feminine_en':  'en-US-AvaNeural'\n  };\n  return map[lower] || (lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural');\n}\n\nconst voice = getValidEdgeVoice(tpl.voice || tpl.voice_model || body.voice, language);\n\nconst renderEngine = (captionStyle === 'pop' || captionStyle === 'karaoke')\n  ? 'remotion'\n  : 'hyperframes';\n\n// ── Imagens enviadas pelo usuário (upload manual) ──\nconst userMedia = tpl.user_media\n  || tpl.uploaded_images\n  || tpl.images\n  || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\n// ── CORREÇÃO: Se o usuário enviou imagens, limitar as cenas\n//    ao exato número de imagens enviadas — sem cenas extras ──\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    user_media:     userMedia,\n    tpl\n  }\n}));"
+        "jsCode": "// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst format       = tpl.format       || 'vertical';\n\n// ── Normalização de Voz (mapeia categorias do Gemini para vozes Edge-TTS válidas) ──\nfunction getValidEdgeVoice(rawVoice, lang) {\n  if (!rawVoice) return lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural';\n  const str = String(rawVoice).trim();\n  const lower = str.toLowerCase();\n  if (lower.includes('neural') || lower.includes('pt-br-') || lower.includes('en-us-')) {\n    return str;\n  }\n  const map = {\n    'masculine_br': 'pt-BR-AntonioNeural',\n    'masculine-br': 'pt-BR-AntonioNeural',\n    'masculino_br': 'pt-BR-AntonioNeural',\n    'homem_br':     'pt-BR-AntonioNeural',\n    'narrator':     'pt-BR-AntonioNeural',\n    'feminine_br':  'pt-BR-FranciscaNeural',\n    'feminine-br':  'pt-BR-FranciscaNeural',\n    'feminino_br':  'pt-BR-FranciscaNeural',\n    'mulher_br':    'pt-BR-FranciscaNeural',\n    'masculine_en': 'en-US-ChristopherNeural',\n    'feminine_en':  'en-US-AvaNeural'\n  };\n  return map[lower] || (lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural');\n}\n\nconst voice = getValidEdgeVoice(tpl.voice || tpl.voice_model || body.voice, language);\n\n// Engine inicial (será sobrescrito pelo AI Engine Selector)\nconst renderEngine = 'pending_ai_selection';\n\nconst userMedia = tpl.user_media || tpl.uploaded_images || tpl.images || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    topic:          tpl.video_title    || '',\n    emotion:        seg.emotion        || 'neutral',\n    user_media:     userMedia,\n    tpl\n  }\n}));"
       },
       "name": "Normalize + Auto Engine",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        432,
-        1968
+        -2768,
+        4272
       ],
-      "id": "2d97433c-075d-4dda-a781-392be0202aa6"
+      "id": "962f4c37-18f5-4847-a617-f7c4beba140a"
     },
     {
       "parameters": {
@@ -37,23 +139,23 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        656,
-        1968
+        -2544,
+        4272
       ],
-      "id": "2d8fbf12-aa7c-48b2-aa62-0358dbb50c1d"
+      "id": "f5c6ecc0-3892-4008-8269-4ca14c4ea270"
     },
     {
       "parameters": {
-        "jsCode": "// Seleciona Imagem da Cena - estritamente 1-para-1 com a imagem enviada\nconst norm        = $json;\nconst idx         = parseInt(norm.index !== undefined ? norm.index : 0);\nconst tpl         = norm.tpl || {};\nconst visual      = norm.visual_content || {};\n\nconst userMedia   = norm.user_media \n  || tpl.user_media \n  || tpl.uploaded_images \n  || tpl.images \n  || [];\n\nlet providedUrl = norm.image_url \n  || norm.media_url \n  || visual.image_url \n  || (Array.isArray(userMedia) && userMedia[idx] ? (userMedia[idx].file_url || userMedia[idx]) : '') \n  || '';\n\nlet imageUrl = providedUrl || tpl.video_thumbnail || '';\nlet source   = providedUrl ? 'user_uploaded_image' : 'template_thumbnail';\n\nreturn [{\n  json: {\n    ...norm,\n    image_url: imageUrl,\n    source: source\n  }\n}];"
+        "jsCode": "// Seleciona Imagem da Cena - estritamente 1-para-1 com a imagem enviada\nconst norm        = $json;\nconst idx         = parseInt(norm.index !== undefined ? norm.index : 0);\nconst tpl         = norm.tpl || {};\nconst visual      = norm.visual_content || {};\n\nconst userMedia   = norm.user_media || tpl.user_media || tpl.uploaded_images || tpl.images || [];\n\nlet providedUrl = norm.image_url\n  || norm.media_url\n  || visual.image_url\n  || (Array.isArray(userMedia) && userMedia[idx] ? (userMedia[idx].file_url || userMedia[idx]) : '')\n  || '';\n\nlet imageUrl = providedUrl || tpl.video_thumbnail || '';\nlet source   = providedUrl ? 'user_uploaded_image' : 'template_thumbnail';\n\n// Converter paths relativos para URLs absolutas\nconst DARKTUBE_BASE = 'https://darktube.fjt-solutions.com';\nif (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:')) {\n  imageUrl = DARKTUBE_BASE + (imageUrl.startsWith('/') ? '' : '/') + imageUrl;\n}\n\nreturn [{ json: { ...norm, image_url: imageUrl, source } }];"
       },
       "name": "Generate Scene Image",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        1968
+        -2320,
+        4272
       ],
-      "id": "8e123f64-6335-4b57-bdc5-8986e8308ae9"
+      "id": "411cf0f8-15c3-4fc4-9efc-3414e0580cb0"
     },
     {
       "parameters": {
@@ -75,10 +177,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        1104,
-        1968
+        -2096,
+        4272
       ],
-      "id": "e8e1106b-ba75-46b9-83f3-dc52709218c9"
+      "id": "14efd762-60ba-4a49-b0c4-e151b77500d3"
     },
     {
       "parameters": {
@@ -119,36 +221,95 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        1328,
-        1968
+        -1872,
+        4464
       ],
-      "id": "b1d7578e-7a54-4cb8-8d82-87897fe321ef"
+      "id": "62357797-f55e-4e09-b585-c81af69edf10"
     },
     {
       "parameters": {
-        "jsCode": "// ── Monta SceneSegment completo ──\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\nconst ttsNode = $('Generate TTS');\nconst ttsItem = ttsNode.item || (ttsNode.all() && ttsNode.all()[0]) || {};\nconst wRes    = $('Whisper Word Timestamps').item.json;\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\nconst imageUrl = segment.image_url\n  || segment.media_url\n  || visual.image_url\n  || segment.tpl?.video_thumbnail\n  || '';\n\nlet audioUrl = segment.audio_url || '';\nif (!audioUrl) {\n  let base64Data = '';\n  try {\n    const getHelper = (typeof this !== 'undefined' && this.helpers && this.helpers.getBinaryDataBuffer) || (typeof $helpers !== 'undefined' && $helpers.getBinaryDataBuffer);\n    if (getHelper) {\n      const buf = await getHelper.call(this, 0, 'data', 'Generate TTS');\n      if (buf && buf.length > 0) {\n        base64Data = buf.toString('base64');\n      }\n    }\n  } catch (err) {\n    console.error('Error fetching TTS binary buffer:', err.message);\n  }\n\n  if (!base64Data && ttsItem && ttsItem.binary) {\n    const binaryKey = Object.keys(ttsItem.binary)[0] || 'data';\n    const binaryObj = ttsItem.binary[binaryKey];\n    if (binaryObj && binaryObj.data && binaryObj.data !== 'database') {\n      base64Data = binaryObj.data;\n    }\n  }\n\n  if (base64Data) {\n    audioUrl = `data:audio/mp3;base64,${base64Data}`;\n  }\n}\nconst captionText = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\n\nconst words = (wRes.words || wRes.segments?.[0]?.words || []).map(w => ({\n  word: w.word,\n  startInSeconds: parseFloat(w.start),\n  endInSeconds:   parseFloat(w.end)\n}));\n\nconst duration = wRes.duration\n  || (() => {\n    const ts = segment.timestamp || '';\n    const parts = ts.split('-');\n    const toSec = t => { const p = t.trim().split(':'); return p.length===2 ? parseInt(p[0])*60+parseInt(p[1]) : parseInt(p[0]); };\n    return parts.length === 2 ? toSec(parts[1]) - toSec(parts[0]) : 5;\n  })();\n\nconst ALL_STYLES = ['kenburns-right','kenburns-left','zoom-punch','parallax-up','zoom-out'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')    animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index:          idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn:   'fade'\n  }\n}];"
+        "jsCode": "// ── Monta SceneSegment completo (v6 — branches paralelos: Upload TTS Audio + Whisper) ──\nconst segment = $('Generate Scene Image').item.json;\nconst idx     = parseInt(segment.index !== undefined ? segment.index : 0);\n\n// ── Whisper vem de Whisper Word Timestamps (branch paralelo) ──\nlet wRes = {};\ntry { wRes = $('Whisper Word Timestamps').item.json; } catch (_) {}\n\nconst voiceover = segment.voiceover || {};\nconst visual    = segment.visual_content || {};\n\n// ── IMAGEM ──\nconst imageUrl = segment.image_url || segment.media_url || visual.image_url || segment.tpl?.video_thumbnail || '';\n\n// ── ÁUDIO — URL pública gerada pelo nó Upload TTS Audio (branch paralelo) ──\nlet audioUrl = '';\ntry {\n  const uploadResult = $('Upload TTS Audio').item.json;\n  audioUrl = uploadResult.url || uploadResult.publicUrl || '';\n} catch (err) {\n  // fallback direto ao Edge-TTS se upload falhou\n  const text2 = voiceover.text || segment.voiceover_text || segment.text || '';\n  const voice2 = segment.voice || 'pt-BR-AntonioNeural';\n  if (text2) {\n    try {\n      const r = await fetch('https://edge-tts.fjt-solutions.com/v1/audio/speech', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ model: 'tts-1', input: text2, voice: voice2, language: 'pt', speed: 1.0, response_format: 'mp3' })\n      });\n      if (r.ok) {\n        const ab = await r.arrayBuffer();\n        audioUrl = `data:audio/mp3;base64,${Buffer.from(ab).toString('base64')}`;\n      }\n    } catch (_) {}\n  }\n}\n\n// ── LEGENDA ──\nconst text = voiceover.text || segment.voiceover_text || segment.voiceoverText || segment.text || '';\nconst captionText = text;\n\n// ── PALAVRAS (timestamps do Whisper) ──\nconst rawWords = (wRes.words || wRes.segments?.[0]?.words || []);\nconst MIN_WORD_DISPLAY = 0.35;\nconst words = rawWords.map((w, wi) => {\n  const start = parseFloat(w.start);\n  const rawEnd = parseFloat(w.end);\n  const nextStart = (wi < rawWords.length - 1) ? parseFloat(rawWords[wi + 1].start) : rawEnd + 1;\n  const expandedEnd = Math.max(rawEnd, start + MIN_WORD_DISPLAY, Math.min(start + 0.8, nextStart - 0.02));\n  return { word: w.word, startInSeconds: start, endInSeconds: expandedEnd };\n});\n\n// ── DURAÇÃO ──\nconst audioDuration = wRes.duration || 5;\nconst duration = audioDuration + 2;\n\n// ── ANIMAÇÃO ──\nconst ALL_STYLES = ['zoom-punch','tilt-3d','parallax-up','parallax-down','zoom-out','shake-impact','spin-in','kenburns-right','kenburns-left'];\nlet animationStyle;\nif (segment.animation_mix === 'kenburns')        animationStyle = idx % 2 === 0 ? 'kenburns-right' : 'kenburns-left';\nelse if (segment.animation_mix === 'zoom-punch') animationStyle = 'zoom-punch';\nelse animationStyle = ALL_STYLES[idx % ALL_STYLES.length];\n\nreturn [{\n  json: {\n    index: idx,\n    imageUrl,\n    audioUrl,\n    captionText,\n    words,\n    durationSeconds: duration,\n    animationStyle,\n    transitionIn: 'fade',\n    emotion: segment.emotion || 'neutral'\n  }\n}];"
       },
       "name": "Build Scene",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1552,
-        2048
+        -1296,
+        4368
       ],
-      "id": "b7fa4bb7-8ade-4420-a197-917d2a377895"
+      "id": "0a5da9f8-dd92-49f2-97af-90d16198064b"
     },
     {
       "parameters": {
-        "jsCode": "// ── Agrega todas as cenas geradas pelo loop ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst execId = $execution?.id || '';\nconst resumeUrl = $execution?.resumeUrl || '';\nconst baseCallback = resumeUrl || (execId ? `https://n8n.fjt-solutions.com/webhook-waiting/${execId}/darktube-render-complete` : `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`);\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     false,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    composition\n  }\n}];"
+        "method": "POST",
+        "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":  \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : 'dt_error_session' }}\",\n  \"session_id\": \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : 'dt_error_session' }}\",\n  \"status\":     \"failed\",\n  \"error\":      \"{{ $json.execution?.error?.message || 'Erro durante execução no n8n' }}\"\n}",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "name": "Callback Error DarkTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -2768,
+        4576
+      ],
+      "id": "262e3045-2a12-4a1d-8ab8-5ce2e6b29f11"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Agrega todas as cenas geradas pelo loop ──\nconst norm = $('Normalize + Auto Engine').first().json;\nconst tpl  = norm.tpl || {};\n\nconst scenes = $input.all()\n  .map(item => item.json)\n  .sort((a, b) => a.index - b.index);\n\nconst execId = $execution?.id || '';\nconst resumeUrl = $execution?.resumeUrl || '';\nconst baseCallback = resumeUrl || (execId ? `https://n8n.fjt-solutions.com/webhook-waiting/${execId}/darktube-render-complete` : `https://n8n.fjt-solutions.com/webhook-waiting/darktube-render-complete`);\n\nconst composition = {\n  scenes,\n  format:            norm.format,\n  captionStyle:      norm.caption_style,\n  primaryColor:      norm.primary_color,\n  accentColor:       norm.accent_color,\n  showWatermark:     false,\n  watermarkText:     norm.watermark_text,\n  backgroundMusicUrl: norm.has_music ? (tpl.music_url || '') : ''\n};\n\nreturn [{\n  json: {\n    session_id:    norm.session_id,\n    render_engine: norm.render_engine,\n    template_id:   tpl.id,\n    callback_url:  baseCallback,\n    topic:         norm.topic         || tpl.video_title || '',\n    emotion:       scenes[0]?.emotion || 'neutral',\n    composition\n  }\n}];"
       },
       "name": "Aggregate Scenes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        880,
-        1680
+        -2320,
+        4080
       ],
-      "id": "d6c6475c-de83-4484-bf2d-d6b758e35fab"
+      "id": "badfa61c-4a9a-4e89-af83-1358e9853d6f"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI ENGINE SELECTOR — Prepara o prompt para o AI Agent OpenAI\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\n\nconst topic        = $json.topic        || comp.topic        || 'não informado';\nconst emotion      = $json.emotion      || scenes[0]?.emotion || 'neutral';\nconst captionStyle = comp.captionStyle  || 'subtitle';\nconst sceneCount   = scenes.length;\nconst totalDur     = scenes.reduce((s, c) => s + (c.durationSeconds || 5), 0);\nconst hasImages    = scenes.some(s => s.imageUrl) ? 'sim' : 'não';\nconst firstWords   = scenes.slice(0, 3).map(s => s.captionText || '').join(' | ');\n\nconst userMessage = `Analise este vídeo e escolha o engine de renderização:\n\n- Tema: ${topic}\n- Emoção predominante: ${emotion}\n- Estilo de legenda configurado: ${captionStyle}\n- Número de cenas: ${sceneCount}\n- Duração total: ${totalDur.toFixed(1)}s\n- Tem imagens de fundo: ${hasImages}\n- Primeiras legendas: ${firstWords}\n\nResponda APENAS com JSON puro (sem markdown): {\"engine\":\"hyperframes\",\"reason\":\"motivo curto\"}`;\n\nreturn [{ json: { ...$json, _selectorPrompt: userMessage } }];"
+      },
+      "name": "Engine Selector — Prepara",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2096,
+        4080
+      ],
+      "id": "fb866b00-37d5-40b4-9fe9-ea7da4635d2a"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// ENGINE SELECTOR — Extrai resultado do AI Agent\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '';\n\nlet parsed = { engine: 'hyperframes', reason: 'fallback padrão' };\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch {\n  parsed = {\n    engine: output.toLowerCase().includes('remotion') ? 'remotion' : 'hyperframes',\n    reason: 'detectado por keyword'\n  };\n}\n\nconst original = $('Engine Selector — Prepara').first().json;\nreturn [{\n  json: {\n    ...original,\n    render_engine: parsed.engine || 'hyperframes',\n    engineReason:  parsed.reason || '',\n  }\n}];"
+      },
+      "name": "Engine Selector — Extrai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1520,
+        4080
+      ],
+      "id": "d819488f-6a4b-4ec2-927d-7ff43c4e3654"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR REMOTION — Prepara prompt cinematográfico (v4)\n// Arsenal completo: imagens sempre presentes, todas as ferramentas\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\nconst emotion = $json.emotion || scenes[0]?.emotion || 'neutral';\nconst style   = comp.captionStyle || 'pop';\nconst topic   = $json.topic || '';\nconst total   = scenes.reduce((s,c) => s + (c.durationSeconds||0), 0).toFixed(1);\n\nconst userMessage = `TEMA: ${topic}\nEMOÇÃO GERAL: ${emotion}\nESTILO DE LEGENDA: ${style}\nDURAÇÃO TOTAL: ${total}s\nNÚMERO DE CENAS: ${scenes.length}\n\nCENAS PARA DIRIGIR:\n${JSON.stringify(scenes.map(s => ({\n  index: s.index,\n  captionText: s.captionText?.substring(0, 80),\n  durationSeconds: s.durationSeconds,\n  emotion: s.emotion,\n  hasImage: !!s.imageUrl\n})), null, 2)}`;\n\nreturn [{ json: { ...$json, _directorPrompt: userMessage } }];"
+      },
+      "name": "Director Remotion — Prepara",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1072,
+        3936
+      ],
+      "id": "8e13e581-6ce5-4ed0-9ca4-76d6e5842bf8"
     },
     {
       "parameters": {
@@ -208,30 +369,49 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
       "position": [
-        1104,
-        1584
+        -1296,
+        4080
       ],
-      "id": "25195eee-1ac3-49df-b913-1b371cf620e9"
+      "id": "5358ac77-737a-4d34-a886-9ab9f7aded0a"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://n8n-remotionservice-ry6eh9:3001/render",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
-        "options": {
-          "allowUnauthorizedCerts": true
-        }
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR HYPERFRAMES — Prepara prompt cinematográfico COMPLETO (v3)\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\nconst emotion = $json.emotion || scenes[0]?.emotion || 'neutral';\nconst style   = comp.captionStyle || 'subtitle';\nconst topic   = $json.topic || '';\nconst total   = scenes.reduce((s,c) => s + (c.durationSeconds||0), 0).toFixed(1);\n\nconst userMessage = `Você é o Diretor Cinematográfico do vídeo no HyperFrames (motor GSAP/HTML5). Seu trabalho é escolher a direção COMPLETA de cada cena para criar o vídeo mais impactante possível.\n\nTEMA: ${topic}\nEMOÇÃO GERAL: ${emotion}\nESTILO DE LEGENDA: ${style}\nDURAÇÃO TOTAL: ${total}s\nCENAS: ${scenes.length}\n\nCENAS PARA DIRIGIR:\n${JSON.stringify(scenes.map(s => ({\n  index: s.index,\n  captionText: s.captionText?.substring(0, 80),\n  durationSeconds: s.durationSeconds,\n  hasImage: !!s.imageUrl,\n  emotion: s.emotion\n})), null, 2)}\n\n═══════════════════════════════════════════\nARSENAL COMPLETO DO HYPERFRAMES (GSAP)\n═══════════════════════════════════════════\n\n▶ animationStyle (movimento de câmera e infográficos via GSAP):\n  \"chart\"          — Gráfico de linha vetorial animado (finanças, métricas)\n  \"bar-chart\"      — Gráfico de barras comparativas animadas\n  \"map\"            — Rota de mapa animada\n  \"zoom-punch\"     — snap rápido de entrada com ease.back, impacto forte\n  \"tilt-3d\"        — perspectiva 3D: rotationX + rotationY + perspective(1000px)\n  \"parallax-up\"    — sobe com profundidade (GSAP y negativo + scale)\n  \"parallax-down\"  — desce com profundidade\n  \"zoom-out\"       — saída de zoom suave\n  \"shake-impact\"   — tremor via GSAP keyframes (x oscilação)\n  \"spin-in\"        — rotação 360° de entrada\n  \"kenburns-right\" — pan + zoom suave para a direita\n  \"kenburns-left\"  — pan + zoom suave para a esquerda\n  \"kenburns-up\"    — pan + zoom suave para cima\n  \"kenburns-down\"  — pan + zoom suave para baixo\n\n▶ transitionIn (transição GSAP entre cenas):\n  \"fade\"           — opacity 0→1 suave\n  \"light-leak\"     — flash laranja/branco estilo lente anamórfica\n  \"whip-pan\"       — varredura horizontal rápida\n  \"cinematic-zoom\" — zoom dramático + fade\n  \"glitch\"         — distorção digital + clip-path\n  \"slide-up\"       — entra de baixo\n  \"slide-right\"    — entra da esquerda\n\n▶ captionEffect (efeito do texto/legenda via GSAP):\n  \"bounce\"         — texto entra com ease.back e bounce final\n  \"clip-wipe\"      — clip-path revela o texto da esquerda para direita\n  \"glitch-rgb\"     — glitch de canais RGB no texto\n  \"editorial\"      — texto limpo com fade e translateY suaves\n  \"typewriter\"     — letras aparecem sequencialmente\n  \"pop\"            — scale 0→1.2→1 com bounce\n\n▶ overlayEffect (efeito visual sobre a imagem):\n  \"light-leak\"     — gradiente laranja/dourado com opacity animada\n  \"glitch\"         — clip-path oscilante + color shift\n  \"flash\"          — flash branco em cortes\n  \"none\"           — sem overlay\n\n▶ intensity: 0.0 a 1.0 (intensidade geral de todos os efeitos GSAP)\n\n═══════════════════════════════════════════\nREGRAS DE DIREÇÃO\n═══════════════════════════════════════════\n1. VARIE os estilos entre cenas consecutivas\n2. Para URGÊNCIA/ENERGIA: zoom-punch, shake-impact, light-leak transition, intensity 0.9+\n3. Para REFLEXÃO/CALMA: kenburns, parallax, fade transition, editorial caption\n4. Para MISTÉRIO: tilt-3d, glitch transition, glitch-rgb caption\n5. Para CALL TO ACTION (última cena): spin-in + light-leak + pop caption + intensity 1.0\n6. captionEffect \"bounce\" é o padrão viral — use em cenas-chave emocionais\n\nResponda APENAS com JSON array puro (sem markdown, sem explicações):\n[{\n  \"index\": 0,\n  \"animationStyle\": \"zoom-punch\",\n  \"transitionIn\": \"light-leak\",\n  \"captionEffect\": \"bounce\",\n  \"overlayEffect\": \"light-leak\",\n  \"intensity\": 0.9\n}]`;\n\nreturn [{ json: { ...$json, _directorPrompt: userMessage } }];"
       },
-      "name": "Remotion Render",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
+      "name": "Director HyperFrames — Prepara",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1328,
-        1488
+        -1072,
+        4224
       ],
-      "id": "4304c962-a6d1-430d-a579-acfbfb7c2fb8"
+      "id": "021846f5-2cd4-4aba-8fb4-92b7ce0001e9"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR REMOTION — Aplica direção ao payload (v3)\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '[]';\n\nlet directions = [];\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  const match = clean.match(/\\[.*\\]/s);\n  directions = JSON.parse(match ? match[0] : clean);\n} catch (e) {\n  console.log('Director Remotion parse error:', e.message);\n  directions = [];\n}\n\nconst original = $('Director Remotion — Prepara').first().json;\nconst comp = original.composition || {};\nconst scenes = comp.scenes || [];\n\nconst enriched = scenes.map(scene => {\n  const dir = directions.find(d => d.index === scene.index) || {};\n  return {\n    ...scene,\n    animationStyle:           dir.animationStyle           || scene.animationStyle || 'zoom-punch',\n    transitionIn:             dir.transitionIn             || scene.transitionIn   || 'fade',\n    transitionDurationFrames: dir.transitionDurationFrames || 18,\n    textEffect:               dir.textEffect               || 'split-bounce',\n    springPreset:             dir.springPreset             || 'bouncy',\n    overlayEffect:            dir.overlayEffect            || 'none',\n    colorGrading:             dir.colorGrading             || 'none',\n    intensity:                dir.intensity                ?? 0.8,\n    emotionColor:             dir.emotionColor             || null,\n  };\n});\n\nreturn [{\n  json: {\n    ...original,\n    composition: { ...comp, scenes: enriched },\n    _directorApplied: 'remotion',\n  }\n}];"
+      },
+      "name": "Director Remotion — Aplica",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        3936
+      ],
+      "id": "508287fe-0d40-4a58-bac9-5f3dccec35ab"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR HYPERFRAMES — Aplica direção ao payload (v3)\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '[]';\n\nlet directions = [];\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  const match = clean.match(/\\[.*\\]/s);\n  directions = JSON.parse(match ? match[0] : clean);\n} catch (e) {\n  console.log('Director HyperFrames parse error:', e.message);\n  directions = [];\n}\n\nconst original = $('Director HyperFrames — Prepara').first().json;\nconst comp = original.composition || {};\nconst scenes = comp.scenes || [];\n\nconst enriched = scenes.map(scene => {\n  const dir = directions.find(d => d.index === scene.index) || {};\n  return {\n    ...scene,\n    animationStyle: dir.animationStyle || scene.animationStyle || 'kenburns-right',\n    transitionIn:   dir.transitionIn   || scene.transitionIn   || 'fade',\n    captionEffect:  dir.captionEffect  || 'bounce',\n    overlayEffect:  dir.overlayEffect  || 'none',\n    intensity:      dir.intensity      ?? 0.75,\n  };\n});\n\nreturn [{\n  json: {\n    ...original,\n    composition: { ...comp, scenes: enriched },\n    _directorApplied: 'hyperframes',\n  }\n}];"
+      },
+      "name": "Director HyperFrames — Aplica",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        4224
+      ],
+      "id": "5e485865-41de-4463-bb57-b3d701478778"
     },
     {
       "parameters": {
@@ -248,10 +428,30 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        1328,
-        1680
+        -272,
+        4224
       ],
-      "id": "f5927597-f655-4104-8f40-861b39295e9f"
+      "id": "f36eec9f-eb1a-4689-9f28-71b6a5dc1f0f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://n8n-remotionservice-ry6eh9:3001/render",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"composition\": {{ JSON.stringify($json.composition) }}\n}",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "name": "Remotion Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        -272,
+        3936
+      ],
+      "id": "ba88a685-45f5-4a08-bc63-25e23c4270a3"
     },
     {
       "parameters": {
@@ -263,10 +463,10 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
       "position": [
-        1552,
-        1584
+        -48,
+        4080
       ],
-      "id": "b1623c45-eb57-4940-9a85-bcd8fc731a94",
+      "id": "dd5f8a0b-eacf-442c-9734-5b1eb8f54e94",
       "webhookId": "ff06ebff-2ea7-45b3-8a11-66c6c96fe988"
     },
     {
@@ -277,10 +477,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1776,
-        1584
+        176,
+        4080
       ],
-      "id": "db564ca1-8553-468f-bfe5-7f18068aac4e"
+      "id": "570217fd-e28a-482f-8598-5771943ec2ef"
     },
     {
       "parameters": {
@@ -288,7 +488,7 @@
         "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"render_engine\": \"{{ $('Normalize + Auto Engine').first().json.render_engine }}\",\n  \"videoUrl\":      \"{{ $('Wait Render').first().json.body?.videoUrl || $('Wait Render').first().json.body?.video_url || $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.body?.videoUrl || $('Wait Render').first().json.body?.video_url || $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}\",\n  \"thumbnailUrl\":  \"{{ $('Wait Render').first().json.body?.thumbnailUrl || $('Wait Render').first().json.body?.thumbnail_url || $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}\",\n  \"thumbnail_url\": \"{{ $('Wait Render').first().json.body?.thumbnailUrl || $('Wait Render').first().json.body?.thumbnail_url || $('Wait Render').first().json.thumbnailUrl || $('Wait Render').first().json.thumbnail_url || '' }}\",\n  \"status\":        \"{{ $('Wait Render').first().json.body?.status || $('Wait Render').first().json.status || 'completed' }}\",\n  \"error\":         \"{{ $('Wait Render').first().json.body?.error || $('Wait Render').first().json.error || '' }}\"\n}",
+        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').first().json.session_id }}\",\n  \"template_id\":   \"{{ $('Normalize + Auto Engine').first().json.tpl.id }}\",\n  \"render_engine\": \"{{ $('Engine Selector — Extrai').first().json.render_engine }}\",\n  \"videoUrl\":      \"{{ $('Wait Render').first().json.body?.videoUrl || $('Wait Render').first().json.body?.video_url || $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}\",\n  \"video_url\":     \"{{ $('Wait Render').first().json.body?.videoUrl || $('Wait Render').first().json.body?.video_url || $('Wait Render').first().json.videoUrl || $('Wait Render').first().json.video_url || '' }}\",\n  \"thumbnailUrl\":  \"{{ $('Wait Render').first().json.body?.thumbnailUrl || $('Wait Render').first().json.thumbnailUrl || '' }}\",\n  \"status\":        \"{{ $('Wait Render').first().json.body?.status || $('Wait Render').first().json.status || 'completed' }}\",\n  \"error\":         \"{{ $('Wait Render').first().json.body?.error || $('Wait Render').first().json.error || '' }}\"\n}",
         "options": {
           "allowUnauthorizedCerts": true
         }
@@ -297,44 +497,125 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        2000,
-        1584
+        400,
+        4080
       ],
-      "id": "a1b6073b-5541-47dd-a0a6-26773d95773a"
-    },
-    {
-      "parameters": {},
-      "name": "Error Trigger",
-      "type": "n8n-nodes-base.errorTrigger",
-      "typeVersion": 1,
-      "position": [
-        656,
-        2240
-      ],
-      "id": "e8e1106b-error-trigger-001"
+      "id": "54a64883-062c-497e-9635-1629ba0d9643"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://darktube.fjt-solutions.com/api/webhooks/production-complete",
+        "url": "https://darktube.fjt-solutions.com/api/storage/upload",
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":     \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}\",\n  \"session_id\":    \"{{ $('Normalize + Auto Engine').isExecuted ? $('Normalize + Auto Engine').first().json.session_id : ($json.execution?.error?.node?.session_id || 'dt_error_session') }}\",\n  \"status\":        \"failed\",\n  \"error\":         \"{{ $json.execution?.error?.message || 'Erro durante execução no n8n' }}\"\n}",
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "filename",
+              "value": "={{ 'tts_' + ($json.index ?? $json.session_id ?? Date.now()) + '.mp3' }}"
+            }
+          ]
+        },
         "options": {
           "allowUnauthorizedCerts": true
         }
       },
-      "name": "Callback Error DarkTube",
+      "name": "Upload TTS Audio",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 3,
       "position": [
-        912,
-        2240
+        -1872,
+        4272
       ],
-      "id": "a1b6073b-error-callback-002"
+      "id": "a4b5c6d7-e8f9-4012-a3b4-c5d6e7f80123"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "name": "Merge Audio + Whisper",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -1552,
+        4368
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     }
   ],
   "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Callback Error DarkTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent — Engine Selector",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI Agent — Director Remotion",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "AI Agent — Director HyperFrames",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent — Engine Selector": {
+      "main": [
+        [
+          {
+            "node": "Engine Selector — Extrai",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent — Director HyperFrames": {
+      "main": [
+        [
+          {
+            "node": "Director HyperFrames — Aplica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent — Director Remotion": {
+      "main": [
+        [
+          {
+            "node": "Director Remotion — Aplica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Webhook Darktube": {
       "main": [
         [
@@ -390,6 +671,11 @@
       "main": [
         [
           {
+            "node": "Upload TTS Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Whisper Word Timestamps",
             "type": "main",
             "index": 0
@@ -401,9 +687,9 @@
       "main": [
         [
           {
-            "node": "Build Scene",
+            "node": "Merge Audio + Whisper",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -423,7 +709,40 @@
       "main": [
         [
           {
+            "node": "Engine Selector — Prepara",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Engine Selector — Prepara": {
+      "main": [
+        [
+          {
+            "node": "AI Agent — Engine Selector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Engine Selector — Extrai": {
+      "main": [
+        [
+          {
             "node": "Route to Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Director Remotion — Prepara": {
+      "main": [
+        [
+          {
+            "node": "AI Agent — Director Remotion",
             "type": "main",
             "index": 0
           }
@@ -434,11 +753,44 @@
       "main": [
         [
           {
-            "node": "Remotion Render",
+            "node": "Director Remotion — Prepara",
             "type": "main",
             "index": 0
           }
         ],
+        [
+          {
+            "node": "Director HyperFrames — Prepara",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Director HyperFrames — Prepara": {
+      "main": [
+        [
+          {
+            "node": "AI Agent — Director HyperFrames",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Director Remotion — Aplica": {
+      "main": [
+        [
+          {
+            "node": "Remotion Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Director HyperFrames — Aplica": {
+      "main": [
         [
           {
             "node": "Hyperframes Render",
@@ -448,7 +800,7 @@
         ]
       ]
     },
-    "Remotion Render": {
+    "Hyperframes Render": {
       "main": [
         [
           {
@@ -459,7 +811,7 @@
         ]
       ]
     },
-    "Hyperframes Render": {
+    "Remotion Render": {
       "main": [
         [
           {
@@ -492,11 +844,22 @@
         ]
       ]
     },
-    "Error Trigger": {
+    "Upload TTS Audio": {
       "main": [
         [
           {
-            "node": "Callback Error DarkTube",
+            "node": "Merge Audio + Whisper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Audio + Whisper": {
+      "main": [
+        [
+          {
+            "node": "Build Scene",
             "type": "main",
             "index": 0
           }
@@ -504,228 +867,7 @@
       ]
     }
   },
-  "pinData": {
-    "Webhook Darktube": [
-      {
-        "headers": {
-          "host": "n8n.fjt-solutions.com",
-          "user-agent": "node",
-          "content-length": "16897",
-          "accept": "*/*",
-          "accept-encoding": "br, gzip, deflate",
-          "accept-language": "*",
-          "content-type": "application/json",
-          "sec-fetch-mode": "cors",
-          "x-forwarded-for": "172.17.0.1",
-          "x-forwarded-host": "n8n.fjt-solutions.com",
-          "x-forwarded-port": "443",
-          "x-forwarded-proto": "https",
-          "x-forwarded-server": "48accbe986c6",
-          "x-real-ip": "172.17.0.1"
-        },
-        "params": {},
-        "query": {},
-        "body": {
-          "message": "Production Request from DarkTube",
-          "timestamp": "2026-07-27T16:50:07.266Z",
-          "user_id": "1ac374d6-2d02-4c07-82f2-e1d3ac491fc8",
-          "template": {
-            "id": "e447ef5b-bd49-4378-9ddf-d4b44c908566",
-            "name": "Template: Domine suas EMOÇÕES e alcance ...",
-            "video_url": "https://youtube.com/watch?v=DZuIjwM38xg",
-            "original_video_id": "DZuIjwM38xg",
-            "video_title": "Domine suas EMOÇÕES e alcance a PAZ interior | ESTOICISMO 😌⚜️",
-            "video_thumbnail": "https://i.ytimg.com/vi/DZuIjwM38xg/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDaaR__N5PDGhrT26fl0sIZs8gkCA",
-            "format": "vertical",
-            "engine_mode": "local",
-            "image_model": "manual-image",
-            "thumbnail_model": "manual-image",
-            "video_model": "manual-none-video",
-            "voice_model": "edge-tts-docker",
-            "music_model": "suno-v4",
-            "render_model": "remotion-engine",
-            "render_engine": "remotion",
-            "caption_style": "subtitle",
-            "animation_mix": "zoom-punch",
-            "transition_style": "fade",
-            "language": "pt",
-            "voice": "pt-BR-FranciscaNeural",
-            "voice_language": "pt-BR",
-            "has_music": true,
-            "music_style": "epic",
-            "post_frequency": "daily",
-            "post_days": [],
-            "post_times": [],
-            "target_accounts": [],
-            "thumbnail_prompt": "CLOSE-UP DRAMÁTICO de um busto de guerreiro helênico, com capacete coríntio detalhado, feito de mármore antigo e rachado, olhos profundamente pensativos e sombra dramática no rosto. Fundo de um templo em ruínas sob um céu tempestuoso com raios distantes e nuvens cinzentas, raios de luz dourada perfurando a escuridão. Estilo cinematográfico, alta resolução, 8K.",
-            "music_prompt": "Epic cinematic orchestral soundtrack with deep strings, powerful percussion, and haunting ambient elements that evoke a sense of ancient wisdom and introspection.",
-            "sfx_prompt": "Create a soundscape that includes gentle thunder, crackling fire, and distant echoes to create an atmosphere of ancient contemplation and internal struggle.",
-            "script_segments": [
-              {
-                "timestamp": "0:00-0:30",
-                "segment_type": "GANCHO",
-                "voiceover": {
-                  "text": "Você já se sentiu dominado pelas suas emoções, incapaz de encontrar paz interior?",
-                  "style": "Narração profunda e autoritária, incentivando reflexão pessoal."
-                },
-                "visual_content": {
-                  "image_prompt": "A lone philosopher standing at the edge of a rugged cliff, overlooking a vast, tumultuous ocean under a stormy sky.",
-                  "animation_instructions": "Slow dolly in towards the philosopher, with dramatic clouds moving in the background."
-                },
-                "voice_direction": "Deep, authoritative voice with a reflective tone.",
-                "sound_design": "Sound of crashing waves and distant thunder to set a dramatic tone.",
-                "emotion": "introspecção"
-              },
-              {
-                "timestamp": "0:31-3:00",
-                "segment_type": "DESENVOLVIMENTO_N",
-                "voiceover": {
-                  "text": "O estoicismo nos ensina a encontrar equilíbrio em meio ao caos, controlando nossas reações e emoções.",
-                  "style": "Tom inspirador e educativo, destacando a sabedoria antiga."
-                },
-                "visual_content": {
-                  "image_prompt": "An ancient library filled with scrolls and a stoic philosopher reading by candlelight.",
-                  "animation_instructions": "Pan across the library with focus on the philosopher's contemplative expression."
-                },
-                "voice_direction": "Inspirational and educational tone, emphasizing ancient wisdom.",
-                "sound_design": "Soft sound of pages turning and candle flickering.",
-                "emotion": "sabedoria"
-              },
-              {
-                "timestamp": "3:01-9:00",
-                "segment_type": "DESENVOLVIMENTO_N",
-                "voiceover": {
-                  "text": "A verdadeira paz interior vem do entendimento de que não podemos controlar os eventos externos, mas apenas nossa reação a eles.",
-                  "style": "Tom calmo e esclarecedor, promovendo auto-reflexão."
-                },
-                "visual_content": {
-                  "image_prompt": "A serene garden with a statue of a stoic figure, surrounded by gentle flowing water and lush greenery.",
-                  "animation_instructions": "Slow zoom out from the statue to reveal the entire tranquil garden setting."
-                },
-                "voice_direction": "Calm and enlightening tone to promote self-reflection.",
-                "sound_design": "Gentle flowing water and soft wind rustling through leaves.",
-                "emotion": "calma"
-              },
-              {
-                "timestamp": "9:01-17:00",
-                "segment_type": "DESENVOLVIMENTO_N",
-                "voiceover": {
-                  "text": "Ao praticar o desapego, aprendemos a não sermos escravos dos nossos desejos e medos.",
-                  "style": "Tom resoluto e motivacional, incentivando a prática pessoal."
-                },
-                "visual_content": {
-                  "image_prompt": "A warrior meditating in a dimly lit room, surrounded by symbols of stoicism.",
-                  "animation_instructions": "Circle around the meditating warrior to emphasize the symbols in the background."
-                },
-                "voice_direction": "Resolute and motivational tone to encourage personal practice.",
-                "sound_design": "Subtle heartbeats and distant chimes to create a meditative atmosphere.",
-                "emotion": "determinação"
-              },
-              {
-                "timestamp": "17:01-29:51",
-                "segment_type": "CLÍMAX",
-                "voiceover": {
-                  "text": "Ao dominar suas emoções, você se torna o mestre do seu destino, alcançando verdadeira liberdade.",
-                  "style": "Tom triunfante e empoderador, culminando na mensagem central."
-                },
-                "visual_content": {
-                  "image_prompt": "A majestic sunrise breaking over a mountain peak, symbolizing new beginnings and mastery.",
-                  "animation_instructions": "Dramatic reveal of the sunrise over the peak with lens flare effects."
-                },
-                "voice_direction": "Triumphant and empowering tone to deliver the central message.",
-                "sound_design": "Rising orchestral score with triumphant brass and strings.",
-                "emotion": "empoderamento"
-              }
-            ],
-            "generated_script": "{\n  \"detected_voice_type\": \"masculine_br\",\n  \"detected_voice_language\": \"pt-BR\",\n  \"detected_music_style\": \"epic\",\n  \"recommended_image_model\": \"ideogram-v3-quality\",\n  \"recommended_video_model\": \"sora-2\",\n  \"music_prompt\": \"Epic cinematic orchestral soundtrack with deep strings, powerful percussion, and haunting ambient elements that evoke a sense of ancient wisdom and introspection.\",\n  \"sfx_prompt\": \"Create a soundscape that includes gentle thunder, crackling fire, and distant echoes to create an atmosphere of ancient contemplation and internal struggle.\",\n  \"script_base\": [\n    {\n      \"timestamp\": \"0:00-0:30\",\n      \"segment_type\": \"GANCHO\",\n      \"voiceover\": {\n        \"text\": \"Você já se sentiu dominado pelas suas emoções, incapaz de encontrar paz interior?\",\n        \"style\": \"Narração profunda e autoritária, incentivando reflexão pessoal.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A lone philosopher standing at the edge of a rugged cliff, overlooking a vast, tumultuous ocean under a stormy sky.\",\n        \"animation_instructions\": \"Slow dolly in towards the philosopher, with dramatic clouds moving in the background.\"\n      },\n      \"voice_direction\": \"Deep, authoritative voice with a reflective tone.\",\n      \"sound_design\": \"Sound of crashing waves and distant thunder to set a dramatic tone.\",\n      \"emotion\": \"introspecção\"\n    },\n    {\n      \"timestamp\": \"0:31-3:00\",\n      \"segment_type\": \"DESENVOLVIMENTO_N\",\n      \"voiceover\": {\n        \"text\": \"O estoicismo nos ensina a encontrar equilíbrio em meio ao caos, controlando nossas reações e emoções.\",\n        \"style\": \"Tom inspirador e educativo, destacando a sabedoria antiga.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"An ancient library filled with scrolls and a stoic philosopher reading by candlelight.\",\n        \"animation_instructions\": \"Pan across the library with focus on the philosopher's contemplative expression.\"\n      },\n      \"voice_direction\": \"Inspirational and educational tone, emphasizing ancient wisdom.\",\n      \"sound_design\": \"Soft sound of pages turning and candle flickering.\",\n      \"emotion\": \"sabedoria\"\n    },\n    {\n      \"timestamp\": \"3:01-9:00\",\n      \"segment_type\": \"DESENVOLVIMENTO_N\",\n      \"voiceover\": {\n        \"text\": \"A verdadeira paz interior vem do entendimento de que não podemos controlar os eventos externos, mas apenas nossa reação a eles.\",\n        \"style\": \"Tom calmo e esclarecedor, promovendo auto-reflexão.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A serene garden with a statue of a stoic figure, surrounded by gentle flowing water and lush greenery.\",\n        \"animation_instructions\": \"Slow zoom out from the statue to reveal the entire tranquil garden setting.\"\n      },\n      \"voice_direction\": \"Calm and enlightening tone to promote self-reflection.\",\n      \"sound_design\": \"Gentle flowing water and soft wind rustling through leaves.\",\n      \"emotion\": \"calma\"\n    },\n    {\n      \"timestamp\": \"9:01-17:00\",\n      \"segment_type\": \"DESENVOLVIMENTO_N\",\n      \"voiceover\": {\n        \"text\": \"Ao praticar o desapego, aprendemos a não sermos escravos dos nossos desejos e medos.\",\n        \"style\": \"Tom resoluto e motivacional, incentivando a prática pessoal.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A warrior meditating in a dimly lit room, surrounded by symbols of stoicism.\",\n        \"animation_instructions\": \"Circle around the meditating warrior to emphasize the symbols in the background.\"\n      },\n      \"voice_direction\": \"Resolute and motivational tone to encourage personal practice.\",\n      \"sound_design\": \"Subtle heartbeats and distant chimes to create a meditative atmosphere.\",\n      \"emotion\": \"determinação\"\n    },\n    {\n      \"timestamp\": \"17:01-29:51\",\n      \"segment_type\": \"CLÍMAX\",\n      \"voiceover\": {\n        \"text\": \"Ao dominar suas emoções, você se torna o mestre do seu destino, alcançando verdadeira liberdade.\",\n        \"style\": \"Tom triunfante e empoderador, culminando na mensagem central.\"\n      },\n      \"visual_content\": {\n        \"image_prompt\": \"A majestic sunrise breaking over a mountain peak, symbolizing new beginnings and mastery.\",\n        \"animation_instructions\": \"Dramatic reveal of the sunrise over the peak with lens flare effects.\"\n      },\n      \"voice_direction\": \"Triumphant and empowering tone to deliver the central message.\",\n      \"sound_design\": \"Rising orchestral score with triumphant brass and strings.\",\n      \"emotion\": \"empoderamento\"\n    }\n  ]\n}",
-            "ai_analysis": {
-              "style": "Motivacional Estoico e Filosofia Antiga",
-              "tools": [
-                "Black Forest Labs flux-2 pro",
-                "ideogram v3",
-                "seedream 5.0 Lite",
-                "Kling 3.0",
-                "Open AI sora 2",
-                "Runway Gen-3",
-                "Elevenlabs V3",
-                "Elevenlabs Text to Speech (multilingual v2)",
-                "Suno v3.5"
-              ],
-              "pacing": "Lento",
-              "summary": "O vídeo apresenta uma série de estátuas e bustos em estilo clássico (gregos/romanos, figuras como Zeus e guerreiros) em cenários dramáticos e atmosféricos (chamas, tempestades com raios, nuvens escuras). Textos motivacionais e filosóficos sobre dominar emoções, resiliência e aceitação do destino são sobrepostos em fonte amarela ou branca. A estética é sombria, grandiosa e inspiradora, com foco em sabedoria ancestral e autodomínio.",
-              "confidence": 0.98,
-              "transcript": "",
-              "feasibility": "Alta",
-              "visualStyle": "Cinematográfico",
-              "justification": "O vídeo utiliza frames estáticos ou com movimento mínimo de bustos e estátuas clássicas, com sobreposição de texto em fonte amarela/branca. O fundo atmosférico (fogo, tempestade, raios) e a qualidade das imagens sugerem forte uso de IA generativa para criar um estilo 'dark academia' com temática de estoicismo. A repetição de elementos e o foco em uma figura central por cena são características comuns de vídeos produzidos com IA. A transição de tema de 'domínio das emoções' para 'aceitação do destino' é coesa com a filosofia estoica.",
-              "remodelingTip": "Para superar este vídeo original, a estratégia ideal é transicionar de estátuas estáticas para cenas dinâmicas geradas por IA, onde figuras antigas (não necessariamente estátuas) interagem sutilmente com seus ambientes, expressando as emoções ou a calma descrita no texto. Varie os ângulos de câmera, introduza elementos em movimento (vento, chuva, fogo dinâmico) e use uma narração com entonação rica e trilha sonora que evolua com a mensagem.",
-              "productionMethod": "IA Gerativa",
-              "has_text_on_screen": true,
-              "detected_audio_type": "voice",
-              "remodeling_template": {
-                "ai_stack": {
-                  "image": "ideogram v3",
-                  "music": "Suno v3.5",
-                  "video": "Open AI sora 2",
-                  "voice": "Elevenlabs Text to Speech (multilingual v2)"
-                },
-                "music_style": "Epic Cinematic Orchestral (com elementos de cordas e percussão), Dark Ambient, Neoclássico.",
-                "script_base": [
-                  {
-                    "emotion": "Curiosidade | Urgência",
-                    "timestamp": "0:00-0:05",
-                    "voiceover": {
-                      "text": "Você já sentiu que suas emoções são um campo de batalha? Que os ventos da vida te jogam para lá e para cá, sem controle? E se eu te dissesse que existe um caminho ancestral para a verdadeira maestria?",
-                      "style": "Tom de voz grave, questionador, com ligeira pausa antes da última frase para criar impacto."
-                    },
-                    "segment_type": "GANCHO",
-                    "visual_content": {
-                      "image_prompt": "Cena de um general romano, vivo, não uma estátua, no auge de uma colina observando seu exército sob um céu tempestuoso e relâmpagos cintilantes ao longe. Ele está calmo, com uma expressão de determinação inabalável. Detalhes realistas de armadura e manto. Estilo de pintura a óleo digital.",
-                      "animation_instructions": "Slow zoom in no rosto do general, com sutis movimentos de nuvens e raios no fundo. Câmera ligeiramente inclinada para dar imponência."
-                    }
-                  },
-                  {
-                    "emotion": "Reflexão | Empoderamento",
-                    "timestamp": "0:06-0:15",
-                    "voiceover": {
-                      "text": "No coração da filosofia estoica, a pergunta mais potente é: O que é o pior que poderia acontecer? Não para temer, mas para aceitar. Porque ao aceitar, você desarma o medo. Você não controla o mundo externo, mas você domina, sim, a sua reação a ele.",
-                      "style": "Tom de voz mais didático, firme, com ênfase nas palavras 'aceitar' e 'domina'."
-                    },
-                    "segment_type": "DESENVOLVIMENTO",
-                    "visual_content": {
-                      "image_prompt": "Filósofo grego (como Séneca ou Epicteto), não uma estátua, sentado em uma biblioteca antiga, iluminada apenas por uma janela que revela uma chuva torrencial lá fora. Ele escreve em um pergaminho, com expressão serena e focada. Detalhes de livros e artefatos antigos. Renderização hiper-realista.",
-                      "animation_instructions": "Pan suave da estante de livros para o filósofo. Pequenos detalhes de fumaça subindo de uma lâmpada a óleo ou gotas de chuva na janela. Close-up da mão escrevendo."
-                    }
-                  },
-                  {
-                    "emotion": "Motivação | Alívio",
-                    "timestamp": "0:16-0:20",
-                    "voiceover": {
-                      "text": "Aceite o que está além do seu controle. Concentre-se no que está. Sua força interior é ilimitada. Comece sua jornada de autodomínio hoje e descubra o poder de DOMINAR SUAS EMOÇÕES. Clique no link e transforme sua vida.",
-                      "style": "Tom de voz inspirador, conclusivo, com aumento de volume e intensidade nas últimas frases."
-                    },
-                    "segment_type": "CTA",
-                    "visual_content": {
-                      "image_prompt": "Uma figura humana (silhueta de homem ou mulher) em pé no topo de uma montanha rochosa, com os braços abertos, observando um nascer do sol dourado rompendo as nuvens escuras. O céu se abre revelando cores vibrantes. Sentimento de esperança e vitória. Estilo foto-realista, cinematográfico.",
-                      "animation_instructions": "Slow backward zoom, revelando a paisagem grandiosa. Raio de luz do sol se expandindo. Fade in de um CTA de texto na tela: 'COMECE AGORA!'"
-                    }
-                  }
-                ],
-                "video_style": "Misticismo Estoico, Dark Academia, Mitológico Moderno.",
-                "thumbnail_prompt": "CLOSE-UP DRAMÁTICO de um busto de guerreiro helênico, com capacete coríntio detalhado, feito de mármore antigo e rachado, olhos profundamente pensativos e sombra dramática no rosto. Fundo de um templo em ruínas sob um céu tempestuoso com raios distantes e nuvens cinzentas, raios de luz dourada perfurando a escuridão. Estilo cinematográfico, alta resolução, 8K.",
-                "composition_rules": "Utilize a regra dos terços para posicionar o sujeito principal. Aplique iluminação de três pontos para criar profundidade e dramaticidade. Cenários devem ser ricos em detalhes, mas focados na emoção ou ação do personagem. Cores predominantes: tons terrosos, cinzas, dourados e azuis profundos.",
-                "visual_directives": "Cenas geradas por IA que retratam figuras antigas (filósofos, guerreiros, deuses) em momentos de introspecção, batalha interna ou contemplação serena. Utilize iluminação dramática para destacar a figura principal e o ambiente. Evite estátuas estáticas; prefira personagens vivendo a cena. Varie entre planos abertos e closes.",
-                "target_audience_psychology": "Ativa o gatilho mental da Autoridade (sabedoria antiga), da Inspiração (autodomínio), e do Medo de Perder (não viver plenamente) seguido por Alívio (solução proposta)."
-              },
-              "original_audio_description": "Provável narração masculina, com voz profunda e autoritária, em tom motivacional e filosófico, acompanhada por uma trilha sonora épica ou dramática de fundo, possivelmente com elementos orquestrais e sons ambientes (ex: trovões, fogo crepitante) que complementam as imagens."
-            }
-          }
-        },
-        "webhookUrl": "https://n8n.fjt-solutions.com/webhook/darktube_producao",
-        "executionMode": "production"
-      }
-    ]
-  },
+  "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "d5c1be1e686158128704986c8b96dfb65a421b52cf38e177cd9037bb8b11d8e0"
