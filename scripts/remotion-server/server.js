@@ -143,33 +143,44 @@ async function preloadAndProcessAllAssets(scenes) {
 
         if (!fs.existsSync(filePath)) {
           console.log(`[Remotion Assets] Baixando mídia da cena ${i + 1}...`);
-          const res = await fetch(scene.imageUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-            }
-          });
-          if (res.ok) {
-            let buf = Buffer.from(await res.arrayBuffer());
-            // Redimensionar para max 1080x1920 se for imagem
-            if (sharp && ext !== 'mp4') {
-              try {
-                buf = await sharp(buf)
-                  .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
-                  .toBuffer();
-                console.log(`[Remotion Assets] ✅ Cena ${i + 1} otimizada com sharp (${Math.round(buf.length / 1024)}KB)`);
-              } catch (err) {
-                console.warn(`[Remotion Assets] Aviso sharp cena ${i + 1}:`, err.message);
+          try {
+            const res = await fetch(scene.imageUrl, {
+              headers: {
+                'User-Agent': 'DarkTubeBot/2.0 (compatible; +https://darktube.fjt.solutions; contact@darktube.ai)',
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+              }
+            });
+            if (res.ok) {
+              let buf = Buffer.from(await res.arrayBuffer());
+              if (sharp && ext !== 'mp4') {
+                try {
+                  buf = await sharp(buf)
+                    .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                    .toBuffer();
+                  console.log(`[Remotion Assets] ✅ Cena ${i + 1} otimizada com sharp (${Math.round(buf.length / 1024)}KB)`);
+                } catch (err) {
+                  console.warn(`[Remotion Assets] Aviso sharp cena ${i + 1}:`, err.message);
+                }
+              }
+              fs.writeFileSync(filePath, buf);
+            } else {
+              console.warn(`[Remotion Assets] ⚠️ Servidor remoto retornou HTTP ${res.status} para cena ${i + 1}. Gerando fallback...`);
+              if (sharp) {
+                const fallbackBuf = await sharp({
+                  create: { width: 1080, height: 1080, channels: 4, background: { r: 15, g: 23, b: 42, alpha: 1 } }
+                }).png().toBuffer();
+                fs.writeFileSync(filePath, fallbackBuf);
               }
             }
-            fs.writeFileSync(filePath, buf);
-          } else {
-            console.warn(`[Remotion Assets] ⚠️ Servidor remoto retornou HTTP ${res.status} para cena ${i + 1}`);
+          } catch (fetchErr) {
+            console.error(`[Remotion Assets] ⚠️ Erro fetch cena ${i + 1}:`, fetchErr.message);
           }
         }
         if (fs.existsSync(filePath)) {
           scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
           console.log(`[Remotion Assets] ✅ Cena ${i + 1} imagem local: /storage/${fileName}`);
+        } else {
+          scene.imageUrl = ''; // Remove URL quebrada para não travar o Remotion
         }
       } catch (err) {
         console.error(`[Remotion Assets] ⚠️ Falha ao baixar imagem da cena ${i + 1}:`, err.message);
