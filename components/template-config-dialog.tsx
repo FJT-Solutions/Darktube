@@ -100,7 +100,7 @@ const MODEL_PRICES: Record<string, ModelEntry> = {
   'gpt-image-1.5':               { label: 'GPT Image 1.5 (Standard)',      credits: 0, usd: 0.03,  type: 'image', billing: 'per_image', brand: 'OpenAI Direct API', detail: 'Equilibrado e versátil', isLocal: true },
   'gpt-image-2':                 { label: 'GPT Image 2 (Premium)',         credits: 0, usd: 0.04,  type: 'image', billing: 'per_image', brand: 'OpenAI Direct API', recommended: true, detail: 'Alta consistência estilística', isLocal: true },
   
-  'none-video':                  { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion/Hyperframes)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Remotion / Hyperframes (VPS)', recommended: true, detail: 'Economiza custo · Animação de imagens via código', isLocal: true },
+  'none-video':                  { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion Engine)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Remotion Engine (VPS)', recommended: true, detail: 'Economiza custo · Animação de imagens via código', isLocal: true },
   'gemini-veo-3.1-lite-1080p':   { label: 'Gemini Veo 3.1 Lite (1080p)',   credits: 0, usd: 0.08,  type: 'video', billing: 'per_second', brand: 'Google Direct API', detail: 'Geração econômica 1080p', isLocal: true },
   'gemini-veo-3.1-fast-1080p':   { label: 'Gemini Veo 3.1 Fast (1080p)',   credits: 0, usd: 0.12,  type: 'video', billing: 'per_second', brand: 'Google Direct API', recommended: true, detail: 'Geração veloz 1080p', isLocal: true },
   'gemini-veo-3.1-standard-1080p': { label: 'Gemini Veo 3.1 Standard (1080p)', credits: 0, usd: 0.40,  type: 'video', billing: 'per_second', brand: 'Google Direct API', detail: 'Cinematográfico padrão', isLocal: true },
@@ -127,7 +127,7 @@ const MODEL_PRICES: Record<string, ModelEntry> = {
   'grok-imagine':            { label: 'Grok Imagine',           credits: 12,   usd: 0.06,   type: 'image', billing: 'per_image', brand: 'xAI (Grok)' },
   'wan-2.7-image':           { label: 'Wan 2.7 Image',          credits: 6,    usd: 0.03,   type: 'image', billing: 'per_image', brand: 'Wan (Alibaba)' },
   // ── VIDEO ─────────────────────────────────────────────────────
-  'none-video-kie':              { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion/Hyperframes)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Remotion / Hyperframes (VPS)', recommended: true, detail: 'Economiza créditos · Animação de imagens via código' },
+  'none-video-kie':              { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion Engine)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Remotion Engine (VPS)', recommended: true, detail: 'Economiza créditos · Animação de imagens via código' },
   'seedance-2-fast-720p':        { label: 'Seedance-2 Fast 720p',         credits: 33,    usd: 0.165,  type: 'video', billing: 'per_video',  brand: 'ByteDance',         detail: 'Sem input vídeo' },
   'seedance-2-fast-720p-input':  { label: 'Seedance-2 Fast 720p +Input',  credits: 20,    usd: 0.10,   type: 'video', billing: 'per_second', brand: 'ByteDance',         detail: 'Com input vídeo' },
   'seedance-2-fast-480p':        { label: 'Seedance-2 Fast 480p',         credits: 15.5,  usd: 0.0775, type: 'video', billing: 'per_second', brand: 'ByteDance',         detail: 'Sem input vídeo' },
@@ -166,7 +166,7 @@ const MODEL_PRICES: Record<string, ModelEntry> = {
   // ── MANUAL (LLMS EXTERNAS) ───────────────────────────────────
   'manual-image':                { label: 'Geração Manual (Midjourney / ChatGPT / Leonardo AI)', credits: 0, usd: 0, type: 'image', billing: 'per_image', brand: 'Manual (LLM Externa)', detail: 'Geração por fora usando sua assinatura', isLocal: true },
   'manual-video':                { label: 'Geração Manual de Vídeo (Sora / Kling Web / Runway Web)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Manual (LLM Externa)', detail: 'Geração de vídeo por fora usando sua assinatura', isLocal: true },
-  'manual-none-video':           { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion/Hyperframes)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Manual (LLM Externa)', recommended: true, detail: 'Economiza tempo — Animação de imagens via código', isLocal: true },
+  'manual-none-video':           { label: 'Sem Gerador de Vídeo (Apenas Imagens + Remotion Engine)', credits: 0, usd: 0, type: 'video', billing: 'per_video', brand: 'Manual (LLM Externa)', recommended: true, detail: 'Economiza tempo — Animação de imagens via código', isLocal: true },
   'manual-voice':                { label: 'Geração Manual (ElevenLabs Web / Gravador)', credits: 0, usd: 0, type: 'voice', billing: 'per_1k_chars', brand: 'Manual (LLM Externa)', detail: 'Voz gerada por fora pelo usuário', isLocal: true },
   'manual-music':                { label: 'Geração Manual (Suno Web / Udio Web / Royalty Free)', credits: 0, usd: 0, type: 'music', billing: 'per_track', brand: 'Manual (LLM Externa)', detail: 'Música gerada por fora pelo usuário', isLocal: true },
 
@@ -724,7 +724,7 @@ export function TemplateConfigDialog({
                   <span className="text-base">🎞️</span> Estilo da Animação do Vídeo
                 </h4>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Defina o estilo das legendas e a movimentação visual. O sistema seleciona o motor ideal (Remotion / Hyperframes) automaticamente.
+                  Defina o estilo das legendas e a movimentação visual (Remotion Engine).
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div className="space-y-1.5">

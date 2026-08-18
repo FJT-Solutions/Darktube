@@ -16,9 +16,7 @@ export async function GET(
     if (rangeHeader) fetchHeaders['range'] = rangeHeader;
 
     const urls = [
-      `http://n8n-hyperframesservice-sruzdk:3002/storage/${filename}`,
       `http://n8n-remotionservice-ry6eh9:3001/storage/${filename}`,
-      `http://localhost:3002/storage/${filename}`,
       `http://localhost:3001/storage/${filename}`
     ];
 

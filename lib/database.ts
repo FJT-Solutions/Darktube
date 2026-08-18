@@ -415,8 +415,8 @@ export interface RemodelingTemplateEntity {
     post_days?: string[];
     created_at: string;
     updated_at: string;
-    // ── Dual-Engine fields ──
-    render_engine?: 'remotion' | 'hyperframes' | 'auto';
+    // ── Render Engine fields ──
+    render_engine?: 'remotion' | 'auto';
     caption_style?: 'pop' | 'karaoke' | 'subtitle';
     animation_mix?: 'varied' | 'kenburns' | 'zoom-punch';
     transition_style?: 'fade' | 'slide-up' | 'zoom-in';

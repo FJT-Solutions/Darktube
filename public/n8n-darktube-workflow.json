@@ -39,50 +39,6 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $json._selectorPrompt }}",
-        "messages": {
-          "messageValues": [
-            {
-              "message": "=Você é um Seletor de Engine de Renderização de Vídeo. Analise o conteúdo do vídeo e decida qual engine usar.\n\nRESPONDA APENAS COM JSON PURO, sem markdown, sem explicação:\n{\"engine\":\"hyperframes\",\"reason\":\"motivo em 1 frase\"}\nou\n{\"engine\":\"remotion\",\"reason\":\"motivo em 1 frase\"}\n\nUSE HYPERFRAMES quando:\n- Vídeo tem imagens de fundo com efeitos cinematográficos pesados\n- Pede transições visuais: glitch, light leak, whip pan, cinematic zoom\n- Estilo de legenda 'subtitle' (caixa de texto clássica)\n- Tema documental, informativo, histórico, filosófico\n- 4 ou mais cenas com imagens diferentes\n- Estética sombria, cinematográfica, épica\n\nUSE REMOTION quando:\n- Palavras explodem na tela (estilo viral TikTok/Reels)\n- Karaoke sincronizado palavra-a-palavra\n- Estilo emocional/motivacional com spring physics\n- 1 a 3 cenas com alto impacto por texto\n- Ritmo rápido baseado em música\n- Legenda 'pop' ou 'karaoke'"
-            }
-          ]
-        },
-        "batching": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.9,
-      "position": [
-        -1872,
-        4080
-      ],
-      "id": "2f0a497a-c0ce-47a9-ae8c-8b4d39d4eded",
-      "name": "AI Agent — Engine Selector"
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "={{ $json._directorPrompt.toJsonString() }}",
-        "messages": {
-          "messageValues": [
-            {
-              "message": "=Você é um Diretor de Cena especializado em HyperFrames (HTML + GSAP globalTimeline).\n\nCRIE DIREÇÃO CINEMATOGRÁFICA variada para cada cena. Nunca use o mesmo estilo para todas.\n\nANIMAÇÕES DE IMAGEM (animationStyle):\n- kenburns-right: zoom + pan suave para direita (clássico, documental)\n- kenburns-left: zoom + pan suave para esquerda (variedade)\n- zoom-punch: zoom dramático de entrada, depois sutil (impacto inicial)\n- parallax-up: câmera sobe enquanto cena avança (revelação, ascensão)\n- zoom-out: começa no detalhe e revela o todo (contexto, grandeza)\n\nTRANSIÇÕES DE ENTRADA (transitionIn):\n- fade: suave, elegante, universal\n- light-leak: luminosidade quente, nostálgico, cinematográfico\n- glitch: distorção digital, viral, tech, urgência\n- whip-pan: movimento lateral veloz, energético, esportivo\n- cinematic-zoom: escala + desfoque na entrada, dramático, épico\n- flash: corte brusco com flash branco, surpresa, impacto\n\nEFEITOS DE LEGENDA (captionEffect):\n- bounce: entrada com bounce e rotação (pop, energético)\n- clip-wipe: wipe da esquerda (elegante, editorial)\n- glitch-rgb: aberração cromática (tech, urgência)\n- editorial: tamanho contrastante com ênfase (profissional)\n\nEscolha baseado na emoção da cena. Varie sempre.\nResponda APENAS com JSON array (sem markdown, sem explicações)."
-            }
-          ]
-        },
-        "batching": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.9,
-      "position": [
-        -848,
-        4224
-      ],
-      "id": "b6eab98b-6ae8-4dde-b237-e1814d417aa7",
-      "name": "AI Agent — Director HyperFrames"
-    },
-    {
-      "parameters": {
-        "promptType": "define",
         "text": "={{ $json._directorPrompt.toJsonString() }}",
         "messages": {
           "messageValues": [
@@ -120,7 +76,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst format       = tpl.format       || 'vertical';\n\n// ── Normalização de Voz (mapeia categorias do Gemini para vozes Edge-TTS válidas) ──\nfunction getValidEdgeVoice(rawVoice, lang) {\n  if (!rawVoice) return lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural';\n  const str = String(rawVoice).trim();\n  const lower = str.toLowerCase();\n  if (lower.includes('neural') || lower.includes('pt-br-') || lower.includes('en-us-')) {\n    return str;\n  }\n  const map = {\n    'masculine_br': 'pt-BR-AntonioNeural',\n    'masculine-br': 'pt-BR-AntonioNeural',\n    'masculino_br': 'pt-BR-AntonioNeural',\n    'homem_br':     'pt-BR-AntonioNeural',\n    'narrator':     'pt-BR-AntonioNeural',\n    'feminine_br':  'pt-BR-FranciscaNeural',\n    'feminine-br':  'pt-BR-FranciscaNeural',\n    'feminino_br':  'pt-BR-FranciscaNeural',\n    'mulher_br':    'pt-BR-FranciscaNeural',\n    'masculine_en': 'en-US-ChristopherNeural',\n    'feminine_en':  'en-US-AvaNeural'\n  };\n  return map[lower] || (lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural');\n}\n\nconst voice = getValidEdgeVoice(tpl.voice || tpl.voice_model || body.voice, language);\n\n// Engine inicial (será sobrescrito pelo AI Engine Selector)\nconst renderEngine = 'pending_ai_selection';\n\nconst userMedia = tpl.user_media || tpl.uploaded_images || tpl.images || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    topic:          tpl.video_title    || '',\n    emotion:        seg.emotion        || 'neutral',\n    user_media:     userMedia,\n    tpl\n  }\n}));"
+        "jsCode": "// ── Normaliza payload e RETORNA CADA SEGMENTO COMO UM ITEM SEPARADO NO N8N ──\nconst body = $input.item.json.body || $input.item.json;\nconst tpl  = body.template || {};\n\nconst sessionId    = `dt_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;\nconst captionStyle = tpl.caption_style || 'pop';\nconst animationMix = tpl.animation_mix || 'varied';\nconst language     = tpl.language     || 'pt';\nconst format       = tpl.format       || 'vertical';\n\n// ── Normalização de Voz (mapeia categorias do Gemini para vozes Edge-TTS válidas) ──\nfunction getValidEdgeVoice(rawVoice, lang) {\n  if (!rawVoice) return lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural';\n  const str = String(rawVoice).trim();\n  const lower = str.toLowerCase();\n  if (lower.includes('neural') || lower.includes('pt-br-') || lower.includes('en-us-')) {\n    return str;\n  }\n  const map = {\n    'masculine_br': 'pt-BR-AntonioNeural',\n    'masculine-br': 'pt-BR-AntonioNeural',\n    'masculino_br': 'pt-BR-AntonioNeural',\n    'homem_br':     'pt-BR-AntonioNeural',\n    'narrator':     'pt-BR-AntonioNeural',\n    'feminine_br':  'pt-BR-FranciscaNeural',\n    'feminine-br':  'pt-BR-FranciscaNeural',\n    'feminino_br':  'pt-BR-FranciscaNeural',\n    'mulher_br':    'pt-BR-FranciscaNeural',\n    'masculine_en': 'en-US-ChristopherNeural',\n    'feminine_en':  'en-US-AvaNeural'\n  };\n  return map[lower] || (lang === 'en' ? 'en-US-ChristopherNeural' : 'pt-BR-FranciscaNeural');\n}\n\nconst voice = getValidEdgeVoice(tpl.voice || tpl.voice_model || body.voice, language);\n\n// Engine inicial (será sobrescrito pelo AI Engine Selector)\nconst renderEngine = 'remotion';\n\nconst userMedia = tpl.user_media || tpl.uploaded_images || tpl.images || [];\nconst hasUserMedia = Array.isArray(userMedia) && userMedia.length > 0;\n\nconst rawSegments = tpl.script_segments || body.script_segments || [];\nlet segments = rawSegments.length > 0 ? rawSegments : [{\n  index: 0,\n  voiceover: { text: tpl.video_title || 'Vídeo sem narração' },\n  visual_content: { image_prompt: tpl.video_title || 'Cena principal' }\n}];\n\nif (hasUserMedia && userMedia.length < segments.length) {\n  segments = segments.slice(0, userMedia.length);\n}\n\nreturn segments.map((seg, idx) => ({\n  json: {\n    ...seg,\n    index: seg.index !== undefined ? seg.index : idx,\n    session_id:     sessionId,\n    render_engine:  renderEngine,\n    caption_style:  captionStyle,\n    animation_mix:  animationMix,\n    language,\n    voice,\n    format,\n    has_music:      tpl.has_music      || false,\n    primary_color:  tpl.primary_color  || '#EAB308',\n    accent_color:   tpl.accent_color   || '#FFFFFF',\n    watermark_text: tpl.watermark_text || 'DarkTube AI',\n    topic:          tpl.video_title    || '',\n    emotion:        seg.emotion        || 'neutral',\n    user_media:     userMedia,\n    tpl\n  }\n}));"
       },
       "name": "Normalize + Auto Engine",
       "type": "n8n-nodes-base.code",
@@ -274,32 +230,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI ENGINE SELECTOR — Prepara o prompt para o AI Agent OpenAI\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\n\nconst topic        = $json.topic        || comp.topic        || 'não informado';\nconst emotion      = $json.emotion      || scenes[0]?.emotion || 'neutral';\nconst captionStyle = comp.captionStyle  || 'subtitle';\nconst sceneCount   = scenes.length;\nconst totalDur     = scenes.reduce((s, c) => s + (c.durationSeconds || 5), 0);\nconst hasImages    = scenes.some(s => s.imageUrl) ? 'sim' : 'não';\nconst firstWords   = scenes.slice(0, 3).map(s => s.captionText || '').join(' | ');\n\nconst userMessage = `Analise este vídeo e escolha o engine de renderização:\n\n- Tema: ${topic}\n- Emoção predominante: ${emotion}\n- Estilo de legenda configurado: ${captionStyle}\n- Número de cenas: ${sceneCount}\n- Duração total: ${totalDur.toFixed(1)}s\n- Tem imagens de fundo: ${hasImages}\n- Primeiras legendas: ${firstWords}\n\nResponda APENAS com JSON puro (sem markdown): {\"engine\":\"hyperframes\",\"reason\":\"motivo curto\"}`;\n\nreturn [{ json: { ...$json, _selectorPrompt: userMessage } }];"
-      },
-      "name": "Engine Selector — Prepara",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -2096,
-        4080
-      ],
-      "id": "fb866b00-37d5-40b4-9fe9-ea7da4635d2a"
-    },
-    {
-      "parameters": {
-        "jsCode": "// ══════════════════════════════════════════════════════════════\n// ENGINE SELECTOR — Extrai resultado do AI Agent\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '';\n\nlet parsed = { engine: 'hyperframes', reason: 'fallback padrão' };\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch {\n  parsed = {\n    engine: output.toLowerCase().includes('remotion') ? 'remotion' : 'hyperframes',\n    reason: 'detectado por keyword'\n  };\n}\n\nconst original = $('Engine Selector — Prepara').first().json;\nreturn [{\n  json: {\n    ...original,\n    render_engine: parsed.engine || 'hyperframes',\n    engineReason:  parsed.reason || '',\n  }\n}];"
-      },
-      "name": "Engine Selector — Extrai",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -1520,
-        4080
-      ],
-      "id": "d819488f-6a4b-4ec2-927d-7ff43c4e3654"
-    },
-    {
-      "parameters": {
         "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR REMOTION — Prepara prompt cinematográfico (v4)\n// Arsenal completo: imagens sempre presentes, todas as ferramentas\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\nconst emotion = $json.emotion || scenes[0]?.emotion || 'neutral';\nconst style   = comp.captionStyle || 'pop';\nconst topic   = $json.topic || '';\nconst total   = scenes.reduce((s,c) => s + (c.durationSeconds||0), 0).toFixed(1);\n\nconst userMessage = `TEMA: ${topic}\nEMOÇÃO GERAL: ${emotion}\nESTILO DE LEGENDA: ${style}\nDURAÇÃO TOTAL: ${total}s\nNÚMERO DE CENAS: ${scenes.length}\n\nCENAS PARA DIRIGIR:\n${JSON.stringify(scenes.map(s => ({\n  index: s.index,\n  captionText: s.captionText?.substring(0, 80),\n  durationSeconds: s.durationSeconds,\n  emotion: s.emotion,\n  hasImage: !!s.imageUrl\n})), null, 2)}`;\n\nreturn [{ json: { ...$json, _directorPrompt: userMessage } }];"
       },
       "name": "Director Remotion — Prepara",
@@ -313,82 +243,6 @@
     },
     {
       "parameters": {
-        "rules": {
-          "values": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "combinator": "and",
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.render_engine }}",
-                    "rightValue": "remotion",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "Remotion"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 1
-                },
-                "combinator": "and",
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.render_engine }}",
-                    "rightValue": "hyperframes",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "Hyperframes"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "name": "Route to Engine",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [
-        -1296,
-        4080
-      ],
-      "id": "5358ac77-737a-4d34-a886-9ab9f7aded0a"
-    },
-    {
-      "parameters": {
-        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR HYPERFRAMES — Prepara prompt cinematográfico COMPLETO (v3)\n// ══════════════════════════════════════════════════════════════\nconst comp   = $json.composition || {};\nconst scenes = comp.scenes || [];\nconst emotion = $json.emotion || scenes[0]?.emotion || 'neutral';\nconst style   = comp.captionStyle || 'subtitle';\nconst topic   = $json.topic || '';\nconst total   = scenes.reduce((s,c) => s + (c.durationSeconds||0), 0).toFixed(1);\n\nconst userMessage = `Você é o Diretor Cinematográfico do vídeo no HyperFrames (motor GSAP/HTML5). Seu trabalho é escolher a direção COMPLETA de cada cena para criar o vídeo mais impactante possível.\n\nTEMA: ${topic}\nEMOÇÃO GERAL: ${emotion}\nESTILO DE LEGENDA: ${style}\nDURAÇÃO TOTAL: ${total}s\nCENAS: ${scenes.length}\n\nCENAS PARA DIRIGIR:\n${JSON.stringify(scenes.map(s => ({\n  index: s.index,\n  captionText: s.captionText?.substring(0, 80),\n  durationSeconds: s.durationSeconds,\n  hasImage: !!s.imageUrl,\n  emotion: s.emotion\n})), null, 2)}\n\n═══════════════════════════════════════════\nARSENAL COMPLETO DO HYPERFRAMES (GSAP)\n═══════════════════════════════════════════\n\n▶ animationStyle (movimento de câmera e infográficos via GSAP):\n  \"chart\"          — Gráfico de linha vetorial animado (finanças, métricas)\n  \"bar-chart\"      — Gráfico de barras comparativas animadas\n  \"map\"            — Rota de mapa animada\n  \"zoom-punch\"     — snap rápido de entrada com ease.back, impacto forte\n  \"tilt-3d\"        — perspectiva 3D: rotationX + rotationY + perspective(1000px)\n  \"parallax-up\"    — sobe com profundidade (GSAP y negativo + scale)\n  \"parallax-down\"  — desce com profundidade\n  \"zoom-out\"       — saída de zoom suave\n  \"shake-impact\"   — tremor via GSAP keyframes (x oscilação)\n  \"spin-in\"        — rotação 360° de entrada\n  \"kenburns-right\" — pan + zoom suave para a direita\n  \"kenburns-left\"  — pan + zoom suave para a esquerda\n  \"kenburns-up\"    — pan + zoom suave para cima\n  \"kenburns-down\"  — pan + zoom suave para baixo\n\n▶ transitionIn (transição GSAP entre cenas):\n  \"fade\"           — opacity 0→1 suave\n  \"light-leak\"     — flash laranja/branco estilo lente anamórfica\n  \"whip-pan\"       — varredura horizontal rápida\n  \"cinematic-zoom\" — zoom dramático + fade\n  \"glitch\"         — distorção digital + clip-path\n  \"slide-up\"       — entra de baixo\n  \"slide-right\"    — entra da esquerda\n\n▶ captionEffect (efeito do texto/legenda via GSAP):\n  \"bounce\"         — texto entra com ease.back e bounce final\n  \"clip-wipe\"      — clip-path revela o texto da esquerda para direita\n  \"glitch-rgb\"     — glitch de canais RGB no texto\n  \"editorial\"      — texto limpo com fade e translateY suaves\n  \"typewriter\"     — letras aparecem sequencialmente\n  \"pop\"            — scale 0→1.2→1 com bounce\n\n▶ overlayEffect (efeito visual sobre a imagem):\n  \"light-leak\"     — gradiente laranja/dourado com opacity animada\n  \"glitch\"         — clip-path oscilante + color shift\n  \"flash\"          — flash branco em cortes\n  \"none\"           — sem overlay\n\n▶ intensity: 0.0 a 1.0 (intensidade geral de todos os efeitos GSAP)\n\n═══════════════════════════════════════════\nREGRAS DE DIREÇÃO\n═══════════════════════════════════════════\n1. VARIE os estilos entre cenas consecutivas\n2. Para URGÊNCIA/ENERGIA: zoom-punch, shake-impact, light-leak transition, intensity 0.9+\n3. Para REFLEXÃO/CALMA: kenburns, parallax, fade transition, editorial caption\n4. Para MISTÉRIO: tilt-3d, glitch transition, glitch-rgb caption\n5. Para CALL TO ACTION (última cena): spin-in + light-leak + pop caption + intensity 1.0\n6. captionEffect \"bounce\" é o padrão viral — use em cenas-chave emocionais\n\nResponda APENAS com JSON array puro (sem markdown, sem explicações):\n[{\n  \"index\": 0,\n  \"animationStyle\": \"zoom-punch\",\n  \"transitionIn\": \"light-leak\",\n  \"captionEffect\": \"bounce\",\n  \"overlayEffect\": \"light-leak\",\n  \"intensity\": 0.9\n}]`;\n\nreturn [{ json: { ...$json, _directorPrompt: userMessage } }];"
-      },
-      "name": "Director HyperFrames — Prepara",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -1072,
-        4224
-      ],
-      "id": "021846f5-2cd4-4aba-8fb4-92b7ce0001e9"
-    },
-    {
-      "parameters": {
         "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR REMOTION — Aplica direção ao payload (v3)\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '[]';\n\nlet directions = [];\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  const match = clean.match(/\\[.*\\]/s);\n  directions = JSON.parse(match ? match[0] : clean);\n} catch (e) {\n  console.log('Director Remotion parse error:', e.message);\n  directions = [];\n}\n\nconst original = $('Director Remotion — Prepara').first().json;\nconst comp = original.composition || {};\nconst scenes = comp.scenes || [];\n\nconst enriched = scenes.map(scene => {\n  const dir = directions.find(d => d.index === scene.index) || {};\n  return {\n    ...scene,\n    animationStyle:           dir.animationStyle           || scene.animationStyle || 'zoom-punch',\n    transitionIn:             dir.transitionIn             || scene.transitionIn   || 'fade',\n    transitionDurationFrames: dir.transitionDurationFrames || 18,\n    textEffect:               dir.textEffect               || 'split-bounce',\n    springPreset:             dir.springPreset             || 'bouncy',\n    overlayEffect:            dir.overlayEffect            || 'none',\n    colorGrading:             dir.colorGrading             || 'none',\n    intensity:                dir.intensity                ?? 0.8,\n    emotionColor:             dir.emotionColor             || null,\n  };\n});\n\nreturn [{\n  json: {\n    ...original,\n    composition: { ...comp, scenes: enriched },\n    _directorApplied: 'remotion',\n  }\n}];"
       },
       "name": "Director Remotion — Aplica",
@@ -399,39 +253,6 @@
         3936
       ],
       "id": "508287fe-0d40-4a58-bac9-5f3dccec35ab"
-    },
-    {
-      "parameters": {
-        "jsCode": "// ══════════════════════════════════════════════════════════════\n// AI DIRECTOR HYPERFRAMES — Aplica direção ao payload (v3)\n// ══════════════════════════════════════════════════════════════\nconst output = $json.output || $json.text || $json.message?.content || '[]';\n\nlet directions = [];\ntry {\n  const clean = output.replace(/```json/g, '').replace(/```/g, '').trim();\n  const match = clean.match(/\\[.*\\]/s);\n  directions = JSON.parse(match ? match[0] : clean);\n} catch (e) {\n  console.log('Director HyperFrames parse error:', e.message);\n  directions = [];\n}\n\nconst original = $('Director HyperFrames — Prepara').first().json;\nconst comp = original.composition || {};\nconst scenes = comp.scenes || [];\n\nconst enriched = scenes.map(scene => {\n  const dir = directions.find(d => d.index === scene.index) || {};\n  return {\n    ...scene,\n    animationStyle: dir.animationStyle || scene.animationStyle || 'kenburns-right',\n    transitionIn:   dir.transitionIn   || scene.transitionIn   || 'fade',\n    captionEffect:  dir.captionEffect  || 'bounce',\n    overlayEffect:  dir.overlayEffect  || 'none',\n    intensity:      dir.intensity      ?? 0.75,\n  };\n});\n\nreturn [{\n  json: {\n    ...original,\n    composition: { ...comp, scenes: enriched },\n    _directorApplied: 'hyperframes',\n  }\n}];"
-      },
-      "name": "Director HyperFrames — Aplica",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -496,
-        4224
-      ],
-      "id": "5e485865-41de-4463-bb57-b3d701478778"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "http://n8n-hyperframesservice-sruzdk:3002/render",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"historyId\":   {{ JSON.stringify($json.session_id) }},\n  \"templateId\":  {{ JSON.stringify($json.template_id) }},\n  \"callbackUrl\": {{ JSON.stringify($execution.resumeUrl) }},\n  \"payload\":     {{ JSON.stringify($json.composition) }}\n}",
-        "options": {
-          "allowUnauthorizedCerts": true
-        }
-      },
-      "name": "Hyperframes Render",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [
-        -272,
-        4224
-      ],
-      "id": "f36eec9f-eb1a-4689-9f28-71b6a5dc1f0f"
     },
     {
       "parameters": {
@@ -566,40 +387,8 @@
       "ai_languageModel": [
         [
           {
-            "node": "AI Agent — Engine Selector",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
             "node": "AI Agent — Director Remotion",
             "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "AI Agent — Director HyperFrames",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI Agent — Engine Selector": {
-      "main": [
-        [
-          {
-            "node": "Engine Selector — Extrai",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI Agent — Director HyperFrames": {
-      "main": [
-        [
-          {
-            "node": "Director HyperFrames — Aplica",
-            "type": "main",
             "index": 0
           }
         ]
@@ -705,39 +494,6 @@
         ]
       ]
     },
-    "Aggregate Scenes": {
-      "main": [
-        [
-          {
-            "node": "Engine Selector — Prepara",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Engine Selector — Prepara": {
-      "main": [
-        [
-          {
-            "node": "AI Agent — Engine Selector",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Engine Selector — Extrai": {
-      "main": [
-        [
-          {
-            "node": "Route to Engine",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Director Remotion — Prepara": {
       "main": [
         [
@@ -749,62 +505,11 @@
         ]
       ]
     },
-    "Route to Engine": {
-      "main": [
-        [
-          {
-            "node": "Director Remotion — Prepara",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Director HyperFrames — Prepara",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Director HyperFrames — Prepara": {
-      "main": [
-        [
-          {
-            "node": "AI Agent — Director HyperFrames",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Director Remotion — Aplica": {
       "main": [
         [
           {
             "node": "Remotion Render",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Director HyperFrames — Aplica": {
-      "main": [
-        [
-          {
-            "node": "Hyperframes Render",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Hyperframes Render": {
-      "main": [
-        [
-          {
-            "node": "Wait Render",
             "type": "main",
             "index": 0
           }
@@ -860,6 +565,17 @@
         [
           {
             "node": "Build Scene",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Scenes": {
+      "main": [
+        [
+          {
+            "node": "Director Remotion — Prepara",
             "type": "main",
             "index": 0
           }
