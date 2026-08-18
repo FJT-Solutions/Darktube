@@ -375,7 +375,6 @@ async function renderAsync(historyId, composition, callbackUrl) {
     const chromiumArgs = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
@@ -400,16 +399,16 @@ async function renderAsync(historyId, composition, callbackUrl) {
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
-        enableMultiProcessOnLinux: true,
+        enableMultiProcessOnLinux: false,
         gl: null,
       },
       timeoutInMilliseconds: 300_000,
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    // Concorrência estável: 6 workers para evitar esgotamento de memória/shm no Docker
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '6', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 6));
+    // Concorrência estável: 4 workers para equilíbrio perfeito entre CPU e throughput
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 4));
     console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 4096MB)`);
 
     let lastPercent = -1;
@@ -428,7 +427,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       chromiumOptions: {
         disableWebSecurity: true,
         args: chromiumArgs,
-        enableMultiProcessOnLinux: true,
+        enableMultiProcessOnLinux: false,
         gl: null,
       },
       onProgress: ({ progress, renderedDoneInFrames }) => {
