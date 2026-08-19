@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         historyId: historyRecord.id,
         templateId,
         payload,
-        callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://darktube.fjt.solutions'}/api/webhooks/production-complete`,
+        callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://darktube.fjt-solutions.com'}/api/webhooks/production-complete`,
       }),
     }).catch((err) => {
       console.error('Erro ao acionar container do Remotion no Dokploy:', err);

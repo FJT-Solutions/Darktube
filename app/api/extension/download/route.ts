@@ -14,6 +14,10 @@ export async function GET() {
         execSync(`powershell -Command "Compress-Archive -Path '${extensionDir}\\*' -DestinationPath '${zipPath}' -Force"`, {
           timeout: 10000,
         });
+      } else {
+        execSync(`cd "${extensionDir}" && zip -r "${zipPath}" . -q`, {
+          timeout: 10000,
+        });
       }
     } catch (e) {
       console.warn('[Extension Download] Recompression warning:', e);

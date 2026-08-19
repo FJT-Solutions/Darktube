@@ -389,11 +389,14 @@
           btn.style.position = 'absolute';
           btn.style.top = '16px';
           btn.style.right = '56px';
+          btn.style.zIndex = '9999999';
 
-          const computedPos = window.getComputedStyle(dialog).position;
-          if (computedPos === 'static') dialog.style.position = 'relative';
+          // Prefer appending to inner modal container (article or main card) so Instagram knows the click is INSIDE the modal
+          const innerCard = dialog.querySelector('article') || dialog.querySelector('div > div > div') || dialog;
+          const computedPos = window.getComputedStyle(innerCard).position;
+          if (computedPos === 'static') innerCard.style.position = 'relative';
 
-          dialog.appendChild(btn);
+          innerCard.appendChild(btn);
         }
         return;
       }
@@ -412,6 +415,7 @@
         btn.style.position = 'absolute';
         btn.style.top = '16px';
         btn.style.right = '16px';
+        btn.style.zIndex = '9999999';
 
         const computedPos = window.getComputedStyle(article).position;
         if (computedPos === 'static') article.style.position = 'relative';
@@ -424,15 +428,25 @@
   function createFloatingButton(onClick) {
     const btn = document.createElement('button');
     btn.className = 'dark-clips-inject-btn';
+    btn.setAttribute('type', 'button');
     btn.innerHTML = `
       <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       <span>Dark Clips</span>
     `;
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onClick();
+
+    // Intercept and stop ALL mouse/touch/pointer events in CAPTURE phase so Instagram backdrop handlers never see them
+    const blockerEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'focus'];
+    blockerEvents.forEach((evt) => {
+      btn.addEventListener(evt, (e) => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (evt === 'click') {
+          e.preventDefault();
+          onClick();
+        }
+      }, true);
     });
+
     return btn;
   }
 

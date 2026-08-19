@@ -157,21 +157,29 @@
         const video = container.querySelector('video');
         if (!video) return;
 
+        const onClick = () => {
+          const data = extractTikTokData(container);
+          sendToDarkClips(data, btn);
+        };
+
         const btn = document.createElement('button');
         btn.className = 'dark-clips-inject-btn';
-        btn.style.position = 'absolute';
-        btn.style.top = '20px';
-        btn.style.right = '20px';
+        btn.setAttribute('type', 'button');
         btn.innerHTML = `
           <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           <span>Dark Clips</span>
         `;
 
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const data = extractTikTokData(container);
-          sendToDarkClips(data, btn);
+        const blockerEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'];
+        blockerEvents.forEach((evt) => {
+          btn.addEventListener(evt, (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (evt === 'click') {
+              e.preventDefault();
+              onClick();
+            }
+          }, true);
         });
 
         const computedPos = window.getComputedStyle(container).position;

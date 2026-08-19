@@ -118,6 +118,7 @@ export default function DarkClipsPage() {
   const [layoutNameInput, setLayoutNameInput] = useState("");
   const [isDefaultLayoutInput, setIsDefaultLayoutInput] = useState(false);
   const [savingPreset, setSavingPreset] = useState(false);
+  const [isEditingLayout, setIsEditingLayout] = useState(false);
 
   // Manual URLs Input
   const [urlInput, setUrlInput] = useState("");
@@ -1109,6 +1110,26 @@ export default function DarkClipsPage() {
                   </Select>
                 </div>
 
+                {isEditingLayout ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingLayout(false)}
+                    className="h-8 text-xs font-semibold gap-1 text-zinc-300 hover:text-white"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Visualizar Resumo
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setIsEditingLayout(true)}
+                    className="h-8 text-xs font-bold gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                  >
+                    <Settings className="h-3.5 w-3.5" /> Editar Layout
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -1116,6 +1137,7 @@ export default function DarkClipsPage() {
                     setLayoutNameInput(`Novo Layout ${presets.length + 1}`);
                     setIsDefaultLayoutInput(false);
                     setIsSaveLayoutDialogOpen(true);
+                    setIsEditingLayout(true);
                   }}
                   className="h-8 text-xs font-semibold gap-1"
                 >
@@ -1164,10 +1186,262 @@ export default function DarkClipsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* ── Left Column: Granular Controls (7 cols) ── */}
+              {/* ── Left Column: Overview Mode OR Granular Controls (7 cols) ── */}
               <div className="lg:col-span-7 space-y-6">
-                {/* 1. Cabeçalho do Perfil */}
-                <Card
+                {!isEditingLayout && presets.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Active Layout Overview Card */}
+                    <Card className="border-border/80 shadow-md bg-card/90 overflow-hidden">
+                      <CardHeader className="p-5 pb-3 border-b border-border/40 bg-secondary/10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <CardTitle className="text-base font-black tracking-tight flex items-center gap-2">
+                                <span>🎨</span> {activePreset?.name || "Layout 9:16"}
+                              </CardTitle>
+                              {activePreset?.is_default && (
+                                <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 text-[10px] font-bold">
+                                  🌟 Padrão
+                                </Badge>
+                              )}
+                            </div>
+                            <CardDescription className="text-xs">
+                              Este layout está pronto e aplicado ao Canvas 9:16 ao lado.
+                            </CardDescription>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => setIsEditingLayout(true)}
+                            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs shadow-md shadow-primary/20 shrink-0"
+                          >
+                            <Settings className="h-3.5 w-3.5" /> Personalizar / Editar Layout
+                          </Button>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="p-5 space-y-4">
+                        {/* Quick Stats & Config Badges */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* Perfil & Autor */}
+                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5 text-primary" /> Cabeçalho do Perfil
+                              </span>
+                              <Badge variant={profileHeader.showHeader ? "default" : "secondary"} className="text-[10px] py-0">
+                                {profileHeader.showHeader ? "Ativo" : "Oculto"}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              {profileHeader.avatarUrl && (
+                                <img src={profileHeader.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-border" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold truncate">{profileHeader.name}</p>
+                                <p className="text-[11px] text-muted-foreground truncate">{profileHeader.handle}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Tipografia & Cores */}
+                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                                <Type className="h-3.5 w-3.5 text-primary" /> Textos & Cores
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: headline.primaryColor }} title="Cor Primária" />
+                                <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: headline.secondaryColor }} title="Cor Secundária" />
+                              </div>
+                            </div>
+                            <p className="text-xs font-medium text-foreground line-clamp-1 italic">
+                              "{headline.mainText || "Texto Principal"}"
+                            </p>
+                            <p className="text-[11px] text-muted-foreground line-clamp-1">
+                              Sub: "{headline.subText || "Subtexto"}"
+                            </p>
+                          </div>
+
+                          {/* Enquadramento & Fundo */}
+                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                                <Video className="h-3.5 w-3.5 text-primary" /> Enquadramento & Fundo
+                              </span>
+                              <Badge variant="outline" className="text-[10px] py-0 border-border">
+                                Pos Y: {videoPlacement.yOffset}%
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Fundo: <strong className="text-foreground">{background.type}</strong></span>
+                              <span>•</span>
+                              <span>Escala: <strong className="text-foreground">{videoPlacement.scale}%</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Marca d'Água & Setas */}
+                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                                <Sparkles className="h-3.5 w-3.5 text-primary" /> Elementos Interativos
+                              </span>
+                              <Badge variant={watermark.enabled ? "default" : "secondary"} className="text-[10px] py-0">
+                                {watermark.enabled ? "Marca D'água On" : "Sem Marca"}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Setas: <strong className="text-foreground">{arrowsList.filter(a => a.enabled !== false).length} ativa(s)</strong></span>
+                              <span>•</span>
+                              <span>Rodapé: <strong className="text-foreground">{footer.showFooter ? "Ativo" : "Oculto"}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Row */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+                          <Button
+                            onClick={() => setIsEditingLayout(true)}
+                            className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs h-9 gap-1.5 shadow-md shadow-primary/20"
+                          >
+                            <Settings className="h-3.5 w-3.5" /> Editar Configurações deste Layout
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => handleProceedToCreation()}
+                            className="w-full sm:flex-1 font-bold text-xs h-9 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                          >
+                            <Video className="h-3.5 w-3.5" /> Produzir Clipes com este Layout 🎬
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Saved Layouts Quick Gallery */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5 text-primary" /> Seus Layouts Salvos ({presets.length})
+                        </h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setLayoutNameInput(`Novo Layout ${presets.length + 1}`);
+                            setIsDefaultLayoutInput(false);
+                            setIsSaveLayoutDialogOpen(true);
+                            setIsEditingLayout(true);
+                          }}
+                          className="h-7 text-[11px] font-bold gap-1 text-primary hover:bg-primary/10"
+                        >
+                          <Plus className="h-3 w-3" /> Criar Novo Layout do Zero
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {presets.map((p) => {
+                          const isSelected = activePreset?.id === p.id;
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => loadPresetIntoModeler(p)}
+                              className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 ${
+                                isSelected
+                                  ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/40"
+                                  : "border-border/60 bg-card hover:border-border hover:bg-secondary/20"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold text-foreground truncate max-w-[140px]">{p.name}</span>
+                                  {p.is_default && (
+                                    <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-400 bg-amber-500/10 py-0">
+                                      Padrão
+                                    </Badge>
+                                  )}
+                                </div>
+                                {isSelected && (
+                                  <Badge variant="default" className="text-[9px] py-0 bg-primary text-primary-foreground font-bold">
+                                    Ativo
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <p className="text-[11px] text-muted-foreground truncate mb-2.5">
+                                @{p.profile_header?.handle || "darkclips"} • {p.headline_style?.primary_color || "#FACC15"}
+                              </p>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[11px]">
+                                <span className="text-muted-foreground">Clique para selecionar</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      loadPresetIntoModeler(p);
+                                      setIsEditingLayout(true);
+                                    }}
+                                    className="text-primary hover:underline font-semibold flex items-center gap-0.5"
+                                  >
+                                    <Settings className="h-3 w-3" /> Editar
+                                  </button>
+                                  {!p.is_default && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeletePreset(p.id);
+                                      }}
+                                      className="text-red-400 hover:text-red-300 ml-1.5"
+                                      title="Excluir layout"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Edit Mode Top Banner */}
+                    <div className="p-3.5 rounded-xl border border-primary/40 bg-primary/10 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-primary text-primary-foreground font-bold text-[10px]">
+                          🛠️ MODO DE EDIÇÃO
+                        </Badge>
+                        <span className="text-xs font-bold text-foreground">
+                          Editando: {activePreset?.name || "Novo Layout"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {presets.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setIsEditingLayout(false)}
+                            className="h-7 text-xs font-semibold"
+                          >
+                            ✓ Concluir Edição
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => handleQuickSavePreset()}
+                          disabled={savingPreset}
+                          className="h-7 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                        >
+                          {savingPreset ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          Salvar 💾
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* 1. Cabeçalho do Perfil */}
+                    <Card
                   id="card-header"
                   className={`transition-all duration-300 ${
                     highlightedCard === "card-header" ? "ring-2 ring-primary shadow-lg shadow-primary/20" : ""
@@ -3121,8 +3395,9 @@ export default function DarkClipsPage() {
                     </Button>
                   </div>
                 </div>
-
               </div>
+            )}
+          </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
               <div className="lg:col-span-5 lg:sticky lg:top-6 self-start space-y-2">

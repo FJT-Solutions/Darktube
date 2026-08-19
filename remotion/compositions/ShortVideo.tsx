@@ -685,7 +685,7 @@ const CaptionLayer: React.FC<{
             fontSize={fontSize + 20}
             frame={wordFrame}
           />
-        ) : (textEffect === 'kinetic-pop' || textEffect === 'kinetic') ? (
+        ) : (textEffect === 'kinetic-pop' || (textEffect as string) === 'kinetic') ? (
           <KineticPopText
             text={currentWord.word}
             primaryColor={primaryColor}

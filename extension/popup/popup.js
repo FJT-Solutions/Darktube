@@ -28,10 +28,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentUser = null;
   let currentToken = null;
 
-  const DARKTUBE_BASE_URL = 'https://darktube.fjt.solutions';
+  const DARKTUBE_BASE_URL = 'https://darktube.fjt-solutions.com';
 
   // 1. Load initial auth state
-  chrome.storage.local.get(['darktube_user', 'darktube_token'], (res) => {
+  chrome.storage.local.get(['darktube_user', 'darktube_token', 'darktube_api_url'], (res) => {
+    if (!res.darktube_api_url || res.darktube_api_url.includes('fjt.solutions')) {
+      chrome.storage.local.set({ darktube_api_url: DARKTUBE_BASE_URL });
+    }
     if (res.darktube_user && res.darktube_token) {
       currentUser = res.darktube_user;
       currentToken = res.darktube_token;

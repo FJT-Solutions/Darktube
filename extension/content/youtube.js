@@ -155,21 +155,25 @@
         if (!actionsBar) return;
 
         const btn = document.createElement('button');
+        btn.setAttribute('type', 'button');
         btn.className = 'dark-clips-inject-btn';
-        btn.style.margin = '8px 0';
         btn.innerHTML = `
           <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
           <span>Dark Clips</span>
         `;
 
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const data = extractShortsData(container);
-          sendToDarkClips(data, btn);
-        });
-
-        actionsBar.prepend(btn);
+        const blockerEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'];
+        blockerEvents.forEach((evt) => {
+          btn.addEventListener(evt, (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            if (evt === 'click') {
+              e.preventDefault();
+              const data = extractShortsData(container);
+              if (data) sendToDarkClips(data, btn);
+            }
+          }, true);
+        }); actionsBar.prepend(btn);
       });
     } catch {}
   }
