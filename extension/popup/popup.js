@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       item.innerHTML = `
         <div class="video-item-left">
-          ${post.thumbnailUrl ? `<img src="${post.thumbnailUrl}" class="video-thumb" alt="Thumb" onerror="this.style.display='none'" />` : '<div class="video-thumb"></div>'}
+          ${post.thumbnailUrl ? `<img src="${post.thumbnailUrl}" class="video-thumb" referrerpolicy="no-referrer" alt="" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><div class="video-thumb fallback-thumb" style="display:none; align-items:center; justify-content:center; background:#181820; font-size:16px;">🎬</div>` : '<div class="video-thumb fallback-thumb" style="display:flex; align-items:center; justify-content:center; background:#181820; font-size:16px;">🎬</div>'}
           <div class="video-meta">
             <div class="video-top-row">
               <span class="video-author">${post.authorHandle || post.authorName || 'Criador'}</span>

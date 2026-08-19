@@ -122,10 +122,17 @@ export async function POST(req: Request) {
               const fileBuffer = fs.readFileSync(sanitizedPath);
               const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
               await uploadThumbnail(fileBuffer, filename);
-              videoUrl = `/api/storage/${filename}`;
+              if (dl.framePaths && dl.framePaths.length > 0 && fs.existsSync(dl.framePaths[0])) {
+                const frameBuf = fs.readFileSync(dl.framePaths[0]);
+                const thumbName = `thumb_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                thumbUrl = await uploadThumbnail(frameBuf, thumbName);
+              }
               duration = dl.duration || duration;
             }
           }
+
+          const rawHandle = item.authorHandle || item.author_handle || '@creator';
+          const author_handle = rawHandle.startsWith('@') ? rawHandle.replace(/^@+/, '@') : `@${rawHandle}`;
 
           const saved = await saveDarkClip({
             user_id: targetUserId,
@@ -135,7 +142,7 @@ export async function POST(req: Request) {
             thumbnail_url: thumbUrl,
             duration,
             author_name: item.authorName || item.author_name || 'Viral Creator',
-            author_handle: item.authorHandle || item.author_handle || '@creator',
+            author_handle,
             author_avatar: item.authorAvatar || item.author_avatar || '',
             original_caption: item.originalCaption || item.caption || '',
             original_metrics: item.metrics || item.original_metrics || {},

@@ -166,14 +166,29 @@
       let likes = 0;
       let comments = 0;
 
-      const likesEl = container.querySelector('section button[type="button"] span, span[class*="html-span"]');
+      const likesEl = container.querySelector('a[href*="/liked_by/"] span, a[href*="liked_by"], section button[type="button"] span, span[class*="html-span"]');
       if (likesEl) {
         likes = parseMetricNumber(likesEl.textContent);
       }
+      if (!likes) {
+        const allSpans = Array.from(container.querySelectorAll('span, a, div'));
+        for (const sp of allSpans) {
+          const txt = sp.textContent || '';
+          if ((txt.includes('curtida') || txt.includes('curtidas') || txt.includes('like') || txt.includes('likes')) && /\d/.test(txt)) {
+            likes = parseMetricNumber(txt);
+            if (likes > 0) break;
+          }
+        }
+      }
 
-      const commentsEls = container.querySelectorAll('ul li');
+      const commentsEls = container.querySelectorAll('ul li, div[role="button"][tabindex="0"]');
       if (commentsEls.length > 1) {
         comments = commentsEls.length - 1;
+      }
+      const commentCountEl = container.querySelector('a[href*="/comments/"] span, span:contains("comentário")');
+      if (commentCountEl) {
+        const parsed = parseMetricNumber(commentCountEl.textContent);
+        if (parsed > comments) comments = parsed;
       }
 
       const isVideo = !!video;
@@ -438,10 +453,10 @@
     const blockerEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'focus'];
     blockerEvents.forEach((evt) => {
       btn.addEventListener(evt, (e) => {
+        e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         if (evt === 'click') {
-          e.preventDefault();
           onClick();
         }
       }, true);

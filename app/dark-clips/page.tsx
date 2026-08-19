@@ -1186,144 +1186,23 @@ export default function DarkClipsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* ── Left Column: Overview Mode OR Granular Controls (7 cols) ── */}
+              {/* ── Left Column: Compact Layouts Gallery OR Granular Controls (7 cols) ── */}
               <div className="lg:col-span-7 space-y-6">
                 {!isEditingLayout && presets.length > 0 ? (
-                  <div className="space-y-6">
-                    {/* Active Layout Overview Card */}
-                    <Card className="border-border/80 shadow-md bg-card/90 overflow-hidden">
-                      <CardHeader className="p-5 pb-3 border-b border-border/40 bg-secondary/10">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <CardTitle className="text-base font-black tracking-tight flex items-center gap-2">
-                                <span>🎨</span> {activePreset?.name || "Layout 9:16"}
-                              </CardTitle>
-                              {activePreset?.is_default && (
-                                <Badge variant="outline" className="border-amber-500/40 text-amber-400 bg-amber-500/10 text-[10px] font-bold">
-                                  🌟 Padrão
-                                </Badge>
-                              )}
-                            </div>
-                            <CardDescription className="text-xs">
-                              Este layout está pronto e aplicado ao Canvas 9:16 ao lado.
-                            </CardDescription>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => setIsEditingLayout(true)}
-                            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs shadow-md shadow-primary/20 shrink-0"
-                          >
-                            <Settings className="h-3.5 w-3.5" /> Personalizar / Editar Layout
-                          </Button>
-                        </div>
-                      </CardHeader>
+                  <div className="space-y-4">
+                    {/* Header bar for layouts */}
+                    <div className="p-4 rounded-xl bg-card border border-border/70 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-black tracking-tight flex items-center gap-2">
+                          <Layers className="h-4 w-4 text-primary" /> Seus Modelos de Layout ({presets.length})
+                        </h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Clique em um modelo para carregar no Canvas ou editar suas configurações.
+                        </p>
+                      </div>
 
-                      <CardContent className="p-5 space-y-4">
-                        {/* Quick Stats & Config Badges */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {/* Perfil & Autor */}
-                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                <Users className="h-3.5 w-3.5 text-primary" /> Cabeçalho do Perfil
-                              </span>
-                              <Badge variant={profileHeader.showHeader ? "default" : "secondary"} className="text-[10px] py-0">
-                                {profileHeader.showHeader ? "Ativo" : "Oculto"}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2.5">
-                              {profileHeader.avatarUrl && (
-                                <img src={profileHeader.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-border" />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold truncate">{profileHeader.name}</p>
-                                <p className="text-[11px] text-muted-foreground truncate">{profileHeader.handle}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Tipografia & Cores */}
-                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                <Type className="h-3.5 w-3.5 text-primary" /> Textos & Cores
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: headline.primaryColor }} title="Cor Primária" />
-                                <span className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: headline.secondaryColor }} title="Cor Secundária" />
-                              </div>
-                            </div>
-                            <p className="text-xs font-medium text-foreground line-clamp-1 italic">
-                              "{headline.mainText || "Texto Principal"}"
-                            </p>
-                            <p className="text-[11px] text-muted-foreground line-clamp-1">
-                              Sub: "{headline.subText || "Subtexto"}"
-                            </p>
-                          </div>
-
-                          {/* Enquadramento & Fundo */}
-                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                <Video className="h-3.5 w-3.5 text-primary" /> Enquadramento & Fundo
-                              </span>
-                              <Badge variant="outline" className="text-[10px] py-0 border-border">
-                                Pos Y: {videoPlacement.yOffset}%
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>Fundo: <strong className="text-foreground">{background.type}</strong></span>
-                              <span>•</span>
-                              <span>Escala: <strong className="text-foreground">{videoPlacement.scale}%</strong></span>
-                            </div>
-                          </div>
-
-                          {/* Marca d'Água & Setas */}
-                          <div className="p-3 rounded-xl border border-border/50 bg-secondary/20 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5 text-primary" /> Elementos Interativos
-                              </span>
-                              <Badge variant={watermark.enabled ? "default" : "secondary"} className="text-[10px] py-0">
-                                {watermark.enabled ? "Marca D'água On" : "Sem Marca"}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span>Setas: <strong className="text-foreground">{arrowsList.filter(a => a.enabled !== false).length} ativa(s)</strong></span>
-                              <span>•</span>
-                              <span>Rodapé: <strong className="text-foreground">{footer.showFooter ? "Ativo" : "Oculto"}</strong></span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action Row */}
-                        <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
-                          <Button
-                            onClick={() => setIsEditingLayout(true)}
-                            className="w-full sm:flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs h-9 gap-1.5 shadow-md shadow-primary/20"
-                          >
-                            <Settings className="h-3.5 w-3.5" /> Editar Configurações deste Layout
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleProceedToCreation()}
-                            className="w-full sm:flex-1 font-bold text-xs h-9 gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
-                          >
-                            <Video className="h-3.5 w-3.5" /> Produzir Clipes com este Layout 🎬
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Saved Layouts Quick Gallery */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                          <Layers className="h-3.5 w-3.5 text-primary" /> Seus Layouts Salvos ({presets.length})
-                        </h3>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <Button
-                          variant="ghost"
                           size="sm"
                           onClick={() => {
                             setLayoutNameInput(`Novo Layout ${presets.length + 1}`);
@@ -1331,78 +1210,115 @@ export default function DarkClipsPage() {
                             setIsSaveLayoutDialogOpen(true);
                             setIsEditingLayout(true);
                           }}
-                          className="h-7 text-[11px] font-bold gap-1 text-primary hover:bg-primary/10"
+                          className="text-xs font-bold gap-1.5 h-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm flex-1 sm:flex-none"
                         >
-                          <Plus className="h-3 w-3" /> Criar Novo Layout do Zero
+                          <Plus className="h-3.5 w-3.5" /> Novo Layout
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleProceedToCreation()}
+                          className="text-xs font-bold gap-1.5 h-8 border-primary/30 text-primary hover:bg-primary/10 flex-1 sm:flex-none"
+                        >
+                          <Video className="h-3.5 w-3.5" /> Ir para Criação 🎬
                         </Button>
                       </div>
+                    </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {presets.map((p) => {
-                          const isSelected = activePreset?.id === p.id;
-                          return (
-                            <div
-                              key={p.id}
-                              onClick={() => loadPresetIntoModeler(p)}
-                              className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 ${
-                                isSelected
-                                  ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-1 ring-primary/40"
-                                  : "border-border/60 bg-card hover:border-border hover:bg-secondary/20"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
+                    {/* Compact Layout Cards Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {presets.map((p) => {
+                        const isSelected = activePreset?.id === p.id;
+                        const cleanHandle = (p.profile_header?.handle || "@darkclips").replace(/^@+/, "@");
+                        const primaryColor = p.headline_style?.primary_color || "#FACC15";
+
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => loadPresetIntoModeler(p)}
+                            className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 relative flex flex-col justify-between ${
+                              isSelected
+                                ? "border-primary bg-primary/5 shadow-md shadow-primary/10 ring-2 ring-primary"
+                                : "border-border/70 bg-card hover:border-border hover:bg-secondary/20"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-bold text-foreground truncate max-w-[140px]">{p.name}</span>
+                                  <span className="font-bold text-sm text-foreground truncate max-w-[150px]">{p.name}</span>
                                   {p.is_default && (
-                                    <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-400 bg-amber-500/10 py-0">
-                                      Padrão
+                                    <Badge variant="outline" className="text-[9px] border-amber-500/40 text-amber-400 bg-amber-500/10 py-0 font-bold">
+                                      🌟 Padrão
                                     </Badge>
                                   )}
                                 </div>
-                                {isSelected && (
-                                  <Badge variant="default" className="text-[9px] py-0 bg-primary text-primary-foreground font-bold">
-                                    Ativo
+                                {isSelected ? (
+                                  <Badge className="text-[9px] py-0 bg-primary text-primary-foreground font-bold">
+                                    ✓ Ativo
                                   </Badge>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">Clique p/ carregar</span>
                                 )}
                               </div>
 
-                              <p className="text-[11px] text-muted-foreground truncate mb-2.5">
-                                @{p.profile_header?.handle || "darkclips"} • {p.headline_style?.primary_color || "#FACC15"}
-                              </p>
-
-                              <div className="flex items-center justify-between pt-2 border-t border-border/40 text-[11px]">
-                                <span className="text-muted-foreground">Clique para selecionar</span>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      loadPresetIntoModeler(p);
-                                      setIsEditingLayout(true);
-                                    }}
-                                    className="text-primary hover:underline font-semibold flex items-center gap-0.5"
-                                  >
-                                    <Settings className="h-3 w-3" /> Editar
-                                  </button>
-                                  {!p.is_default && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeletePreset(p.id);
-                                      }}
-                                      className="text-red-400 hover:text-red-300 ml-1.5"
-                                      title="Excluir layout"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </button>
-                                  )}
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                                <span className="text-primary font-medium">{cleanHandle}</span>
+                                <span>•</span>
+                                <div className="flex items-center gap-1">
+                                  <span className="w-2.5 h-2.5 rounded-full border border-white/20" style={{ backgroundColor: primaryColor }} />
+                                  <span className="font-mono text-[11px]">{primaryColor}</span>
                                 </div>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+
+                            <div className="flex items-center justify-between pt-2.5 border-t border-border/40 gap-2">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  loadPresetIntoModeler(p);
+                                  setIsEditingLayout(true);
+                                }}
+                                className="text-xs h-7 px-3 font-bold gap-1 bg-secondary hover:bg-secondary/80 text-foreground border border-border/60"
+                              >
+                                <Settings className="h-3 w-3 text-primary" /> Abrir / Editar Layout
+                              </Button>
+
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLayoutNameInput(`${p.name} (Cópia)`);
+                                    setIsDefaultLayoutInput(false);
+                                    setIsSaveLayoutDialogOpen(true);
+                                  }}
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                  title="Duplicar este layout"
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                                {!p.is_default && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeletePreset(p.id);
+                                    }}
+                                    className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-950/20"
+                                    title="Excluir este layout"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -1414,7 +1330,7 @@ export default function DarkClipsPage() {
                           🛠️ MODO DE EDIÇÃO
                         </Badge>
                         <span className="text-xs font-bold text-foreground">
-                          Editando: {activePreset?.name || "Novo Layout"}
+                          Personalizando: {activePreset?.name || "Novo Layout"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -3403,10 +3319,55 @@ export default function DarkClipsPage() {
               <div className="lg:col-span-5 lg:sticky lg:top-6 self-start space-y-2">
                 <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col">
                   <CardHeader className="p-3 px-4 border-b border-border/40 shrink-0">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <CardTitle className="text-sm font-bold flex items-center gap-2">
                         <Eye className="h-4 w-4 text-primary" /> Visualização ao Vivo (Canvas 9:16)
                       </CardTitle>
+
+                      {/* Platform Overlay Switcher Pills */}
+                      <div className="flex items-center gap-1 bg-secondary/40 p-0.5 rounded-lg border border-border/60">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode("clean")}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                            previewMode === "clean" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                          title="Visualização limpa sem sobreposições"
+                        >
+                          📱 Limpo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode("tiktok")}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                            previewMode === "tiktok" ? "bg-[#FE2C55] text-white shadow-sm font-black" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                          title="Sobrepor interface e botões nativos do TikTok (Seguir, Curtir, etc)"
+                        >
+                          🎵 TikTok
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode("reels")}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                            previewMode === "reels" ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm font-black" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                          title="Sobrepor interface e botões nativos do Instagram Reels"
+                        >
+                          📸 Reels
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewMode("shorts")}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${
+                            previewMode === "shorts" ? "bg-red-600 text-white shadow-sm font-black" : "text-muted-foreground hover:text-foreground"
+                          }`}
+                          title="Sobrepor interface e botões nativos do YouTube Shorts"
+                        >
+                          🔴 Shorts
+                        </button>
+                      </div>
+
                       <div className="flex items-center gap-1.5">
                         <Button
                           type="button"
@@ -3698,16 +3659,26 @@ export default function DarkClipsPage() {
                             <div>
                               <div 
                                 onClick={() => setSelectedClip(clip)}
-                                className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-black relative mb-2 cursor-pointer group-hover:opacity-95"
+                                className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-zinc-900 border border-border/40 relative mb-2 cursor-pointer group-hover:opacity-95 flex items-center justify-center"
                               >
                                 {clip.thumbnail_url ? (
-                                  <img src={clip.thumbnail_url} alt="Thumb" className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                    <Play className="h-6 w-6" />
-                                  </div>
-                                )}
-                                <Badge className="absolute bottom-1 right-1 text-[9px] px-1 py-0 bg-black/70">
+                                  <img 
+                                    src={clip.thumbnail_url} 
+                                    alt={clip.author_handle || "Thumb"} 
+                                    referrerPolicy="no-referrer"
+                                    className="w-full h-full object-cover" 
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLElement).style.display = 'none';
+                                    }}
+                                  />
+                                ) : null}
+                                <div className="absolute inset-0 -z-1 flex flex-col items-center justify-center text-muted-foreground p-2 text-center bg-gradient-to-b from-zinc-800 to-zinc-950">
+                                  <Play className="h-6 w-6 text-primary/80 mb-1" />
+                                  <span className="text-[9px] font-bold text-zinc-400 truncate max-w-full">
+                                    {clip.author_handle || "Vídeo"}
+                                  </span>
+                                </div>
+                                <Badge className="absolute bottom-1 right-1 text-[9px] px-1 py-0 bg-black/80 font-mono">
                                   {clip.duration}s
                                 </Badge>
                                 <Badge 
