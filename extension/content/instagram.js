@@ -135,34 +135,54 @@
   function extractModalPostData(container) {
     try {
       const video = container.querySelector('video');
-      const currentUrl = window.location.href;
       const profileInfo = getPageProfileInfo();
 
+      // 1. Resolve Post/Reel URL accurately
+      let resolvedUrl = '';
+      const postLink = container.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], a[href*="/tv/"]');
+      if (postLink) {
+        const rawHref = postLink.getAttribute('href') || postLink.href || '';
+        const cleanPath = rawHref.split('?')[0].split('#')[0];
+        resolvedUrl = cleanPath.startsWith('http') ? cleanPath : `https://www.instagram.com${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+      }
+
+      if (!resolvedUrl) {
+        const currentUrl = window.location.href.split('?')[0].split('#')[0];
+        if (currentUrl.includes('/p/') || currentUrl.includes('/reel/') || currentUrl.includes('/reels/')) {
+          resolvedUrl = currentUrl;
+        } else {
+          resolvedUrl = currentUrl;
+        }
+      }
+
+      // 2. Resolve Author Info
       let authorHandle = profileInfo.handle;
       let authorName = profileInfo.name;
       let authorAvatar = profileInfo.avatar;
 
-      const authorLink = container.querySelector('header a, a[role="link"][href^="/"]');
+      const authorLink = container.querySelector('header a, a[role="link"][href^="/"], div[role="dialog"] a[href^="/"]');
       if (authorLink) {
         const href = authorLink.getAttribute('href') || '';
         const handle = href.replace(/\//g, '').split('?')[0];
-        if (handle && !['explore', 'reels', 'direct', 'stories'].includes(handle)) {
-          authorHandle = `@${handle}`;
+        if (handle && !['explore', 'reels', 'direct', 'stories', 'home', 'tags'].includes(handle)) {
+          authorHandle = `@${handle.replace(/^@+/, '')}`;
           authorName = authorLink.textContent?.trim() || handle;
         }
       }
 
-      const avatarImg = container.querySelector('header img, img[alt*="perfil"], img[alt*="profile"]');
+      const avatarImg = container.querySelector('header img, img[alt*="perfil"], img[alt*="profile"], img[alt*="Avatar"]');
       if (avatarImg) {
         authorAvatar = avatarImg.getAttribute('src') || '';
       }
 
+      // 3. Resolve Caption
       let caption = '';
-      const captionEl = container.querySelector('h1, span._ap3a, div[class*="caption"], div[class*="Description"]');
+      const captionEl = container.querySelector('h1, span._ap3a, div[class*="caption"], div[class*="Description"], span[class*="_a9zs"]');
       if (captionEl) {
         caption = captionEl.textContent?.trim() || '';
       }
 
+      // 4. Resolve Metrics (Likes / Comments)
       let likes = 0;
       let comments = 0;
 
@@ -191,7 +211,7 @@
         if (parsed > comments) comments = parsed;
       }
 
-      const isVideo = !!video;
+      const isVideo = !!video || resolvedUrl.includes('/reel/') || resolvedUrl.includes('/reels/');
       const isCarousel = !!container.querySelector('div[aria-label*="carrossel"], div[aria-label*="carousel"], ul[class*="carousel"]');
 
       let thumbUrl = '';
@@ -199,13 +219,13 @@
         thumbUrl = video.getAttribute('poster') || '';
       }
       if (!thumbUrl) {
-        const img = container.querySelector('div[role="dialog"] img, article img');
+        const img = container.querySelector('div[role="dialog"] img, article img, img[style*="object-fit"]');
         thumbUrl = img?.currentSrc || img?.src || '';
       }
 
       return {
-        url: currentUrl,
-        videoUrl: video ? (video.src || video.querySelector('source')?.src || currentUrl) : currentUrl,
+        url: resolvedUrl,
+        videoUrl: video ? (video.src || video.querySelector('source')?.src || resolvedUrl) : resolvedUrl,
         thumbnailUrl: thumbUrl,
         duration: video ? Math.round(video.duration || 15) : 15,
         authorName,
@@ -394,50 +414,94 @@
 
   function injectButtons() {
     try {
-      const dialog = document.querySelector('div[role="dialog"]');
-      if (dialog) {
-        if (!dialog.querySelector('.dark-clips-inject-btn')) {
-          const btn = createFloatingButton(() => {
-            const data = extractModalPostData(dialog);
-            if (data) sendToDarkClips(data, btn);
-          });
-          btn.style.position = 'absolute';
-          btn.style.top = '16px';
-          btn.style.right = '56px';
-          btn.style.zIndex = '9999999';
+      // 1. EXPLORE / MODAL DIALOGS (div[role="dialog"])
+      const dialogs = document.querySelectorAll('div[role="dialog"]');
+      dialogs.forEach((dialog) => {
+        if (dialog.querySelector('.dark-clips-inject-btn')) return;
 
-          // Prefer appending to inner modal container (article or main card) so Instagram knows the click is INSIDE the modal
-          const innerCard = dialog.querySelector('article') || dialog.querySelector('div > div > div') || dialog;
-          const computedPos = window.getComputedStyle(innerCard).position;
-          if (computedPos === 'static') innerCard.style.position = 'relative';
+        const video = dialog.querySelector('video');
+        
+        // Target the video player frame (left side) or article container
+        const targetFrame = video?.closest('div[style*="aspect-ratio"]') || 
+                            video?.parentElement?.parentElement || 
+                            video?.parentElement || 
+                            dialog.querySelector('article > div:first-child') || 
+                            dialog.querySelector('article') || 
+                            dialog;
 
-          innerCard.appendChild(btn);
+        if (window.getComputedStyle(targetFrame).position === 'static') {
+          targetFrame.style.position = 'relative';
         }
-        return;
-      }
 
+        const btn = createFloatingButton(() => {
+          const data = extractModalPostData(dialog);
+          if (data) sendToDarkClips(data, btn);
+        });
+
+        btn.style.position = 'absolute';
+        btn.style.top = '14px';
+        btn.style.right = '14px';
+        btn.style.zIndex = '9999999';
+
+        targetFrame.appendChild(btn);
+      });
+
+      // 2. REELS, FEED VIDEOS & ALL ACTIVE VIDEOS
+      const allVideos = document.querySelectorAll('video');
+      allVideos.forEach((video) => {
+        const container = video.closest('article') || 
+                          video.closest('div[role="dialog"]') || 
+                          video.closest('div[data-pressable-container="true"]') || 
+                          video.closest('div[style*="aspect-ratio"]') || 
+                          video.parentElement?.parentElement || 
+                          video.parentElement;
+
+        if (!container || container.querySelector('.dark-clips-inject-btn')) return;
+
+        // Find the visual frame container of the video
+        const visualFrame = video.closest('div[style*="aspect-ratio"]') || video.parentElement || container;
+        if (window.getComputedStyle(visualFrame).position === 'static') {
+          visualFrame.style.position = 'relative';
+        }
+
+        const btn = createFloatingButton(() => {
+          const data = extractModalPostData(container);
+          if (data) sendToDarkClips(data, btn);
+        });
+
+        btn.style.position = 'absolute';
+        btn.style.top = '14px';
+        btn.style.right = '14px';
+        btn.style.zIndex = '9999999';
+
+        visualFrame.appendChild(btn);
+      });
+
+      // 3. STANDALONE ARTICLES (Carousels/Images without video in Feed)
       const standaloneArticles = document.querySelectorAll('article:not([role="dialog"] article)');
       standaloneArticles.forEach((article) => {
         if (article.querySelector('.dark-clips-inject-btn')) return;
 
-        const video = article.querySelector('video');
-        if (!video) return;
+        const mediaFrame = article.querySelector('div[style*="aspect-ratio"]') || article.querySelector('header')?.parentElement || article;
+        if (window.getComputedStyle(mediaFrame).position === 'static') {
+          mediaFrame.style.position = 'relative';
+        }
 
         const btn = createFloatingButton(() => {
           const data = extractModalPostData(article);
           if (data) sendToDarkClips(data, btn);
         });
+
         btn.style.position = 'absolute';
-        btn.style.top = '16px';
-        btn.style.right = '16px';
+        btn.style.top = '14px';
+        btn.style.right = '14px';
         btn.style.zIndex = '9999999';
 
-        const computedPos = window.getComputedStyle(article).position;
-        if (computedPos === 'static') article.style.position = 'relative';
-
-        article.appendChild(btn);
+        mediaFrame.appendChild(btn);
       });
-    } catch {}
+    } catch (err) {
+      console.error('[DarkClips] Erro em injectButtons:', err);
+    }
   }
 
   function createFloatingButton(onClick) {
