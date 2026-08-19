@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { saveDarkClipPost } from '@/lib/database';
 
-const REMOTION_SERVER_URL = process.env.REMOTION_SERVER_URL || 'http://localhost:3001';
+const CANDIDATE_URLS = [
+  process.env.REMOTION_SERVICE_URL?.replace(/\/render$/, ''),
+  process.env.REMOTION_SERVER_URL,
+  'http://n8n-remotionservice-ry6eh9:3001',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+].filter(Boolean) as string[];
 
 export async function POST(req: Request) {
   try {
@@ -20,42 +26,52 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Video URL e inputProps são obrigatórios.' }, { status: 400 });
     }
 
-    console.log(`[DarkClips Render] Enviando render para Remotion Server (${REMOTION_SERVER_URL})...`);
-
     let renderedVideoUrl = '';
+    let lastError = '';
 
-    // 1. Try Remotion Render Server
-    try {
-      const res = await fetch(`${REMOTION_SERVER_URL}/render`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          compositionId: 'DarkClipsVideo',
-          inputProps: {
-            ...inputProps,
-            durationInSeconds,
-          },
-          durationInFrames: Math.max(30, Math.round(durationInSeconds * 30)),
-        }),
-      });
+    // 1. Tentar conectar nos endpoints do Remotion
+    for (const baseUrl of CANDIDATE_URLS) {
+      const cleanBase = baseUrl.replace(/\/+$/, '');
+      const renderEndpoint = cleanBase.endsWith('/render') ? cleanBase : `${cleanBase}/render`;
+      console.log(`[DarkClips Render] Tentando Remotion Server em ${renderEndpoint}...`);
 
-      if (res.ok) {
-        const data = await res.json();
-        renderedVideoUrl = data.videoUrl || data.url || '';
-        console.log('[DarkClips Render] Render concluído no servidor Remotion:', renderedVideoUrl);
-      } else {
-        console.warn('[DarkClips Render] Remotion Server response not OK:', await res.text());
+      try {
+        const res = await fetch(renderEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            compositionId: 'DarkClipsVideo',
+            inputProps: {
+              ...inputProps,
+              durationInSeconds,
+            },
+            durationInFrames: Math.max(30, Math.round(durationInSeconds * 30)),
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          renderedVideoUrl = data.videoUrl || data.url || '';
+          if (renderedVideoUrl) {
+            console.log(`[DarkClips Render] ✅ Render concluído com sucesso via ${cleanBase}:`, renderedVideoUrl);
+            break;
+          }
+        } else {
+          lastError = await res.text();
+          console.warn(`[DarkClips Render] Resposta não-OK de ${cleanBase}:`, lastError);
+        }
+      } catch (err: any) {
+        lastError = err?.message;
+        console.warn(`[DarkClips Render] Falha ao conectar em ${cleanBase}:`, lastError);
       }
-    } catch (err: any) {
-      console.warn('[DarkClips Render] Remotion server unavailable:', err?.message);
     }
 
-    // 2. Fallback: if render server is not running, return the source sanitized video URL
     if (!renderedVideoUrl) {
+      console.warn(`[DarkClips Render] Remotion indisponível (${lastError}), usando vídeo sanitizado como fallback.`);
       renderedVideoUrl = inputProps.videoUrl;
     }
 
-    // 3. Save post record in database
+    // 2. Salvar post no banco de dados
     const post = await saveDarkClipPost({
       user_id: user?.id,
       clip_id: clipId,

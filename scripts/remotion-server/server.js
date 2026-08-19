@@ -95,6 +95,12 @@ app.use('/bundle', (req, res, next) => {
 // }
 // ──────────────────────────────────────────────
 app.post('/render', async (req, res) => {
+  // 1. Dark Clips Direct Video Render
+  if (req.body.compositionId === 'DarkClipsVideo' || (req.body.inputProps && !req.body.composition)) {
+    return handleDarkClipsRender(req, res);
+  }
+
+  // 2. Story / n8n Multi-Scene Video Render
   const { historyId, templateId, composition, callbackUrl } = req.body;
 
   if (!composition || !callbackUrl) {
@@ -114,6 +120,141 @@ app.post('/render', async (req, res) => {
 
   renderAsync(historyId, composition, callbackUrl);
 });
+
+// ──────────────────────────────────────────────
+// RENDER DARK CLIPS VIDEO (Meme / Clip 9:16)
+// ──────────────────────────────────────────────
+async function handleDarkClipsRender(req, res) {
+  const {
+    compositionId = 'DarkClipsVideo',
+    inputProps = {},
+    durationInFrames: requestedFrames,
+    historyId,
+    callbackUrl,
+  } = req.body;
+
+  const jobId = historyId || `dc_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+  if (!bundledLocation) {
+    return res.status(503).json({ error: 'Bundle Remotion ainda não está pronto' });
+  }
+
+  console.log(`[Remotion DarkClips] Iniciando render do clipe ${jobId}...`);
+
+  try {
+    const serveUrl = bundledLocation;
+    const outputFileName = `darkclip_${jobId}.mp4`;
+    const outputFilePath = path.join(OUTPUT_DIR, outputFileName);
+
+    let resolvedVideoUrl = inputProps.videoUrl || '';
+    if (resolvedVideoUrl.startsWith('/api/storage/')) {
+      resolvedVideoUrl = `https://darktube.fjt-solutions.com${resolvedVideoUrl}`;
+    }
+
+    const durationInSeconds = Number(inputProps.durationInSeconds) || 15;
+    const durationInFrames = requestedFrames || Math.max(30, Math.round(durationInSeconds * 30));
+
+    const finalInputProps = {
+      ...inputProps,
+      videoUrl: resolvedVideoUrl,
+      durationInSeconds,
+    };
+
+    const chromiumArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-software-rasterizer',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-breakpad',
+      '--mute-audio',
+      '--no-first-run',
+      '--js-flags=--max-old-space-size=8192',
+      '--disable-features=site-per-process,IsolateOrigins',
+      '--enable-features=SharedArrayBuffer',
+    ];
+
+    const comp = await selectComposition({
+      serveUrl,
+      id: compositionId,
+      inputProps: finalInputProps,
+      durationInFrames,
+      fps: 30,
+      width: 1080,
+      height: 1920,
+      browserExecutable: CHROME_PATH,
+      chromiumOptions: {
+        disableWebSecurity: true,
+        args: chromiumArgs,
+        enableMultiProcessOnLinux: true,
+        gl: null,
+      },
+      timeoutInMilliseconds: 300_000,
+      delayRenderTimeoutInMilliseconds: 300_000,
+    });
+
+    const concurrency = Math.max(1, Math.min(parseInt(process.env.RENDER_CONCURRENCY || '8', 10), 12));
+    console.log(`[Remotion DarkClips] Renderizando ${comp.id} (${durationInFrames} frames, concorrência: ${concurrency})...`);
+
+    await renderMedia({
+      composition: comp,
+      serveUrl,
+      outputLocation: outputFilePath,
+      codec: 'h264',
+      concurrency,
+      maxRetries: 3,
+      imageFormat: 'jpeg',
+      jpegQuality: 90,
+      inputProps: finalInputProps,
+      gl: null,
+      browserExecutable: CHROME_PATH,
+      chromiumOptions: {
+        disableWebSecurity: true,
+        args: chromiumArgs,
+        enableMultiProcessOnLinux: true,
+        gl: null,
+      },
+      onProgress: ({ progress, renderedDoneInFrames }) => {
+        const pct = Math.floor(progress * 100);
+        const done = renderedDoneInFrames || Math.floor(progress * comp.durationInFrames);
+        if (pct % 20 === 0) {
+          console.log(`[Remotion DarkClips] Progresso: ${pct}% (${done}/${comp.durationInFrames})`);
+        }
+      },
+      timeoutInMilliseconds: 300_000,
+      delayRenderTimeoutInMilliseconds: 300_000,
+    });
+
+    const videoUrl = STORAGE_BASE_URL
+      ? `${STORAGE_BASE_URL}/storage/${outputFileName}`
+      : `/storage/${outputFileName}`;
+
+    console.log(`[Remotion DarkClips] ✅ Render concluído: ${videoUrl}`);
+
+    if (callbackUrl) {
+      await sendCallback(callbackUrl, { historyId: jobId, status: 'completed', video_url: videoUrl });
+    }
+    
+    if (!res.headersSent) {
+      return res.json({
+        success: true,
+        videoUrl,
+        jobId,
+      });
+    }
+  } catch (err) {
+    console.error(`[Remotion DarkClips] ERRO no render ${jobId}:`, err);
+    if (callbackUrl) {
+      await sendCallback(callbackUrl, { historyId: jobId, status: 'failed', error: err.message });
+    }
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, error: err.message || 'Erro de renderização' });
+    }
+  }
+}
 
 let removeBackground = null;
 try {
