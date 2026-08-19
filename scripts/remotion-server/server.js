@@ -58,8 +58,17 @@ app.get('/health', (req, res) => {
 
 // ──────────────────────────────────────────────
 // SERVIR arquivos renderizados e bundle do Remotion
+// Cache-Control agressivo para que os workers do Chromium
+// não façam re-fetch da mesma imagem em cada frame.
 // ──────────────────────────────────────────────
-app.use('/storage', express.static(OUTPUT_DIR));
+app.use('/storage', express.static(OUTPUT_DIR, {
+  maxAge: '1h',         // Chromium caches image in memory for 1h
+  etag: false,          // Skip ETag computation overhead
+  lastModified: false,  // Skip Last-Modified header computation
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'public, max-age=3600, immutable');
+  }
+}));
 app.use('/bundle', (req, res, next) => {
   if (!bundledLocation) return res.status(503).send('Bundle Remotion ainda não está pronto');
   express.static(bundledLocation)(req, res, next);
@@ -117,7 +126,8 @@ try {
 
 // ──────────────────────────────────────────────
 // PRÉ-DOWNLOAD E RECORTE 2.5D DE TODOS OS ASSETS
-// Otimiza com sharp (max 1080x1920) para 0% lag no Chromium
+// Otimiza com sharp (max 1080x1920). Serve via HTTP local para manter
+// inputProps leve (sem base64 gigante) e evitar OOM do Chromium.
 // ──────────────────────────────────────────────
 let sharp = null;
 try {
@@ -179,15 +189,12 @@ async function preloadAndProcessAllAssets(scenes) {
             console.error(`[Remotion Assets] ⚠️ Erro fetch cena ${i + 1}:`, fetchErr.message);
           }
         }
+
         if (fs.existsSync(filePath)) {
-          const fileBuf = fs.readFileSync(filePath);
-          const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
-          if (!isVideo) {
-            scene.imageUrl = `data:${mimeType};base64,${fileBuf.toString('base64')}`;
-            console.log(`[Remotion Assets] ✅ Cena ${i + 1} em memória RAM (base64 data-uri ${Math.round(fileBuf.length / 1024)}KB)`);
-          } else {
-            scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
-          }
+          // ── FIX: Servir via HTTP local (não base64) para manter inputProps leve ──
+          // Base64 de 292KB × 3 cenas × 12 workers = ~10MB de JSON por frame → OOM Chromium
+          scene.imageUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
+          console.log(`[Remotion Assets] ✅ Cena ${i + 1} disponível local: /storage/${fileName}`);
         } else {
           scene.imageUrl = ''; // Remove URL quebrada para não travar o Remotion
         }
@@ -223,8 +230,7 @@ async function preloadAndProcessAllAssets(scenes) {
           }
         }
         if (fs.existsSync(filePath)) {
-          const fgBuf = fs.readFileSync(filePath);
-          scene.foregroundUrl = `data:image/png;base64,${fgBuf.toString('base64')}`;
+          scene.foregroundUrl = `http://127.0.0.1:${PORT}/storage/${fileName}`;
         }
       } catch (err) {
         console.error(`[Remotion Assets] ⚠️ Falha ao baixar foreground da cena ${i + 1}:`, err.message);
@@ -232,39 +238,42 @@ async function preloadAndProcessAllAssets(scenes) {
     }
 
     // 3. Processar auto-recorte 2.5D
-    if (removeBackground && scene.imageUrl && !scene.subjectImageUrl && !scene.foregroundUrl) {
-      const clean = scene.imageUrl.toLowerCase().split('?')[0];
-      if (!clean.endsWith('.mp4') && !clean.endsWith('.webm') && !clean.endsWith('.mov')) {
+    // ── FIX: o cutout usa o arquivo em DISCO (não data URI), pois @imgly não suporta "data:" protocol ──
+    // Precisamos identificar o arquivo local pelo nome (derivado do hash da URL original)
+    if (removeBackground && scene.imageUrl && scene.imageUrl.includes(`127.0.0.1:${PORT}/storage/`)) {
+      const localFileName = scene.imageUrl.split('/storage/')[1];
+      const isVideoFile = localFileName && (localFileName.endsWith('.mp4') || localFileName.endsWith('.webm'));
+      if (localFileName && !isVideoFile && !scene.subjectImageUrl && !scene.foregroundUrl) {
         try {
-          const hash = crypto.createHash('md5').update(scene.imageUrl).digest('hex');
+          const localFilePath = path.join(OUTPUT_DIR, localFileName);
+          const hash = crypto.createHash('md5').update(localFilePath).digest('hex');
           const fgFileName = `cutout_${hash}.png`;
           const fgPath = path.join(OUTPUT_DIR, fgFileName);
 
           if (fs.existsSync(fgPath)) {
             console.log(`[Remotion Cutout] Camada 2.5D encontrada no cache para cena ${i + 1}`);
-            const cachedBuf = fs.readFileSync(fgPath);
-            scene.subjectImageUrl = `data:image/png;base64,${cachedBuf.toString('base64')}`;
-            continue;
+            scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+          } else if (fs.existsSync(localFilePath)) {
+            console.log(`[Remotion Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
+            // Passar o caminho local como file:// URL — @imgly suporta file:// e http:// mas NÃO data:
+            const fileUrl = `file://${localFilePath}`;
+            const blob = await removeBackground(fileUrl);
+            let buffer = Buffer.from(await blob.arrayBuffer());
+
+            if (sharp) {
+              try {
+                buffer = await sharp(buffer)
+                  .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
+                  .png({ compressionLevel: 9, effort: 7 })
+                  .toBuffer();
+                console.log(`[Remotion Cutout] ✅ Cutout otimizado com sharp (${Math.round(buffer.length / 1024)}KB)`);
+              } catch (_) {}
+            }
+
+            fs.writeFileSync(fgPath, buffer);
+            scene.subjectImageUrl = `http://127.0.0.1:${PORT}/storage/${fgFileName}`;
+            console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D disponível: /storage/${fgFileName}`);
           }
-
-          console.log(`[Remotion Cutout] Gerando camada 2.5D para cena ${i + 1}...`);
-          const blob = await removeBackground(scene.imageUrl);
-          let buffer = Buffer.from(await blob.arrayBuffer());
-
-          if (sharp) {
-            try {
-              buffer = await sharp(buffer)
-                .resize({ width: 1080, height: 1920, fit: 'inside', withoutEnlargement: true })
-                .png({ compressionLevel: 9, effort: 7 })
-                .toBuffer();
-              console.log(`[Remotion Cutout] ✅ Cutout otimizado com sharp (${Math.round(buffer.length / 1024)}KB)`);
-            } catch (_) {}
-          }
-
-          fs.writeFileSync(fgPath, buffer);
-
-          scene.subjectImageUrl = `data:image/png;base64,${buffer.toString('base64')}`;
-          console.log(`[Remotion Cutout] ✅ Cena ${i + 1} camada 2.5D em memória RAM (base64)`);
         } catch (err) {
           console.error(`[Remotion Cutout] ⚠️ Cutout da cena ${i + 1} ignorado:`, err.message);
         }
