@@ -312,6 +312,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               src={videoUrl}
               muted
               volume={0}
+              onError={(e) => {
+                console.warn('[DarkClips Bg Video Warning]:', e);
+              }}
               style={{
                 width: '100%',
                 height: '100%',
@@ -556,6 +559,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               src={videoUrl}
               muted={muted !== false}
               volume={muted === false ? 1 : 0}
+              onError={(e) => {
+                console.warn('[DarkClips Video Element Warning]:', e);
+              }}
               style={{
                 width: '100%',
                 height: '100%',
