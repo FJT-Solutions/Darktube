@@ -687,6 +687,37 @@ export default function DarkClipsPage() {
     }
   }
 
+  // Delete a mined clip from library
+  async function handleDeleteClip(clipId: string) {
+    try {
+      const res = await fetch(`/api/dark-clips/import?id=${clipId}`, { method: "DELETE" });
+      if (res.ok) {
+        setClips((prev) => prev.filter((c) => c.id !== clipId));
+        if (selectedClip?.id === clipId) setSelectedClip(null);
+        toast.success("Clipe excluído com sucesso!");
+      } else {
+        toast.error("Erro ao excluir clipe.");
+      }
+    } catch {
+      toast.error("Erro ao excluir clipe.");
+    }
+  }
+
+  // Delete a post from scheduled queue or history
+  async function handleDeletePost(postId: string) {
+    try {
+      const res = await fetch(`/api/dark-clips/schedule?id=${postId}`, { method: "DELETE" });
+      if (res.ok) {
+        setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
+        toast.success("Postagem removida da fila!");
+      } else {
+        toast.error("Erro ao excluir postagem.");
+      }
+    } catch {
+      toast.error("Erro ao excluir postagem.");
+    }
+  }
+
   // Proceed from Modeler to Creation Tab
   async function handleProceedToCreation() {
     await handleQuickSavePreset(false);
@@ -1184,49 +1215,45 @@ export default function DarkClipsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
-              {/* ── Left Column: Compact Layouts Gallery OR Granular Controls (7 cols) ── */}
-              <div className="lg:col-span-7 space-y-6">
-                {!isEditingLayout && presets.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Header bar for layouts */}
-                    <div className="p-4 rounded-xl bg-card border border-border/70 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div>
-                        <h2 className="text-base font-black tracking-tight flex items-center gap-2">
-                          <Layers className="h-4 w-4 text-primary" /> Seus Modelos de Layout ({presets.length})
-                        </h2>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Clique em um modelo para carregar no Canvas ou editar suas configurações.
-                        </p>
-                      </div>
+            {!isEditingLayout && presets.length > 0 ? (
+              <div className="w-full space-y-4">
+                {/* Header bar for layouts */}
+                <div className="p-4 rounded-xl bg-card border border-border/70 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-black tracking-tight flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-primary" /> Seus Modelos de Layout ({presets.length})
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Clique em um modelo para carregar ou abrir para editar. O Canvas 9:16 será aberto dentro do modo de edição do layout.
+                    </p>
+                  </div>
 
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setLayoutNameInput(`Novo Layout ${presets.length + 1}`);
-                            setIsDefaultLayoutInput(false);
-                            setIsSaveLayoutDialogOpen(true);
-                            setIsEditingLayout(true);
-                          }}
-                          className="text-xs font-bold gap-1.5 h-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm flex-1 sm:flex-none"
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Novo Layout
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleProceedToCreation()}
-                          className="text-xs font-bold gap-1.5 h-8 border-primary/30 text-primary hover:bg-primary/10 flex-1 sm:flex-none"
-                        >
-                          <Video className="h-3.5 w-3.5" /> Ir para Criação 🎬
-                        </Button>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setLayoutNameInput(`Novo Layout ${presets.length + 1}`);
+                        setIsDefaultLayoutInput(false);
+                        setIsSaveLayoutDialogOpen(true);
+                        setIsEditingLayout(true);
+                      }}
+                      className="text-xs font-bold gap-1.5 h-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm flex-1 sm:flex-none"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Novo Layout
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleProceedToCreation()}
+                      className="text-xs font-bold gap-1.5 h-8 border-primary/30 text-primary hover:bg-primary/10 flex-1 sm:flex-none"
+                    >
+                      <Video className="h-3.5 w-3.5" /> Ir para Criação 🎬
+                    </Button>
+                  </div>
+                </div>
 
-                    {/* Compact Layout Cards Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Full-Width Grid of Layout Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {presets.map((p) => {
                         const isSelected = activePreset?.id === p.id;
                         const cleanHandle = (p.profile_header?.handle || "@darkclips").replace(/^@+/, "@");
@@ -1322,17 +1349,19 @@ export default function DarkClipsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    {/* Edit Mode Top Banner */}
-                    <div className="p-3.5 rounded-xl border border-primary/40 bg-primary/10 flex flex-wrap items-center justify-between gap-2 shadow-sm">
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-primary text-primary-foreground font-bold text-[10px]">
-                          🛠️ MODO DE EDIÇÃO
-                        </Badge>
-                        <span className="text-xs font-bold text-foreground">
-                          Personalizando: {activePreset?.name || "Novo Layout"}
-                        </span>
-                      </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    {/* Left Column: Granular Controls (7 cols) */}
+                    <div className="lg:col-span-7 space-y-6">
+                      {/* Edit Mode Top Banner */}
+                      <div className="p-3.5 rounded-xl border border-primary/40 bg-primary/10 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-primary text-primary-foreground font-bold text-[10px]">
+                            🛠️ MODO DE EDIÇÃO
+                          </Badge>
+                          <span className="text-xs font-bold text-foreground">
+                            Personalizando: {activePreset?.name || "Novo Layout"}
+                          </span>
+                        </div>
                       <div className="flex items-center gap-2">
                         {presets.length > 0 && (
                           <Button
@@ -3430,6 +3459,7 @@ export default function DarkClipsPage() {
               </div>
 
             </div>
+          )}
           </TabsContent>
 
           {/* ══════════════════════════════════════════════════════════
@@ -3698,7 +3728,7 @@ export default function DarkClipsPage() {
                               </p>
                             </div>
 
-                            <div className="flex gap-1.5 mt-3">
+                            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border/40">
                               <Button 
                                 size="sm" 
                                 variant={isSelected ? "default" : "outline"} 
@@ -3706,7 +3736,7 @@ export default function DarkClipsPage() {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
                                 }}
-                                className="flex-1 text-[11px] h-7"
+                                className="flex-1 text-[11px] h-7 font-bold"
                               >
                                 {isSelected ? "Selecionado ✓" : "Selecionar"}
                               </Button>
@@ -3716,13 +3746,14 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  setIsEditingLayout(true);
                                   setActiveTab('modeler');
-                                  toast.info('Clipe carregado no Canvas de Modelagem!');
+                                  toast.info('Clipe carregado no Canvas para ajuste temporário!');
                                 }}
-                                className="text-[11px] h-7 px-2 text-zinc-300"
-                                title="Visualizar este clipe no Canvas de Modelagem"
+                                className="text-[11px] h-7 px-2 text-zinc-300 hover:text-white"
+                                title="Ajustar visual e posicionamento temporário deste clipe"
                               >
-                                <Eye className="h-3 w-3" />
+                                <Settings className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
@@ -3732,10 +3763,22 @@ export default function DarkClipsPage() {
                                   handleRender();
                                 }}
                                 disabled={isRendering}
-                                className="text-[11px] h-7 px-2.5 text-red-400 border border-red-500/30"
+                                className="text-[11px] h-7 px-2.5 text-red-400 border border-red-500/30 hover:bg-red-500/10 font-bold"
                                 title="Produzir clipe com o layout ativo"
                               >
                                 {isRendering && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "🎬 Produzir"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClip(clip.id);
+                                }}
+                                className="text-[11px] h-7 w-7 p-0 text-red-400/80 hover:text-red-400 hover:bg-red-950/20"
+                                title="Excluir este clipe da lista"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </div>
@@ -3968,32 +4011,67 @@ export default function DarkClipsPage() {
                     </div>
                   ) : (
                     <div className="space-y-2.5">
-                      {scheduledPosts.map((post) => (
-                        <div key={post.id} className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3 shadow-sm">
-                          <div className="min-w-0">
-                            <p className="font-bold text-xs truncate">{post.title}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Post Imediato"}
-                            </p>
-                          </div>
+                      {scheduledPosts.map((post) => {
+                        const isPublished = post.status === "published";
+                        const isRendered = post.status === "rendered" || post.status === "completed";
+                        const isFailed = post.status === "failed" || post.status === "error";
+                        const isRendering = post.status === "rendering" || post.status === "publishing";
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge
-                              variant={post.status === "published" ? "default" : "secondary"}
-                              className="text-[9px] uppercase"
-                            >
-                              {post.status}
-                            </Badge>
-                            {post.rendered_video_url && (
-                              <a href={post.rendered_video_url} target="_blank" rel="noreferrer" download>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" title="Baixar Vídeo MP4">
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                              </a>
-                            )}
+                        return (
+                          <div key={post.id} className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3 shadow-sm hover:border-border/80 transition-all">
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs truncate">{post.title || "Dark Clip Meme"}</p>
+                              <p className="text-[10px] text-muted-foreground">
+                                {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Post Imediato"}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isPublished ? (
+                                <Badge className="text-[9px] uppercase bg-emerald-600 text-white font-bold">
+                                  ✓ Publicado
+                                </Badge>
+                              ) : isRendered ? (
+                                <Badge className="text-[9px] uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+                                  ✓ Pronto
+                                </Badge>
+                              ) : isRendering ? (
+                                <Badge className="text-[9px] uppercase bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold animate-pulse">
+                                  ⏳ Renderizando
+                                </Badge>
+                              ) : isFailed ? (
+                                <Badge variant="destructive" className="text-[9px] uppercase font-bold">
+                                  ❌ Falhou
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-[9px] uppercase font-bold text-purple-300 bg-purple-900/30 border border-purple-500/30">
+                                  🕒 Agendado
+                                </Badge>
+                              )}
+
+                              {/* Download MP4 */}
+                              {post.rendered_video_url && (
+                                <a href={post.rendered_video_url} target="_blank" rel="noreferrer" download>
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" title="Baixar Vídeo MP4">
+                                    <Download className="h-3.5 w-3.5" />
+                                  </Button>
+                                </a>
+                              )}
+
+                              {/* Delete post from queue */}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleDeletePost(post.id)}
+                                className="h-7 w-7 text-red-400/80 hover:text-red-400 hover:bg-red-950/20"
+                                title="Excluir postagem da fila"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -4118,9 +4196,9 @@ export default function DarkClipsPage() {
               </Button>
             </div>
 
-            {/* Canvas Container Center */}
-            <div className="flex-1 w-full max-h-[86vh] flex items-center justify-center py-1 overflow-hidden">
-              <div className="h-full max-h-[86vh] aspect-[9/16] shadow-2xl rounded-2xl overflow-hidden border-2 border-zinc-800 bg-black relative flex items-center justify-center">
+            {/* Canvas Container Center (Pure View Mode) */}
+            <div className="flex-1 w-full max-h-[92vh] flex items-center justify-center py-2 overflow-hidden">
+              <div className="h-full max-h-[90vh] aspect-[9/16] shadow-2xl rounded-2xl overflow-hidden border border-zinc-800 bg-black relative flex items-center justify-center">
                 <DarkClipsPreviewPlayer
                   previewMode={previewMode}
                   videoUrl={sampleVideoUrl}
@@ -4135,29 +4213,8 @@ export default function DarkClipsPage() {
                   arrowsList={isAnyArrowEnabled ? arrowsList : []}
                   isFullscreen={true}
                   onToggleFullscreen={() => setIsFullscreenPreview(false)}
-                  onLayerFocus={handleLayerFocus}
-                  onUpdateHeaderPadding={(paddingTop) => setProfileHeader((p) => ({ ...p, paddingTop }))}
-                  onUpdateHeadline={(updates) => setHeadline((h) => ({ ...h, ...updates }))}
-                  onUpdateVideoPlacement={(placement) => setVideoPlacement((p) => ({ ...p, ...placement }))}
-                  onUpdateWatermark={(updates) => setWatermark((w) => ({ ...w, ...updates }))}
-                  onUpdateFooter={(updates) => setFooter((f) => ({ ...f, ...updates }))}
-                  onUpdateArrows={(updates) => handleUpdateSelectedArrow(updates)}
-                  onUpdateArrowItem={(index, updates) =>
-                    setArrowsList((prev) =>
-                      prev.map((item, i) => (i === index ? { ...item, ...updates } : item))
-                    )
-                  }
                 />
               </div>
-            </div>
-
-            {/* Footer Information */}
-            <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-2 shrink-0">
-              <span>{profileHeader.name}</span>
-              <span>•</span>
-              <span>@{profileHeader.handle.replace('@', '')}</span>
-              <span>•</span>
-              <span>1080x1920 Full HD (9:16)</span>
             </div>
           </div>
         )}

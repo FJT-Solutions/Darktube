@@ -139,6 +139,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
     layer: 'header' | 'mainText' | 'subText' | 'video' | 'watermark' | 'footer' | string,
     e: React.PointerEvent
   ) => {
+    if (isFullscreen) return;
     e.preventDefault();
     e.stopPropagation();
     setActiveLayer(layer);
@@ -622,227 +623,231 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           </div>
         )}
 
-        {/* ── Sleek Non-Blocking Figma/Canva Interactive Layer Overlays ── */}
-        <div className="absolute inset-0 pointer-events-none z-30">
-          
-          {/* Snapping Center Guide */}
-          {dragging && (
-            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-red-500/60 border-l border-dashed border-red-500 z-40" />
-          )}
-
-          {/* 1. Header Layer Drag Box */}
-          {profileHeader.showHeader !== false && (
-            <div
-              style={{
-                position: 'absolute',
-                top: `${(headerPadding / 1920) * 100}%`,
-                left: '4%',
-                width: '92%',
-                height: `${Math.round(7 * ((profileHeader.scale || 100) / 100))}%`,
-                cursor: 'grab',
-              }}
-              className={`pointer-events-auto transition-all rounded-lg ${
-                activeLayer === 'header'
-                  ? 'ring-2 ring-sky-400 bg-sky-400/10 shadow-lg'
-                  : 'hover:ring-1 hover:ring-sky-400/60 hover:bg-sky-400/5'
-              }`}
-              onPointerDown={(e) => handlePointerDown('header', e)}
-              onMouseEnter={() => setHoveredLayer('header')}
-              onMouseLeave={() => setHoveredLayer('none')}
-            >
-              {(activeLayer === 'header' || hoveredLayer === 'header') && (
-                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-sky-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
-                  <Move className="h-2.5 w-2.5" /> CABEÇALHO ({headerPadding}px)
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 2. Main Text Layer Drag Box (Texto Principal) */}
-          {headline.showMainText !== false && headline.mainText && (
-            <div
-              style={{
-                position: 'absolute',
-                top: `${mainTextY}%`,
-                left: '4%',
-                width: '92%',
-                minHeight: '6%',
-                cursor: 'grab',
-              }}
-              className={`pointer-events-auto transition-all rounded-lg ${
-                activeLayer === 'mainText'
-                  ? 'ring-2 ring-yellow-400 bg-yellow-400/10 shadow-lg'
-                  : 'hover:ring-1 hover:ring-yellow-400/60 hover:bg-yellow-400/5'
-              }`}
-              onPointerDown={(e) => handlePointerDown('mainText', e)}
-              onMouseEnter={() => setHoveredLayer('mainText')}
-              onMouseLeave={() => setHoveredLayer('none')}
-            >
-              {(activeLayer === 'mainText' || hoveredLayer === 'mainText') && (
-                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-yellow-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
-                  <Move className="h-2.5 w-2.5" /> TÍTULO PRINCIPAL ({mainTextY}%)
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 3. Sub Text Layer Drag Box (Subtítulo / Punchline) */}
-          {headline.showSubText !== false && headline.subText && (
-            <div
-              style={{
-                position: 'absolute',
-                top: `${subTextY}%`,
-                left: '4%',
-                width: '92%',
-                minHeight: '5%',
-                cursor: 'grab',
-              }}
-              className={`pointer-events-auto transition-all rounded-lg ${
-                activeLayer === 'subText'
-                  ? 'ring-2 ring-cyan-400 bg-cyan-400/10 shadow-lg'
-                  : 'hover:ring-1 hover:ring-cyan-400/60 hover:bg-cyan-400/5'
-              }`}
-              onPointerDown={(e) => handlePointerDown('subText', e)}
-              onMouseEnter={() => setHoveredLayer('subText')}
-              onMouseLeave={() => setHoveredLayer('none')}
-            >
-              {(activeLayer === 'subText' || hoveredLayer === 'subText') && (
-                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-cyan-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
-                  <Move className="h-2.5 w-2.5" /> SUBTÍTULO ({subTextY}%)
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 4. Video Placement Layer Drag Box */}
-          <div
-            style={{
-              position: 'absolute',
-              top: `${videoY}%`,
-              transform: 'translateY(-50%)',
-              left: `${(100 - videoScale) / 2}%`,
-              width: `${videoScale}%`,
-              height: '38%',
-              cursor: 'grab',
-            }}
-            className={`pointer-events-auto transition-all rounded-xl ${
-              activeLayer === 'video'
-                ? 'ring-2 ring-red-500 bg-red-500/10 shadow-lg'
-                : 'hover:ring-1 hover:ring-red-400/60 hover:bg-red-500/5'
-            }`}
-            onPointerDown={(e) => handlePointerDown('video', e)}
-            onMouseEnter={() => setHoveredLayer('video')}
-            onMouseLeave={() => setHoveredLayer('none')}
-          >
-            {(activeLayer === 'video' || hoveredLayer === 'video') && (
-              <div className="absolute -top-3 left-2 flex items-center gap-1 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow">
-                <Move className="h-2.5 w-2.5" /> VÍDEO (Y: {videoY}%)
-              </div>
+        {/* ── Sleek Non-Blocking Figma/Canva Interactive Layer Overlays (Only in Edit/Normal Mode) ── */}
+        {!isFullscreen && (
+          <div className="absolute inset-0 pointer-events-none z-30">
+            
+            {/* Snapping Center Guide */}
+            {dragging && (
+              <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-red-500/60 border-l border-dashed border-red-500 z-40" />
             )}
-          </div>
 
-          {/* 5. Watermark Layer Drag Box */}
-          {watermark.enabled && (
-            <div
-              style={{
-                position: 'absolute',
-                top: `${watermarkY}%`,
-                left: `${watermarkX}%`,
-                transform: 'translate(-50%, -50%)',
-                minWidth: '28%',
-                height: '5%',
-                cursor: 'grab',
-              }}
-              className={`pointer-events-auto transition-all rounded-lg ${
-                activeLayer === 'watermark'
-                  ? 'ring-2 ring-pink-500 bg-pink-500/20 shadow-lg'
-                  : 'hover:ring-1 hover:ring-pink-400/70 hover:bg-pink-500/10'
-              }`}
-              onPointerDown={(e) => handlePointerDown('watermark', e)}
-              onMouseEnter={() => setHoveredLayer('watermark')}
-              onMouseLeave={() => setHoveredLayer('none')}
-            >
-              {(activeLayer === 'watermark' || hoveredLayer === 'watermark') && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
-                  <Move className="h-2.5 w-2.5" /> MARCA D'ÁGUA (X: {watermarkX}%, Y: {watermarkY}%)
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 6. Footer / CTA Layer Drag Box */}
-          {footer.showFooter !== false && footer.text && (
-            <div
-              style={{
-                position: 'absolute',
-                top: `${footerY}%`,
-                transform: 'translateY(-50%)',
-                left: '4%',
-                width: '92%',
-                minHeight: '5%',
-                cursor: 'grab',
-              }}
-              className={`pointer-events-auto transition-all rounded-lg ${
-                activeLayer === 'footer'
-                  ? 'ring-2 ring-emerald-400 bg-emerald-400/20 shadow-lg'
-                  : 'hover:ring-1 hover:ring-emerald-400/70 hover:bg-emerald-400/10'
-              }`}
-              onPointerDown={(e) => handlePointerDown('footer', e)}
-              onMouseEnter={() => setHoveredLayer('footer')}
-              onMouseLeave={() => setHoveredLayer('none')}
-            >
-              {(activeLayer === 'footer' || hoveredLayer === 'footer') && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
-                  <Move className="h-2.5 w-2.5" /> RODAPÉ / CTA (Y: {footerY}%)
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 7. Multiple Arrows / Callout Containers Drag Boxes */}
-          {effectiveArrowsList.map((item, idx) => {
-            if (item.enabled === false) return null;
-            const itemX = item.xOffset ?? item.x_offset ?? 82;
-            const itemY = item.yOffset ?? item.y_offset ?? 65;
-            const isThisActive = activeLayer === `arrow-${idx}`;
-            const isThisHovered = hoveredLayer === `arrow-${idx}`;
-
-            return (
+            {/* 1. Header Layer Drag Box */}
+            {profileHeader.showHeader !== false && (
               <div
-                key={item.id || `drag-arrow-${idx}`}
                 style={{
                   position: 'absolute',
-                  top: `${itemY}%`,
-                  left: `${itemX}%`,
-                  transform: 'translate(-50%, -50%)',
-                  minWidth: '22%',
-                  height: '5.5%',
+                  top: `${(headerPadding / 1920) * 100}%`,
+                  left: '4%',
+                  width: '92%',
+                  height: `${Math.round(7 * ((profileHeader.scale || 100) / 100))}%`,
                   cursor: 'grab',
                 }}
                 className={`pointer-events-auto transition-all rounded-lg ${
-                  isThisActive
-                    ? 'ring-2 ring-rose-500 bg-rose-500/20 shadow-lg'
-                    : 'hover:ring-1 hover:ring-rose-400/70 hover:bg-rose-500/10'
+                  activeLayer === 'header'
+                    ? 'ring-2 ring-sky-400 bg-sky-400/10 shadow-lg'
+                    : 'hover:ring-1 hover:ring-sky-400/60 hover:bg-sky-400/5'
                 }`}
-                onPointerDown={(e) => handlePointerDown(`arrow-${idx}`, e)}
-                onMouseEnter={() => setHoveredLayer(`arrow-${idx}`)}
+                onPointerDown={(e) => handlePointerDown('header', e)}
+                onMouseEnter={() => setHoveredLayer('header')}
                 onMouseLeave={() => setHoveredLayer('none')}
               >
-                {(isThisActive || isThisHovered) && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
-                    <Move className="h-2.5 w-2.5" /> SETAS #{idx + 1} (X: {itemX}%, Y: {itemY}%)
+                {(activeLayer === 'header' || hoveredLayer === 'header') && (
+                  <div className="absolute -top-3 left-2 flex items-center gap-1 bg-sky-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                    <Move className="h-2.5 w-2.5" /> CABEÇALHO ({headerPadding}px)
                   </div>
                 )}
               </div>
-            );
-          })}
-        </div>
+            )}
+
+            {/* 2. Main Text Layer Drag Box (Texto Principal) */}
+            {headline.showMainText !== false && headline.mainText && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${mainTextY}%`,
+                  left: '4%',
+                  width: '92%',
+                  minHeight: '6%',
+                  cursor: 'grab',
+                }}
+                className={`pointer-events-auto transition-all rounded-lg ${
+                  activeLayer === 'mainText'
+                    ? 'ring-2 ring-yellow-400 bg-yellow-400/10 shadow-lg'
+                    : 'hover:ring-1 hover:ring-yellow-400/60 hover:bg-yellow-400/5'
+                }`}
+                onPointerDown={(e) => handlePointerDown('mainText', e)}
+                onMouseEnter={() => setHoveredLayer('mainText')}
+                onMouseLeave={() => setHoveredLayer('none')}
+              >
+                {(activeLayer === 'mainText' || hoveredLayer === 'mainText') && (
+                  <div className="absolute -top-3 left-2 flex items-center gap-1 bg-yellow-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                    <Move className="h-2.5 w-2.5" /> TÍTULO PRINCIPAL ({mainTextY}%)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3. Sub Text Layer Drag Box (Subtítulo / Punchline) */}
+            {headline.showSubText !== false && headline.subText && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${subTextY}%`,
+                  left: '4%',
+                  width: '92%',
+                  minHeight: '5%',
+                  cursor: 'grab',
+                }}
+                className={`pointer-events-auto transition-all rounded-lg ${
+                  activeLayer === 'subText'
+                    ? 'ring-2 ring-cyan-400 bg-cyan-400/10 shadow-lg'
+                    : 'hover:ring-1 hover:ring-cyan-400/60 hover:bg-cyan-400/5'
+                }`}
+                onPointerDown={(e) => handlePointerDown('subText', e)}
+                onMouseEnter={() => setHoveredLayer('subText')}
+                onMouseLeave={() => setHoveredLayer('none')}
+              >
+                {(activeLayer === 'subText' || hoveredLayer === 'subText') && (
+                  <div className="absolute -top-3 left-2 flex items-center gap-1 bg-cyan-400 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                    <Move className="h-2.5 w-2.5" /> SUBTÍTULO ({subTextY}%)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Video Placement Layer Drag Box */}
+            <div
+              style={{
+                position: 'absolute',
+                top: `${videoY}%`,
+                transform: 'translateY(-50%)',
+                left: `${(100 - videoScale) / 2}%`,
+                width: `${videoScale}%`,
+                height: '38%',
+                cursor: 'grab',
+              }}
+              className={`pointer-events-auto transition-all rounded-xl ${
+                activeLayer === 'video'
+                  ? 'ring-2 ring-red-500 bg-red-500/10 shadow-lg'
+                  : 'hover:ring-1 hover:ring-red-400/60 hover:bg-red-500/5'
+              }`}
+              onPointerDown={(e) => handlePointerDown('video', e)}
+              onMouseEnter={() => setHoveredLayer('video')}
+              onMouseLeave={() => setHoveredLayer('none')}
+            >
+              {(activeLayer === 'video' || hoveredLayer === 'video') && (
+                <div className="absolute -top-3 left-2 flex items-center gap-1 bg-red-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow">
+                  <Move className="h-2.5 w-2.5" /> VÍDEO (Y: {videoY}%)
+                </div>
+              )}
+            </div>
+
+            {/* 5. Watermark Layer Drag Box */}
+            {watermark.enabled && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${watermarkY}%`,
+                  left: `${watermarkX}%`,
+                  transform: 'translate(-50%, -50%)',
+                  minWidth: '28%',
+                  height: '5%',
+                  cursor: 'grab',
+                }}
+                className={`pointer-events-auto transition-all rounded-lg ${
+                  activeLayer === 'watermark'
+                    ? 'ring-2 ring-pink-500 bg-pink-500/20 shadow-lg'
+                    : 'hover:ring-1 hover:ring-pink-400/70 hover:bg-pink-500/10'
+                }`}
+                onPointerDown={(e) => handlePointerDown('watermark', e)}
+                onMouseEnter={() => setHoveredLayer('watermark')}
+                onMouseLeave={() => setHoveredLayer('none')}
+              >
+                {(activeLayer === 'watermark' || hoveredLayer === 'watermark') && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-pink-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                    <Move className="h-2.5 w-2.5" /> MARCA D'ÁGUA (X: {watermarkX}%, Y: {watermarkY}%)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 6. Footer / CTA Layer Drag Box */}
+            {footer.showFooter !== false && footer.text && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: `${footerY}%`,
+                  transform: 'translateY(-50%)',
+                  left: '4%',
+                  width: '92%',
+                  minHeight: '5%',
+                  cursor: 'grab',
+                }}
+                className={`pointer-events-auto transition-all rounded-lg ${
+                  activeLayer === 'footer'
+                    ? 'ring-2 ring-emerald-400 bg-emerald-400/20 shadow-lg'
+                    : 'hover:ring-1 hover:ring-emerald-400/70 hover:bg-emerald-400/10'
+                }`}
+                onPointerDown={(e) => handlePointerDown('footer', e)}
+                onMouseEnter={() => setHoveredLayer('footer')}
+                onMouseLeave={() => setHoveredLayer('none')}
+              >
+                {(activeLayer === 'footer' || hoveredLayer === 'footer') && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                    <Move className="h-2.5 w-2.5" /> RODAPÉ / CTA (Y: {footerY}%)
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 7. Multiple Arrows / Callout Containers Drag Boxes */}
+            {effectiveArrowsList.map((item, idx) => {
+              if (item.enabled === false) return null;
+              const itemX = item.xOffset ?? item.x_offset ?? 82;
+              const itemY = item.yOffset ?? item.y_offset ?? 65;
+              const isThisActive = activeLayer === `arrow-${idx}`;
+              const isThisHovered = hoveredLayer === `arrow-${idx}`;
+
+              return (
+                <div
+                  key={item.id || `drag-arrow-${idx}`}
+                  style={{
+                    position: 'absolute',
+                    top: `${itemY}%`,
+                    left: `${itemX}%`,
+                    transform: 'translate(-50%, -50%)',
+                    minWidth: '22%',
+                    height: '5.5%',
+                    cursor: 'grab',
+                  }}
+                  className={`pointer-events-auto transition-all rounded-lg ${
+                    isThisActive
+                      ? 'ring-2 ring-rose-500 bg-rose-500/20 shadow-lg'
+                      : 'hover:ring-1 hover:ring-rose-400/70 hover:bg-rose-500/10'
+                  }`}
+                  onPointerDown={(e) => handlePointerDown(`arrow-${idx}`, e)}
+                  onMouseEnter={() => setHoveredLayer(`arrow-${idx}`)}
+                  onMouseLeave={() => setHoveredLayer('none')}
+                >
+                  {(isThisActive || isThisHovered) && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded shadow whitespace-nowrap">
+                      <Move className="h-2.5 w-2.5" /> SETAS #{idx + 1} (X: {itemX}%, Y: {itemY}%)
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Stage Hint Footer */}
-      <p className="text-[10px] text-zinc-500 text-center font-medium leading-tight shrink-0">
-        💡 <strong>Editor Visual:</strong> Arraste os elementos no Canvas para reposicionar.
-      </p>
+      {!isFullscreen && (
+        <p className="text-[10px] text-zinc-500 text-center font-medium leading-tight shrink-0">
+          💡 <strong>Editor Visual:</strong> Arraste os elementos no Canvas para reposicionar.
+        </p>
+      )}
     </div>
   );
 };

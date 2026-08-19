@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { saveDarkClip, getDarkClips } from '@/lib/database';
+import { saveDarkClip, getDarkClips, deleteDarkClip } from '@/lib/database';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { uploadThumbnail } from '@/lib/storage';
@@ -216,6 +216,18 @@ export async function POST(req: Request) {
     });
   } catch (err: any) {
     console.error('Error importing dark clips:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
+    await deleteDarkClip(id);
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
