@@ -22,7 +22,7 @@ function getYtDlpPath(): string {
     ];
     
     for (const p of possiblePaths) {
-        if (fs.existsSync(p)) {
+        if (fs.existsSync(/*turbopackIgnore: true*/ p)) {
             console.log(`[VideoCaptureService] Encontrado yt-dlp em: ${p}`);
             return p;
         }

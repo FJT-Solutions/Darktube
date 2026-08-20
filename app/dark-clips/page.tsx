@@ -3341,8 +3341,6 @@ export default function DarkClipsPage() {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
               <div className="lg:col-span-5 lg:sticky lg:top-6 self-start space-y-2">
@@ -4013,9 +4011,9 @@ export default function DarkClipsPage() {
                     <div className="space-y-2.5">
                       {scheduledPosts.map((post) => {
                         const isPublished = post.status === "published";
-                        const isRendered = post.status === "rendered" || post.status === "completed";
-                        const isFailed = post.status === "failed" || post.status === "error";
-                        const isRendering = post.status === "rendering" || post.status === "publishing";
+                        const isRendered = (post.status as string) === "rendered" || (post.status as string) === "completed";
+                        const isFailed = post.status === "failed" || (post.status as string) === "error";
+                        const isRendering = (post.status as string) === "rendering" || post.status === "publishing";
 
                         return (
                           <div key={post.id} className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3 shadow-sm hover:border-border/80 transition-all">
