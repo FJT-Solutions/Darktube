@@ -114,7 +114,14 @@ function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: str
             </Button>
           </DialogHeader>
           <div className="aspect-[9/16] max-h-[75vh] w-full bg-black flex items-center justify-center p-2">
-            <video src={videoUrl} controls autoPlay className="w-full h-full max-h-[72vh] object-contain rounded-xl" />
+            <video
+              src={videoUrl}
+              controls
+              autoPlay
+              playsInline
+              preload="auto"
+              className="w-full h-full max-h-[72vh] object-contain rounded-xl shadow-lg"
+            />
           </div>
         </DialogContent>
       </Dialog>
