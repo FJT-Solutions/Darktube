@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { saveDarkClipPost } from '@/lib/database';
+import { uploadMediaFile } from '@/lib/storage';
+import path from 'path';
 
 const CANDIDATE_URLS = [
+  'http://n8n-remotionservice-ry6eh9:3001',
   process.env.REMOTION_SERVICE_URL?.replace(/\/render$/, ''),
   process.env.REMOTION_SERVER_URL,
-  'http://n8n-remotionservice-ry6eh9:3001',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
 ].filter(Boolean) as string[];
@@ -51,10 +53,27 @@ export async function POST(req: Request) {
 
         if (res.ok) {
           const data = await res.json();
-          renderedVideoUrl = data.videoUrl || data.url || '';
-          if (renderedVideoUrl) {
-            console.log(`[DarkClips Render] ✅ Render concluído com sucesso via ${cleanBase}:`, renderedVideoUrl);
-            break;
+          const rawUrl = data.videoUrl || data.url || '';
+          if (rawUrl) {
+            console.log(`[DarkClips Render] ✅ Render concluído via ${cleanBase}: ${rawUrl}. Persistindo no storage...`);
+
+            // Baixar o arquivo MP4 do container do Remotion e salvar no banco de dados local
+            try {
+              const fetchUrl = rawUrl.startsWith('http') ? rawUrl : `${cleanBase}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+              const videoStreamRes = await fetch(fetchUrl);
+              if (videoStreamRes.ok) {
+                const arrayBuf = await videoStreamRes.arrayBuffer();
+                const buffer = Buffer.from(arrayBuf);
+                const filename = `rendered_${path.basename(rawUrl)}`;
+                renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                console.log(`[DarkClips Render] ✅ MP4 persistido com sucesso em: ${renderedVideoUrl}`);
+                break;
+              }
+            } catch (persistErr: any) {
+              console.warn('[DarkClips Render] Aviso ao persistir MP4 no storage:', persistErr.message);
+              renderedVideoUrl = rawUrl;
+              break;
+            }
           }
         } else {
           lastError = await res.text();
@@ -67,8 +86,11 @@ export async function POST(req: Request) {
     }
 
     if (!renderedVideoUrl) {
-      console.warn(`[DarkClips Render] Remotion indisponível (${lastError}), usando vídeo sanitizado como fallback.`);
-      renderedVideoUrl = inputProps.videoUrl;
+      console.error(`[DarkClips Render] Falha em todos os endpoints do Remotion. Último erro: ${lastError}`);
+      return NextResponse.json({
+        success: false,
+        error: `Falha ao renderizar no Remotion: ${lastError || 'Servidor Remotion indisponível'}`,
+      }, { status: 500 });
     }
 
     // 2. Salvar post no banco de dados

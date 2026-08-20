@@ -59,7 +59,79 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
+
+function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: string }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDownloading(true);
+    try {
+      const res = await fetch(videoUrl);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `darkclip_${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(videoUrl, "_blank");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold">
+            <Play className="h-3 w-3 fill-current" />
+            Ver Vídeo
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md p-0 overflow-hidden bg-black/95 border-border shadow-2xl rounded-2xl">
+          <DialogHeader className="p-3.5 px-4 bg-zinc-900/80 backdrop-blur-md border-b border-border/50 flex flex-row items-center justify-between">
+            <DialogTitle className="text-white text-xs font-bold flex items-center gap-2 truncate pr-2">
+              <Film className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="truncate">{title}</span>
+            </DialogTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="h-6 text-[10px] gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black font-semibold mr-6"
+            >
+              {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+              Baixar MP4
+            </Button>
+          </DialogHeader>
+          <div className="aspect-[9/16] max-h-[75vh] w-full bg-black flex items-center justify-center p-2">
+            <video src={videoUrl} controls autoPlay className="w-full h-full max-h-[72vh] object-contain rounded-xl" />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={handleDownload}
+        disabled={downloading}
+        className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
+        title="Baixar Vídeo MP4"
+      >
+        {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  );
+}
 import {
   Select,
   SelectContent,
@@ -944,24 +1016,26 @@ export default function DarkClipsPage() {
     }
   }
 
-  async function handleRender() {
-    if (!selectedClip?.video_url) {
+  async function handleRender(targetClip?: DarkClip) {
+    const clipToRender = targetClip || selectedClip;
+    if (!clipToRender?.video_url) {
       toast.error("Selecione um clipe de vídeo para renderizar.");
-      return;
+      return null;
     }
 
     setIsRendering(true);
     try {
+      toast.info(`🎬 Enviando render de "${clipToRender.author_handle || 'Clipe'}" para o Remotion (1080x1920)...`);
       const res = await fetch("/api/dark-clips/render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clipId: selectedClip.id,
+          clipId: clipToRender.id,
           title: headline.mainText || "Dark Clip Meme",
-          durationInSeconds: selectedClip.duration || 15,
+          durationInSeconds: clipToRender.duration || 15,
           inputProps: {
-            videoUrl: selectedClip.video_url,
-            durationInSeconds: selectedClip.duration || 15,
+            videoUrl: clipToRender.video_url,
+            durationInSeconds: clipToRender.duration || 15,
             profileHeader,
             headline,
             videoPlacement,
@@ -985,11 +1059,14 @@ export default function DarkClipsPage() {
         setRenderedUrl(data.videoUrl);
         toast.success("🎉 Vídeo MP4 1080x1920 renderizado com sucesso!");
         fetchInitialData();
+        return data.videoUrl;
       } else {
-        toast.error(data.error || "Erro ao renderizar.");
+        toast.error(data.error || "Erro ao renderizar no Remotion.");
+        return null;
       }
     } catch {
-      toast.error("Falha no renderizador Remotion.");
+      toast.error("Falha ao comunicar com o renderizador Remotion.");
+      return null;
     } finally {
       setIsRendering(false);
     }
@@ -1002,6 +1079,16 @@ export default function DarkClipsPage() {
     }
 
     try {
+      let finalVideoUrl = renderedUrl;
+      if (!finalVideoUrl) {
+        toast.info("Renderizando clipe em 1080x1920 antes de agendar...");
+        finalVideoUrl = await handleRender(selectedClip);
+        if (!finalVideoUrl) {
+          toast.error("Não foi possível renderizar o vídeo para postagem.");
+          return;
+        }
+      }
+
       const scheduledDateTime = scheduleDate && scheduleTime ? `${scheduleDate}T${scheduleTime}:00` : new Date().toISOString();
       const res = await fetch("/api/dark-clips/schedule", {
         method: "POST",
@@ -1009,7 +1096,7 @@ export default function DarkClipsPage() {
         body: JSON.stringify({
           clipId: selectedClip.id,
           title: headline.mainText || "Meme Dark Clips",
-          renderedVideoUrl: renderedUrl || selectedClip.video_url,
+          renderedVideoUrl: finalVideoUrl,
           remodelData: {
             headline_main: headline.mainText,
             headline_sub: headline.subText,
@@ -1083,7 +1170,7 @@ export default function DarkClipsPage() {
 
             <Button
               size="sm"
-              onClick={handleRender}
+              onClick={() => handleRender()}
               disabled={isRendering || !selectedClip}
               className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-9 shadow-md shadow-red-600/20"
             >
@@ -3758,7 +3845,8 @@ export default function DarkClipsPage() {
                                 variant="secondary"
                                 onClick={() => {
                                   setSelectedClip(clip);
-                                  handleRender();
+                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  handleRender(clip);
                                 }}
                                 disabled={isRendering}
                                 className="text-[11px] h-7 px-2.5 text-red-400 border border-red-500/30 hover:bg-red-500/10 font-bold"
@@ -3802,7 +3890,7 @@ export default function DarkClipsPage() {
 
                         <Button
                           size="sm"
-                          onClick={handleRender}
+                          onClick={() => handleRender()}
                           disabled={isRendering}
                           className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-8 shadow-sm"
                         >
@@ -4047,13 +4135,12 @@ export default function DarkClipsPage() {
                                 </Badge>
                               )}
 
-                              {/* Download MP4 */}
+                              {/* Ver Vídeo & Baixar MP4 */}
                               {post.rendered_video_url && (
-                                <a href={post.rendered_video_url} target="_blank" rel="noreferrer" download>
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" title="Baixar Vídeo MP4">
-                                    <Download className="h-3.5 w-3.5" />
-                                  </Button>
-                                </a>
+                                <DarkClipsVideoModal
+                                  videoUrl={post.rendered_video_url}
+                                  title={post.title || "Dark Clip"}
+                                />
                               )}
 
                               {/* Delete post from queue */}
