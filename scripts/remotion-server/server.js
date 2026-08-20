@@ -155,6 +155,23 @@ async function handleDarkClipsRender(req, res) {
       resolvedVideoUrl = '';
     }
 
+    if (resolvedVideoUrl && resolvedVideoUrl.startsWith('http')) {
+      try {
+        console.log(`[Remotion DarkClips] Pre-caching input video: ${resolvedVideoUrl}...`);
+        const vidRes = await fetch(resolvedVideoUrl);
+        if (vidRes.ok) {
+          const inputFileName = `input_${jobId}.mp4`;
+          const inputFilePath = path.join(OUTPUT_DIR, inputFileName);
+          const arrayBuf = await vidRes.arrayBuffer();
+          fs.writeFileSync(inputFilePath, Buffer.from(arrayBuf));
+          resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
+          console.log(`[Remotion DarkClips] ✅ Pre-cached input video to: ${resolvedVideoUrl}`);
+        }
+      } catch (cacheErr) {
+        console.warn(`[Remotion DarkClips] Pre-cache warning (using remote URL directly):`, cacheErr.message);
+      }
+    }
+
     const durationInSeconds = Number(inputProps.durationInSeconds) || 15;
     const durationInFrames = requestedFrames || Math.max(30, Math.round(durationInSeconds * 30));
 

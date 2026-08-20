@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Video, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, useCurrentFrame } from 'remotion';
 import { DarkClipsVideoProps, DarkClipArrowType } from '../types';
 
 export const renderArrowShape = (
@@ -308,7 +308,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
       {bgType === 'blur' ? (
         <AbsoluteFill style={{ overflow: 'hidden' }}>
           {hasVideo ? (
-            <Video
+            <OffthreadVideo
               src={videoUrl}
               muted
               volume={0}
@@ -555,7 +555,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           }}
         >
           {hasVideo ? (
-            <Video
+            <OffthreadVideo
               src={videoUrl}
               muted={muted !== false}
               volume={muted === false ? 1 : 0}
