@@ -51,3 +51,6 @@ verify_supabase.ts
 /tmp/
 *.mp4
 public/*.mp4
+
+# Scratch scripts and temporary research clones
+/scratch/
