@@ -275,7 +275,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   const bounceDelta = Math.sin(bounceCycle * Math.PI * 2) * 14;
   const pulseScale = 1 + Math.sin(bounceCycle * Math.PI * 2) * 0.15;
 
-  const hasVideo = !!(videoUrl && videoUrl.trim().length > 0);
+  const hasVideo = !!(videoUrl && videoUrl.trim().length > 0 && !videoUrl.startsWith('blob:'));
   const isLightBg = bgType === 'white';
 
   // Smart Contrast for Header and Subtitles

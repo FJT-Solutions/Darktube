@@ -107,13 +107,20 @@ export async function POST(req: Request) {
     if (Array.isArray(items) && items.length > 0) {
       for (const item of items) {
         try {
-          let videoUrl = item.videoUrl || item.url || '';
+          // Normalize source URL (never accept blob: as videoUrl)
+          let sourceUrl = item.url || item.originalUrl || item.videoUrl || '';
+          if (sourceUrl.startsWith('blob:')) {
+            sourceUrl = item.url || item.originalUrl || '';
+          }
+
+          let servedVideoUrl = '';
           let duration = item.duration || 15;
           let thumbUrl = item.thumbnailUrl || '';
 
-          // If extension sent direct web URL to download
-          if (videoUrl.startsWith('http') && !videoUrl.includes('/api/storage/') && !videoUrl.endsWith('.mp4')) {
-            const dl = await VideoCaptureService.downloadFromUrl(videoUrl);
+          // If source is a valid web URL, download and sanitize into local persistent MP4
+          if (sourceUrl.startsWith('http') && !sourceUrl.includes('/api/storage/') && !sourceUrl.endsWith('.mp4')) {
+            console.log(`[DarkClips Import] Downloading item from source: ${sourceUrl}`);
+            const dl = await VideoCaptureService.downloadFromUrl(sourceUrl);
             if (dl.videoPath && fs.existsSync(dl.videoPath)) {
               const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(dl.videoPath)}`);
               await sanitizeVideo(dl.videoPath, sanitizedPath);
@@ -122,6 +129,8 @@ export async function POST(req: Request) {
               const fileBuffer = fs.readFileSync(sanitizedPath);
               const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
               await uploadThumbnail(fileBuffer, filename);
+              servedVideoUrl = `/api/storage/${filename}`;
+
               if (dl.framePaths && dl.framePaths.length > 0 && fs.existsSync(dl.framePaths[0])) {
                 const frameBuf = fs.readFileSync(dl.framePaths[0]);
                 const thumbName = `thumb_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
@@ -129,6 +138,12 @@ export async function POST(req: Request) {
               }
               duration = dl.duration || duration;
             }
+          } else if (sourceUrl.startsWith('http')) {
+            servedVideoUrl = sourceUrl;
+          }
+
+          if (!servedVideoUrl && sourceUrl) {
+            servedVideoUrl = sourceUrl;
           }
 
           const rawHandle = item.authorHandle || item.author_handle || '@creator';
@@ -136,9 +151,9 @@ export async function POST(req: Request) {
 
           const saved = await saveDarkClip({
             user_id: targetUserId,
-            original_url: item.originalUrl || item.url || videoUrl,
+            original_url: sourceUrl,
             platform: item.platform || platform,
-            video_url: videoUrl,
+            video_url: servedVideoUrl,
             thumbnail_url: thumbUrl,
             duration,
             author_name: item.authorName || item.author_name || 'Viral Creator',

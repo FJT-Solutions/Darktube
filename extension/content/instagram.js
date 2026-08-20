@@ -225,7 +225,7 @@
 
       return {
         url: resolvedUrl,
-        videoUrl: video ? (video.src || video.querySelector('source')?.src || resolvedUrl) : resolvedUrl,
+        videoUrl: resolvedUrl,
         thumbnailUrl: thumbUrl,
         duration: video ? Math.round(video.duration || 15) : 15,
         authorName,
