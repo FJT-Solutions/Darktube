@@ -150,6 +150,10 @@ async function handleDarkClipsRender(req, res) {
     if (resolvedVideoUrl.startsWith('/api/storage/')) {
       resolvedVideoUrl = `https://darktube.fjt-solutions.com${resolvedVideoUrl}`;
     }
+    if (resolvedVideoUrl.startsWith('blob:')) {
+      console.warn(`[Remotion DarkClips] Ignoring invalid browser blob URL: ${resolvedVideoUrl}`);
+      resolvedVideoUrl = '';
+    }
 
     const durationInSeconds = Number(inputProps.durationInSeconds) || 15;
     const durationInFrames = requestedFrames || Math.max(30, Math.round(durationInSeconds * 30));

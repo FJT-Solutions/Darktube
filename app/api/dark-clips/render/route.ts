@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { saveDarkClipPost } from '@/lib/database';
 import { uploadMediaFile } from '@/lib/storage';
+import { pool } from '@/lib/db-client';
+import { VideoCaptureService } from '@/lib/video-capture';
+import { sanitizeVideo } from '@/lib/video-sanitizer';
+import fs from 'fs';
 import path from 'path';
 
 const CANDIDATE_URLS = [
@@ -28,6 +32,49 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Video URL e inputProps são obrigatórios.' }, { status: 400 });
     }
 
+    let sourceVideoUrl = inputProps.videoUrl || '';
+
+    // Auto-heal de URLs blob: antigas ou links web que ainda não foram baixados
+    if (sourceVideoUrl.startsWith('blob:') || (sourceVideoUrl.startsWith('http') && !sourceVideoUrl.includes('/api/storage/') && !sourceVideoUrl.endsWith('.mp4'))) {
+      if (clipId) {
+        try {
+          const clipRes = await pool.query('SELECT * FROM public.dark_clips WHERE id = $1', [clipId]);
+          if (clipRes.rows.length > 0) {
+            const clip = clipRes.rows[0];
+            const originalUrl = (clip.original_url && !clip.original_url.startsWith('blob:')) ? clip.original_url : (sourceVideoUrl.startsWith('blob:') ? '' : sourceVideoUrl);
+            if (originalUrl && originalUrl.startsWith('http') && !originalUrl.includes('/api/storage/')) {
+              console.log(`[DarkClips Render] Auto-healing clipe ${clipId} a partir de: ${originalUrl}`);
+              const dl = await VideoCaptureService.downloadFromUrl(originalUrl);
+              if (dl.videoPath && fs.existsSync(dl.videoPath)) {
+                const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
+                const sanitizedDir = path.join(baseTmp, 'sanitized_clips');
+                if (!fs.existsSync(sanitizedDir)) fs.mkdirSync(sanitizedDir, { recursive: true });
+                const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(dl.videoPath)}`);
+                await sanitizeVideo(dl.videoPath, sanitizedPath);
+
+                const fileBuffer = fs.readFileSync(sanitizedPath);
+                const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
+                sourceVideoUrl = await uploadMediaFile(fileBuffer, filename, 'video/mp4');
+
+                // Atualizar registro no banco para que nunca mais tenha blob:
+                await pool.query('UPDATE public.dark_clips SET video_url = $1 WHERE id = $2', [sourceVideoUrl, clipId]);
+                console.log(`[DarkClips Render] ✅ Clipe recuperado e salvo em: ${sourceVideoUrl}`);
+              }
+            }
+          }
+        } catch (healErr: any) {
+          console.warn('[DarkClips Render] Aviso ao recuperar vídeo original:', healErr.message);
+        }
+      }
+    }
+
+    if (sourceVideoUrl.startsWith('blob:')) {
+      return NextResponse.json({
+        success: false,
+        error: 'Este clipe foi minerado com uma URL temporária blob:. Por favor, reimporte o post com a extensão atualizada.',
+      }, { status: 400 });
+    }
+
     let renderedVideoUrl = '';
     let lastError = '';
 
@@ -45,6 +92,7 @@ export async function POST(req: Request) {
             compositionId: 'DarkClipsVideo',
             inputProps: {
               ...inputProps,
+              videoUrl: sourceVideoUrl,
               durationInSeconds,
             },
             durationInFrames: Math.max(30, Math.round(durationInSeconds * 30)),

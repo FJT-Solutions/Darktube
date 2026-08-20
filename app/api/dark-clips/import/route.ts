@@ -1,64 +1,11 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { saveDarkClip, getDarkClips, deleteDarkClip } from '@/lib/database';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { uploadThumbnail } from '@/lib/storage';
-
-const execFilePromise = promisify(execFile);
-
-/**
- * Sanitiza o arquivo de vídeo removendo metadados EXIF, device tags e assinaturas antigas
- */
-async function sanitizeVideo(inputPath: string, outputPath: string): Promise<string> {
-  try {
-    await execFilePromise(
-      'ffmpeg',
-      [
-        '-i', inputPath,
-        '-map_metadata', '-1',
-        '-map_chapters', '-1',
-        '-c:v', 'copy',
-        '-c:a', 'aac',
-        '-b:a', '192k',
-        '-movflags', '+faststart',
-        outputPath,
-        '-y'
-      ],
-      { timeout: 60000 }
-    );
-    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 1000) {
-      return outputPath;
-    }
-  } catch (err: any) {
-    console.warn(`[Sanitizer] FFmpeg sanitize copy failed, trying full transcode:`, err?.message);
-    try {
-      await execFilePromise(
-        'ffmpeg',
-        [
-          '-i', inputPath,
-          '-map_metadata', '-1',
-          '-map_chapters', '-1',
-          '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '22',
-          '-c:a', 'aac',
-          '-b:a', '192k',
-          outputPath,
-          '-y'
-        ],
-        { timeout: 120000 }
-      );
-      if (fs.existsSync(outputPath)) return outputPath;
-    } catch (e) {
-      console.error(`[Sanitizer] Full transcode failed:`, e);
-    }
-  }
-  return inputPath; // fallback
-}
+import { sanitizeVideo } from '@/lib/video-sanitizer';
 
 export async function GET() {
   try {
