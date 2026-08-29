@@ -183,18 +183,24 @@
         const match = currentUrl.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
         if (match && !currentUrl.includes('/audio/')) {
           resolvedUrl = `https://www.instagram.com/${match[1] === 'reels' ? 'reel' : match[1]}/${match[2]}/`;
-        } else {
-          // Check any post links on document
-          const docLinks = Array.from(document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]'));
-          for (const dl of docLinks) {
-            const h = dl.getAttribute('href') || dl.href || '';
+        }
+      }
+
+      if (!resolvedUrl) {
+        // Look in parent elements up to body
+        let parent = container.parentElement;
+        while (parent && parent !== document.body && !resolvedUrl) {
+          const pLinks = Array.from(parent.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]'));
+          for (const pl of pLinks) {
+            const h = pl.getAttribute('href') || pl.href || '';
             if (h.includes('/audio/')) continue;
-            const dm = h.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
-            if (dm) {
-              resolvedUrl = `https://www.instagram.com/${dm[1] === 'reels' ? 'reel' : dm[1]}/${dm[2]}/`;
+            const pm = h.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
+            if (pm) {
+              resolvedUrl = `https://www.instagram.com/${pm[1] === 'reels' ? 'reel' : pm[1]}/${pm[2]}/`;
               break;
             }
           }
+          parent = parent.parentElement;
         }
       }
 
@@ -564,34 +570,36 @@
     const btn = document.createElement('button');
     btn.className = 'dark-clips-inject-btn';
     btn.setAttribute('type', 'button');
-    // Fixed positioning — completely outside Instagram's container hierarchy
     btn.style.cssText = `
       position: fixed !important;
       z-index: 2147483647 !important;
-      pointer-events: all !important;
+      pointer-events: auto !important;
+      cursor: pointer !important;
     `;
     btn.innerHTML = `
       <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       <span>Dark Clips</span>
     `;
 
-    // All events isolated — button is on body, not inside video hierarchy
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      onClick();
-    });
+    let lastTrigger = 0;
+    const trigger = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const now = Date.now();
+      if (now - lastTrigger < 1200) return;
+      lastTrigger = now;
+      console.log('[DarkClips] Floating button acionado pelo usuário!');
+      try {
+        onClick();
+      } catch (err) {
+        console.error('[DarkClips] Erro ao executar onClick:', err);
+      }
+    };
 
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    btn.addEventListener('click', trigger, true);
+    btn.addEventListener('pointerup', trigger, true);
 
     return btn;
   }
