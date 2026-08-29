@@ -739,9 +739,11 @@ export async function ensureDarkClipsTablesExist() {
             author_avatar TEXT,
             original_caption TEXT,
             original_metrics JSONB DEFAULT '{}'::jsonb,
+            remodel_data JSONB DEFAULT '{}'::jsonb,
             sanitized BOOLEAN DEFAULT true,
             created_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE public.dark_clips ADD COLUMN IF NOT EXISTS remodel_data JSONB DEFAULT '{}'::jsonb;
 
         CREATE TABLE IF NOT EXISTS public.dark_clips_presets (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -780,30 +782,64 @@ export async function ensureDarkClipsTablesExist() {
 
 export async function saveDarkClip(clip: Partial<DarkClip>): Promise<DarkClip> {
     await ensureDarkClipsTablesExist()
-    const query = `
-        INSERT INTO public.dark_clips (
-            user_id, original_url, platform, video_url, thumbnail_url,
-            duration, author_name, author_handle, author_avatar,
-            original_caption, original_metrics, sanitized
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING *
-    `
-    const values = [
-        clip.user_id || null,
-        clip.original_url,
-        clip.platform || 'other',
-        clip.video_url,
-        clip.thumbnail_url || '',
-        clip.duration || 0,
-        clip.author_name || '',
-        clip.author_handle || '',
-        clip.author_avatar || '',
-        clip.original_caption || '',
-        JSON.stringify(clip.original_metrics || {}),
-        clip.sanitized !== false
-    ]
-    const { rows } = await pool.query(query, values)
-    return rows[0]
+    if (clip.id) {
+        const query = `
+            UPDATE public.dark_clips SET
+                video_url = COALESCE($1, video_url),
+                thumbnail_url = COALESCE($2, thumbnail_url),
+                duration = COALESCE($3, duration),
+                author_name = COALESCE($4, author_name),
+                author_handle = COALESCE($5, author_handle),
+                author_avatar = COALESCE($6, author_avatar),
+                original_caption = COALESCE($7, original_caption),
+                original_metrics = COALESCE($8, original_metrics),
+                remodel_data = COALESCE($9, remodel_data),
+                sanitized = COALESCE($10, sanitized)
+            WHERE id = $11
+            RETURNING *
+        `
+        const values = [
+            clip.video_url,
+            clip.thumbnail_url,
+            clip.duration,
+            clip.author_name,
+            clip.author_handle,
+            clip.author_avatar,
+            clip.original_caption,
+            clip.original_metrics ? JSON.stringify(clip.original_metrics) : null,
+            clip.remodel_data ? JSON.stringify(clip.remodel_data) : null,
+            clip.sanitized,
+            clip.id
+        ]
+        const { rows } = await pool.query(query, values)
+        return rows[0]
+    } else {
+        const query = `
+            INSERT INTO public.dark_clips (
+                user_id, original_url, platform, video_url, thumbnail_url,
+                duration, author_name, author_handle, author_avatar,
+                original_caption, original_metrics, remodel_data, sanitized
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING *
+        `
+        const values = [
+            clip.user_id || null,
+            clip.original_url,
+            clip.platform || 'other',
+            clip.video_url,
+            clip.thumbnail_url || '',
+            clip.duration || 0,
+            clip.author_name || '',
+            clip.author_handle || '',
+            clip.author_avatar || '',
+            clip.original_caption || '',
+            JSON.stringify(clip.original_metrics || {}),
+            JSON.stringify(clip.remodel_data || {}),
+            clip.sanitized !== false
+        ]
+        const { rows } = await pool.query(query, values)
+        return rows[0]
+    }
 }
 
 export async function getDarkClips(userId?: string): Promise<DarkClip[]> {
@@ -819,7 +855,8 @@ export async function getDarkClips(userId?: string): Promise<DarkClip[]> {
     return rows.map((r: any) => ({
         ...r,
         duration: Number(r.duration || 0),
-        original_metrics: typeof r.original_metrics === 'string' ? JSON.parse(r.original_metrics) : (r.original_metrics || {})
+        original_metrics: typeof r.original_metrics === 'string' ? JSON.parse(r.original_metrics) : (r.original_metrics || {}),
+        remodel_data: typeof r.remodel_data === 'string' ? JSON.parse(r.remodel_data) : (r.remodel_data || {})
     }))
 }
 
@@ -830,7 +867,8 @@ export async function getDarkClipById(id: string): Promise<DarkClip | null> {
     return {
         ...rows[0],
         duration: Number(rows[0].duration || 0),
-        original_metrics: typeof rows[0].original_metrics === 'string' ? JSON.parse(rows[0].original_metrics) : (rows[0].original_metrics || {})
+        original_metrics: typeof rows[0].original_metrics === 'string' ? JSON.parse(rows[0].original_metrics) : (rows[0].original_metrics || {}),
+        remodel_data: typeof rows[0].remodel_data === 'string' ? JSON.parse(rows[0].remodel_data) : (rows[0].remodel_data || {})
     }
 }
 

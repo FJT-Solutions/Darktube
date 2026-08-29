@@ -144,6 +144,13 @@ export interface DarkClip {
     shares?: number
   }
   sanitized: boolean
+  remodel_data?: {
+    headline_main?: string
+    headline_sub?: string
+    cta_text?: string
+    post_caption?: string
+    hashtags?: string[]
+  }
   created_at: string
 }
 

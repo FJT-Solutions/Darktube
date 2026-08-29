@@ -1038,9 +1038,15 @@ export default function DarkClipsPage() {
       return null;
     }
 
-    // Se o texto da headline ainda for o template padrão fixo, gera automaticamente um gancho inédito para o vídeo com IA antes de renderizar
+    // Se o texto da headline ainda for o template padrão fixo, usa o gancho exclusivo do clipe ou gera na hora com IA
     let currentHeadline = headline;
-    if (headline.mainText === 'Meu amigo: "Comprei um mic novo, mano."' || !headline.mainText) {
+    if (clipToRender.remodel_data?.headline_main && (headline.mainText === 'Meu amigo: "Comprei um mic novo, mano."' || !headline.mainText)) {
+      currentHeadline = {
+        ...headline,
+        mainText: clipToRender.remodel_data.headline_main,
+        subText: clipToRender.remodel_data.headline_sub || headline.subText,
+      };
+    } else if (headline.mainText === 'Meu amigo: "Comprei um mic novo, mano."' || !headline.mainText) {
       toast.info("✨ Criando gancho e textos exclusivos para este vídeo com IA...");
       const aiData = await handleRemodelWithAi(clipToRender);
       if (aiData?.headline_main) {
@@ -3840,6 +3846,12 @@ export default function DarkClipsPage() {
                               <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
                                 {clip.original_caption || clip.original_url}
                               </p>
+
+                              {clip.remodel_data?.headline_main ? (
+                                <div className="mt-1.5 p-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-300 font-semibold line-clamp-2 leading-tight">
+                                  ✨ {clip.remodel_data.headline_main}
+                                </div>
+                              ) : null}
                             </div>
 
                             <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border/40">
@@ -3849,6 +3861,18 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  if (clip.remodel_data?.headline_main) {
+                                    setHeadline((h) => ({
+                                      ...h,
+                                      mainText: clip.remodel_data!.headline_main!,
+                                      subText: clip.remodel_data!.headline_sub || h.subText,
+                                    }));
+                                    if (clip.remodel_data.cta_text && footer.showFooter) {
+                                      setFooter((f) => ({ ...f, text: clip.remodel_data!.cta_text! }));
+                                    }
+                                    if (clip.remodel_data.post_caption) setPostCaption(clip.remodel_data.post_caption);
+                                    if (clip.remodel_data.hashtags) setPostHashtags(clip.remodel_data.hashtags);
+                                  }
                                 }}
                                 className="flex-1 text-[11px] h-7 font-bold"
                               >

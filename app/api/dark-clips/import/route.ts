@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
-import { saveDarkClip, getDarkClips, deleteDarkClip } from '@/lib/database';
+import { saveDarkClip, getDarkClips, deleteDarkClip, getUserApiKey } from '@/lib/database';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { uploadThumbnail } from '@/lib/storage';
 import { sanitizeVideo } from '@/lib/video-sanitizer';
+import { generateAiRemodelForClip } from '../remodel-ai/route';
 
 export async function GET() {
   try {
@@ -43,12 +44,14 @@ export async function POST(req: Request) {
     }
 
     const targetUserId = user?.id || userId || null;
+    const userOpenAiKey = targetUserId ? await getUserApiKey(targetUserId, 'openai') : null;
+    const userGeminiKey = targetUserId ? await getUserApiKey(targetUserId, 'gemini') : null;
 
-
-    const results = [];
     const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
     const sanitizedDir = path.join(baseTmp, 'sanitized_clips');
     if (!fs.existsSync(sanitizedDir)) fs.mkdirSync(sanitizedDir, { recursive: true });
+
+    const results = [];
 
     // ── 1. Process items directly from extension ──
     if (Array.isArray(items) && items.length > 0) {
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
 
           let servedVideoUrl = '';
           let duration = item.duration || 15;
-          let thumbUrl = item.thumbnailUrl || '';
+          let thumbUrl = item.thumbnailUrl || item.thumbnail || '';
 
           // If source is a valid web URL, download and sanitize into local persistent MP4
           if (sourceUrl.startsWith('http') && !sourceUrl.includes('/api/storage/') && !sourceUrl.endsWith('.mp4')) {
@@ -95,6 +98,22 @@ export async function POST(req: Request) {
 
           const rawHandle = item.authorHandle || item.author_handle || '@creator';
           const author_handle = rawHandle.startsWith('@') ? rawHandle.replace(/^@+/, '@') : `@${rawHandle}`;
+          const rawCaption = item.originalCaption || item.caption || item.title || '';
+
+          // Geração automática de Gancho e Textos com IA para este clipe específico
+          let remodelData = null;
+          try {
+            remodelData = await generateAiRemodelForClip({
+              originalCaption: rawCaption,
+              authorName: item.authorName || item.author_name || 'Viral Creator',
+              authorHandle: author_handle,
+              platform: item.platform || platform,
+              userOpenAiKey,
+              userGeminiKey,
+            });
+          } catch (aiErr) {
+            console.warn('[DarkClips Import] Aviso ao gerar IA para clipe importado:', aiErr);
+          }
 
           const saved = await saveDarkClip({
             user_id: targetUserId,
@@ -106,8 +125,9 @@ export async function POST(req: Request) {
             author_name: item.authorName || item.author_name || 'Viral Creator',
             author_handle,
             author_avatar: item.authorAvatar || item.author_avatar || '',
-            original_caption: item.originalCaption || item.caption || '',
+            original_caption: rawCaption,
             original_metrics: item.metrics || item.original_metrics || {},
+            remodel_data: remodelData || {},
             sanitized: true
           });
           results.push(saved);
@@ -152,6 +172,21 @@ export async function POST(req: Request) {
           else if (cleanUrl.includes('twitter.com') || cleanUrl.includes('x.com')) detectedPlatform = 'twitter';
           else if (cleanUrl.includes('facebook.com')) detectedPlatform = 'facebook';
 
+          // Geração automática de Gancho e Textos com IA para a URL importada
+          let remodelData = null;
+          try {
+            remodelData = await generateAiRemodelForClip({
+              originalCaption: cleanUrl,
+              authorName: 'Viral Creator',
+              authorHandle: '@viral',
+              platform: detectedPlatform,
+              userOpenAiKey,
+              userGeminiKey,
+            });
+          } catch (aiErr) {
+            console.warn('[DarkClips Import] Aviso ao gerar IA para URL:', aiErr);
+          }
+
           const saved = await saveDarkClip({
             user_id: targetUserId,
             original_url: cleanUrl,
@@ -162,6 +197,7 @@ export async function POST(req: Request) {
             author_name: 'Viral Creator',
             author_handle: '@viral',
             original_caption: '',
+            remodel_data: remodelData || {},
             sanitized: true
           });
           results.push(saved);
