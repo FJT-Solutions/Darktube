@@ -51,6 +51,23 @@ export async function POST(req: NextRequest) {
 
     const { rows } = await pool.query(query, queryParams);
     console.log(`[Production Webhook] Histórico atualizado com sucesso (${status}).`);
+
+    // Atualizar dark_clips_posts caso o historyId pertença a um render de Dark Clips
+    try {
+      if (isValidUuid(historyId)) {
+        await pool.query(
+          `UPDATE public.dark_clips_posts SET
+            status = $1,
+            rendered_video_url = COALESCE($2, rendered_video_url),
+            error_message = $3
+           WHERE id = $4`,
+          [status === 'completed' ? 'rendered' : 'failed', videoUrl || null, error || null, historyId]
+        );
+      }
+    } catch (dcErr) {
+      console.warn('[Production Webhook] Nota ao atualizar dark_clips_posts:', dcErr);
+    }
+
     return NextResponse.json({ success: true, updated: rows[0] || null });
   } catch (error: any) {
     console.error('Erro ao processar webhook de conclusão de produção:', error);

@@ -40,7 +40,8 @@ import {
   FolderPlus,
   Move,
   Navigation,
-  Smartphone
+  Smartphone,
+  History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -492,6 +493,33 @@ export default function DarkClipsPage() {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  // Polling ativo quando há algum clipe em processamento/renderização
+  useEffect(() => {
+    const hasRendering = scheduledPosts.some((p) => p.status === 'rendering' || p.status === 'publishing') || renderingClipIds.length > 0 || isRendering;
+    if (!hasRendering) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/dark-clips/schedule");
+        const data = await res.json();
+        if (data.success && data.posts) {
+          setScheduledPosts(data.posts);
+          if (selectedClip) {
+            const match = data.posts.find((p: any) => p.clip_id === selectedClip.id && p.rendered_video_url);
+            if (match && match.status === 'rendered') {
+              setRenderedUrl(match.rendered_video_url);
+              setRenderingClipIds((prev) => prev.filter((id) => id !== selectedClip.id));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Polling dark clips error:", e);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [scheduledPosts, renderingClipIds, isRendering, selectedClip]);
 
   async function fetchInitialData() {
     setLoading(true);
@@ -1129,13 +1157,20 @@ export default function DarkClipsPage() {
         }),
       });
       const data = await res.json();
-      if (data.success && data.videoUrl) {
-        setRenderedUrl(data.videoUrl);
-        toast.success("🎉 Vídeo MP4 1080x1920 renderizado com sucesso!", { id: renderToastId });
+      if (data.success) {
+        if (data.videoUrl) {
+          setRenderedUrl(data.videoUrl);
+          toast.success("🎉 Vídeo MP4 1080x1920 renderizado com sucesso!", { id: renderToastId });
+        } else {
+          toast.success("🎬 Produção enviada para o Remotion! Acompanhe o status no Histórico de Produções abaixo.", { id: renderToastId });
+        }
+        if (data.post) {
+          setScheduledPosts((prev) => [data.post, ...prev.filter((p) => p.id !== data.post.id)]);
+        }
         fetchInitialData();
-        return data.videoUrl;
+        return data.videoUrl || data.post?.id;
       } else {
-        toast.error(data.error || "Erro ao renderizar no Remotion.", { id: renderToastId });
+        toast.error(data.error || "Erro ao iniciar renderização no Remotion.", { id: renderToastId });
         return null;
       }
     } catch {
@@ -4366,82 +4401,153 @@ export default function DarkClipsPage() {
                   </Card>
                 )}
 
-                {/* 3. Fila de Postagens Agendadas */}
-                <div className="space-y-3 pt-2">
-                  <h3 className="text-sm font-bold flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-primary" /> Fila de Postagens Agendadas ({scheduledPosts.length})
-                  </h3>
-
-                  {scheduledPosts.length === 0 ? (
-                    <div className="text-center py-8 border rounded-xl bg-card border-dashed">
-                      <Calendar className="h-7 w-7 mx-auto text-muted-foreground mb-1.5 opacity-50" />
-                      <p className="text-xs text-muted-foreground">Nenhuma postagem agendada na fila.</p>
+                {/* 3. Histórico de Produções & Processos (Dark Clips) */}
+                <Card className="border-emerald-500/20 shadow-md">
+                  <CardHeader className="p-4 pb-3 border-b border-border/40 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <History className="h-4 w-4 text-emerald-400" /> HISTÓRICO DE PRODUÇÕES & PROCESSOS ({scheduledPosts.length})
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Acompanhe o status de renderização no Remotion, assista às prévias geradas em 1080x1920 e agende suas postagens.
+                      </CardDescription>
                     </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {scheduledPosts.map((post) => {
-                        const isPublished = post.status === "published";
-                        const isRendered = (post.status as string) === "rendered" || (post.status as string) === "completed";
-                        const isFailed = post.status === "failed" || (post.status as string) === "error";
-                        const isRendering = (post.status as string) === "rendering" || post.status === "publishing";
 
-                        return (
-                          <div key={post.id} className="p-3 rounded-xl border border-border bg-card flex items-center justify-between gap-3 shadow-sm hover:border-border/80 transition-all">
-                            <div className="min-w-0">
-                              <p className="font-bold text-xs truncate">{post.title || "Dark Clip Meme"}</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Post Imediato"}
-                              </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fetchInitialData()}
+                      className="h-7 text-xs gap-1.5 border-border/60 hover:bg-secondary/40 font-semibold"
+                      title="Atualizar lista de produções"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Atualizar
+                    </Button>
+                  </CardHeader>
+
+                  <CardContent className="p-4">
+                    {scheduledPosts.length === 0 ? (
+                      <div className="text-center py-10 border rounded-xl bg-card/50 border-dashed">
+                        <History className="h-8 w-8 mx-auto text-muted-foreground mb-2 opacity-40" />
+                        <p className="text-xs font-semibold text-muted-foreground">Nenhuma produção registrada ainda.</p>
+                        <p className="text-[11px] text-muted-foreground/80 mt-1">
+                          Clique em &quot;🎬 Produzir&quot; em qualquer clipe acima para iniciar a renderização no Remotion.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {scheduledPosts.map((post) => {
+                          const isPublished = post.status === "published";
+                          const isRendered = (post.status as string) === "rendered" || (post.status as string) === "completed";
+                          const isFailed = post.status === "failed" || (post.status as string) === "error";
+                          const isRendering = (post.status as string) === "rendering" || post.status === "publishing";
+
+                          return (
+                            <div
+                              key={post.id}
+                              className="p-3.5 rounded-xl border border-border bg-card flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm hover:border-border/90 transition-all"
+                            >
+                              <div className="min-w-0 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-bold text-xs truncate text-foreground">{post.title || "Dark Clip Meme"}</p>
+                                  {post.remodel_data?.headline_main && post.remodel_data.headline_main !== post.title && (
+                                    <span className="text-[11px] text-amber-400 font-semibold truncate max-w-xs">
+                                      ✨ {post.remodel_data.headline_main}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                  <span>
+                                    {post.created_at ? new Date(post.created_at).toLocaleString("pt-BR") : post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Recentemente"}
+                                  </span>
+                                  {post.error_message && (
+                                    <span className="text-red-400 truncate max-w-xs" title={post.error_message}>
+                                      • Erro: {post.error_message}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                                {isPublished ? (
+                                  <Badge className="text-[10px] uppercase bg-emerald-600 text-white font-bold">
+                                    ✓ Publicado
+                                  </Badge>
+                                ) : isRendered ? (
+                                  <Badge className="text-[10px] uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+                                    ✓ Concluído
+                                  </Badge>
+                                ) : isRendering ? (
+                                  <Badge className="text-[10px] uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold animate-pulse flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Renderizando...
+                                  </Badge>
+                                ) : isFailed ? (
+                                  <Badge variant="destructive" className="text-[10px] uppercase font-bold">
+                                    ❌ Falhou
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-[10px] uppercase font-bold text-purple-300 bg-purple-900/30 border border-purple-500/30">
+                                    🕒 Agendado
+                                  </Badge>
+                                )}
+
+                                {/* Assistir Prévia do Vídeo MP4 */}
+                                {post.rendered_video_url && (
+                                  <DarkClipsVideoModal
+                                    videoUrl={post.rendered_video_url}
+                                    title={post.title || "Dark Clip 9:16"}
+                                  />
+                                )}
+
+                                {/* Carregar no Estúdio de Agendamento */}
+                                {post.rendered_video_url && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      if (post.rendered_video_url) {
+                                        setRenderedUrl(post.rendered_video_url);
+                                      }
+                                      if (post.title) {
+                                        setHeadline((h) => ({ ...h, mainText: post.title || h.mainText }));
+                                      }
+                                      const postCap = post.remodel_data?.post_caption || post.remodel_data?.caption;
+                                      if (postCap) {
+                                        setPostCaption(postCap);
+                                      }
+                                      if (post.remodel_data?.hashtags) {
+                                        setPostHashtags(post.remodel_data.hashtags);
+                                      }
+                                      toast.info("Vídeo carregado no Estúdio de Produção para agendamento/publicação!");
+                                    }}
+                                    className="h-7 text-[10px] gap-1 font-semibold border-primary/40 text-primary hover:bg-primary/10"
+                                    title="Carregar este vídeo no Estúdio de Produção para agendar"
+                                  >
+                                    <Send className="h-3 w-3" />
+                                    Usar no Estúdio
+                                  </Button>
+                                )}
+
+                                {/* Excluir postagem da fila/histórico */}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeletePost(post.id)}
+                                  className="h-7 w-7 text-red-400/80 hover:text-red-400 hover:bg-red-950/20"
+                                  title="Excluir do histórico"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             </div>
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {isPublished ? (
-                                <Badge className="text-[9px] uppercase bg-emerald-600 text-white font-bold">
-                                  ✓ Publicado
-                                </Badge>
-                              ) : isRendered ? (
-                                <Badge className="text-[9px] uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
-                                  ✓ Pronto
-                                </Badge>
-                              ) : isRendering ? (
-                                <Badge className="text-[9px] uppercase bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold animate-pulse">
-                                  ⏳ Renderizando
-                                </Badge>
-                              ) : isFailed ? (
-                                <Badge variant="destructive" className="text-[9px] uppercase font-bold">
-                                  ❌ Falhou
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-[9px] uppercase font-bold text-purple-300 bg-purple-900/30 border border-purple-500/30">
-                                  🕒 Agendado
-                                </Badge>
-                              )}
-
-                              {/* Ver Vídeo & Baixar MP4 */}
-                              {post.rendered_video_url && (
-                                <DarkClipsVideoModal
-                                  videoUrl={post.rendered_video_url}
-                                  title={post.title || "Dark Clip"}
-                                />
-                              )}
-
-                              {/* Delete post from queue */}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => handleDeletePost(post.id)}
-                                className="h-7 w-7 text-red-400/80 hover:text-red-400 hover:bg-red-950/20"
-                                title="Excluir postagem da fila"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
               </div>
 

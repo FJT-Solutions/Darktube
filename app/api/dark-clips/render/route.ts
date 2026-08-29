@@ -152,97 +152,116 @@ export async function POST(req: Request) {
       }
     }
 
-    let renderedVideoUrl = '';
-    let lastError = '';
-
-    // 1. Tentar conectar nos endpoints do Remotion
-    for (const baseUrl of CANDIDATE_URLS) {
-      const cleanBase = baseUrl.replace(/\/+$/, '');
-      const renderEndpoint = cleanBase.endsWith('/render') ? cleanBase : `${cleanBase}/render`;
-      console.log(`[DarkClips Render] Tentando Remotion Server em ${renderEndpoint}...`);
-
-      try {
-        const res = await fetch(renderEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            compositionId: 'DarkClipsVideo',
-            inputProps: {
-              ...inputProps,
-              videoUrl: sourceVideoUrl,
-              durationInSeconds,
-            },
-            durationInFrames: Math.max(30, Math.round(durationInSeconds * 30)),
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const rawUrl = data.videoUrl || data.url || '';
-          if (rawUrl) {
-            console.log(`[DarkClips Render] ✅ Render concluído via ${cleanBase}: ${rawUrl}. Persistindo no storage...`);
-
-            // Baixar o arquivo MP4 do container do Remotion e salvar no banco de dados local
-            try {
-              const fetchUrl = rawUrl.startsWith('http') ? rawUrl : `${cleanBase}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
-              const videoStreamRes = await fetch(fetchUrl);
-              if (videoStreamRes.ok) {
-                const arrayBuf = await videoStreamRes.arrayBuffer();
-                const buffer = Buffer.from(arrayBuf);
-                const filename = `rendered_${path.basename(rawUrl)}`;
-                renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
-                console.log(`[DarkClips Render] ✅ MP4 persistido com sucesso em: ${renderedVideoUrl}`);
-                break;
-              }
-            } catch (persistErr: any) {
-              console.warn('[DarkClips Render] Aviso ao persistir MP4 no storage:', persistErr.message);
-              renderedVideoUrl = rawUrl;
-              break;
-            }
-          }
-        } else {
-          lastError = await res.text();
-          console.warn(`[DarkClips Render] Resposta não-OK de ${cleanBase}:`, lastError);
-        }
-      } catch (err: any) {
-        lastError = err?.message;
-        console.warn(`[DarkClips Render] Falha ao conectar em ${cleanBase}:`, lastError);
-      }
-    }
-
-    if (!renderedVideoUrl) {
-      console.error(`[DarkClips Render] Falha em todos os endpoints do Remotion. Último erro: ${lastError}`);
-      return NextResponse.json({
-        success: false,
-        error: `Falha ao renderizar no Remotion: ${lastError || 'Servidor Remotion indisponível'}`,
-      }, { status: 500 });
-    }
-
-    // 2. Salvar post no banco de dados
-    const post = await saveDarkClipPost({
+    // 1. Criar registro imediato no Histórico de Produções com status 'rendering'
+    const postTitle = title || finalRemodelData.headline_main || clipRecord?.author_handle || 'Dark Clip Render';
+    const initialPost = await saveDarkClipPost({
       user_id: user?.id,
       clip_id: clipId,
-      title,
-      rendered_video_url: renderedVideoUrl,
-      remodel_data: remodelData || {
+      title: postTitle,
+      remodel_data: finalRemodelData || {
         headline_main: inputProps.headline?.mainText,
         headline_sub: inputProps.headline?.subText,
         cta_text: inputProps.footer?.text,
       },
-      status: 'rendered',
+      status: 'rendering',
     });
 
+    const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://darktube.fjt-solutions.com'}/api/webhooks/production-complete`;
+
+    // 2. Disparo assíncrono para o container do Remotion
+    (async () => {
+      let renderedVideoUrl = '';
+      let lastError = '';
+
+      for (const baseUrl of CANDIDATE_URLS) {
+        const cleanBase = baseUrl.replace(/\/+$/, '');
+        const renderEndpoint = cleanBase.endsWith('/render') ? cleanBase : `${cleanBase}/render`;
+        console.log(`[DarkClips Render] Despachando para Remotion Server em ${renderEndpoint} (Job: ${initialPost.id})...`);
+
+        try {
+          const res = await fetch(renderEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              compositionId: 'DarkClipsVideo',
+              historyId: initialPost.id,
+              callbackUrl,
+              inputProps: {
+                ...inputProps,
+                videoUrl: sourceVideoUrl,
+                durationInSeconds,
+              },
+              durationInFrames: Math.max(30, Math.round(durationInSeconds * 30)),
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const rawUrl = data.videoUrl || data.url || '';
+            if (rawUrl) {
+              console.log(`[DarkClips Render] ✅ Render concluído via ${cleanBase}: ${rawUrl}. Persistindo no storage...`);
+
+              try {
+                const fetchUrl = rawUrl.startsWith('http') ? rawUrl : `${cleanBase}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+                const videoStreamRes = await fetch(fetchUrl);
+                if (videoStreamRes.ok) {
+                  const arrayBuf = await videoStreamRes.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuf);
+                  const filename = `rendered_${path.basename(rawUrl)}`;
+                  renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                  console.log(`[DarkClips Render] ✅ MP4 persistido com sucesso em: ${renderedVideoUrl}`);
+                }
+              } catch (persistErr: any) {
+                console.warn('[DarkClips Render] Aviso ao persistir MP4 no storage:', persistErr.message);
+                renderedVideoUrl = rawUrl;
+              }
+
+              if (renderedVideoUrl) {
+                await saveDarkClipPost({
+                  id: initialPost.id,
+                  rendered_video_url: renderedVideoUrl,
+                  status: 'rendered',
+                });
+                break;
+              }
+            }
+          } else {
+            lastError = await res.text();
+            console.warn(`[DarkClips Render] Resposta não-OK de ${cleanBase}:`, lastError);
+          }
+        } catch (err: any) {
+          lastError = err?.message;
+          console.warn(`[DarkClips Render] Falha ao conectar em ${cleanBase}:`, lastError);
+        }
+      }
+
+      if (!renderedVideoUrl && lastError) {
+        console.error(`[DarkClips Render] Render falhou para ${initialPost.id}: ${lastError}`);
+        try {
+          await pool.query('UPDATE public.dark_clips_posts SET status = $1, error_message = $2 WHERE id = $3', ['failed', lastError, initialPost.id]);
+        } catch (e) {}
+      }
+
+      if (activeLockClipId) {
+        activeClipRenders.delete(activeLockClipId);
+      }
+    })().catch((bgErr) => {
+      console.error('[DarkClips Render] Erro inesperado em background render:', bgErr);
+      if (activeLockClipId) activeClipRenders.delete(activeLockClipId);
+    });
+
+    // Resposta imediata para a interface não travar e o card entrar no Histórico
     return NextResponse.json({
       success: true,
-      videoUrl: renderedVideoUrl,
-      post,
+      message: 'Renderização iniciada com sucesso em segundo plano no Remotion.',
+      post: initialPost,
+      status: 'rendering',
     });
   } catch (err: any) {
     console.error('Error in dark-clips render API:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  } finally {
     if (activeLockClipId) {
       activeClipRenders.delete(activeLockClipId);
     }
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

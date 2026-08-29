@@ -1,11 +1,49 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getDarkClipPosts, saveDarkClipPost, deleteDarkClipPost, updateDarkClipPostStatus, getUserApiKey } from '@/lib/database';
+import { uploadMediaFile } from '@/lib/storage';
+import { pool } from '@/lib/db-client';
+
+const CANDIDATE_URLS = [
+  'http://n8n-remotionservice-ry6eh9:3001',
+  process.env.REMOTION_SERVICE_URL?.replace(/\/render$/, ''),
+  process.env.REMOTION_SERVER_URL,
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+].filter(Boolean) as string[];
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     const posts = await getDarkClipPosts(user?.id);
+
+    // Auto-reconciliação de renders em andamento diretamente do storage do Remotion
+    for (const post of posts) {
+      if (post.status === 'rendering') {
+        for (const baseUrl of CANDIDATE_URLS) {
+          const cleanBase = baseUrl.replace(/\/+$/, '');
+          const fileCandidate = `${cleanBase}/storage/darkclip_${post.id}.mp4`;
+          try {
+            const checkRes = await fetch(fileCandidate, { method: 'HEAD' });
+            if (checkRes.ok) {
+              console.log(`[DarkClips Reconcile] ✅ Encontrado vídeo renderizado pronto para ${post.id}: ${fileCandidate}`);
+              const dlRes = await fetch(fileCandidate);
+              if (dlRes.ok) {
+                const arrayBuf = await dlRes.arrayBuffer();
+                const buffer = Buffer.from(arrayBuf);
+                const filename = `rendered_darkclip_${post.id}.mp4`;
+                const permanentUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                await pool.query('UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2 WHERE id = $3', ['rendered', permanentUrl, post.id]);
+                post.status = 'rendered';
+                post.rendered_video_url = permanentUrl;
+                break;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
     return NextResponse.json({ success: true, posts });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

@@ -338,10 +338,11 @@ export interface DarkClipPost {
     headline_sub?: string
     cta_text?: string
     caption?: string
+    post_caption?: string
     hashtags?: string[]
   }
   scheduled_at?: string
-  status?: 'draft' | 'rendered' | 'scheduled' | 'publishing' | 'published' | 'failed'
+  status?: 'draft' | 'rendering' | 'rendered' | 'scheduled' | 'publishing' | 'published' | 'failed'
   target_accounts?: string[]
   published_at?: string
   error_message?: string
