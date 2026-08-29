@@ -517,137 +517,14 @@
     }
   }
 
-  // Map to track: container → button (so we can update position on scroll/resize)
-  const injectedContainerMap = new WeakMap();
-  const floatingButtons = []; // [{btn, getRect}]
-
-  function repositionFloatingButtons() {
-    floatingButtons.forEach(({ btn, getRect }) => {
-      try {
-        const rect = getRect();
-        if (!rect || rect.width === 0) {
-          btn.style.display = 'none';
-          return;
-        }
-        btn.style.display = 'inline-flex';
-        btn.style.top = `${rect.top + 12}px`;
-        btn.style.left = `${rect.right - 140}px`;
-      } catch {}
-    });
-  }
-
-  window.addEventListener('scroll', repositionFloatingButtons, { passive: true });
-  window.addEventListener('resize', repositionFloatingButtons, { passive: true });
-  setInterval(repositionFloatingButtons, 300);
-
-  function injectButtons() {
-    try {
-      // 1. Check if a modal dialog is open
-      const openModal = document.querySelector('div[role="dialog"]');
-
-      if (openModal) {
-        // When modal is open: inject ONLY ONE button on the modal's main video
-        if (!injectedContainerMap.has(openModal)) {
-          const video = openModal.querySelector('video');
-          // Only inject if there's a real video or a legit reel/post link inside the modal
-          const hasReelLink = !!openModal.querySelector('a[href*="/reel/"], a[href*="/p/"]');
-          if (video || hasReelLink) {
-            const targetRef = video || openModal;
-            const btn = createFloatingButton(() => {
-              const data = extractModalPostData(openModal);
-              if (data) sendToDarkClips(data, btn);
-            });
-            document.body.appendChild(btn);
-            injectedContainerMap.set(openModal, btn);
-            floatingButtons.push({ btn, getRect: () => targetRef.getBoundingClientRect() });
-            repositionFloatingButtons();
-          }
-        }
-        // Hide all non-modal buttons while the modal is open
-        floatingButtons.forEach(({ btn, getRect }) => {
-          try {
-            const isForModal = btn.dataset.isModal === 'true';
-            if (!isForModal && btn.parentElement) {
-              btn.style.display = 'none';
-            }
-          } catch {}
-        });
-        return; // Don't inject on anything else while modal is open
-      }
-
-      // 2. No modal open: inject on feed/reel standalone videos
-      // Only target videos that are large enough to be main content (not avatars/ads)
-      const allVideos = document.querySelectorAll('video');
-      allVideos.forEach((video) => {
-        // Skip tiny videos (avatar-like, preview icons, etc.)
-        const rect = video.getBoundingClientRect();
-        if (rect.width < 100 || rect.height < 100) return;
-
-        const container =
-          video.closest('article') ||
-          video.closest('div[data-pressable-container="true"]') ||
-          video.closest('section') ||
-          video.parentElement;
-
-        if (!container || injectedContainerMap.has(container)) return;
-
-        const btn = createFloatingButton(() => {
-          const data = extractModalPostData(container);
-          if (data) sendToDarkClips(data, btn);
-        });
-        document.body.appendChild(btn);
-        injectedContainerMap.set(container, btn);
-        floatingButtons.push({ btn, getRect: () => video.getBoundingClientRect() });
-        repositionFloatingButtons();
-      });
-
-      // 3. Standalone articles (images/carousels) — only those with a real reel or post link
-      const standaloneArticles = document.querySelectorAll('article');
-      standaloneArticles.forEach((article) => {
-        if (injectedContainerMap.has(article)) return;
-        if (article.querySelector('video')) return; // handled above
-
-        // Only inject if article has a real post/reel link (not comment section)
-        const hasPostLink = !!article.querySelector('a[href*="/p/"], a[href*="/reel/"]');
-        if (!hasPostLink) return;
-
-        const mediaEl = article.querySelector('img[style*="object-fit"], div[role="button"] img') || article;
-        const imgRect = mediaEl?.getBoundingClientRect?.();
-        if (!imgRect || imgRect.width < 100) return;
-
-        const btn = createFloatingButton(() => {
-          const data = extractModalPostData(article);
-          if (data) sendToDarkClips(data, btn);
-        });
-        document.body.appendChild(btn);
-        injectedContainerMap.set(article, btn);
-        floatingButtons.push({ btn, getRect: () => mediaEl.getBoundingClientRect() });
-        repositionFloatingButtons();
-      });
-
-      // Re-show any hidden feed buttons (modal was closed)
-      floatingButtons.forEach(({ btn }) => {
-        try {
-          if (btn.style.display === 'none' && btn.dataset.isModal !== 'true') {
-            btn.style.display = 'inline-flex';
-          }
-        } catch {}
-      });
-    } catch (err) {
-      console.error('[DarkClips] Erro em injectButtons:', err);
-    }
-  }
-
-  function createFloatingButton(onClick) {
+  // Direct in-DOM button creation
+  function createDirectButton(onClick, customStyles = '') {
     const btn = document.createElement('button');
     btn.className = 'dark-clips-inject-btn';
     btn.setAttribute('type', 'button');
-    btn.style.cssText = `
-      position: fixed !important;
-      z-index: 2147483647 !important;
-      pointer-events: auto !important;
-      cursor: pointer !important;
-    `;
+    if (customStyles) {
+      btn.style.cssText = customStyles;
+    }
     btn.innerHTML = `
       <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       <span>Dark Clips</span>
@@ -674,16 +551,143 @@
       }
     };
 
-    btn.onclick = triggerAction;
-    btn.onpointerdown = (e) => { e.stopPropagation(); };
-    btn.onmousedown = (e) => { e.stopPropagation(); };
-    btn.addEventListener('click', triggerAction, true);
-    btn.addEventListener('pointerup', triggerAction, true);
+    const blockerEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'];
+    blockerEvents.forEach((evt) => {
+      btn.addEventListener(evt, (e) => {
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        if (evt === 'click') {
+          e.preventDefault();
+          triggerAction(e);
+        }
+      }, true);
+    });
 
     return btn;
   }
 
-  setInterval(injectButtons, 1500);
+  function injectButtons() {
+    try {
+      // ── 1. Modal Reel / Post Dialog ──
+      const dialog = document.querySelector('div[role="dialog"]');
+      if (dialog) {
+        if (!dialog.querySelector('.dark-clips-inject-btn')) {
+          // Find the visual media container inside the modal (left column with video or image)
+          const mediaContainer = dialog.querySelector('article') ||
+                                 dialog.querySelector('video')?.closest('div[style*="flex"]') ||
+                                 dialog.querySelector('video')?.parentElement ||
+                                 dialog.querySelector('div[role="button"] img')?.parentElement ||
+                                 dialog;
+
+          const pos = window.getComputedStyle(mediaContainer).position;
+          if (pos === 'static') {
+            mediaContainer.style.position = 'relative';
+          }
+
+          const btn = createDirectButton(() => {
+            const data = extractModalPostData(dialog);
+            if (data) sendToDarkClips(data, btn);
+          }, 'position: absolute !important; top: 16px !important; right: 16px !important; z-index: 50 !important;');
+
+          mediaContainer.appendChild(btn);
+        }
+        return; // When modal is open, don't waste cycles on background elements
+      }
+
+      // ── 2. Grid Thumbnails (Explore / Profile) ──
+      const gridLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
+      gridLinks.forEach((anchor) => {
+        if (anchor.closest('article') || anchor.closest('div[role="dialog"]')) return;
+
+        const href = anchor.getAttribute('href') || '';
+        if (href.includes('/audio/') || href.includes('/tagged/') || href.includes('/liked_by/')) return;
+
+        const match = href.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
+        if (!match) return;
+
+        const img = anchor.querySelector('img');
+        if (!img) return;
+
+        if (anchor.querySelector('.dark-clips-inject-btn')) return;
+
+        const pos = window.getComputedStyle(anchor).position;
+        if (pos === 'static') {
+          anchor.style.position = 'relative';
+        }
+
+        const btn = createDirectButton(() => {
+          const fullUrl = `https://www.instagram.com/${match[1] === 'reels' ? 'reel' : match[1]}/${match[2]}/`;
+          const thumbUrl = img.currentSrc || img.src || '';
+          const profileInfo = getPageProfileInfo();
+          sendToDarkClips({
+            url: fullUrl,
+            videoUrl: fullUrl,
+            thumbnailUrl: thumbUrl,
+            duration: 15,
+            authorName: profileInfo.name,
+            authorHandle: profileInfo.handle,
+            authorAvatar: profileInfo.avatar,
+            originalCaption: img.getAttribute('alt') || '',
+            platform: 'instagram',
+            type: match[1].includes('reel') ? 'reel' : 'post',
+            metrics: { likes: 0, comments: 0, views: 0 }
+          }, btn);
+        }, 'position: absolute !important; top: 8px !important; right: 8px !important; z-index: 20 !important;');
+
+        anchor.appendChild(btn);
+      });
+
+      // ── 3. Home Feed Posts ──
+      const feedArticles = document.querySelectorAll('article:not(div[role="dialog"] article)');
+      feedArticles.forEach((article) => {
+        if (article.querySelector('.dark-clips-inject-btn')) return;
+
+        const mediaArea = article.querySelector('video')?.parentElement ||
+                          article.querySelector('div[style*="padding-bottom"]') ||
+                          article.querySelector('img[style*="object-fit"]')?.parentElement ||
+                          article;
+
+        const pos = window.getComputedStyle(mediaArea).position;
+        if (pos === 'static') {
+          mediaArea.style.position = 'relative';
+        }
+
+        const btn = createDirectButton(() => {
+          const data = extractModalPostData(article);
+          if (data) sendToDarkClips(data, btn);
+        }, 'position: absolute !important; top: 12px !important; right: 12px !important; z-index: 20 !important;');
+
+        mediaArea.appendChild(btn);
+      });
+
+      // ── 4. Standalone Reels View ──
+      if (window.location.pathname.includes('/reel/') || window.location.pathname.includes('/reels/')) {
+        const reelVideos = document.querySelectorAll('video');
+        reelVideos.forEach((vid) => {
+          const wrapper = vid.closest('div[data-pressable-container="true"]') ||
+                          vid.closest('section') ||
+                          vid.parentElement;
+          if (!wrapper || wrapper.querySelector('.dark-clips-inject-btn')) return;
+
+          const pos = window.getComputedStyle(wrapper).position;
+          if (pos === 'static') {
+            wrapper.style.position = 'relative';
+          }
+
+          const btn = createDirectButton(() => {
+            const data = extractModalPostData(wrapper);
+            if (data) sendToDarkClips(data, btn);
+          }, 'position: absolute !important; top: 20px !important; right: 20px !important; z-index: 50 !important;');
+
+          wrapper.appendChild(btn);
+        });
+      }
+    } catch (err) {
+      console.error('[DarkClips] Erro em injectButtons:', err);
+    }
+  }
+
+  setInterval(injectButtons, 1200);
 
   // Message listener for Extension Popup
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
