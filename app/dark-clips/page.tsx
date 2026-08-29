@@ -520,6 +520,13 @@ export default function DarkClipsPage() {
 
       if (postsRes.success && postsRes.posts) {
         setScheduledPosts(postsRes.posts);
+        const currentTargetClip = selectedClip || (clipsRes.clips && clipsRes.clips[0]);
+        if (currentTargetClip) {
+          const match = postsRes.posts.find((p: any) => p.clip_id === currentTargetClip.id && p.rendered_video_url);
+          if (match) {
+            setRenderedUrl(match.rendered_video_url);
+          }
+        }
       }
 
       if (accountsData) {
@@ -4008,6 +4015,8 @@ export default function DarkClipsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       {clips.map((clip) => {
                         const isSelected = selectedClip?.id === clip.id;
+                        const renderedPost = scheduledPosts.find((p) => p.clip_id === clip.id && p.rendered_video_url);
+
                         return (
                           <div
                             key={clip.id}
@@ -4017,7 +4026,15 @@ export default function DarkClipsPage() {
                           >
                             <div>
                               <div 
-                                onClick={() => setSelectedClip(clip)}
+                                onClick={() => {
+                                  setSelectedClip(clip);
+                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  if (renderedPost?.rendered_video_url) {
+                                    setRenderedUrl(renderedPost.rendered_video_url);
+                                  } else {
+                                    setRenderedUrl(null);
+                                  }
+                                }}
                                 className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-zinc-900 border border-border/40 relative mb-2 cursor-pointer group-hover:opacity-95 flex items-center justify-center"
                               >
                                 {clip.thumbnail_url ? (
@@ -4048,6 +4065,11 @@ export default function DarkClipsPage() {
                                 >
                                   {clip.platform === 'upload' ? '📁 UPLOAD' : clip.platform}
                                 </Badge>
+                                {renderedPost?.rendered_video_url && (
+                                  <Badge className="absolute top-1 right-1 text-[8px] px-1.5 py-0 bg-emerald-600 text-white font-bold shadow-sm">
+                                    ✓ PRONTO
+                                  </Badge>
+                                )}
                               </div>
 
                               <p className="font-bold text-xs truncate text-primary">{clip.author_handle || clip.author_name}</p>
@@ -4070,6 +4092,11 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  if (renderedPost?.rendered_video_url) {
+                                    setRenderedUrl(renderedPost.rendered_video_url);
+                                  } else {
+                                    setRenderedUrl(null);
+                                  }
                                   if (clip.remodel_data?.headline_main) {
                                     setHeadline((h) => ({
                                       ...h,
@@ -4087,6 +4114,14 @@ export default function DarkClipsPage() {
                               >
                                 {isSelected ? "Selecionado ✓" : "Selecionar"}
                               </Button>
+
+                              {renderedPost?.rendered_video_url && (
+                                <DarkClipsVideoModal
+                                  videoUrl={renderedPost.rendered_video_url}
+                                  title={clip.author_handle || "Dark Clip 9:16"}
+                                />
+                              )}
+
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -4174,7 +4209,54 @@ export default function DarkClipsPage() {
                     </CardHeader>
 
                     <CardContent className="p-4 space-y-6">
-                      
+                      {/* 1. Banner de Vídeo Produzido / Status de Renderização */}
+                      {renderedUrl ? (
+                        <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/30 via-card to-card border border-emerald-500/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+                              <Film className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-bold text-foreground">Vídeo 9:16 Renderizado e Pronto! 🎉</h4>
+                                <Badge className="text-[10px] bg-emerald-600 text-white font-bold">1080x1920 MP4</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Diagramação com layout, ganchos dinâmicos e vídeo já foram compilados em alta definição.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                            <DarkClipsVideoModal
+                              videoUrl={renderedUrl}
+                              title={headline.mainText || selectedClip.author_handle || "Dark Clip 9:16"}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRender(selectedClip)}
+                              disabled={isRendering || renderingClipIds.includes(selectedClip.id)}
+                              className="h-7 text-[10px] gap-1 font-semibold text-zinc-300 hover:text-white"
+                              title="Renderizar novamente este clipe"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Re-renderizar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : isRendering && selectedClip && renderingClipIds.includes(selectedClip.id) ? (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 animate-pulse">
+                          <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                          <div>
+                            <h4 className="text-xs font-bold text-amber-300">Renderização em andamento no Remotion...</h4>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              Compilando frames em 1080x1920. Assim que terminar, a prévia e opções de download aparecerão aqui.
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
                       {/* Painel de Agendamento & Publicação Automática (Integrado) */}
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">

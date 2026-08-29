@@ -17,6 +17,9 @@ const CANDIDATE_URLS = [
   'http://127.0.0.1:3001',
 ].filter(Boolean) as string[];
 
+export const maxDuration = 300;
+export const dynamic = 'force-dynamic';
+
 // Global in-memory set to prevent concurrent duplicate renders of the same clip
 const activeClipRenders = new Set<string>();
 
