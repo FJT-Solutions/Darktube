@@ -1050,24 +1050,34 @@ export default function DarkClipsPage() {
       return null;
     }
 
-    // Se o texto da headline ainda for o template padrão fixo, usa o gancho exclusivo do clipe ou gera na hora com IA
-    let currentHeadline = headline;
-    if (clipToRender.remodel_data?.headline_main && (headline.mainText === 'Meu amigo: "Comprei um mic novo, mano."' || !headline.mainText)) {
-      currentHeadline = {
-        ...headline,
-        mainText: clipToRender.remodel_data.headline_main,
-        subText: clipToRender.remodel_data.headline_sub || headline.subText,
-      };
-    } else if (headline.mainText === 'Meu amigo: "Comprei um mic novo, mano."' || !headline.mainText) {
-      toast.info("✨ Criando gancho e textos exclusivos para este vídeo com IA...");
-      const aiData = await handleRemodelWithAi(clipToRender);
-      if (aiData?.headline_main) {
-        currentHeadline = {
-          ...headline,
-          mainText: aiData.headline_main,
-          subText: aiData.headline_sub || headline.subText,
-        };
+    // Ajusta os textos de acordo com os modos definidos no Layout (IA vs Manual)
+    let currentHeadline = { ...headline };
+    let currentFooter = { ...footer };
+
+    if (headline.mainTextMode === "ai") {
+      if (clipToRender.remodel_data?.headline_main) {
+        currentHeadline.mainText = clipToRender.remodel_data.headline_main;
+      } else {
+        toast.info("✨ Criando gancho exclusivo para este vídeo com IA...");
+        const aiData = await handleRemodelWithAi(clipToRender);
+        if (aiData?.headline_main) {
+          currentHeadline.mainText = aiData.headline_main;
+          if (headline.subTextMode === "ai" && aiData.headline_sub) {
+            currentHeadline.subText = aiData.headline_sub;
+          }
+          if (footer.mode === "ai" && aiData.cta_text) {
+            currentFooter.text = aiData.cta_text;
+          }
+        }
       }
+    }
+
+    if (headline.subTextMode === "ai" && clipToRender.remodel_data?.headline_sub) {
+      currentHeadline.subText = clipToRender.remodel_data.headline_sub;
+    }
+
+    if (footer.mode === "ai" && clipToRender.remodel_data?.cta_text) {
+      currentFooter.text = clipToRender.remodel_data.cta_text;
     }
 
     setIsRendering(true);
@@ -1088,14 +1098,14 @@ export default function DarkClipsPage() {
             videoPlacement,
             background,
             watermark,
-            footer,
+            footer: currentFooter,
             arrows: arrowsList[0] || {},
             arrowsList: arrowsList,
           },
           remodelData: {
             headline_main: currentHeadline.mainText,
             headline_sub: currentHeadline.subText,
-            cta_text: footer.text,
+            cta_text: currentFooter.text,
             post_caption: postCaption,
             hashtags: postHashtags,
           },
