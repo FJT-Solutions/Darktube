@@ -43,7 +43,29 @@
     });
   }
 
+  async function getInstagramCookies() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ action: 'GET_COOKIES', domain: 'instagram.com' }, (response) => {
+          if (chrome.runtime.lastError || !response?.cookies) {
+            resolve([]);
+          } else {
+            resolve(response.cookies);
+          }
+        });
+      } catch {
+        resolve([]);
+      }
+    });
+  }
+
   async function sendToDarkClips(items, btnElement) {
+    console.log('[DarkClips] Enviando dados ao servidor:', items);
+    if (!items || (Array.isArray(items) && items.length === 0)) {
+      showToast('Nenhum dado de vídeo encontrado para enviar', true);
+      return;
+    }
+
     if (btnElement) {
       btnElement.classList.add('sending');
       btnElement.innerHTML = '<span>⏳ Enviando...</span>';
@@ -58,22 +80,9 @@
 
       const list = Array.isArray(items) ? items : [items];
 
-      // Captura cookies do Instagram do navegador para autenticar o yt-dlp no servidor
-      let sessionCookies = [];
-      try {
-        sessionCookies = await new Promise((resolve) => {
-          chrome.cookies.getAll({ domain: 'instagram.com' }, (cookies) => {
-            resolve((cookies || []).map((c) => ({
-              name: c.name,
-              value: c.value,
-              domain: c.domain,
-              path: c.path,
-              secure: c.secure,
-              expirationDate: c.expirationDate || 9999999999
-            })));
-          });
-        });
-      } catch {}
+      // Captura cookies do Instagram via background service worker
+      const sessionCookies = await getInstagramCookies();
+      console.log(`[DarkClips] ${sessionCookies.length} cookies capturados para autenticação.`);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -87,12 +96,13 @@
       });
 
       const result = await response.json();
+      console.log('[DarkClips] Resposta do servidor DarkTube:', result);
 
       if (result.success) {
         if (btnElement) {
           btnElement.classList.remove('sending');
           btnElement.classList.add('sent');
-          btnElement.innerHTML = '<span>✅ Enviado ao Dark Clips!</span>';
+          btnElement.innerHTML = '<span>✅ Enviado!</span>';
           setTimeout(() => {
             btnElement.classList.remove('sent');
             btnElement.innerHTML = `
@@ -101,15 +111,15 @@
             `;
           }, 3000);
         }
-        showToast(`${list.length} post(s) enviado(s) ao Dark Clips com sucesso!`);
+        showToast(`${list.length} post(s) enviado(s) ao Dark Clips!`);
       } else {
-        throw new Error(result.error || 'Erro ao importar');
+        throw new Error(result.error || 'Erro retornado pelo servidor');
       }
     } catch (err) {
       console.error('[DarkClips] Erro ao enviar:', err);
       if (btnElement) {
         btnElement.classList.remove('sending');
-        btnElement.innerHTML = '<span>❌ Falha</span>';
+        btnElement.innerHTML = '<span>❌ Erro</span>';
         setTimeout(() => {
           btnElement.innerHTML = `
             <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -117,7 +127,7 @@
           `;
         }, 3000);
       }
-      showToast('Falha ao conectar com https://darktube.fjt-solutions.com', true);
+      showToast(`Erro ao enviar: ${err.message || 'Falha de conexão'}`, true);
     }
   }
 
@@ -155,22 +165,41 @@
       const video = container.querySelector('video');
       const profileInfo = getPageProfileInfo();
 
-      // 1. Resolve Post/Reel URL accurately
+      // 1. Resolve Post/Reel URL accurately (ignoring /audio/ and secondary links)
       let resolvedUrl = '';
-      const postLink = container.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], a[href*="/tv/"]');
-      if (postLink) {
-        const rawHref = postLink.getAttribute('href') || postLink.href || '';
-        const cleanPath = rawHref.split('?')[0].split('#')[0];
-        resolvedUrl = cleanPath.startsWith('http') ? cleanPath : `https://www.instagram.com${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+      const allCandidateLinks = Array.from(container.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], a[href*="/tv/"]'));
+      for (const link of allCandidateLinks) {
+        const rawHref = link.getAttribute('href') || link.href || '';
+        if (rawHref.includes('/audio/') || rawHref.includes('/tagged/') || rawHref.includes('/liked_by/')) continue;
+        const match = rawHref.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
+        if (match) {
+          resolvedUrl = `https://www.instagram.com/${match[1] === 'reels' ? 'reel' : match[1]}/${match[2]}/`;
+          break;
+        }
       }
 
       if (!resolvedUrl) {
         const currentUrl = window.location.href.split('?')[0].split('#')[0];
-        if (currentUrl.includes('/p/') || currentUrl.includes('/reel/') || currentUrl.includes('/reels/')) {
-          resolvedUrl = currentUrl;
+        const match = currentUrl.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
+        if (match && !currentUrl.includes('/audio/')) {
+          resolvedUrl = `https://www.instagram.com/${match[1] === 'reels' ? 'reel' : match[1]}/${match[2]}/`;
         } else {
-          resolvedUrl = currentUrl;
+          // Check any post links on document
+          const docLinks = Array.from(document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]'));
+          for (const dl of docLinks) {
+            const h = dl.getAttribute('href') || dl.href || '';
+            if (h.includes('/audio/')) continue;
+            const dm = h.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
+            if (dm) {
+              resolvedUrl = `https://www.instagram.com/${dm[1] === 'reels' ? 'reel' : dm[1]}/${dm[2]}/`;
+              break;
+            }
+          }
         }
+      }
+
+      if (!resolvedUrl) {
+        resolvedUrl = window.location.href.split('?')[0];
       }
 
       // 2. Resolve Author Info
@@ -283,13 +312,16 @@
       const rawHref = a.getAttribute('href') || a.href || '';
       if (!rawHref) return;
 
-      // Filter only post or reel links
+      // Filter only post or reel links, explicitly excluding audio and tagged links
       if (!rawHref.includes('/p/') && !rawHref.includes('/reel/') && !rawHref.includes('/reels/') && !rawHref.includes('/tv/')) {
+        return;
+      }
+      if (rawHref.includes('/audio/') || rawHref.includes('/tagged/') || rawHref.includes('/liked_by/')) {
         return;
       }
 
       const cleanPath = rawHref.split('?')[0].split('#')[0];
-      const match = cleanPath.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+      const match = cleanPath.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
       if (!match) return;
 
       const postTypeKey = match[1];

@@ -55,10 +55,13 @@ export async function POST(req: Request) {
     if (Array.isArray(items) && items.length > 0) {
       for (const item of items) {
         try {
-          // Normalize source URL (never accept blob: as videoUrl)
+          // Normalize source URL (never accept blob: or /audio/ as videoUrl)
           let sourceUrl = item.url || item.originalUrl || item.videoUrl || '';
-          if (sourceUrl.startsWith('blob:')) {
+          if (sourceUrl.startsWith('blob:') || sourceUrl.includes('/audio/')) {
             sourceUrl = item.url || item.originalUrl || '';
+            if (sourceUrl.includes('/audio/')) {
+              sourceUrl = '';
+            }
           }
 
           let servedVideoUrl = '';

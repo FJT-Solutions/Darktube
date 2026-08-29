@@ -33,15 +33,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Helper: Captura cookies do Instagram do navegador ──
   async function getInstagramCookies() {
     try {
-      const cookies = await chrome.cookies.getAll({ domain: 'instagram.com' });
-      return cookies.map((c) => ({
-        name: c.name,
-        value: c.value,
-        domain: c.domain,
-        path: c.path,
-        secure: c.secure,
-        expirationDate: c.expirationDate || 9999999999
-      }));
+      if (chrome.cookies) {
+        const cookies = await chrome.cookies.getAll({ domain: 'instagram.com' });
+        return cookies.map((c) => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain,
+          path: c.path,
+          secure: c.secure,
+          expirationDate: c.expirationDate || 9999999999
+        }));
+      }
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage({ action: 'GET_COOKIES', domain: 'instagram.com' }, (response) => {
+          resolve(response?.cookies || []);
+        });
+      });
     } catch {
       return [];
     }
