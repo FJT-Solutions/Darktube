@@ -168,6 +168,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusText.textContent = 'Escaneando página & perfil...';
     videosListEl.innerHTML = '<div class="empty-state"><span>Procurando posts e reels na página...</span></div>';
 
+    // Animate refresh button
+    if (refreshBtn) {
+      refreshBtn.classList.add('loading');
+      refreshBtn.setAttribute('disabled', 'disabled');
+    }
+
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) {
@@ -194,6 +200,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       console.error(err);
       statusText.textContent = 'Erro ao escanear';
+    } finally {
+      if (refreshBtn) {
+        refreshBtn.classList.remove('loading');
+        refreshBtn.removeAttribute('disabled');
+      }
     }
   }
 
@@ -399,7 +410,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  refreshBtn.addEventListener('click', scanCurrentTab);
+  refreshBtn.addEventListener('click', () => {
+    scanCurrentTab();
+  });
 
   // Initial tab scan
   scanCurrentTab();

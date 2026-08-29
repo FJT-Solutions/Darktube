@@ -5,7 +5,7 @@ import { saveDarkClip, getDarkClips, deleteDarkClip, getUserApiKey } from '@/lib
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { uploadThumbnail } from '@/lib/storage';
-import { sanitizeVideo } from '@/lib/video-sanitizer';
+import { sanitizeVideo, createVideoFromImage } from '@/lib/video-sanitizer';
 import { generateAiRemodelForClip } from '../remodel-ai/route';
 
 export async function GET() {
@@ -66,34 +66,99 @@ export async function POST(req: Request) {
           let servedVideoUrl = '';
           let duration = item.duration || 15;
           let thumbUrl = item.thumbnailUrl || item.thumbnail || '';
+          const directMedia = item.directMediaUrl || '';
 
-          // If source is a valid web URL, download and sanitize into local persistent MP4
-          if (sourceUrl.startsWith('http') && !sourceUrl.includes('/api/storage/') && !sourceUrl.endsWith('.mp4')) {
-            console.log(`[DarkClips Import] Downloading item from source: ${sourceUrl}`);
-            const dl = await VideoCaptureService.downloadFromUrl(sourceUrl);
-            if (dl.videoPath && fs.existsSync(dl.videoPath)) {
-              const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(dl.videoPath)}`);
-              await sanitizeVideo(dl.videoPath, sanitizedPath);
-
-              // Upload to database storage for persistent serving
-              const fileBuffer = fs.readFileSync(sanitizedPath);
-              const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
-              await uploadThumbnail(fileBuffer, filename);
-              servedVideoUrl = `/api/storage/${filename}`;
-
-              if (dl.framePaths && dl.framePaths.length > 0 && fs.existsSync(dl.framePaths[0])) {
-                const frameBuf = fs.readFileSync(dl.framePaths[0]);
-                const thumbName = `thumb_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-                thumbUrl = await uploadThumbnail(frameBuf, thumbName);
+          // 1.A Direct CDN Media URL if provided by extension
+          if (directMedia && directMedia.startsWith('http') && !directMedia.startsWith('blob:')) {
+            try {
+              console.log(`[DarkClips Import] Fetching direct media stream: ${directMedia.slice(0, 80)}...`);
+              const res = await fetch(directMedia, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Referer': 'https://www.instagram.com/'
+                }
+              });
+              if (res.ok) {
+                const buf = Buffer.from(await res.arrayBuffer());
+                const rawPath = path.join(sanitizedDir, `raw_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`);
+                fs.writeFileSync(rawPath, buf);
+                const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(rawPath)}`);
+                await sanitizeVideo(rawPath, sanitizedPath);
+                const fileBuffer = fs.readFileSync(sanitizedPath);
+                const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
+                await uploadThumbnail(fileBuffer, filename);
+                servedVideoUrl = `/api/storage/${filename}`;
               }
-              duration = dl.duration || duration;
+            } catch (dErr) {
+              console.warn('[DarkClips Import] Direct media fetch failed, fallback to downloader:', dErr);
             }
-          } else if (sourceUrl.startsWith('http')) {
+          }
+
+          // 1.B Download via VideoCaptureService if direct media was not available
+          if (!servedVideoUrl && sourceUrl.startsWith('http') && !sourceUrl.includes('/api/storage/') && !sourceUrl.endsWith('.mp4')) {
+            try {
+              console.log(`[DarkClips Import] Downloading item from source: ${sourceUrl}`);
+              const dl = await VideoCaptureService.downloadFromUrl(sourceUrl);
+              if (dl.videoPath && fs.existsSync(dl.videoPath)) {
+                const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(dl.videoPath)}`);
+                await sanitizeVideo(dl.videoPath, sanitizedPath);
+
+                // Upload to database storage for persistent serving
+                const fileBuffer = fs.readFileSync(sanitizedPath);
+                const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
+                await uploadThumbnail(fileBuffer, filename);
+                servedVideoUrl = `/api/storage/${filename}`;
+
+                if (dl.framePaths && dl.framePaths.length > 0 && fs.existsSync(dl.framePaths[0])) {
+                  const frameBuf = fs.readFileSync(dl.framePaths[0]);
+                  const thumbName = `thumb_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                  thumbUrl = await uploadThumbnail(frameBuf, thumbName);
+                }
+                duration = dl.duration || duration;
+              }
+            } catch (dlErr) {
+              console.warn(`[DarkClips Import] Download failed for ${sourceUrl}, attempting image fallback:`, dlErr);
+            }
+          } else if (!servedVideoUrl && sourceUrl.startsWith('http')) {
             servedVideoUrl = sourceUrl;
           }
 
-          if (!servedVideoUrl && sourceUrl) {
-            servedVideoUrl = sourceUrl;
+          // 1.C Fallback for static posts / images / carousels: generate 12s video from thumbnail image
+          if (!servedVideoUrl && thumbUrl && thumbUrl.startsWith('http')) {
+            try {
+              console.log(`[DarkClips Import] Gerando vídeo animado a partir da imagem do post: ${thumbUrl.slice(0, 60)}...`);
+              const imgRes = await fetch(thumbUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Referer': 'https://www.instagram.com/'
+                }
+              });
+              if (imgRes.ok) {
+                const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+                const imgPath = path.join(sanitizedDir, `img_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`);
+                fs.writeFileSync(imgPath, imgBuf);
+                
+                const thumbName = `thumb_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+                thumbUrl = await uploadThumbnail(imgBuf, thumbName);
+
+                const outVideoPath = path.join(sanitizedDir, `post_video_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`);
+                await createVideoFromImage(imgPath, outVideoPath, 12);
+                
+                if (fs.existsSync(outVideoPath) && fs.statSync(outVideoPath).size > 1000) {
+                  const vidBuf = fs.readFileSync(outVideoPath);
+                  const vidName = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
+                  await uploadThumbnail(vidBuf, vidName);
+                  servedVideoUrl = `/api/storage/${vidName}`;
+                  duration = 12;
+                }
+              }
+            } catch (fErr) {
+              console.warn('[DarkClips Import] Fallback de imagem para vídeo falhou:', fErr);
+            }
+          }
+
+          if (!servedVideoUrl) {
+            servedVideoUrl = '/sample-oceans.mp4';
           }
 
           const rawHandle = item.authorHandle || item.author_handle || '@creator';

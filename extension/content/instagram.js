@@ -214,6 +214,14 @@
       const isVideo = !!video || resolvedUrl.includes('/reel/') || resolvedUrl.includes('/reels/');
       const isCarousel = !!container.querySelector('div[aria-label*="carrossel"], div[aria-label*="carousel"], ul[class*="carousel"]');
 
+      let directMediaUrl = '';
+      if (video) {
+        const vSrc = video.currentSrc || video.src || '';
+        if (vSrc && !vSrc.startsWith('blob:')) {
+          directMediaUrl = vSrc;
+        }
+      }
+
       let thumbUrl = '';
       if (video) {
         thumbUrl = video.getAttribute('poster') || '';
@@ -225,7 +233,8 @@
 
       return {
         url: resolvedUrl,
-        videoUrl: resolvedUrl,
+        videoUrl: directMediaUrl || resolvedUrl,
+        directMediaUrl,
         thumbnailUrl: thumbUrl,
         duration: video ? Math.round(video.duration || 15) : 15,
         authorName,
@@ -513,18 +522,28 @@
       <span>Dark Clips</span>
     `;
 
-    // Intercept and stop ALL mouse/touch/pointer events in CAPTURE phase so Instagram backdrop handlers never see them
-    const blockerEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'focus'];
-    blockerEvents.forEach((evt) => {
-      btn.addEventListener(evt, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (evt === 'click') {
-          onClick();
-        }
-      }, true);
-    });
+    // Isolate button events so Instagram video controls or background navigation never intercept them
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      onClick();
+    }, true);
+
+    btn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }, true);
+
+    btn.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }, true);
+
+    btn.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }, { passive: true, capture: true });
 
     return btn;
   }
