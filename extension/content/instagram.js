@@ -258,10 +258,22 @@
       if (commentsEls.length > 1) {
         comments = commentsEls.length - 1;
       }
-      const commentCountEl = container.querySelector('a[href*="/comments/"] span, span:contains("comentário")');
+      const commentCountEl = container.querySelector('a[href*="/comments/"] span');
       if (commentCountEl) {
         const parsed = parseMetricNumber(commentCountEl.textContent);
         if (parsed > comments) comments = parsed;
+      } else {
+        const allSpans = Array.from(container.querySelectorAll('span'));
+        for (const sp of allSpans) {
+          const txt = sp.textContent || '';
+          if (txt.includes('comentário') || txt.includes('comment')) {
+            const parsed = parseMetricNumber(txt);
+            if (parsed > 0) {
+              comments = parsed;
+              break;
+            }
+          }
+        }
       }
 
       const isVideo = !!video || resolvedUrl.includes('/reel/') || resolvedUrl.includes('/reels/');
@@ -302,8 +314,22 @@
           views: likes * 5 || 1000
         }
       };
-    } catch {
-      return null;
+    } catch (err) {
+      console.error('[DarkClips] Erro em extractModalPostData:', err);
+      const profileInfo = getPageProfileInfo();
+      return {
+        url: window.location.href.split('?')[0],
+        videoUrl: window.location.href.split('?')[0],
+        thumbnailUrl: '',
+        duration: 15,
+        authorName: profileInfo.name,
+        authorHandle: profileInfo.handle,
+        authorAvatar: profileInfo.avatar,
+        originalCaption: '',
+        platform: 'instagram',
+        type: 'reel',
+        metrics: { likes: 0, comments: 0, views: 0 }
+      };
     }
   }
 
