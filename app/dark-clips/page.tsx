@@ -485,6 +485,7 @@ export default function DarkClipsPage() {
   const [postCaption, setPostCaption] = useState("");
   const [postHashtags, setPostHashtags] = useState<string[]>(["#memes", "#viral", "#humor", "#reels", "#fyp"]);
   const [isRendering, setIsRendering] = useState(false);
+  const [renderingClipIds, setRenderingClipIds] = useState<string[]>([]);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
 
   // Load data on mount
@@ -1050,39 +1051,48 @@ export default function DarkClipsPage() {
       return null;
     }
 
-    // Ajusta os textos de acordo com os modos definidos no Layout (IA vs Manual)
-    let currentHeadline = { ...headline };
-    let currentFooter = { ...footer };
+    if (isRendering || renderingClipIds.includes(clipToRender.id)) {
+      toast.warning("Este vídeo já está sendo produzido! Por favor, aguarde a conclusão.");
+      return null;
+    }
 
-    if (headline.mainTextMode === "ai") {
-      if (clipToRender.remodel_data?.headline_main) {
-        currentHeadline.mainText = clipToRender.remodel_data.headline_main;
-      } else {
-        toast.info("✨ Criando gancho exclusivo para este vídeo com IA...");
-        const aiData = await handleRemodelWithAi(clipToRender);
-        if (aiData?.headline_main) {
-          currentHeadline.mainText = aiData.headline_main;
-          if (headline.subTextMode === "ai" && aiData.headline_sub) {
-            currentHeadline.subText = aiData.headline_sub;
-          }
-          if (footer.mode === "ai" && aiData.cta_text) {
-            currentFooter.text = aiData.cta_text;
+    // Trava imediatamente o clipe e a interface antes de qualquer chamada assíncrona
+    setRenderingClipIds((prev) => [...prev, clipToRender.id]);
+    setIsRendering(true);
+    const renderToastId = toast.loading(`🎬 Produzindo clipe de ${clipToRender.author_handle || 'Criador'}...`);
+
+    try {
+      // Ajusta os textos de acordo com os modos definidos no Layout (IA vs Manual)
+      let currentHeadline = { ...headline };
+      let currentFooter = { ...footer };
+
+      if (headline.mainTextMode === "ai") {
+        if (clipToRender.remodel_data?.headline_main) {
+          currentHeadline.mainText = clipToRender.remodel_data.headline_main;
+        } else {
+          toast.loading("✨ Criando gancho viral com IA para este vídeo...", { id: renderToastId });
+          const aiData = await handleRemodelWithAi(clipToRender);
+          if (aiData?.headline_main) {
+            currentHeadline.mainText = aiData.headline_main;
+            if (headline.subTextMode === "ai" && aiData.headline_sub) {
+              currentHeadline.subText = aiData.headline_sub;
+            }
+            if (footer.mode === "ai" && aiData.cta_text) {
+              currentFooter.text = aiData.cta_text;
+            }
           }
         }
       }
-    }
 
-    if (headline.subTextMode === "ai" && clipToRender.remodel_data?.headline_sub) {
-      currentHeadline.subText = clipToRender.remodel_data.headline_sub;
-    }
+      if (headline.subTextMode === "ai" && clipToRender.remodel_data?.headline_sub) {
+        currentHeadline.subText = clipToRender.remodel_data.headline_sub;
+      }
 
-    if (footer.mode === "ai" && clipToRender.remodel_data?.cta_text) {
-      currentFooter.text = clipToRender.remodel_data.cta_text;
-    }
+      if (footer.mode === "ai" && clipToRender.remodel_data?.cta_text) {
+        currentFooter.text = clipToRender.remodel_data.cta_text;
+      }
 
-    setIsRendering(true);
-    try {
-      toast.info(`🎬 Enviando render de "${clipToRender.author_handle || 'Clipe'}" para o Remotion (1080x1920)...`);
+      toast.loading(`🎬 Renderizando vídeo 9:16 (1080x1920) no Remotion...`, { id: renderToastId });
       const res = await fetch("/api/dark-clips/render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1114,18 +1124,19 @@ export default function DarkClipsPage() {
       const data = await res.json();
       if (data.success && data.videoUrl) {
         setRenderedUrl(data.videoUrl);
-        toast.success("🎉 Vídeo MP4 1080x1920 renderizado com sucesso!");
+        toast.success("🎉 Vídeo MP4 1080x1920 renderizado com sucesso!", { id: renderToastId });
         fetchInitialData();
         return data.videoUrl;
       } else {
-        toast.error(data.error || "Erro ao renderizar no Remotion.");
+        toast.error(data.error || "Erro ao renderizar no Remotion.", { id: renderToastId });
         return null;
       }
     } catch {
-      toast.error("Falha ao comunicar com o renderizador Remotion.");
+      toast.error("Falha ao comunicar com o renderizador Remotion.", { id: renderToastId });
       return null;
     } finally {
       setIsRendering(false);
+      setRenderingClipIds((prev) => prev.filter((id) => id !== clipToRender.id));
     }
   }
 
@@ -4099,11 +4110,22 @@ export default function DarkClipsPage() {
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
                                   handleRender(clip);
                                 }}
-                                disabled={isRendering}
-                                className="text-[11px] h-7 px-2.5 text-red-400 border border-red-500/30 hover:bg-red-500/10 font-bold"
+                                disabled={isRendering || renderingClipIds.includes(clip.id)}
+                                className={`text-[11px] h-7 px-2.5 font-bold transition-all ${
+                                  renderingClipIds.includes(clip.id)
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait opacity-90"
+                                    : "text-red-400 border border-red-500/30 hover:bg-red-500/10"
+                                }`}
                                 title="Produzir clipe com o layout ativo"
                               >
-                                {isRendering && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "🎬 Produzir"}
+                                {renderingClipIds.includes(clip.id) ? (
+                                  <div className="flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                                    <span>Produzindo...</span>
+                                  </div>
+                                ) : (
+                                  "🎬 Produzir"
+                                )}
                               </Button>
                               <Button
                                 size="sm"

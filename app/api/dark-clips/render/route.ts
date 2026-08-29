@@ -17,7 +17,11 @@ const CANDIDATE_URLS = [
   'http://127.0.0.1:3001',
 ].filter(Boolean) as string[];
 
+// Global in-memory set to prevent concurrent duplicate renders of the same clip
+const activeClipRenders = new Set<string>();
+
 export async function POST(req: Request) {
+  let activeLockClipId: string | null = null;
   try {
     const user = await getCurrentUser();
     const body = await req.json();
@@ -31,6 +35,19 @@ export async function POST(req: Request) {
 
     if (!inputProps || !inputProps.videoUrl) {
       return NextResponse.json({ success: false, error: 'Video URL e inputProps são obrigatórios.' }, { status: 400 });
+    }
+
+    if (clipId) {
+      if (activeClipRenders.has(clipId)) {
+        console.warn(`[DarkClips Render] Tentativa de render duplicado bloqueada para o clipe: ${clipId}`);
+        return NextResponse.json({
+          success: false,
+          error: 'Este vídeo já está sendo produzido no momento. Aguarde a conclusão do render atual.',
+          isAlreadyRendering: true,
+        }, { status: 409 });
+      }
+      activeClipRenders.add(clipId);
+      activeLockClipId = clipId;
     }
 
     let sourceVideoUrl = inputProps.videoUrl || '';
@@ -220,5 +237,9 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('Error in dark-clips render API:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } finally {
+    if (activeLockClipId) {
+      activeClipRenders.delete(activeLockClipId);
+    }
   }
 }
