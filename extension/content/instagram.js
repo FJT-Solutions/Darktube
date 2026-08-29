@@ -542,64 +542,96 @@
 
   function injectButtons() {
     try {
-      // 1. MODAL DIALOGS (Reels / Explore modal)
-      const dialogs = document.querySelectorAll('div[role="dialog"]');
-      dialogs.forEach((dialog) => {
-        if (injectedContainerMap.has(dialog)) return;
+      // 1. Check if a modal dialog is open
+      const openModal = document.querySelector('div[role="dialog"]');
 
-        const video = dialog.querySelector('video');
-        const targetRef = video || dialog;
-
-        const btn = createFloatingButton(() => {
-          const data = extractModalPostData(dialog);
-          if (data) sendToDarkClips(data, btn);
+      if (openModal) {
+        // When modal is open: inject ONLY ONE button on the modal's main video
+        if (!injectedContainerMap.has(openModal)) {
+          const video = openModal.querySelector('video');
+          // Only inject if there's a real video or a legit reel/post link inside the modal
+          const hasReelLink = !!openModal.querySelector('a[href*="/reel/"], a[href*="/p/"]');
+          if (video || hasReelLink) {
+            const targetRef = video || openModal;
+            const btn = createFloatingButton(() => {
+              const data = extractModalPostData(openModal);
+              if (data) sendToDarkClips(data, btn);
+            });
+            document.body.appendChild(btn);
+            injectedContainerMap.set(openModal, btn);
+            floatingButtons.push({ btn, getRect: () => targetRef.getBoundingClientRect() });
+            repositionFloatingButtons();
+          }
+        }
+        // Hide all non-modal buttons while the modal is open
+        floatingButtons.forEach(({ btn, getRect }) => {
+          try {
+            const isForModal = btn.dataset.isModal === 'true';
+            if (!isForModal && btn.parentElement) {
+              btn.style.display = 'none';
+            }
+          } catch {}
         });
+        return; // Don't inject on anything else while modal is open
+      }
 
-        document.body.appendChild(btn);
-        injectedContainerMap.set(dialog, btn);
-        floatingButtons.push({ btn, getRect: () => targetRef.getBoundingClientRect() });
-        repositionFloatingButtons();
-      });
-
-      // 2. Feed / Reel standalone videos
+      // 2. No modal open: inject on feed/reel standalone videos
+      // Only target videos that are large enough to be main content (not avatars/ads)
       const allVideos = document.querySelectorAll('video');
       allVideos.forEach((video) => {
-        const container = video.closest('article') ||
-                          video.closest('div[role="dialog"]') ||
-                          video.closest('div[data-pressable-container="true"]') ||
-                          video.parentElement;
+        // Skip tiny videos (avatar-like, preview icons, etc.)
+        const rect = video.getBoundingClientRect();
+        if (rect.width < 100 || rect.height < 100) return;
+
+        const container =
+          video.closest('article') ||
+          video.closest('div[data-pressable-container="true"]') ||
+          video.closest('section') ||
+          video.parentElement;
 
         if (!container || injectedContainerMap.has(container)) return;
-        if (document.querySelector('div[role="dialog"]')) return; // modal open — handled above
 
         const btn = createFloatingButton(() => {
           const data = extractModalPostData(container);
           if (data) sendToDarkClips(data, btn);
         });
-
         document.body.appendChild(btn);
         injectedContainerMap.set(container, btn);
         floatingButtons.push({ btn, getRect: () => video.getBoundingClientRect() });
         repositionFloatingButtons();
       });
 
-      // 3. Standalone articles (images/carousels)
-      const standaloneArticles = document.querySelectorAll('article:not([role="dialog"] article)');
+      // 3. Standalone articles (images/carousels) — only those with a real reel or post link
+      const standaloneArticles = document.querySelectorAll('article');
       standaloneArticles.forEach((article) => {
         if (injectedContainerMap.has(article)) return;
         if (article.querySelector('video')) return; // handled above
 
-        const mediaEl = article.querySelector('img') || article;
+        // Only inject if article has a real post/reel link (not comment section)
+        const hasPostLink = !!article.querySelector('a[href*="/p/"], a[href*="/reel/"]');
+        if (!hasPostLink) return;
+
+        const mediaEl = article.querySelector('img[style*="object-fit"], div[role="button"] img') || article;
+        const imgRect = mediaEl?.getBoundingClientRect?.();
+        if (!imgRect || imgRect.width < 100) return;
 
         const btn = createFloatingButton(() => {
           const data = extractModalPostData(article);
           if (data) sendToDarkClips(data, btn);
         });
-
         document.body.appendChild(btn);
         injectedContainerMap.set(article, btn);
         floatingButtons.push({ btn, getRect: () => mediaEl.getBoundingClientRect() });
         repositionFloatingButtons();
+      });
+
+      // Re-show any hidden feed buttons (modal was closed)
+      floatingButtons.forEach(({ btn }) => {
+        try {
+          if (btn.style.display === 'none' && btn.dataset.isModal !== 'true') {
+            btn.style.display = 'inline-flex';
+          }
+        } catch {}
       });
     } catch (err) {
       console.error('[DarkClips] Erro em injectButtons:', err);
