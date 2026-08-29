@@ -4082,21 +4082,6 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
-                                  handleRemodelWithAi(clip);
-                                }}
-                                disabled={remodelingAi}
-                                className="text-[11px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10 font-bold"
-                                title="Gerar gancho e textos exclusivos para este vídeo com IA"
-                              >
-                                {remodelingAi && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                                <span className="ml-1">IA</span>
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedClip(clip);
-                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
                                   setIsEditingLayout(true);
                                   setActiveTab('modeler');
                                   toast.info('Clipe carregado no Canvas para ajuste temporário!');

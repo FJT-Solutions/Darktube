@@ -439,92 +439,89 @@
     }
   }
 
+  // Map to track: container → button (so we can update position on scroll/resize)
+  const injectedContainerMap = new WeakMap();
+  const floatingButtons = []; // [{btn, getRect}]
+
+  function repositionFloatingButtons() {
+    floatingButtons.forEach(({ btn, getRect }) => {
+      try {
+        const rect = getRect();
+        if (!rect || rect.width === 0) {
+          btn.style.display = 'none';
+          return;
+        }
+        btn.style.display = 'inline-flex';
+        btn.style.top = `${rect.top + 12}px`;
+        btn.style.left = `${rect.right - 140}px`;
+      } catch {}
+    });
+  }
+
+  window.addEventListener('scroll', repositionFloatingButtons, { passive: true });
+  window.addEventListener('resize', repositionFloatingButtons, { passive: true });
+  setInterval(repositionFloatingButtons, 300);
+
   function injectButtons() {
     try {
-      // 1. EXPLORE / MODAL DIALOGS (div[role="dialog"])
+      // 1. MODAL DIALOGS (Reels / Explore modal)
       const dialogs = document.querySelectorAll('div[role="dialog"]');
       dialogs.forEach((dialog) => {
-        if (dialog.querySelector('.dark-clips-inject-btn')) return;
+        if (injectedContainerMap.has(dialog)) return;
 
         const video = dialog.querySelector('video');
-        
-        // Target the video player frame (left side) or article container
-        const targetFrame = video?.closest('div[style*="aspect-ratio"]') || 
-                            video?.parentElement?.parentElement || 
-                            video?.parentElement || 
-                            dialog.querySelector('article > div:first-child') || 
-                            dialog.querySelector('article') || 
-                            dialog;
-
-        if (window.getComputedStyle(targetFrame).position === 'static') {
-          targetFrame.style.position = 'relative';
-        }
+        const targetRef = video || dialog;
 
         const btn = createFloatingButton(() => {
           const data = extractModalPostData(dialog);
           if (data) sendToDarkClips(data, btn);
         });
 
-        btn.style.position = 'absolute';
-        btn.style.top = '14px';
-        btn.style.right = '14px';
-        btn.style.zIndex = '9999999';
-
-        targetFrame.appendChild(btn);
+        document.body.appendChild(btn);
+        injectedContainerMap.set(dialog, btn);
+        floatingButtons.push({ btn, getRect: () => targetRef.getBoundingClientRect() });
+        repositionFloatingButtons();
       });
 
-      // 2. REELS, FEED VIDEOS & ALL ACTIVE VIDEOS
+      // 2. Feed / Reel standalone videos
       const allVideos = document.querySelectorAll('video');
       allVideos.forEach((video) => {
-        const container = video.closest('article') || 
-                          video.closest('div[role="dialog"]') || 
-                          video.closest('div[data-pressable-container="true"]') || 
-                          video.closest('div[style*="aspect-ratio"]') || 
-                          video.parentElement?.parentElement || 
+        const container = video.closest('article') ||
+                          video.closest('div[role="dialog"]') ||
+                          video.closest('div[data-pressable-container="true"]') ||
                           video.parentElement;
 
-        if (!container || container.querySelector('.dark-clips-inject-btn')) return;
-
-        // Find the visual frame container of the video
-        const visualFrame = video.closest('div[style*="aspect-ratio"]') || video.parentElement || container;
-        if (window.getComputedStyle(visualFrame).position === 'static') {
-          visualFrame.style.position = 'relative';
-        }
+        if (!container || injectedContainerMap.has(container)) return;
+        if (document.querySelector('div[role="dialog"]')) return; // modal open — handled above
 
         const btn = createFloatingButton(() => {
           const data = extractModalPostData(container);
           if (data) sendToDarkClips(data, btn);
         });
 
-        btn.style.position = 'absolute';
-        btn.style.top = '14px';
-        btn.style.right = '14px';
-        btn.style.zIndex = '9999999';
-
-        visualFrame.appendChild(btn);
+        document.body.appendChild(btn);
+        injectedContainerMap.set(container, btn);
+        floatingButtons.push({ btn, getRect: () => video.getBoundingClientRect() });
+        repositionFloatingButtons();
       });
 
-      // 3. STANDALONE ARTICLES (Carousels/Images without video in Feed)
+      // 3. Standalone articles (images/carousels)
       const standaloneArticles = document.querySelectorAll('article:not([role="dialog"] article)');
       standaloneArticles.forEach((article) => {
-        if (article.querySelector('.dark-clips-inject-btn')) return;
+        if (injectedContainerMap.has(article)) return;
+        if (article.querySelector('video')) return; // handled above
 
-        const mediaFrame = article.querySelector('div[style*="aspect-ratio"]') || article.querySelector('header')?.parentElement || article;
-        if (window.getComputedStyle(mediaFrame).position === 'static') {
-          mediaFrame.style.position = 'relative';
-        }
+        const mediaEl = article.querySelector('img') || article;
 
         const btn = createFloatingButton(() => {
           const data = extractModalPostData(article);
           if (data) sendToDarkClips(data, btn);
         });
 
-        btn.style.position = 'absolute';
-        btn.style.top = '14px';
-        btn.style.right = '14px';
-        btn.style.zIndex = '9999999';
-
-        mediaFrame.appendChild(btn);
+        document.body.appendChild(btn);
+        injectedContainerMap.set(article, btn);
+        floatingButtons.push({ btn, getRect: () => mediaEl.getBoundingClientRect() });
+        repositionFloatingButtons();
       });
     } catch (err) {
       console.error('[DarkClips] Erro em injectButtons:', err);
@@ -535,33 +532,34 @@
     const btn = document.createElement('button');
     btn.className = 'dark-clips-inject-btn';
     btn.setAttribute('type', 'button');
+    // Fixed positioning — completely outside Instagram's container hierarchy
+    btn.style.cssText = `
+      position: fixed !important;
+      z-index: 2147483647 !important;
+      pointer-events: all !important;
+    `;
     btn.innerHTML = `
       <svg class="dark-clips-icon" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       <span>Dark Clips</span>
     `;
 
-    // Isolate button events so Instagram video controls or background navigation never intercept them
+    // All events isolated — button is on body, not inside video hierarchy
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
       onClick();
-    }, true);
-
-    btn.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-    }, true);
+    });
 
     btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      e.stopImmediatePropagation();
-    }, true);
+    });
 
-    btn.addEventListener('touchstart', (e) => {
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      e.stopImmediatePropagation();
-    }, { passive: true, capture: true });
+    });
 
     return btn;
   }

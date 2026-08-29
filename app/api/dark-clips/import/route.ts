@@ -6,7 +6,6 @@ import { getCurrentUser } from '@/lib/auth-helpers';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { uploadThumbnail } from '@/lib/storage';
 import { sanitizeVideo, createVideoFromImage } from '@/lib/video-sanitizer';
-import { generateAiRemodelForClip } from '../remodel-ai/route';
 
 export async function GET() {
   try {
@@ -45,8 +44,6 @@ export async function POST(req: Request) {
     }
 
     const targetUserId = user?.id || userId || null;
-    const userOpenAiKey = targetUserId ? await getUserApiKey(targetUserId, 'openai') : null;
-    const userGeminiKey = targetUserId ? await getUserApiKey(targetUserId, 'gemini') : null;
 
     const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
     const sanitizedDir = path.join(baseTmp, 'sanitized_clips');
@@ -166,20 +163,8 @@ export async function POST(req: Request) {
           const author_handle = rawHandle.startsWith('@') ? rawHandle.replace(/^@+/, '@') : `@${rawHandle}`;
           const rawCaption = item.originalCaption || item.caption || item.title || '';
 
-          // Geração automática de Gancho e Textos com IA para este clipe específico
-          let remodelData = null;
-          try {
-            remodelData = await generateAiRemodelForClip({
-              originalCaption: rawCaption,
-              authorName: item.authorName || item.author_name || 'Viral Creator',
-              authorHandle: author_handle,
-              platform: item.platform || platform,
-              userOpenAiKey,
-              userGeminiKey,
-            });
-          } catch (aiErr) {
-            console.warn('[DarkClips Import] Aviso ao gerar IA para clipe importado:', aiErr);
-          }
+          // IA NÃO é executada na mineração — só na renderização/produção
+          // remodel_data será preenchido quando o usuário clicar em 'Produzir'
 
           const saved = await saveDarkClip({
             user_id: targetUserId,
@@ -193,7 +178,7 @@ export async function POST(req: Request) {
             author_avatar: item.authorAvatar || item.author_avatar || '',
             original_caption: rawCaption,
             original_metrics: item.metrics || item.original_metrics || {},
-            remodel_data: remodelData || {},
+            remodel_data: {},
             sanitized: true
           });
           results.push(saved);
@@ -238,21 +223,7 @@ export async function POST(req: Request) {
           else if (cleanUrl.includes('twitter.com') || cleanUrl.includes('x.com')) detectedPlatform = 'twitter';
           else if (cleanUrl.includes('facebook.com')) detectedPlatform = 'facebook';
 
-          // Geração automática de Gancho e Textos com IA para a URL importada
-          let remodelData = null;
-          try {
-            remodelData = await generateAiRemodelForClip({
-              originalCaption: cleanUrl,
-              authorName: 'Viral Creator',
-              authorHandle: '@viral',
-              platform: detectedPlatform,
-              userOpenAiKey,
-              userGeminiKey,
-            });
-          } catch (aiErr) {
-            console.warn('[DarkClips Import] Aviso ao gerar IA para URL:', aiErr);
-          }
-
+          // IA NÃO é executada na mineração — só na renderização/produção
           const saved = await saveDarkClip({
             user_id: targetUserId,
             original_url: cleanUrl,
@@ -263,7 +234,7 @@ export async function POST(req: Request) {
             author_name: 'Viral Creator',
             author_handle: '@viral',
             original_caption: '',
-            remodel_data: remodelData || {},
+            remodel_data: {},
             sanitized: true
           });
           results.push(saved);
