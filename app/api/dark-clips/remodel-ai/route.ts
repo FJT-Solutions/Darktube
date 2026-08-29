@@ -9,8 +9,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const {
       originalCaption = '',
-      theme = '',
+      authorName = '',
       authorHandle = '@darkclips',
+      platform = 'instagram',
+      theme = '',
       style = 'meme-ironic', // 'meme-ironic' | 'relatable' | 'absurd' | 'pov'
     } = body;
 
@@ -19,29 +21,35 @@ export async function POST(req: Request) {
     const systemGeminiKey = process.env.GEMINI_API_KEY;
 
     const promptInstructions = `
-Você é o Diretor Criativo e Especialista em Memes Virais do DarkTube.
-Sua missão é remodelar um vídeo/clipe viral gerando uma HEADLINE DE ALTO IMPACTO (Setup + Punchline), um CTA de rodapé e uma legenda de postagem com hashtags.
+Você é o Diretor Criativo e Especialista Máximo em Copywriting Viral, Retenção e Memes do DarkTube.
+Sua missão é analisar os DADOS REAIS DESTE VÍDEO CAPTURADO e criar uma HEADLINE (Setup + Reação/Punchline) 100% INÉDITA E TOTALMENTE PERSONALIZADA para o acontecimento/história real deste clipe.
 
-DADOS DE ENTRADA:
-- Legenda/Contexto Original: "${originalCaption || 'Vídeo engraçado / meme de situação cotidiana'}"
-- Tema/Instrução Adicional do Usuário: "${theme || 'Humor de identificação moderno brasileiro'}"
-- Arroba da Página do Usuário: "${authorHandle}"
+DADOS REAIS DO VÍDEO CAPTURADO:
+- Transcrição / Legenda / Contexto Original do Vídeo: "${originalCaption || 'Vídeo de situação inusitada / meme viral'}"
+- Criador do Vídeo: "${authorName || ''} (${authorHandle || ''})"
+- Plataforma de Origem: "${platform || 'instagram'}"
+- Direcionamento / Tema Desejado pelo Usuário: "${theme || 'Identificação e humor viral brasileiro'}"
 - Estilo: "${style}"
 
-REGRAS OBRIGATÓRIAS:
-1. "headline_main": Frase de setup (ex: "MEU AMIGO: 'COMPREI UM MIC NOVO, MANO.'", "QUANDO EU DIGO QUE VOU SÓ EM UM LUGAR:", "POV: VOCÊ TENTANDO DISFARÇAR NO TRABALHO:"). Deve ser curta, chamativa e em MAIÚSCULAS.
-2. "headline_sub": Frase de reação / punchline (ex: "O DESGRAÇADO ENTRANDO NA CALL:", "EU 10 MINUTOS DEPOIS:", "MINHA REAÇÃO:").
-3. "cta_text": Chamada para ação sutil de rodapé (ex: "Sigam ${authorHandle} para mais memes!", "*qualquer semelhança é mera coincidência").
-4. "post_caption": Legenda envolvente para o post no Instagram/TikTok/Shorts com gancho inicial que incentive comentários.
-5. "hashtags": Array com 8 a 12 hashtags virais em alta no Brasil.
+DIRETRIZES FUNDAMENTAIS DE CRIAÇÃO (LEIA COM MÁXIMA ATENÇÃO):
+1. PROIBIÇÃO ABSOLUTA DE TEMPLATES GENÉRICOS:
+   - É ESTRITAMENTE PROIBIDO reutilizar frases prontas de exemplos ou templates (como "comprei um mic novo", "o desgraçado entrando na call", "quando eu digo que vou só em um lugar", etc.), a menos que o vídeo capturado trate literalmente disso.
+2. CONTEXTUALIZAÇÃO TOTAL AO VÍDEO:
+   - Identifique e extraia o tema e a ação CENTRAL descrita na legenda/contexto do vídeo (ex: se fala do Dinossauro do Google Chrome e internet caindo, crie ganchos sobre internet/desespero/jogo offline; se fala de trabalho, sobre CLT/chefe; se fala de finanças, sobre boletos/banco; se fala de academia, sobre treino/dor; se fala de games, sobre jogos).
+3. ESTRUTURA DO MEME (1080x1920):
+   - "headline_main": Frase de abertura/setup curta, provocativa e impactante em MAIÚSCULAS (ex: "POV: ...", "QUANDO VOCÊ...", "O MOMENTO EXATO EM QUE...", "MEU CÉREBRO ÀS 3 DA MANHÃ:").
+   - "headline_sub": Frase de reação / punchline / contexto que complementa com humor afiado o que acontece na cena.
+   - "cta_text": Chamada para ação sutil e moderna (ex: "Siga ${authorHandle} para mais", "Marca quem faz isso").
+   - "post_caption": Legenda magnética para o feed do Instagram/TikTok/Shorts, contextualizando a história e terminando com uma pergunta envolvente que force comentários.
+   - "hashtags": Array com 8 a 12 hashtags específicas do nicho do vídeo e tendências no Brasil.
 
-RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem formatação markdown envolvente):
+RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown envolventes):
 {
   "headline_main": "...",
   "headline_sub": "...",
   "cta_text": "...",
   "post_caption": "...",
-  "hashtags": ["#meme", "#humor", "#viral"]
+  "hashtags": ["#tag1", "#tag2", "#tag3"]
 }
 `.trim();
 
@@ -60,11 +68,14 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem formatação mar
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: 'Você é um assistente criativo que responde apenas com objetos JSON estritos.' },
+              {
+                role: 'system',
+                content: 'Você é um assistente criativo e especialista em memes virais que analisa contextos reais de vídeos e responde apenas com objetos JSON estritos, sem repetir templates.'
+              },
               { role: 'user', content: promptInstructions }
             ],
             response_format: { type: 'json_object' },
-            temperature: 0.8
+            temperature: 0.85
           })
         });
 
@@ -96,13 +107,16 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem formatação mar
       }
     }
 
-    // ── 3. Hardcoded Fallback if all AI fails ──
+    // ── 3. Dynamic Contextual Fallback if all AI fails ──
     if (!responseJson) {
+      const contextWords = (originalCaption || '').replace(/[^\w\s]/gi, '').split(/\s+/).filter((w: string) => w.length > 4);
+      const keyword = contextWords[0] ? contextWords[0].toUpperCase() : 'ISSO';
+
       responseJson = {
-        headline_main: "MEU AMIGO: \"COMPREI UM MIC NOVO, MANO.\"",
-        headline_sub: "O DESGRAÇADO ENTRANDO NA CALL:",
-        cta_text: `Sigam ${authorHandle} para mais vídeos!`,
-        post_caption: "Marca aquele amigo que faz exatamente isso 😂👇",
+        headline_main: `QUANDO VOCÊ MENOS ESPERA E ACONTECE ${keyword}:`,
+        headline_sub: "A REAÇÃO DE QUEM NÃO TEM MAIS NADA A PERDER:",
+        cta_text: `Siga ${authorHandle} para mais vídeos!`,
+        post_caption: originalCaption ? `${originalCaption.slice(0, 120)}... O que você faria nessa situação? 😂👇` : "Marca aquele amigo que precisa ver isso 😂👇",
         hashtags: ["#memesbrasil", "#humor", "#engraçado", "#viral", "#reels", "#fyp", "#shorts"]
       };
     }

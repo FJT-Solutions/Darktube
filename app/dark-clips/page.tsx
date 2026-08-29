@@ -989,35 +989,43 @@ export default function DarkClipsPage() {
     }
   };
 
-  async function handleRemodelWithAi() {
-    if (!selectedClip) {
+  async function handleRemodelWithAi(targetClip?: DarkClip) {
+    const clip = targetClip || selectedClip;
+    if (!clip) {
       toast.error("Selecione um clipe na biblioteca para gerar o gancho com IA.");
-      return;
+      return null;
     }
     setRemodelingAi(true);
     try {
+      const toastId = toast.loading(`✨ Analisando contexto do vídeo de ${clip.author_handle || 'Criador'} com IA...`);
       const res = await fetch("/api/dark-clips/remodel-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          originalCaption: selectedClip.original_caption || selectedClip.title || "",
+          originalCaption: clip.original_caption || "",
+          authorName: clip.author_name || "",
+          authorHandle: clip.author_handle || profileHeader.handle,
+          platform: clip.platform || "instagram",
           theme: aiThemePrompt,
-          authorHandle: profileHeader.handle,
         }),
       });
       const result = await res.json();
+      toast.dismiss(toastId);
       if (result.success && result.data) {
         const { headline_main, headline_sub, cta_text, post_caption, hashtags } = result.data;
         if (headline_main) setHeadline((h) => ({ ...h, mainText: headline_main, subText: headline_sub || h.subText }));
         if (cta_text && footer.showFooter) setFooter((f) => ({ ...f, text: cta_text }));
         if (post_caption) setPostCaption(post_caption);
         if (hashtags) setPostHashtags(hashtags);
-        toast.success("✨ Gancho e textos virais gerados com IA!");
+        toast.success(`✨ Gancho viral gerado: "${headline_main}"`);
+        return result.data;
       } else {
         toast.error(result.error || "Erro ao gerar com IA.");
+        return null;
       }
     } catch {
       toast.error("Erro ao comunicar com a IA.");
+      return null;
     } finally {
       setRemodelingAi(false);
     }
@@ -1030,6 +1038,20 @@ export default function DarkClipsPage() {
       return null;
     }
 
+    // Se o texto da headline ainda for o template padrão fixo, gera automaticamente um gancho inédito para o vídeo com IA antes de renderizar
+    let currentHeadline = headline;
+    if (headline.mainText === 'Meu amigo: "Comprei um mic novo, mano."' || !headline.mainText) {
+      toast.info("✨ Criando gancho e textos exclusivos para este vídeo com IA...");
+      const aiData = await handleRemodelWithAi(clipToRender);
+      if (aiData?.headline_main) {
+        currentHeadline = {
+          ...headline,
+          mainText: aiData.headline_main,
+          subText: aiData.headline_sub || headline.subText,
+        };
+      }
+    }
+
     setIsRendering(true);
     try {
       toast.info(`🎬 Enviando render de "${clipToRender.author_handle || 'Clipe'}" para o Remotion (1080x1920)...`);
@@ -1038,13 +1060,13 @@ export default function DarkClipsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clipId: clipToRender.id,
-          title: headline.mainText || "Dark Clip Meme",
+          title: currentHeadline.mainText || "Dark Clip Meme",
           durationInSeconds: clipToRender.duration || 15,
           inputProps: {
             videoUrl: clipToRender.video_url,
             durationInSeconds: clipToRender.duration || 15,
             profileHeader,
-            headline,
+            headline: currentHeadline,
             videoPlacement,
             background,
             watermark,
@@ -1053,8 +1075,8 @@ export default function DarkClipsPage() {
             arrowsList: arrowsList,
           },
           remodelData: {
-            headline_main: headline.mainText,
-            headline_sub: headline.subText,
+            headline_main: currentHeadline.mainText,
+            headline_sub: currentHeadline.subText,
             cta_text: footer.text,
             post_caption: postCaption,
             hashtags: postHashtags,
@@ -3838,6 +3860,21 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                  handleRemodelWithAi(clip);
+                                }}
+                                disabled={remodelingAi}
+                                className="text-[11px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10 font-bold"
+                                title="Gerar gancho e textos exclusivos para este vídeo com IA"
+                              >
+                                {remodelingAi && selectedClip?.id === clip.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                                <span className="ml-1">IA</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedClip(clip);
+                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
                                   setIsEditingLayout(true);
                                   setActiveTab('modeler');
                                   toast.info('Clipe carregado no Canvas para ajuste temporário!');
@@ -3923,7 +3960,7 @@ export default function DarkClipsPage() {
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={handleRemodelWithAi}
+                            onClick={() => handleRemodelWithAi()}
                             disabled={remodelingAi}
                             className="text-xs font-bold gap-1.5 h-7.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                           >
