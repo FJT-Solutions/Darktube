@@ -8,7 +8,7 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
-// Cookie bridge for content scripts (content scripts cannot call chrome.cookies directly)
+// Cookie & API bridge for content scripts (bypasses page CSP and CORS restrictions)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'GET_COOKIES') {
     try {
@@ -26,6 +26,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } catch (err) {
       sendResponse({ cookies: [], error: err.message });
     }
-    return true; // Keep channel open for async response
+    return true;
+  }
+
+  if (request.action === 'IMPORT_CLIP') {
+    (async () => {
+      try {
+        const { endpoint, headers, body } = request;
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: headers || { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        sendResponse({ success: res.ok, data, status: res.status });
+      } catch (err) {
+        console.error('[DarkClips Background] Fetch error:', err);
+        sendResponse({ success: false, error: err.message || 'Falha de rede' });
+      }
+    })();
+    return true; // Keep message channel open for async response
   }
 });

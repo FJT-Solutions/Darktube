@@ -55,19 +55,26 @@
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          platform: 'youtube',
-          items: [videoData],
-          userId: user?.id || null
-        })
+      const result = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: 'IMPORT_CLIP',
+          endpoint,
+          headers,
+          body: {
+            platform: 'youtube',
+            items: [videoData],
+            userId: user?.id || null
+          }
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve(response || { success: false, error: 'Sem resposta do background service worker' });
+          }
+        });
       });
 
-      const result = await response.json();
-
-      if (result.success) {
+      if (result.success && (result.data?.success || result.data?.clips || result.status === 200)) {
         if (btnElement) {
           btnElement.classList.remove('sending');
           btnElement.classList.add('sent');
@@ -82,7 +89,7 @@
         }
         showToast('Shorts do YouTube enviado para o Dark Clips!');
       } else {
-        throw new Error(result.error || 'Erro ao importar');
+        throw new Error(result.error || result.data?.error || 'Erro ao importar');
       }
     } catch (err) {
       console.error('[DarkClips YouTube] Erro:', err);

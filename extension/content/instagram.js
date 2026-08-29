@@ -89,21 +89,30 @@
       const sessionCookies = await getInstagramCookies();
       console.log(`[DarkClips] ${sessionCookies.length} cookies capturados para autenticação.`);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          platform: 'instagram',
-          items: list,
-          userId: user?.id || null,
-          sessionCookies
-        })
+      // Dispara o fetch através do Background Service Worker para burlar CSP e CORS do Instagram
+      const result = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: 'IMPORT_CLIP',
+          endpoint,
+          headers,
+          body: {
+            platform: 'instagram',
+            items: list,
+            userId: user?.id || null,
+            sessionCookies
+          }
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            resolve(response || { success: false, error: 'Sem resposta do background service worker' });
+          }
+        });
       });
 
-      const result = await response.json();
       console.log('[DarkClips] Resposta do servidor DarkTube:', result);
 
-      if (result.success) {
+      if (result.success && (result.data?.success || result.data?.clips || result.status === 200)) {
         if (btnElement) {
           btnElement.classList.remove('sending');
           btnElement.classList.add('sent');
@@ -118,7 +127,7 @@
         }
         showToast(`${list.length} post(s) enviado(s) ao Dark Clips!`);
       } else {
-        throw new Error(result.error || 'Erro retornado pelo servidor');
+        throw new Error(result.error || result.data?.error || 'Erro retornado pelo servidor');
       }
     } catch (err) {
       console.error('[DarkClips] Erro ao enviar:', err);
