@@ -571,12 +571,26 @@
       // ── 1. Modal Reel / Post Dialog ──
       const dialog = document.querySelector('div[role="dialog"]');
       if (dialog) {
-        if (!dialog.querySelector('.dark-clips-inject-btn')) {
-          // Find the visual media container inside the modal (left column with video or image)
+        // Look for the user header in the modal (e.g. username • Seguir)
+        const modalHeader = dialog.querySelector('header');
+        if (modalHeader && !modalHeader.querySelector('.dark-clips-inject-btn')) {
+          const btn = createDirectButton(() => {
+            const data = extractModalPostData(dialog);
+            if (data) sendToDarkClips(data, btn);
+          }, 'margin-left: auto !important; margin-right: 8px !important; padding: 6px 12px !important; font-size: 12px !important; flex-shrink: 0 !important;');
+
+          // Insert next to user profile header (before the 3-dots button or at the end of header)
+          const menuBtn = modalHeader.querySelector('div[role="button"]:last-child, button:last-child');
+          if (menuBtn && menuBtn.parentElement === modalHeader) {
+            modalHeader.insertBefore(btn, menuBtn);
+          } else {
+            modalHeader.appendChild(btn);
+          }
+        } else if (!modalHeader && !dialog.querySelector('.dark-clips-inject-btn')) {
+          // Fallback if header not found (e.g. standalone video modal)
           const mediaContainer = dialog.querySelector('article') ||
                                  dialog.querySelector('video')?.closest('div[style*="flex"]') ||
                                  dialog.querySelector('video')?.parentElement ||
-                                 dialog.querySelector('div[role="button"] img')?.parentElement ||
                                  dialog;
 
           const pos = window.getComputedStyle(mediaContainer).position;
@@ -595,7 +609,7 @@
       }
 
       // ── 2. Grid Thumbnails (Explore / Profile) ──
-      const gridLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
+      const gridLinks = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], a[href*="/tv/"]');
       gridLinks.forEach((anchor) => {
         if (anchor.closest('article') || anchor.closest('div[role="dialog"]')) return;
 
@@ -605,8 +619,9 @@
         const match = href.match(/\/(p|reel|reels|tv)\/([A-Za-z0-9_-]{5,})/);
         if (!match) return;
 
-        const img = anchor.querySelector('img');
-        if (!img) return;
+        // Skip tiny navigation / avatar links (must be a post tile)
+        const rect = anchor.getBoundingClientRect();
+        if (rect.width > 0 && (rect.width < 80 || rect.height < 80)) return;
 
         if (anchor.querySelector('.dark-clips-inject-btn')) return;
 
@@ -617,7 +632,9 @@
 
         const btn = createDirectButton(() => {
           const fullUrl = `https://www.instagram.com/${match[1] === 'reels' ? 'reel' : match[1]}/${match[2]}/`;
-          const thumbUrl = img.currentSrc || img.src || '';
+          const img = anchor.querySelector('img');
+          const video = anchor.querySelector('video');
+          const thumbUrl = img?.currentSrc || img?.src || video?.getAttribute('poster') || '';
           const profileInfo = getPageProfileInfo();
           sendToDarkClips({
             url: fullUrl,
@@ -627,7 +644,7 @@
             authorName: profileInfo.name,
             authorHandle: profileInfo.handle,
             authorAvatar: profileInfo.avatar,
-            originalCaption: img.getAttribute('alt') || '',
+            originalCaption: img?.getAttribute('alt') || '',
             platform: 'instagram',
             type: match[1].includes('reel') ? 'reel' : 'post',
             metrics: { likes: 0, comments: 0, views: 0 }
