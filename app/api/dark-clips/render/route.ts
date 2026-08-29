@@ -168,10 +168,11 @@ export async function POST(req: Request) {
 
     const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://darktube.fjt-solutions.com'}/api/webhooks/production-complete`;
 
-    // 2. Disparo assíncrono para o container do Remotion
+    // 2. Disparo assíncrono para o container do Remotion com polling inteligente de storage
     (async () => {
       let renderedVideoUrl = '';
       let lastError = '';
+      let activeBaseUrl = '';
 
       for (const baseUrl of CANDIDATE_URLS) {
         const cleanBase = baseUrl.replace(/\/+$/, '');
@@ -179,6 +180,7 @@ export async function POST(req: Request) {
         console.log(`[DarkClips Render] Despachando para Remotion Server em ${renderEndpoint} (Job: ${initialPost.id})...`);
 
         try {
+          activeBaseUrl = cleanBase;
           const res = await fetch(renderEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -231,12 +233,43 @@ export async function POST(req: Request) {
           }
         } catch (err: any) {
           lastError = err?.message;
-          console.warn(`[DarkClips Render] Falha ao conectar em ${cleanBase}:`, lastError);
+          console.warn(`[DarkClips Render] Conexão HTTP direta encerrou (${cleanBase}): ${lastError}. Iniciando monitoramento de storage...`);
+        }
+      }
+
+      // Se a conexão HTTP encerrou (timeout natural após 5 min), o Remotion continua processando em background.
+      // Vamos monitorar a saída do storage do Remotion por até 12 minutos.
+      if (!renderedVideoUrl && activeBaseUrl) {
+        const expectedFileUrl = `${activeBaseUrl}/storage/darkclip_${initialPost.id}.mp4`;
+        const startTime = Date.now();
+        const maxWaitMs = 12 * 60 * 1000; // 12 minutos
+
+        while (Date.now() - startTime < maxWaitMs) {
+          await new Promise((resolve) => setTimeout(resolve, 6000));
+          try {
+            const checkRes = await fetch(expectedFileUrl, { method: 'HEAD' });
+            if (checkRes.ok) {
+              console.log(`[DarkClips Render] ✅ Arquivo final detectado no Remotion via polling: ${expectedFileUrl}`);
+              const dlRes = await fetch(expectedFileUrl);
+              if (dlRes.ok) {
+                const arrayBuf = await dlRes.arrayBuffer();
+                const buffer = Buffer.from(arrayBuf);
+                const filename = `rendered_darkclip_${initialPost.id}.mp4`;
+                renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                await pool.query(
+                  'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
+                  ['rendered', renderedVideoUrl, initialPost.id]
+                );
+                console.log(`[DarkClips Render] 🎉 Render salvo com sucesso no DarkTube após polling: ${renderedVideoUrl}`);
+                break;
+              }
+            }
+          } catch (pollErr: any) {}
         }
       }
 
       if (!renderedVideoUrl && lastError) {
-        console.error(`[DarkClips Render] Render falhou para ${initialPost.id}: ${lastError}`);
+        console.error(`[DarkClips Render] Render falhou definitivamente para ${initialPost.id}: ${lastError}`);
         try {
           await pool.query('UPDATE public.dark_clips_posts SET status = $1, error_message = $2 WHERE id = $3', ['failed', lastError, initialPost.id]);
         } catch (e) {}

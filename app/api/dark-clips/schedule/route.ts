@@ -17,9 +17,9 @@ export async function GET() {
     const user = await getCurrentUser();
     const posts = await getDarkClipPosts(user?.id);
 
-    // Auto-reconciliação de renders em andamento diretamente do storage do Remotion
+    // Auto-reconciliação de renders diretamente do storage do Remotion (mesmo que tenham recebido timeout inicial)
     for (const post of posts) {
-      if (post.status === 'rendering') {
+      if (!post.rendered_video_url || post.status === 'rendering' || post.status === 'failed') {
         for (const baseUrl of CANDIDATE_URLS) {
           const cleanBase = baseUrl.replace(/\/+$/, '');
           const fileCandidate = `${cleanBase}/storage/darkclip_${post.id}.mp4`;
@@ -33,9 +33,13 @@ export async function GET() {
                 const buffer = Buffer.from(arrayBuf);
                 const filename = `rendered_darkclip_${post.id}.mp4`;
                 const permanentUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
-                await pool.query('UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2 WHERE id = $3', ['rendered', permanentUrl, post.id]);
+                await pool.query(
+                  'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
+                  ['rendered', permanentUrl, post.id]
+                );
                 post.status = 'rendered';
                 post.rendered_video_url = permanentUrl;
+                post.error_message = undefined;
                 break;
               }
             }
