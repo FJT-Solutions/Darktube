@@ -29,7 +29,8 @@ export async function POST(req: Request) {
       urls = [], 
       items = [], // direct metadata items from extension
       platform = 'other',
-      userId = null
+      userId = null,
+      sessionCookies = [] // cookies from the user's browser (Instagram, TikTok, etc.)
     } = body;
 
     // Check token from headers if not found in session cookies
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
           if (!servedVideoUrl && sourceUrl.startsWith('http') && !sourceUrl.includes('/api/storage/') && !sourceUrl.endsWith('.mp4')) {
             try {
               console.log(`[DarkClips Import] Downloading item from source: ${sourceUrl}`);
-              const dl = await VideoCaptureService.downloadFromUrl(sourceUrl);
+              const dl = await VideoCaptureService.downloadFromUrl(sourceUrl, sessionCookies?.length ? sessionCookies : undefined);
               if (dl.videoPath && fs.existsSync(dl.videoPath)) {
                 const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(dl.videoPath)}`);
                 await sanitizeVideo(dl.videoPath, sanitizedPath);

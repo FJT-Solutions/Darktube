@@ -30,6 +30,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const DARKTUBE_BASE_URL = 'https://darktube.fjt-solutions.com';
 
+  // ── Helper: Captura cookies do Instagram do navegador ──
+  async function getInstagramCookies() {
+    try {
+      const cookies = await chrome.cookies.getAll({ domain: 'instagram.com' });
+      return cookies.map((c) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path,
+        secure: c.secure,
+        expirationDate: c.expirationDate || 9999999999
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   // 1. Load initial auth state
   chrome.storage.local.get(['darktube_user', 'darktube_token', 'darktube_api_url'], (res) => {
     if (!res.darktube_api_url || res.darktube_api_url.includes('fjt.solutions')) {
@@ -297,7 +314,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 7. Send Items with User Token
+  // 7. Send Items with User Token + Browser Cookies
   async function sendItems(items, btnElement) {
     if (btnElement) {
       btnElement.disabled = true;
@@ -312,13 +329,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         headers['Authorization'] = `Bearer ${currentToken}`;
       }
 
+      // Captura os cookies do Instagram do navegador para autenticar o download
+      const sessionCookies = await getInstagramCookies();
+      if (sessionCookies.length > 0) {
+        statusText.textContent = `🍪 Usando ${sessionCookies.length} cookies da sessão...`;
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           platform: items[0]?.platform || 'instagram',
           items,
-          userId: currentUser?.id || null
+          userId: currentUser?.id || null,
+          sessionCookies
         })
       });
 

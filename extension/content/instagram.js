@@ -58,13 +58,31 @@
 
       const list = Array.isArray(items) ? items : [items];
 
+      // Captura cookies do Instagram do navegador para autenticar o yt-dlp no servidor
+      let sessionCookies = [];
+      try {
+        sessionCookies = await new Promise((resolve) => {
+          chrome.cookies.getAll({ domain: 'instagram.com' }, (cookies) => {
+            resolve((cookies || []).map((c) => ({
+              name: c.name,
+              value: c.value,
+              domain: c.domain,
+              path: c.path,
+              secure: c.secure,
+              expirationDate: c.expirationDate || 9999999999
+            })));
+          });
+        });
+      } catch {}
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           platform: 'instagram',
           items: list,
-          userId: user?.id || null
+          userId: user?.id || null,
+          sessionCookies
         })
       });
 
