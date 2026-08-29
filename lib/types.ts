@@ -234,7 +234,10 @@ export interface DarkClipPreset {
     borderRadius?: number
     has_shadow?: boolean
     hasShadow?: boolean
-    aspect_ratio?: string // 'auto' | '16:9' | '4:3' | '1:1'
+    aspect_ratio?: string // 'auto' | '1:1' | '4:5' | '9:16' | '16:9' | '4:3'
+    aspectRatio?: string
+    fit_mode?: 'contain' | 'cover'
+    fitMode?: 'contain' | 'cover'
   }
   background_style: {
     type?: 'black' | 'blur' | 'gradient' | 'color' | 'white' | 'neon' | 'zinc'

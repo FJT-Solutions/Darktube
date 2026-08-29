@@ -42,7 +42,11 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     borderRadius = 24,
     hasShadow = true,
     aspectRatio = 'auto',
+    fitMode = 'contain',
+    fit_mode,
   } = videoPlacement;
+
+  const activeFitMode = fit_mode || fitMode || 'contain';
 
   // ── 4. Background Defaults ──
   const {
@@ -270,9 +274,20 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               borderRadius: `${borderRadius}px`,
               overflow: 'hidden',
               boxShadow: hasShadow ? '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255,255,255,0.1)' : 'none',
-              backgroundColor: '#09090b',
-              aspectRatio: aspectRatio === '16:9' ? '16/9' : aspectRatio === '4:3' ? '4/3' : aspectRatio === '1:1' ? '1/1' : 'auto',
-              maxHeight: '58%',
+              backgroundColor: 'transparent',
+              aspectRatio:
+                aspectRatio === '16:9'
+                  ? '16/9'
+                  : aspectRatio === '4:3'
+                  ? '4/3'
+                  : aspectRatio === '1:1'
+                  ? '1/1'
+                  : aspectRatio === '4:5'
+                  ? '4/5'
+                  : aspectRatio === '9:16'
+                  ? '9/16'
+                  : undefined,
+              maxHeight: '62%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -284,7 +299,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain',
+                maxHeight: '100%',
+                objectFit: activeFitMode === 'cover' ? 'cover' : 'contain',
+                borderRadius: `${borderRadius}px`,
               }}
             />
           </div>

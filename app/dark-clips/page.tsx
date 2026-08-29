@@ -338,6 +338,7 @@ export default function DarkClipsPage() {
     borderRadius: 24,
     hasShadow: true,
     aspectRatio: "auto",
+    fitMode: "contain" as "contain" | "cover",
   });
 
   const [background, setBackground] = useState({
@@ -620,6 +621,8 @@ export default function DarkClipsPage() {
         scale: preset.video_placement.scale ?? v.scale,
         borderRadius: preset.video_placement.border_radius ?? preset.video_placement.borderRadius ?? v.borderRadius,
         hasShadow: preset.video_placement.has_shadow ?? preset.video_placement.hasShadow ?? v.hasShadow,
+        aspectRatio: preset.video_placement.aspect_ratio ?? preset.video_placement.aspectRatio ?? v.aspectRatio,
+        fitMode: (preset.video_placement.fit_mode || preset.video_placement.fitMode || v.fitMode) as any,
       }));
     }
     if (preset.background_style) {
@@ -2496,7 +2499,72 @@ export default function DarkClipsPage() {
                       />
                     </div>
 
-                    {/* Estilo do Fundo */}
+                    {/* Enquadramento & Modo de Ajuste (Sem Cortes vs Preencher) */}
+                    <div className="space-y-2 pt-1 border-t border-border/40">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold">Modo de Enquadramento</Label>
+                        <span className="text-[10px] text-muted-foreground">
+                          {videoPlacement.fitMode === "contain" ? "🛡️ 100% Original Sem Cortes" : "✂️ Preencher Container"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={videoPlacement.fitMode === "contain" ? "default" : "outline"}
+                          onClick={() => setVideoPlacement((v) => ({ ...v, fitMode: "contain" }))}
+                          className={`text-xs h-8 font-bold gap-1.5 ${
+                            videoPlacement.fitMode === "contain"
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              : "border-border/60"
+                          }`}
+                        >
+                          🛡️ Sem Cortes (Preservar 100%)
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={videoPlacement.fitMode === "cover" ? "default" : "outline"}
+                          onClick={() => setVideoPlacement((v) => ({ ...v, fitMode: "cover" }))}
+                          className={`text-xs h-8 font-bold gap-1.5 ${
+                            videoPlacement.fitMode === "cover"
+                              ? "bg-primary text-primary-foreground"
+                              : "border-border/60"
+                          }`}
+                        >
+                          ✂️ Preencher Bordas
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Proporção da Moldura (Aspect Ratio) */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Proporção da Moldura do Vídeo</Label>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                          { id: "auto", label: "Auto" },
+                          { id: "1:1", label: "1:1" },
+                          { id: "4:5", label: "4:5" },
+                          { id: "9:16", label: "9:16" },
+                          { id: "16:9", label: "16:9" },
+                        ].map((r) => (
+                          <Button
+                            key={r.id}
+                            type="button"
+                            size="sm"
+                            variant={videoPlacement.aspectRatio === r.id ? "default" : "outline"}
+                            onClick={() => setVideoPlacement((v) => ({ ...v, aspectRatio: r.id }))}
+                            className={`text-xs h-7 px-1 font-bold ${
+                              videoPlacement.aspectRatio === r.id
+                                ? "bg-primary text-primary-foreground"
+                                : "border-border/60"
+                            }`}
+                          >
+                            {r.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="space-y-2 pt-2 border-t border-border/40">
                       <Label className="text-xs font-semibold">Estilo de Fundo 9:16</Label>
                       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">

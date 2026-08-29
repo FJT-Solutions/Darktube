@@ -48,6 +48,7 @@ export const RemotionRoot: React.FC = () => {
             borderRadius: 24,
             hasShadow: true,
             aspectRatio: 'auto',
+            fitMode: 'contain',
           },
           background: {
             type: 'black',

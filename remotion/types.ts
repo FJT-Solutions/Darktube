@@ -299,7 +299,9 @@ export interface DarkClipsVideoProps {
     scale?: number; // 50 - 100 percentage
     borderRadius?: number; // px
     hasShadow?: boolean;
-    aspectRatio?: string;
+    aspectRatio?: string; // 'auto' | '1:1' | '4:5' | '9:16' | '16:9' | '4:3'
+    fitMode?: 'contain' | 'cover';
+    fit_mode?: 'contain' | 'cover';
   };
 
   // Background
