@@ -10,6 +10,15 @@ export interface RemodelAiParams {
   platform?: string;
   theme?: string;
   style?: string;
+  mainTextMode?: 'ai' | 'manual';
+  mainTextFixed?: string;
+  mainTextMaxWords?: number;
+  subTextMode?: 'ai' | 'manual';
+  subTextFixed?: string;
+  subTextMaxWords?: number;
+  ctaMode?: 'ai' | 'manual';
+  fixedCta?: string;
+  ctaMaxWords?: number;
   userOpenAiKey?: string | null;
   userGeminiKey?: string | null;
   systemGeminiKey?: string | null;
@@ -31,6 +40,15 @@ export async function generateAiRemodelForClip(params: RemodelAiParams): Promise
     platform = 'instagram',
     theme = '',
     style = 'meme-ironic',
+    mainTextMode = 'ai',
+    mainTextFixed = '',
+    mainTextMaxWords = 8,
+    subTextMode = 'ai',
+    subTextFixed = '',
+    subTextMaxWords = 6,
+    ctaMode = 'manual',
+    fixedCta = '',
+    ctaMaxWords = 6,
     userOpenAiKey,
     userGeminiKey,
     systemGeminiKey = process.env.GEMINI_API_KEY,
@@ -38,7 +56,7 @@ export async function generateAiRemodelForClip(params: RemodelAiParams): Promise
 
   const promptInstructions = `
 Você é o Diretor Criativo e Especialista Máximo em Copywriting Viral, Retenção e Memes do DarkTube.
-Sua missão é analisar os DADOS REAIS DESTE VÍDEO CAPTURADO e criar uma HEADLINE (Setup + Reação/Punchline) 100% INÉDITA E TOTALMENTE PERSONALIZADA para o acontecimento/história real deste clipe.
+Sua missão é analisar os DADOS REAIS DESTE VÍDEO CAPTURADO e criar os textos e gancho (Setup + Reação/Punchline) 100% INÉDITOS E TOTALMENTE PERSONALIZADOS para o acontecimento/história real deste clipe.
 
 DADOS REAIS DO VÍDEO CAPTURADO:
 - Transcrição / Legenda / Contexto Original do Vídeo: "${originalCaption || 'Vídeo de situação inusitada / meme viral'}"
@@ -47,15 +65,15 @@ DADOS REAIS DO VÍDEO CAPTURADO:
 - Direcionamento / Tema Desejado pelo Usuário: "${theme || 'Identificação e humor viral brasileiro'}"
 - Estilo: "${style}"
 
-DIRETRIZES FUNDAMENTAIS DE CRIAÇÃO (LEIA COM MÁXIMA ATENÇÃO):
+DIRETRIZES DE CRIAÇÃO E LIMITES DE PALAVRAS POR CAMPO:
 1. PROIBIÇÃO ABSOLUTA DE TEMPLATES GENÉRICOS:
    - É ESTRITAMENTE PROIBIDO reutilizar frases prontas de exemplos ou templates (como "comprei um mic novo", "o desgraçado entrando na call", "quando eu digo que vou só em um lugar", etc.), a menos que o vídeo capturado trate literalmente disso.
 2. CONTEXTUALIZAÇÃO TOTAL AO VÍDEO:
    - Identifique e extraia o tema e a ação CENTRAL descrita na legenda/contexto do vídeo (ex: se fala do Dinossauro do Google Chrome e internet caindo, crie ganchos sobre internet/desespero/jogo offline; se fala de trabalho, sobre CLT/chefe; se fala de finanças, sobre boletos/banco; se fala de academia, sobre treino/dor; se fala de games, sobre jogos; se fala de pets, sobre animais).
-3. ESTRUTURA DO MEME (1080x1920):
-   - "headline_main": Frase de abertura/setup curta, provocativa e impactante em MAIÚSCULAS (ex: "POV: ...", "QUANDO VOCÊ...", "O MOMENTO EXATO EM QUE...", "MEU CÉREBRO ÀS 3 DA MANHÃ:").
-   - "headline_sub": Frase de reação / punchline / contexto que complementa com humor afiado o que acontece na cena.
-   - "cta_text": Chamada para ação sutil e moderna (ex: "Siga ${authorHandle} para mais", "Marca quem faz isso").
+3. CONTROLE DE PALAVRAS E MODOS (OBRIGATÓRIO):
+   - "headline_main": ${mainTextMode === 'manual' && mainTextFixed ? `Copie exatamente o texto fixo fornecido: "${mainTextFixed}"` : `Frase de abertura/setup curta em MAIÚSCULAS respeitando RIGOROSAMENTE o limite de NO MÁXIMO ${mainTextMaxWords || 8} PALAVRAS.`}
+   - "headline_sub": ${subTextMode === 'manual' && subTextFixed ? `Copie exatamente o texto fixo fornecido: "${subTextFixed}"` : `Frase de reação / punchline complementar respeitando RIGOROSAMENTE o limite de NO MÁXIMO ${subTextMaxWords || 6} PALAVRAS.`}
+   - "cta_text": ${ctaMode === 'manual' && fixedCta ? `Copie exatamente o CTA fixo fornecido: "${fixedCta}"` : `Chamada para ação moderna de rodapé respeitando o limite de NO MÁXIMO ${ctaMaxWords || 6} PALAVRAS.`}
    - "post_caption": Legenda magnética para o feed do Instagram/TikTok/Shorts, contextualizando a história e terminando com uma pergunta envolvente que force comentários.
    - "hashtags": Array com 8 a 12 hashtags específicas do nicho do vídeo e tendências no Brasil.
 
@@ -86,7 +104,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente criativo e especialista em memes virais que analisa contextos reais de vídeos e responde apenas com objetos JSON estritos, sem repetir templates.'
+              content: 'Você é um assistente criativo e especialista em memes virais que analisa contextos reais de vídeos e responde apenas com objetos JSON estritos, respeitando limites exatos de palavras por campo.'
             },
             { role: 'user', content: promptInstructions }
           ],
@@ -133,12 +151,25 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
     const keyword = contextWords[0] ? contextWords[0].toUpperCase() : 'ISSO';
 
     responseJson = {
-      headline_main: `QUANDO VOCÊ MENOS ESPERA E ACONTECE ${keyword}:`,
-      headline_sub: "A REAÇÃO DE QUEM NÃO TEM MAIS NADA A PERDER:",
-      cta_text: `Siga ${authorHandle} para mais vídeos!`,
+      headline_main: mainTextMode === 'manual' && mainTextFixed ? mainTextFixed : `QUANDO VOCÊ MENOS ESPERA E ACONTECE ${keyword}:`,
+      headline_sub: subTextMode === 'manual' && subTextFixed ? subTextFixed : "A REAÇÃO DE QUEM NÃO TEM MAIS NADA A PERDER:",
+      cta_text: (ctaMode === 'manual' || fixedCta) && fixedCta ? fixedCta.trim() : `Siga ${authorHandle} para mais vídeos!`,
       post_caption: originalCaption ? `${originalCaption.slice(0, 120)}... O que você faria nessa situação? 😂👇` : "Marca aquele amigo que precisa ver isso 😂👇",
       hashtags: ["#memesbrasil", "#humor", "#engraçado", "#viral", "#reels", "#fyp", "#shorts"]
     };
+  }
+
+  // Overrides manuais garantidos
+  if (responseJson) {
+    if (mainTextMode === 'manual' && mainTextFixed && mainTextFixed.trim().length > 0) {
+      responseJson.headline_main = mainTextFixed.trim();
+    }
+    if (subTextMode === 'manual' && subTextFixed && subTextFixed.trim().length > 0) {
+      responseJson.headline_sub = subTextFixed.trim();
+    }
+    if ((ctaMode === 'manual' || fixedCta) && fixedCta && fixedCta.trim().length > 0) {
+      responseJson.cta_text = fixedCta.trim();
+    }
   }
 
   return responseJson;
@@ -155,6 +186,15 @@ export async function POST(req: Request) {
       platform = 'instagram',
       theme = '',
       style = 'meme-ironic',
+      mainTextMode = 'ai',
+      mainTextFixed = '',
+      mainTextMaxWords = 8,
+      subTextMode = 'ai',
+      subTextFixed = '',
+      subTextMaxWords = 6,
+      ctaMode = 'manual',
+      fixedCta = '',
+      ctaMaxWords = 6,
     } = body;
 
     const userOpenAiKey = user ? await getUserApiKey(user.id, 'openai') : null;
@@ -167,6 +207,15 @@ export async function POST(req: Request) {
       platform,
       theme,
       style,
+      mainTextMode,
+      mainTextFixed,
+      mainTextMaxWords,
+      subTextMode,
+      subTextFixed,
+      subTextMaxWords,
+      ctaMode,
+      fixedCta,
+      ctaMaxWords,
       userOpenAiKey,
       userGeminiKey,
     });

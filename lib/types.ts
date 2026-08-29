@@ -217,6 +217,14 @@ export interface DarkClipPreset {
     showSubText?: boolean
     mainText?: string
     subText?: string
+    main_text_mode?: 'ai' | 'manual'
+    mainTextMode?: 'ai' | 'manual'
+    main_text_max_words?: number
+    mainTextMaxWords?: number
+    sub_text_mode?: 'ai' | 'manual'
+    subTextMode?: 'ai' | 'manual'
+    sub_text_max_words?: number
+    subTextMaxWords?: number
   }
   video_placement: {
     y_offset?: number // percentage 0 - 100
@@ -274,6 +282,9 @@ export interface DarkClipPreset {
     text_align?: 'left' | 'center' | 'right'
     textAlign?: 'left' | 'center' | 'right'
     scale?: number
+    mode?: 'manual' | 'ai'
+    max_words?: number
+    maxWords?: number
   }
   arrows_style?: DarkClipArrowItem
   arrows_list?: DarkClipArrowItem[]

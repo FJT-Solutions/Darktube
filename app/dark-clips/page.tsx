@@ -247,7 +247,11 @@ export default function DarkClipsPage() {
 
   const [headline, setHeadline] = useState({
     mainText: 'Meu amigo: "Comprei um mic novo, mano."',
+    mainTextMode: "ai" as "ai" | "manual",
+    mainTextMaxWords: 8,
     subText: "O desgraçado entrando na call:",
+    subTextMode: "ai" as "ai" | "manual",
+    subTextMaxWords: 6,
     showMainText: true,
     showSubText: true,
     fontFamily: 'Montserrat, Inter, sans-serif',
@@ -345,6 +349,8 @@ export default function DarkClipsPage() {
   const [footer, setFooter] = useState({
     showFooter: false,
     text: "Sigam a melhor página de memes!",
+    mode: "manual" as "manual" | "ai",
+    maxWords: 6,
     fontSize: 26,
     color: "#9CA3AF",
     yOffset: 92,
@@ -565,6 +571,10 @@ export default function DarkClipsPage() {
         subTextYOffset: preset.headline_style.subTextYOffset ?? preset.headline_style.sub_text_y_offset ?? h.subTextYOffset,
         showMainText: preset.headline_style.showMainText ?? preset.headline_style.show_main_text ?? h.showMainText,
         showSubText: preset.headline_style.showSubText ?? preset.headline_style.show_sub_text ?? h.showSubText,
+        mainTextMode: preset.headline_style.mainTextMode ?? preset.headline_style.main_text_mode ?? h.mainTextMode ?? "ai",
+        mainTextMaxWords: preset.headline_style.mainTextMaxWords ?? preset.headline_style.main_text_max_words ?? h.mainTextMaxWords ?? 8,
+        subTextMode: preset.headline_style.subTextMode ?? preset.headline_style.sub_text_mode ?? h.subTextMode ?? "ai",
+        subTextMaxWords: preset.headline_style.subTextMaxWords ?? preset.headline_style.sub_text_max_words ?? h.subTextMaxWords ?? 6,
       }));
     }
     if (preset.video_placement) {
@@ -612,6 +622,8 @@ export default function DarkClipsPage() {
         ...f,
         showFooter: preset.footer_style.show_footer ?? preset.footer_style.showFooter ?? f.showFooter,
         text: preset.footer_style.text ?? f.text,
+        mode: preset.footer_style.mode ?? f.mode ?? "manual",
+        maxWords: preset.footer_style.maxWords ?? preset.footer_style.max_words ?? f.maxWords ?? 6,
         fontSize: preset.footer_style.font_size ?? preset.footer_style.fontSize ?? f.fontSize,
         color: preset.footer_style.color ?? f.color,
         yOffset: preset.footer_style.y_offset ?? preset.footer_style.yOffset ?? f.yOffset ?? 92,
@@ -1778,13 +1790,73 @@ export default function DarkClipsPage() {
                       </div>
                       {headline.showMainText && (
                         <>
-                          <Textarea
-                            value={headline.mainText}
-                            onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
-                            placeholder="Ex: MEU AMIGO: 'COMPREI UM MIC NOVO, MANO.'"
-                            rows={2}
-                            className="text-xs font-bold resize-none bg-background/80"
-                          />
+                          {/* Toggle Modo IA vs Manual e Quantidade de Palavras */}
+                          <div className="p-2.5 rounded-lg bg-background/60 border border-border/50 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-foreground">Modo de Preenchimento:</span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={(headline.mainTextMode || "ai") === "ai" ? "default" : "outline"}
+                                  onClick={() => setHeadline((h) => ({ ...h, mainTextMode: "ai" }))}
+                                  className="h-6 text-[10px] px-2 font-bold gap-1"
+                                >
+                                  🤖 Automático (IA)
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={headline.mainTextMode === "manual" ? "default" : "outline"}
+                                  onClick={() => setHeadline((h) => ({ ...h, mainTextMode: "manual" }))}
+                                  className="h-6 text-[10px] px-2 font-bold gap-1"
+                                >
+                                  ✍️ Manual / Fixo
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Quantidade de Palavras */}
+                            <div className="flex items-center justify-between pt-1 border-t border-border/30 text-xs">
+                              <span className="text-[11px] text-muted-foreground">
+                                {(headline.mainTextMode || "ai") === "ai" ? "Limite de Palavras da IA:" : "Palavras recomendadas:"}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={2}
+                                  max={25}
+                                  value={headline.mainTextMaxWords ?? 8}
+                                  onChange={(e) =>
+                                    setHeadline((h) => ({
+                                      ...h,
+                                      mainTextMaxWords: e.target.value === "" ? 8 : Number(e.target.value),
+                                    }))
+                                  }
+                                  className="w-14 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                />
+                                <span className="text-[10px] text-muted-foreground font-semibold">palavras</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Se for Manual, mostra o campo de texto; se for IA mostra preview ou exemplo */}
+                          {headline.mainTextMode === "manual" ? (
+                            <div>
+                              <Label className="text-[11px] font-semibold text-muted-foreground">Texto Fixo Primário</Label>
+                              <Textarea
+                                value={headline.mainText}
+                                onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
+                                placeholder="Digite o texto primário fixo para todos os clipes..."
+                                rows={2}
+                                className="text-xs font-bold resize-none bg-background/80 mt-1"
+                              />
+                            </div>
+                          ) : (
+                            <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-[11px] text-yellow-300 leading-tight">
+                              ✨ <strong>Modo IA Ativo:</strong> O gancho de abertura será gerado automaticamente a partir do contexto de cada vídeo minerado (máx. {headline.mainTextMaxWords || 8} palavras).
+                            </div>
+                          )}
 
                           {/* Seletor de Fonte do Texto Primário */}
                           <div className="space-y-1.5">
@@ -1923,13 +1995,73 @@ export default function DarkClipsPage() {
                       </div>
                       {headline.showSubText && (
                         <>
-                          <Textarea
-                            value={headline.subText}
-                            onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                            placeholder="Ex: O DESGRAÇADO ENTRANDO NA CALL:"
-                            rows={2}
-                            className="text-xs resize-none bg-background/80"
-                          />
+                          {/* Toggle Modo IA vs Manual e Quantidade de Palavras */}
+                          <div className="p-2.5 rounded-lg bg-background/60 border border-border/50 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-semibold text-foreground">Modo de Preenchimento:</span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={(headline.subTextMode || "ai") === "ai" ? "default" : "outline"}
+                                  onClick={() => setHeadline((h) => ({ ...h, subTextMode: "ai" }))}
+                                  className="h-6 text-[10px] px-2 font-bold gap-1"
+                                >
+                                  🤖 Automático (IA)
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={headline.subTextMode === "manual" ? "default" : "outline"}
+                                  onClick={() => setHeadline((h) => ({ ...h, subTextMode: "manual" }))}
+                                  className="h-6 text-[10px] px-2 font-bold gap-1"
+                                >
+                                  ✍️ Manual / Fixo
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Quantidade de Palavras */}
+                            <div className="flex items-center justify-between pt-1 border-t border-border/30 text-xs">
+                              <span className="text-[11px] text-muted-foreground">
+                                {(headline.subTextMode || "ai") === "ai" ? "Limite de Palavras da IA:" : "Palavras recomendadas:"}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={2}
+                                  max={20}
+                                  value={headline.subTextMaxWords ?? 6}
+                                  onChange={(e) =>
+                                    setHeadline((h) => ({
+                                      ...h,
+                                      subTextMaxWords: e.target.value === "" ? 6 : Number(e.target.value),
+                                    }))
+                                  }
+                                  className="w-14 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                                />
+                                <span className="text-[10px] text-muted-foreground font-semibold">palavras</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Se for Manual, mostra o campo de texto; se for IA mostra aviso */}
+                          {headline.subTextMode === "manual" ? (
+                            <div>
+                              <Label className="text-[11px] font-semibold text-muted-foreground">Texto Fixo Secundário</Label>
+                              <Textarea
+                                value={headline.subText}
+                                onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
+                                placeholder="Digite a reação ou contexto fixo..."
+                                rows={2}
+                                className="text-xs resize-none bg-background/80 mt-1"
+                              />
+                            </div>
+                          ) : (
+                            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 leading-tight">
+                              ✨ <strong>Modo IA Ativo:</strong> A reação/punchline será gerada automaticamente a partir da cena de cada vídeo (máx. {headline.subTextMaxWords || 6} palavras).
+                            </div>
+                          )}
 
                           {/* Seletor de Fonte do Texto Secundário Independente */}
                           <div className="space-y-1.5">
@@ -2791,16 +2923,72 @@ export default function DarkClipsPage() {
                   </CardHeader>
                   {footer.showFooter && (
                     <CardContent className="p-4 pt-0 space-y-4">
-                      {/* Texto do CTA */}
-                      <div>
-                        <Label className="text-xs font-semibold">Texto do Rodapé / CTA</Label>
-                        <Input
-                          value={footer.text}
-                          onChange={(e) => setFooter((f) => ({ ...f, text: e.target.value }))}
-                          placeholder="Ex: Siga para não perder nenhum vídeo!"
-                          className="h-8 text-xs mt-1"
-                        />
+                      {/* Toggle Modo Manual vs IA e Quantidade de Palavras */}
+                      <div className="p-2.5 rounded-lg bg-secondary/20 border border-border/50 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-foreground">Modo de Preenchimento:</span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={(footer.mode || "manual") === "manual" ? "default" : "outline"}
+                              onClick={() => setFooter((f) => ({ ...f, mode: "manual" }))}
+                              className="h-6 text-[10px] px-2 font-bold gap-1"
+                            >
+                              ✍️ Manual / Fixo
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={footer.mode === "ai" ? "default" : "outline"}
+                              onClick={() => setFooter((f) => ({ ...f, mode: "ai" }))}
+                              className="h-6 text-[10px] px-2 font-bold gap-1"
+                            >
+                              🤖 Automático (IA)
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Quantidade de Palavras */}
+                        <div className="flex items-center justify-between pt-1 border-t border-border/30 text-xs">
+                          <span className="text-[11px] text-muted-foreground">
+                            {footer.mode === "ai" ? "Limite de Palavras da IA:" : "Palavras recomendadas:"}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={2}
+                              max={20}
+                              value={footer.maxWords ?? 6}
+                              onChange={(e) =>
+                                setFooter((f) => ({
+                                  ...f,
+                                  maxWords: e.target.value === "" ? 6 : Number(e.target.value),
+                                }))
+                              }
+                              className="w-14 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[10px] text-muted-foreground font-semibold">palavras</span>
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Campo de Texto do CTA se Manual, ou aviso se IA */}
+                      {footer.mode === "ai" ? (
+                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 leading-tight">
+                          ✨ <strong>Modo IA Ativo:</strong> O CTA de rodapé será gerado automaticamente para cada vídeo (máx. {footer.maxWords || 6} palavras).
+                        </div>
+                      ) : (
+                        <div>
+                          <Label className="text-xs font-semibold">Texto Fixo do Rodapé / CTA</Label>
+                          <Input
+                            value={footer.text}
+                            onChange={(e) => setFooter((f) => ({ ...f, text: e.target.value }))}
+                            placeholder="Ex: Siga para não perder nenhum vídeo!"
+                            className="h-8 text-xs mt-1"
+                          />
+                        </div>
+                      )}
 
                       {/* Presets Rápidos de Posição Vertical */}
                       <div className="space-y-1.5">
@@ -3952,7 +4140,7 @@ export default function DarkClipsPage() {
                             <Film className="h-4 w-4 text-primary" /> Estúdio de Produção: {selectedClip.author_handle || selectedClip.author_name}
                           </CardTitle>
                           <CardDescription className="text-xs">
-                            Remodele o gancho com IA, renderize o vídeo em 1080x1920 e agende para suas redes.
+                            Renderize o vídeo em 1080x1920 e agende para suas redes sociais. O gancho viral é gerado de forma 100% automática a partir do vídeo original.
                           </CardDescription>
                         </div>
 
@@ -3970,81 +4158,8 @@ export default function DarkClipsPage() {
 
                     <CardContent className="p-4 space-y-6">
                       
-                      {/* Remodelagem com IA baseada no vídeo selecionado */}
-                      <div className="p-3.5 rounded-xl bg-secondary/20 border border-border/50 space-y-3">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div>
-                            <Label className="text-xs font-bold flex items-center gap-1.5 text-primary">
-                              <Wand2 className="h-3.5 w-3.5" /> Geração de Textos & Gancho Viral com IA (GPT-4o)
-                            </Label>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              A IA analisa a legenda e contexto do clipe ({selectedClip.platform ? `@${selectedClip.author_handle || selectedClip.author_name}` : "Minerado"}) para criar ganchos de alta retenção.
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleRemodelWithAi()}
-                            disabled={remodelingAi}
-                            className="text-xs font-bold gap-1.5 h-7.5 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                          >
-                            {remodelingAi ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                            {remodelingAi ? "Gerando com IA..." : "Gerar com IA ✨"}
-                          </Button>
-                        </div>
-                        
-                        <div className="space-y-1.5">
-                          <Label className="text-[11px] font-semibold">Tema / Direcionamento do Gancho (Opcional)</Label>
-                          <Input
-                            placeholder="Ex: Humor brasileiro, sarcasmo, reflexão profunda, mistério..."
-                            value={aiThemePrompt}
-                            onChange={(e) => setAiThemePrompt(e.target.value)}
-                            className="h-8 text-xs"
-                          />
-                        </div>
-
-                        {/* Campos de Textos Ativos no Layout */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                          {headline.showMainText && (
-                            <div>
-                              <Label className="text-[11px] font-semibold text-yellow-400">Texto Primário / Gancho</Label>
-                              <Input
-                                value={headline.mainText}
-                                onChange={(e) => setHeadline((h) => ({ ...h, mainText: e.target.value }))}
-                                placeholder="Gancho principal gerado..."
-                                className="h-8 text-xs font-bold mt-1"
-                              />
-                            </div>
-                          )}
-
-                          {headline.showSubText && (
-                            <div>
-                              <Label className="text-[11px] font-semibold">Texto Secundário / Contexto</Label>
-                              <Input
-                                value={headline.subText}
-                                onChange={(e) => setHeadline((h) => ({ ...h, subText: e.target.value }))}
-                                placeholder="Texto secundário ou contexto..."
-                                className="h-8 text-xs mt-1"
-                              />
-                            </div>
-                          )}
-
-                          {footer.showFooter && (
-                            <div className="sm:col-span-2">
-                              <Label className="text-[11px] font-semibold text-emerald-400">Texto do Rodapé / CTA</Label>
-                              <Input
-                                value={footer.text}
-                                onChange={(e) => setFooter((f) => ({ ...f, text: e.target.value }))}
-                                placeholder="Ex: Siga para mais vídeos diários!"
-                                className="h-8 text-xs mt-1"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
                       {/* Painel de Agendamento & Publicação Automática (Integrado) */}
-                      <div className="space-y-4 pt-2 border-t border-border/40">
+                      <div className="space-y-4">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-primary" />
                           <h4 className="text-xs font-bold">Agendamento & Publicação Automática (Blotato)</h4>
