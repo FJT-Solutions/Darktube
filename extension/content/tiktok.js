@@ -26,8 +26,12 @@
     return new Promise((resolve) => {
       try {
         chrome.storage.local.get(['darktube_api_url', 'darktube_token', 'darktube_user'], (res) => {
+          let baseUrl = res?.darktube_api_url || DEFAULT_API_URL;
+          if (!baseUrl || baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('fjt.solutions')) {
+            baseUrl = DEFAULT_API_URL;
+          }
           resolve({
-            baseUrl: res?.darktube_api_url || DEFAULT_API_URL,
+            baseUrl: baseUrl.replace(/\/$/, ''),
             token: res?.darktube_token || null,
             user: res?.darktube_user || null
           });

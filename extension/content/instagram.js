@@ -31,8 +31,13 @@
     return new Promise((resolve) => {
       try {
         chrome.storage.local.get(['darktube_api_url', 'darktube_token', 'darktube_user'], (res) => {
+          let baseUrl = res?.darktube_api_url || DEFAULT_API_URL;
+          // Force production URL if localhost or old invalid format was saved in storage
+          if (!baseUrl || baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('fjt.solutions')) {
+            baseUrl = DEFAULT_API_URL;
+          }
           resolve({
-            baseUrl: res?.darktube_api_url || DEFAULT_API_URL,
+            baseUrl: baseUrl.replace(/\/$/, ''),
             token: res?.darktube_token || null,
             user: res?.darktube_user || null
           });
@@ -607,25 +612,32 @@
       <span>Dark Clips</span>
     `;
 
-    let lastTrigger = 0;
-    const trigger = (e) => {
+    let isTriggering = false;
+    const triggerAction = (e) => {
       if (e) {
         e.preventDefault();
         e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       }
-      const now = Date.now();
-      if (now - lastTrigger < 1200) return;
-      lastTrigger = now;
-      console.log('[DarkClips] Floating button acionado pelo usuário!');
+      if (isTriggering) return;
+      isTriggering = true;
+      setTimeout(() => { isTriggering = false; }, 1500);
+
+      console.log('[DarkClips] Botão clicado pelo usuário! Disparando envio...');
+      showToast('Enviando clipe ao DarkTube...');
       try {
         onClick();
       } catch (err) {
-        console.error('[DarkClips] Erro ao executar onClick:', err);
+        console.error('[DarkClips] Erro na ação do botão:', err);
+        showToast('Erro ao capturar dados do vídeo', true);
       }
     };
 
-    btn.addEventListener('click', trigger, true);
-    btn.addEventListener('pointerup', trigger, true);
+    btn.onclick = triggerAction;
+    btn.onpointerdown = (e) => { e.stopPropagation(); };
+    btn.onmousedown = (e) => { e.stopPropagation(); };
+    btn.addEventListener('click', triggerAction, true);
+    btn.addEventListener('pointerup', triggerAction, true);
 
     return btn;
   }
