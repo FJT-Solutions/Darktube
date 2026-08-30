@@ -167,120 +167,148 @@ async function handleDarkClipsRender(req, res) {
           console.log(`[Remotion DarkClips] ✅ Pre-cached input video: ${inputFilePath}`);
 
           // ─────────────────────────────────────────────────────────────────────────
-          // DETECÇÃO INTELIGENTE DE CONTEÚDO POR MOVIMENTO (sem LLM, sem IA, R$ 0,00)
-          // ─────────────────────────────────────────────────────────────────────────
-          // Princípio: textos/watermarks são ESTÁTICOS (diferença entre frames = PRETO)
-          //            o vídeo real tem MOVIMENTO (diferença entre frames = BRILHANTE)
-          // tblend=difference → torna texto invisível, vídeo visível
-          // cropdetect nessa imagem → encontra a bounding box EXATA do conteúdo real
+          // 1. DETECÇÃO DA DURAÇÃO REAL DO VÍDEO (ffprobe)
           // ─────────────────────────────────────────────────────────────────────────
           const { execFile } = require('child_process');
 
-          const detectMotionCrop = () => new Promise((resolve) => {
-            execFile('ffmpeg', [
-              '-i', inputFilePath,
-              '-vf', 'tblend=all_mode=difference,cropdetect=limit=8:round=2:reset_count=0',
-              '-t', '4',          // analisa os primeiros 4 segundos
-              '-f', 'null', '-',
-            ], { timeout: 30000 }, (err, stdout, stderr) => {
-              const output = (stderr || stdout || '');
-              // cropdetect imprime linhas como: crop=W:H:X:Y
-              const matches = [...output.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
-              if (matches.length > 0) {
-                // Pega o último valor convergido pelo cropdetect
-                const last = matches[matches.length - 1];
-                resolve({
-                  w: parseInt(last[1], 10),
-                  h: parseInt(last[2], 10),
-                  x: parseInt(last[3], 10),
-                  y: parseInt(last[4], 10),
-                });
-              } else {
-                resolve(null);
+          const getVideoMeta = () => new Promise((resolve) => {
+            execFile('ffprobe', [
+              '-v', 'error',
+              '-select_streams', 'v:0',
+              '-show_entries', 'stream=width,height,duration:format=duration',
+              '-of', 'json',
+              inputFilePath,
+            ], (err, stdout) => {
+              try {
+                const data = JSON.parse(stdout || '{}');
+                const stream = data.streams?.[0] || {};
+                const format = data.format || {};
+                const w = parseInt(stream.width, 10) || 1080;
+                const h = parseInt(stream.height, 10) || 1920;
+                const dur = parseFloat(stream.duration || format.duration) || 15;
+                resolve({ w, h, dur: Math.max(3, dur) });
+              } catch (_) {
+                resolve({ w: 1080, h: 1920, dur: 15 });
               }
             });
           });
 
-          // Obter dimensões originais
-          const getVideoDims = () => new Promise((resolve) => {
-            execFile('ffprobe', [
-              '-v', 'error',
-              '-select_streams', 'v:0',
-              '-show_entries', 'stream=width,height',
-              '-of', 'csv=p=0',
-              inputFilePath,
-            ], (err, stdout) => {
-              const parts = (stdout || '').trim().split(',');
-              resolve({
-                w: parseInt(parts[0], 10) || 1080,
-                h: parseInt(parts[1], 10) || 1920,
-              });
-            });
-          });
+          const meta = await getVideoMeta();
+          detectedVideoDuration = meta.dur;
+          console.log(`[Remotion DarkClips] ⏱️ Duração real detectada: ${meta.dur.toFixed(1)}s (${meta.w}x${meta.h})`);
 
-          let cropBox = null;
-          let origDims = { w: 1080, h: 1920 };
-
-          try {
-            [cropBox, origDims] = await Promise.all([detectMotionCrop(), getVideoDims()]);
-          } catch (_) {}
-
-          // Validar resultado: o crop box deve ser menor que o original (algo foi detectado)
-          const hasValidCrop = cropBox
-            && cropBox.w > 0
-            && cropBox.h > 0
-            && (cropBox.y > 0 || cropBox.h < origDims.h || cropBox.x > 0 || cropBox.w < origDims.w);
-
+          // ─────────────────────────────────────────────────────────────────────────
+          // 2. DETECÇÃO EXATA DA ÁREA DO VÍDEO (REMOVER TEXTOS TOP/BOTTOM)
+          // Em vídeos 9:16 (meme), o topo e base têm fundo preto/escuro com textos.
+          // O vídeo real no centro tem cores nas bordas laterais (x=10 e x=W-10).
+          // ─────────────────────────────────────────────────────────────────────────
           let finalCropFilter = null;
 
-          if (hasValidCrop) {
-            // Garantir dimensões pares (exigido pelo codec H.264)
-            const cw = cropBox.w % 2 === 0 ? cropBox.w : cropBox.w - 1;
-            const ch = cropBox.h % 2 === 0 ? cropBox.h : cropBox.h - 1;
-            const cx = cropBox.x % 2 === 0 ? cropBox.x : cropBox.x + 1;
-            const cy = cropBox.y % 2 === 0 ? cropBox.y : cropBox.y + 1;
-            finalCropFilter = `crop=${cw}:${ch}:${cx}:${cy}`;
-            console.log(`[Remotion DarkClips] 🎯 Conteúdo real detectado por movimento: ${origDims.w}x${origDims.h} → ${finalCropFilter}`);
-          } else {
-            // Fallback conservador para vídeos estáticos ou sem diferença detectada
-            const fallbackTopPct = 0.14;
-            const fallbackBottomPct = 0.08;
-            const cy = Math.round(origDims.h * fallbackTopPct);
-            const ch = origDims.h - cy - Math.round(origDims.h * fallbackBottomPct);
-            const cw = origDims.w % 2 === 0 ? origDims.w : origDims.w - 1;
-            finalCropFilter = `crop=${cw}:${ch}:0:${cy}`;
-            console.log(`[Remotion DarkClips] ⚠️ Movimento não detectado. Aplicando fallback conservador: ${finalCropFilter}`);
+          if (meta.h > meta.w) {
+            try {
+              const rawFramePath = path.join(OUTPUT_DIR, `scan_${jobId}.raw`);
+              const seekSec = Math.min(2, Math.max(0.5, meta.dur * 0.1)).toFixed(1);
+              
+              await new Promise((resolve, reject) => {
+                execFile('ffmpeg', [
+                  '-ss', seekSec,
+                  '-i', inputFilePath,
+                  '-vframes', '1',
+                  '-f', 'rawvideo',
+                  '-pix_fmt', 'rgb24',
+                  '-y', rawFramePath,
+                ], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
+              });
+
+              if (fs.existsSync(rawFramePath)) {
+                const buf = fs.readFileSync(rawFramePath);
+                const w = meta.w;
+                const h = meta.h;
+
+                let topY = 0;
+                let bottomY = h;
+                let foundTop = false;
+
+                // Escaneia de cima para baixo
+                for (let y = 0; y < h; y += 4) {
+                  const lIdx = (y * w + Math.min(15, Math.floor(w * 0.02))) * 3;
+                  const rIdx = (y * w + Math.max(w - 16, Math.floor(w * 0.98))) * 3;
+                  const isLBlack = buf[lIdx] < 28 && buf[lIdx+1] < 28 && buf[lIdx+2] < 28;
+                  const isRBlack = buf[rIdx] < 28 && buf[rIdx+1] < 28 && buf[rIdx+2] < 28;
+                  
+                  if (!isLBlack && !isRBlack) {
+                    if (!foundTop) {
+                      topY = y;
+                      foundTop = true;
+                    }
+                    bottomY = y;
+                  }
+                }
+
+                try { fs.unlinkSync(rawFramePath); } catch (_) {}
+
+                // Adiciona margem de segurança de 4px para cortar qualquer resíduo de texto
+                topY = Math.min(topY + 6, h);
+                bottomY = Math.max(bottomY - 6, topY + 100);
+                const cleanH = bottomY - topY;
+
+                // Se identificou barras de texto (topo > 5% ou base < 95%)
+                if (foundTop && cleanH > 100 && (topY > h * 0.05 || bottomY < h * 0.95)) {
+                  const cw = w % 2 === 0 ? w : w - 1;
+                  const ch = cleanH % 2 === 0 ? cleanH : cleanH - 1;
+                  const cy = topY % 2 === 0 ? topY : topY + 1;
+                  finalCropFilter = `crop=${cw}:${ch}:0:${cy}`;
+                  console.log(`[Remotion DarkClips] 🎯 Retângulo do vídeo isolado: ${w}x${h} → ${finalCropFilter} (Topo cortado: ${topY}px, Base cortada: ${h - bottomY}px)`);
+                }
+              }
+            } catch (scanErr) {
+              console.warn('[Remotion DarkClips] Aviso no scan de bordas:', scanErr.message);
+            }
           }
 
-          // Aplicar o corte físico ao arquivo de vídeo
-          try {
-            const croppedFileName = `input_${jobId}_clean.mp4`;
-            const croppedFilePath = path.join(OUTPUT_DIR, croppedFileName);
+          // Se for 9:16 e o scan falhou, aplica corte padrão de segurança para memes
+          if (!finalCropFilter && meta.h > meta.w) {
+            const cutTop = Math.round(meta.h * 0.24);
+            const cutBottom = Math.round(meta.h * 0.24);
+            const ch = meta.h - cutTop - cutBottom;
+            const cw = meta.w % 2 === 0 ? meta.w : meta.w - 1;
+            const cy = cutTop % 2 === 0 ? cutTop : cutTop + 1;
+            finalCropFilter = `crop=${cw}:${ch % 2 === 0 ? ch : ch - 1}:0:${cy}`;
+            console.log(`[Remotion DarkClips] 📐 Aplicando enquadramento central 16:9/4:3: ${finalCropFilter}`);
+          }
 
-            await new Promise((resolve, reject) => {
-              execFile('ffmpeg', [
-                '-i', inputFilePath,
-                '-vf', finalCropFilter,
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '18',
-                '-c:a', 'copy',
-                '-y', croppedFilePath,
-              ], { timeout: 120000 }, (err) => {
-                if (err) reject(err); else resolve();
+          // Aplicar o corte físico ao arquivo de vídeo se necessário
+          if (finalCropFilter) {
+            try {
+              const croppedFileName = `input_${jobId}_clean.mp4`;
+              const croppedFilePath = path.join(OUTPUT_DIR, croppedFileName);
+
+              await new Promise((resolve, reject) => {
+                execFile('ffmpeg', [
+                  '-i', inputFilePath,
+                  '-vf', finalCropFilter,
+                  '-c:v', 'libx264',
+                  '-preset', 'veryfast',
+                  '-crf', '18',
+                  '-c:a', 'copy',
+                  '-y', croppedFilePath,
+                ], { timeout: 180000 }, (err) => {
+                  if (err) reject(err); else resolve();
+                });
               });
-            });
 
-            if (fs.existsSync(croppedFilePath) && fs.statSync(croppedFilePath).size > 1000) {
-              resolvedVideoUrl = `http://localhost:${PORT}/storage/${croppedFileName}`;
-              console.log(`[Remotion DarkClips] ✅ Vídeo limpo (textos removidos) pronto: ${resolvedVideoUrl}`);
-              try { fs.unlinkSync(inputFilePath); } catch (_) {}
-            } else {
+              if (fs.existsSync(croppedFilePath) && fs.statSync(croppedFilePath).size > 1000) {
+                resolvedVideoUrl = `http://localhost:${PORT}/storage/${croppedFileName}`;
+                console.log(`[Remotion DarkClips] ✅ Vídeo limpo (sem textos antigos) pronto: ${resolvedVideoUrl}`);
+                try { fs.unlinkSync(inputFilePath); } catch (_) {}
+              } else {
+                resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
+              }
+            } catch (cropErr) {
+              console.warn(`[Remotion DarkClips] Aviso no corte FFmpeg:`, cropErr.message);
               resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
-              console.warn(`[Remotion DarkClips] ⚠️ Corte FFmpeg falhou, usando original`);
             }
-          } catch (cropErr) {
-            console.warn(`[Remotion DarkClips] Aviso no corte:`, cropErr.message);
+          } else {
             resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
           }
         }
@@ -289,13 +317,12 @@ async function handleDarkClipsRender(req, res) {
       }
     }
 
-    // Cap: Dark Clips são vídeos meme curtos. Máximo 15 segundos para evitar renders de horas.
-
-    const MAX_DARK_CLIP_DURATION = 15;
-    const durationInSeconds = Math.min(Number(inputProps.durationInSeconds) || 15, MAX_DARK_CLIP_DURATION);
+    // Duração total real do vídeo (sem cortes artificiais de 15 segundos)
+    const durationInSeconds = Math.max(3, detectedVideoDuration || Number(inputProps.durationInSeconds) || 15);
     const durationInFrames = requestedFrames
-      ? Math.min(requestedFrames, MAX_DARK_CLIP_DURATION * 30)
-      : Math.max(30, Math.round(durationInSeconds * 30));
+      ? Math.max(requestedFrames, Math.round(durationInSeconds * 30))
+      : Math.round(durationInSeconds * 30);
+    console.log(`[Remotion DarkClips] 🎞️ Renderizando duração completa: ${durationInSeconds.toFixed(1)}s (${durationInFrames} frames)`);
 
     const finalInputProps = {
       ...inputProps,
