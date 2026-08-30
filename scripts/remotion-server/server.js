@@ -164,8 +164,104 @@ async function handleDarkClipsRender(req, res) {
           const inputFilePath = path.join(OUTPUT_DIR, inputFileName);
           const arrayBuf = await vidRes.arrayBuffer();
           fs.writeFileSync(inputFilePath, Buffer.from(arrayBuf));
-          resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
-          console.log(`[Remotion DarkClips] ✅ Pre-cached input video to: ${resolvedVideoUrl}`);
+          console.log(`[Remotion DarkClips] ✅ Pre-cached input video to: ${inputFilePath}`);
+
+          // ── Corte Físico com FFmpeg: Remove textos/watermarks baked-in do vídeo original ──
+          // Detecta a resolução e aplica corte real nos pixels (não só CSS mask)
+          const vp = inputProps.videoPlacement || {};
+          const cropTopPct = vp.crop_top ?? vp.cropTop ?? 0;
+          const cropBottomPct = vp.crop_bottom ?? vp.cropBottom ?? 0;
+
+          // Se não vier crop da API, tenta detectar com cropdetect e usa fallback de 12% top
+          let finalCropTop = cropTopPct;
+          let finalCropBottom = cropBottomPct;
+
+          if (finalCropTop === 0 && finalCropBottom === 0) {
+            try {
+              const { stderr: cropStderr } = await new Promise((resolve, reject) => {
+                const { execFile } = require('child_process');
+                execFile('ffprobe', [
+                  '-v', 'error',
+                  '-select_streams', 'v:0',
+                  '-show_entries', 'stream=width,height',
+                  '-of', 'csv=p=0',
+                  inputFilePath,
+                ], (err, stdout) => {
+                  if (err) reject(err);
+                  else resolve({ stderr: '', stdout });
+                });
+              }).catch(() => ({ stderr: '', stdout: '' }));
+
+              // Social media default: remove 12% top (handle/watermark) and 5% bottom (ui/captions)
+              finalCropTop = 12;
+              finalCropBottom = 5;
+              console.log(`[Remotion DarkClips] 🤖 Nenhum crop detectado. Aplicando padrão de redes sociais: topo=${finalCropTop}%, base=${finalCropBottom}%`);
+            } catch (_) {
+              finalCropTop = 12;
+              finalCropBottom = 5;
+            }
+          }
+
+          if (finalCropTop > 0 || finalCropBottom > 0) {
+            try {
+              const croppedFileName = `input_${jobId}_clean.mp4`;
+              const croppedFilePath = path.join(OUTPUT_DIR, croppedFileName);
+
+              // Get video dimensions with ffprobe
+              const probeResult = await new Promise((resolve) => {
+                const { execFile } = require('child_process');
+                execFile('ffprobe', [
+                  '-v', 'error',
+                  '-select_streams', 'v:0',
+                  '-show_entries', 'stream=width,height',
+                  '-of', 'csv=p=0',
+                  inputFilePath,
+                ], (err, stdout) => resolve(stdout?.trim() || ''));
+              });
+
+              const [wStr, hStr] = (probeResult || '').split(',');
+              const origW = parseInt(wStr, 10) || 1080;
+              const origH = parseInt(hStr, 10) || 1920;
+
+              const cutTop = Math.round((finalCropTop / 100) * origH);
+              const cutBottom = Math.round((finalCropBottom / 100) * origH);
+              const newH = origH - cutTop - cutBottom;
+
+              if (newH > 100) {
+                console.log(`[Remotion DarkClips] ✂️ Cortando fisicamente com FFmpeg: ${origW}x${origH} → crop=${origW}:${newH}:0:${cutTop}`);
+                await new Promise((resolve, reject) => {
+                  const { execFile } = require('child_process');
+                  execFile('ffmpeg', [
+                    '-i', inputFilePath,
+                    '-vf', `crop=${origW}:${newH}:0:${cutTop}`,
+                    '-c:a', 'copy',
+                    '-y',
+                    croppedFilePath,
+                  ], { timeout: 60000 }, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  });
+                });
+
+                if (fs.existsSync(croppedFilePath) && fs.statSync(croppedFilePath).size > 1000) {
+                  resolvedVideoUrl = `http://localhost:${PORT}/storage/${croppedFileName}`;
+                  console.log(`[Remotion DarkClips] ✅ Vídeo limpo (sem textos) pronto: ${resolvedVideoUrl}`);
+                  // Remove o original para poupar disco
+                  try { fs.unlinkSync(inputFilePath); } catch (_) {}
+                } else {
+                  resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
+                  console.warn(`[Remotion DarkClips] ⚠️ Corte FFmpeg falhou, usando original`);
+                }
+              } else {
+                resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
+              }
+            } catch (cropErr) {
+              console.warn(`[Remotion DarkClips] Aviso no corte físico FFmpeg:`, cropErr.message);
+              resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
+            }
+          } else {
+            resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
+          }
         }
       } catch (cacheErr) {
         console.warn(`[Remotion DarkClips] Pre-cache warning (using remote URL directly):`, cacheErr.message);

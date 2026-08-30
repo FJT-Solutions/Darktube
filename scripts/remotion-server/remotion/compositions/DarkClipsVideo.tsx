@@ -56,20 +56,10 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   } = videoPlacement;
 
   const activeFitMode = fit_mode || fitMode || 'cover';
-  const activeCropTop = crop_top ?? cropTop ?? 0;
-  const activeCropBottom = crop_bottom ?? cropBottom ?? 0;
   const activePanY = pan_y ?? panY ?? 0;
   const activePanX = pan_x ?? panX ?? 0;
-
-  // Priorização 100% do vídeo: expande a área limpa da cena eliminando textos do topo e base
-  const visibleHeightRatio = Math.max(0.2, (100 - activeCropTop - activeCropBottom) / 100);
-  const autoExpandZoom = (activeCropTop > 0 || activeCropBottom > 0) ? (1 / visibleHeightRatio) : 1;
-  const autoShiftY = (activeCropTop > 0 || activeCropBottom > 0)
-    ? -((activeCropTop - activeCropBottom) / 2)
-    : 0;
-
-  const totalZoom = ((zoom || 100) / 100) * autoExpandZoom;
-  const totalPanY = activePanY + autoShiftY;
+  const totalZoom = (zoom || 100) / 100;
+  const totalPanY = activePanY;
 
   // ── 4. Background Defaults ──
   const {
@@ -326,10 +316,6 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                clipPath:
-                  activeCropTop > 0 || activeCropBottom > 0
-                    ? `inset(${activeCropTop}% 0% ${activeCropBottom}% 0%)`
-                    : undefined,
               }}
             >
               <OffthreadVideo
