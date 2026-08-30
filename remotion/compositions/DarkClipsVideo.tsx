@@ -194,11 +194,11 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   // ── 3. Video Placement Defaults ──
   const {
     yOffset = 52, // Percentage from top
-    scale = 92, // Width percentage
+    scale = 94, // Width percentage
     borderRadius = 24,
     hasShadow = true,
     aspectRatio = 'auto',
-    fitMode = 'contain',
+    fitMode = 'cover',
     fit_mode,
     zoom = 100,
     cropTop = 0,
@@ -211,12 +211,21 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     pan_x,
   } = videoPlacement;
 
-  const activeFitMode = fit_mode || fitMode || 'contain';
-  const activeZoom = (zoom || 100) / 100;
+  const activeFitMode = fit_mode || fitMode || 'cover';
   const activeCropTop = crop_top ?? cropTop ?? 0;
   const activeCropBottom = crop_bottom ?? cropBottom ?? 0;
   const activePanY = pan_y ?? panY ?? 0;
   const activePanX = pan_x ?? panX ?? 0;
+
+  // Priorização 100% do vídeo: expande a área limpa da cena eliminando textos do topo e base
+  const visibleHeightRatio = Math.max(0.2, (100 - activeCropTop - activeCropBottom) / 100);
+  const autoExpandZoom = (activeCropTop > 0 || activeCropBottom > 0) ? (1 / visibleHeightRatio) : 1;
+  const autoShiftY = (activeCropTop > 0 || activeCropBottom > 0)
+    ? -((activeCropTop - activeCropBottom) / 2)
+    : 0;
+
+  const totalZoom = ((zoom || 100) / 100) * autoExpandZoom;
+  const totalPanY = activePanY + autoShiftY;
 
   // ── 4. Background Defaults ──
   const {
@@ -612,7 +621,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   maxHeight: '100%',
                   objectFit: activeFitMode === 'cover' ? 'cover' : 'contain',
                   borderRadius: `${borderRadius}px`,
-                  transform: `scale(${activeZoom}) translate(${activePanX}%, ${activePanY}%)`,
+                  transform: `scale(${totalZoom}) translate(${activePanX}%, ${totalPanY}%)`,
                   transformOrigin: 'center center',
                 }}
               />
