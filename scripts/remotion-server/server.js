@@ -172,8 +172,12 @@ async function handleDarkClipsRender(req, res) {
       }
     }
 
-    const durationInSeconds = Number(inputProps.durationInSeconds) || 15;
-    const durationInFrames = requestedFrames || Math.max(30, Math.round(durationInSeconds * 30));
+    // Cap: Dark Clips são vídeos meme curtos. Máximo 15 segundos para evitar renders de horas.
+    const MAX_DARK_CLIP_DURATION = 15;
+    const durationInSeconds = Math.min(Number(inputProps.durationInSeconds) || 15, MAX_DARK_CLIP_DURATION);
+    const durationInFrames = requestedFrames
+      ? Math.min(requestedFrames, MAX_DARK_CLIP_DURATION * 30)
+      : Math.max(30, Math.round(durationInSeconds * 30));
 
     const finalInputProps = {
       ...inputProps,

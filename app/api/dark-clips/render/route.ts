@@ -191,9 +191,10 @@ export async function POST(req: Request) {
               inputProps: {
                 ...inputProps,
                 videoUrl: sourceVideoUrl,
-                durationInSeconds,
+                // Cap: Dark Clips max 15 segundos
+                durationInSeconds: Math.min(durationInSeconds, 15),
               },
-              durationInFrames: Math.max(30, Math.round(durationInSeconds * 30)),
+              durationInFrames: Math.min(Math.max(30, Math.round(durationInSeconds * 30)), 15 * 30),
             }),
           });
 

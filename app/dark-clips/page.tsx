@@ -1131,16 +1131,18 @@ export default function DarkClipsPage() {
       }
 
       toast.loading(`🎬 Renderizando vídeo 9:16 (1080x1920) no Remotion...`, { id: renderToastId });
+      // Cap: Dark Clips são memes curtos — max 15s independente da duração do vídeo fonte
+      const clipDuration = Math.min(clipToRender.duration || 15, 15);
       const res = await fetch("/api/dark-clips/render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clipId: clipToRender.id,
           title: currentHeadline.mainText || "Dark Clip Meme",
-          durationInSeconds: clipToRender.duration || 15,
+          durationInSeconds: clipDuration,
           inputProps: {
             videoUrl: clipToRender.video_url,
-            durationInSeconds: clipToRender.duration || 15,
+            durationInSeconds: clipDuration,
             profileHeader,
             headline: currentHeadline,
             videoPlacement,
