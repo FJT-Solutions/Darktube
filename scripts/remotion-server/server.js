@@ -400,6 +400,20 @@ async function handleDarkClipsRender(req, res) {
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
+    // Garante compatibilidade 100% universal com navegadores, iOS, Android e Windows Media Player (+faststart e yuv420p)
+    const faststartFilePath = path.join(OUTPUT_DIR, `play_${outputFileName}`);
+    try {
+      console.log(`[Remotion DarkClips] Formatando MP4 com yuv420p +faststart...`);
+      execSync(`ffmpeg -i "${outputFilePath}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 192k -y "${faststartFilePath}"`, { timeout: 180000 });
+      if (fs.existsSync(faststartFilePath) && fs.statSync(faststartFilePath).size > 1000) {
+        fs.unlinkSync(outputFilePath);
+        fs.renameSync(faststartFilePath, outputFilePath);
+        console.log(`[Remotion DarkClips] ✅ MP4 formatado com yuv420p +faststart para compatibilidade universal!`);
+      }
+    } catch (postErr) {
+      console.warn(`[Remotion DarkClips] Aviso no pós-processamento faststart:`, postErr.message);
+    }
+
     const videoUrl = STORAGE_BASE_URL
       ? `${STORAGE_BASE_URL}/storage/${outputFileName}`
       : `/storage/${outputFileName}`;
@@ -920,6 +934,9 @@ async function sendCallback(url, body) {
       .replace('http://localhost:5678', N8N_EXTERNAL)
       .replace('http://127.0.0.1:5678', N8N_EXTERNAL);
     console.log(`[Remotion Callback] URL corrigida: ${fixedUrl}`);
+  }
+  if (fixedUrl.includes('darktube.fjt.solutions')) {
+    fixedUrl = fixedUrl.replace('darktube.fjt.solutions', 'darktube.fjt-solutions.com');
   }
 
   const attempts = [fixedUrl];
