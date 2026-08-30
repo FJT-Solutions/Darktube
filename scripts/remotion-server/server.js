@@ -221,7 +221,7 @@ async function handleDarkClipsRender(req, res) {
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
-    const concurrency = Math.max(1, Math.min(parseInt(process.env.RENDER_CONCURRENCY || '8', 10), 12));
+    const concurrency = Math.max(1, Math.min(parseInt(process.env.RENDER_CONCURRENCY || '6', 10), 8));
     console.log(`[Remotion DarkClips] Renderizando ${comp.id} (${durationInFrames} frames, concorrência: ${concurrency})...`);
 
     let lastLoggedPct = -1;

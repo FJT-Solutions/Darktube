@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Video, Img, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, Img, interpolate, useCurrentFrame } from 'remotion';
 import { DarkClipsVideoProps } from '../types';
 
 export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
@@ -323,7 +323,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                     : undefined,
               }}
             >
-              <Video
+              <OffthreadVideo
                 src={videoUrl}
                 style={{
                   width: '100%',
