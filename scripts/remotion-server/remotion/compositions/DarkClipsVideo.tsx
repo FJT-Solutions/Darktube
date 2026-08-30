@@ -44,9 +44,23 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     aspectRatio = 'auto',
     fitMode = 'contain',
     fit_mode,
+    zoom = 100,
+    cropTop = 0,
+    crop_top,
+    cropBottom = 0,
+    crop_bottom,
+    panY = 0,
+    pan_y,
+    panX = 0,
+    pan_x,
   } = videoPlacement;
 
   const activeFitMode = fit_mode || fitMode || 'contain';
+  const activeZoom = (zoom || 100) / 100;
+  const activeCropTop = crop_top ?? cropTop ?? 0;
+  const activeCropBottom = crop_bottom ?? cropBottom ?? 0;
+  const activePanY = pan_y ?? panY ?? 0;
+  const activePanX = pan_x ?? panX ?? 0;
 
   // ── 4. Background Defaults ──
   const {
@@ -294,16 +308,34 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               zIndex: 5,
             }}
           >
-            <Video
-              src={videoUrl}
+            <div
               style={{
                 width: '100%',
                 height: '100%',
-                maxHeight: '100%',
-                objectFit: activeFitMode === 'cover' ? 'cover' : 'contain',
-                borderRadius: `${borderRadius}px`,
+                overflow: 'hidden',
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                clipPath:
+                  activeCropTop > 0 || activeCropBottom > 0
+                    ? `inset(${activeCropTop}% 0% ${activeCropBottom}% 0%)`
+                    : undefined,
               }}
-            />
+            >
+              <Video
+                src={videoUrl}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  maxHeight: '100%',
+                  objectFit: activeFitMode === 'cover' ? 'cover' : 'contain',
+                  borderRadius: `${borderRadius}px`,
+                  transform: `scale(${activeZoom}) translate(${activePanX}%, ${activePanY}%)`,
+                  transformOrigin: 'center center',
+                }}
+              />
+            </div>
           </div>
         )}
 

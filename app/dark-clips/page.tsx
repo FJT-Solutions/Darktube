@@ -339,6 +339,11 @@ export default function DarkClipsPage() {
     hasShadow: true,
     aspectRatio: "auto",
     fitMode: "contain" as "contain" | "cover",
+    zoom: 100,
+    cropTop: 0,
+    cropBottom: 0,
+    panY: 0,
+    panX: 0,
   });
 
   const [background, setBackground] = useState({
@@ -623,6 +628,11 @@ export default function DarkClipsPage() {
         hasShadow: preset.video_placement.has_shadow ?? preset.video_placement.hasShadow ?? v.hasShadow,
         aspectRatio: preset.video_placement.aspect_ratio ?? preset.video_placement.aspectRatio ?? v.aspectRatio,
         fitMode: (preset.video_placement.fit_mode || preset.video_placement.fitMode || v.fitMode) as any,
+        zoom: preset.video_placement.zoom ?? v.zoom,
+        cropTop: preset.video_placement.crop_top ?? preset.video_placement.cropTop ?? v.cropTop,
+        cropBottom: preset.video_placement.crop_bottom ?? preset.video_placement.cropBottom ?? v.cropBottom,
+        panY: preset.video_placement.pan_y ?? preset.video_placement.panY ?? v.panY,
+        panX: preset.video_placement.pan_x ?? preset.video_placement.panX ?? v.panX,
       }));
     }
     if (preset.background_style) {
@@ -1039,6 +1049,66 @@ export default function DarkClipsPage() {
       toast.error("Permissão de clipboard necessária ou use Ctrl+V.");
     }
   };
+
+  const [detectingCrop, setDetectingCrop] = useState(false);
+
+  async function handleAutoDetectCrop(targetClip?: DarkClip) {
+    const clip = targetClip || selectedClip;
+    if (!clip) {
+      toast.error("Selecione um clipe para analisar.");
+      return;
+    }
+
+    setDetectingCrop(true);
+    const toastId = toast.loading("🔍 Analisando frame com IA para identificar vídeo e recortar legendas...");
+
+    try {
+      const res = await fetch("/api/dark-clips/detect-crop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clipId: clip.id,
+          thumbnailUrl: clip.thumbnail_url,
+          videoUrl: clip.video_url,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.detection) {
+        const d = data.detection;
+        // Aplica o enquadramento detectado
+        const calculatedCropTop = typeof d.crop_top === "number" ? d.crop_top : (d.has_header_text ? 20 : 0);
+        const calculatedCropBottom = typeof d.crop_bottom === "number" ? d.crop_bottom : 0;
+        
+        setVideoPlacement((v) => ({
+          ...v,
+          cropTop: calculatedCropTop,
+          cropBottom: calculatedCropBottom,
+          aspectRatio: d.aspect_ratio || "16:9",
+          fitMode: "cover",
+        }));
+
+        if (d.headline_main) {
+          setHeadline((h) => ({
+            ...h,
+            mainText: d.headline_main,
+            subText: d.headline_sub || h.subText,
+          }));
+        }
+
+        if (d.detected_text) {
+          toast.success(`🎉 Texto detectado: "${d.detected_text.slice(0, 45)}..." • Corte superior de ${calculatedCropTop}% aplicado!`, { id: toastId });
+        } else {
+          toast.success(`🎉 Área de vídeo identificada! Enquadramento e corte superior de ${calculatedCropTop}% aplicados.`, { id: toastId });
+        }
+      } else {
+        toast.error("Não foi possível detectar a área do vídeo automaticamente.", { id: toastId });
+      }
+    } catch {
+      toast.error("Erro ao comunicar com o serviço de visão computacional.", { id: toastId });
+    } finally {
+      setDetectingCrop(false);
+    }
+  }
 
   async function handleRemodelWithAi(targetClip?: DarkClip) {
     const clip = targetClip || selectedClip;
@@ -2565,6 +2635,144 @@ export default function DarkClipsPage() {
                             {r.label}
                           </Button>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Ferramentas de Recorte & Ajuste Fino do Vídeo Original */}
+                    <div className="p-3.5 rounded-xl bg-secondary/30 border border-border/70 space-y-3 pt-2.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold flex items-center gap-1.5 text-foreground">
+                          <Sliders className="h-3.5 w-3.5 text-primary" /> Recorte de Legendas & Enquadramento do Vídeo
+                        </Label>
+                        {(videoPlacement.cropTop > 0 || videoPlacement.cropBottom > 0 || videoPlacement.zoom !== 100 || videoPlacement.panY !== 0) && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setVideoPlacement((v) => ({
+                                ...v,
+                                cropTop: 0,
+                                cropBottom: 0,
+                                zoom: 100,
+                                panY: 0,
+                                panX: 0,
+                              }))
+                            }
+                            className="h-5 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+                          >
+                            Resetar
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Botão de Auto-Identificação e Recorte com IA */}
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={detectingCrop}
+                        onClick={() => handleAutoDetectCrop()}
+                        className="w-full h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black shadow-sm"
+                      >
+                        {detectingCrop ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Wand2 className="h-3.5 w-3.5" />
+                        )}
+                        ✨ Auto-Identificar Vídeo & Isolar Cena (IA)
+                      </Button>
+
+                      {/* Botões de Recorte Rápido de Topo */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        <span className="text-[10px] text-muted-foreground font-semibold">Atalhos rápidos:</span>
+                        {[
+                          { label: "Topo 15%", top: 15 },
+                          { label: "Topo 20%", top: 20 },
+                          { label: "Topo 25%", top: 25 },
+                          { label: "Topo 30%", top: 30 },
+                        ].map((btn) => (
+                          <Button
+                            key={btn.label}
+                            type="button"
+                            size="sm"
+                            variant={videoPlacement.cropTop === btn.top ? "default" : "outline"}
+                            onClick={() =>
+                              setVideoPlacement((v) => ({
+                                ...v,
+                                cropTop: btn.top,
+                                aspectRatio: "16:9",
+                                fitMode: "cover",
+                              }))
+                            }
+                            className={`h-6 text-[10px] px-2 font-bold ${
+                              videoPlacement.cropTop === btn.top
+                                ? "bg-primary text-primary-foreground"
+                                : "border-border/60 text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {btn.label}
+                          </Button>
+                        ))}
+                      </div>
+
+                      {/* Cortar Topo (Crop Top) */}
+                      <div className="space-y-1 pt-1 border-t border-border/40">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-[11px]">✂️ Cortar Topo (Ocultar Legenda Superior)</span>
+                          <span className="text-[11px] font-mono text-primary font-bold">{videoPlacement.cropTop || 0}%</span>
+                        </div>
+                        <Slider
+                          value={[videoPlacement.cropTop || 0]}
+                          min={0}
+                          max={45}
+                          step={1}
+                          onValueChange={([cropTop]) => setVideoPlacement((v) => ({ ...v, cropTop }))}
+                        />
+                      </div>
+
+                      {/* Cortar Base (Crop Bottom) */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-[11px]">✂️ Cortar Base (Ocultar Marca d'Água Inferior)</span>
+                          <span className="text-[11px] font-mono text-primary font-bold">{videoPlacement.cropBottom || 0}%</span>
+                        </div>
+                        <Slider
+                          value={[videoPlacement.cropBottom || 0]}
+                          min={0}
+                          max={45}
+                          step={1}
+                          onValueChange={([cropBottom]) => setVideoPlacement((v) => ({ ...v, cropBottom }))}
+                        />
+                      </div>
+
+                      {/* Zoom Interno */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-[11px]">🔍 Zoom / Escala do Vídeo</span>
+                          <span className="text-[11px] font-mono text-primary font-bold">{videoPlacement.zoom || 100}%</span>
+                        </div>
+                        <Slider
+                          value={[videoPlacement.zoom || 100]}
+                          min={100}
+                          max={220}
+                          step={2}
+                          onValueChange={([zoom]) => setVideoPlacement((v) => ({ ...v, zoom }))}
+                        />
+                      </div>
+
+                      {/* Posição Vertical Interna (Pan Y) */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-[11px]">↕️ Ajuste Vertical da Cena (Pan Y)</span>
+                          <span className="text-[11px] font-mono text-primary font-bold">{videoPlacement.panY || 0}%</span>
+                        </div>
+                        <Slider
+                          value={[videoPlacement.panY || 0]}
+                          min={-40}
+                          max={40}
+                          step={1}
+                          onValueChange={([panY]) => setVideoPlacement((v) => ({ ...v, panY }))}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2 pt-2 border-t border-border/40">

@@ -302,6 +302,15 @@ export interface DarkClipsVideoProps {
     aspectRatio?: string; // 'auto' | '1:1' | '4:5' | '9:16' | '16:9' | '4:3'
     fitMode?: 'contain' | 'cover';
     fit_mode?: 'contain' | 'cover';
+    zoom?: number; // 100 - 250 percentage
+    cropTop?: number; // 0 - 50 percentage
+    crop_top?: number;
+    cropBottom?: number; // 0 - 50 percentage
+    crop_bottom?: number;
+    panY?: number; // -50 - 50 percentage
+    pan_y?: number;
+    panX?: number; // -50 - 50 percentage
+    pan_x?: number;
   };
 
   // Background

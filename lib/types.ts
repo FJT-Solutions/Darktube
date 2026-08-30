@@ -238,6 +238,15 @@ export interface DarkClipPreset {
     aspectRatio?: string
     fit_mode?: 'contain' | 'cover'
     fitMode?: 'contain' | 'cover'
+    zoom?: number // 100 - 250 percentage
+    crop_top?: number // 0 - 50 percentage
+    cropTop?: number
+    crop_bottom?: number // 0 - 50 percentage
+    cropBottom?: number
+    pan_y?: number // -50 to 50 percentage
+    panY?: number
+    pan_x?: number // -50 to 50 percentage
+    panX?: number
   }
   background_style: {
     type?: 'black' | 'blur' | 'gradient' | 'color' | 'white' | 'neon' | 'zinc'
