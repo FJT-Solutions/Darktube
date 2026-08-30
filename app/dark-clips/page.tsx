@@ -2627,10 +2627,10 @@ export default function DarkClipsPage() {
                     </div>
 
                     {/* Ferramentas de Recorte & Ajuste Fino do Vídeo Original */}
-                    <div className="p-3.5 rounded-xl bg-secondary/30 border border-border/70 space-y-3 pt-2.5">
+                    <div className="p-3 rounded-xl bg-secondary/30 border border-border/70 space-y-3 pt-2">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-bold flex items-center gap-1.5 text-foreground">
-                          <Sliders className="h-3.5 w-3.5 text-primary" /> Recorte de Legendas & Enquadramento do Vídeo
+                          <Sliders className="h-3.5 w-3.5 text-primary" /> Ajuste Manual de Recorte & Enquadramento
                         </Label>
                         {(videoPlacement.cropTop > 0 || videoPlacement.cropBottom > 0 || videoPlacement.zoom !== 100 || videoPlacement.panY !== 0) && (
                           <Button
@@ -2653,55 +2653,9 @@ export default function DarkClipsPage() {
                           </Button>
                         )}
                       </div>
-
-                      {/* Botão de Auto-Identificação e Recorte Local FFmpeg */}
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={detectingCrop}
-                        onClick={() => handleAutoDetectCrop()}
-                        className="w-full h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm"
-                      >
-                        {detectingCrop ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sliders className="h-3.5 w-3.5" />
-                        )}
-                        ⚡ Auto-Detectar & Isolar Vídeo (FFmpeg • 100% Grátis)
-                      </Button>
-
-                      {/* Botões de Recorte Rápido de Topo */}
-                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                        <span className="text-[10px] text-muted-foreground font-semibold">Atalhos rápidos:</span>
-                        {[
-                          { label: "Topo 15%", top: 15 },
-                          { label: "Topo 20%", top: 20 },
-                          { label: "Topo 25%", top: 25 },
-                          { label: "Topo 30%", top: 30 },
-                        ].map((btn) => (
-                          <Button
-                            key={btn.label}
-                            type="button"
-                            size="sm"
-                            variant={videoPlacement.cropTop === btn.top ? "default" : "outline"}
-                            onClick={() =>
-                              setVideoPlacement((v) => ({
-                                ...v,
-                                cropTop: btn.top,
-                                aspectRatio: "16:9",
-                                fitMode: "cover",
-                              }))
-                            }
-                            className={`h-6 text-[10px] px-2 font-bold ${
-                              videoPlacement.cropTop === btn.top
-                                ? "bg-primary text-primary-foreground"
-                                : "border-border/60 text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {btn.label}
-                          </Button>
-                        ))}
-                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-tight">
+                        O sistema recorta legendas automaticamente ao produzir. Use estes controles apenas se desejar ajuste manual fino.
+                      </p>
 
                       {/* Cortar Topo (Crop Top) */}
                       <div className="space-y-1 pt-1 border-t border-border/40">

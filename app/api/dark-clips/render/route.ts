@@ -6,6 +6,7 @@ import { pool } from '@/lib/db-client';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { sanitizeVideo } from '@/lib/video-sanitizer';
 import { generateAiRemodelForClip } from '../remodel-ai/route';
+import { detectCropWithLocalFFmpeg } from '../detect-crop/route';
 import fs from 'fs';
 import path from 'path';
 
@@ -174,6 +175,39 @@ export async function POST(req: Request) {
       let lastError = '';
       let activeBaseUrl = '';
 
+      // ── Detecção Automática de Enquadramento e Corte de Legendas (100% Local / FFmpeg) ──
+      let effectiveVideoPlacement = { ...(inputProps.videoPlacement || {}) };
+      const hasManualCrop = typeof effectiveVideoPlacement.cropTop === 'number' && effectiveVideoPlacement.cropTop > 0;
+
+      if (!hasManualCrop) {
+        try {
+          let localVideoPath = '';
+          if (sourceVideoUrl.includes('/api/storage/')) {
+            const fn = sourceVideoUrl.split('/api/storage/')[1]?.split('?')[0];
+            const storageDir = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');
+            const p = path.join(storageDir, fn);
+            if (fs.existsSync(p)) localVideoPath = p;
+          }
+          const sourceForCrop = localVideoPath || sourceVideoUrl;
+          if (sourceForCrop) {
+            console.log(`[DarkClips Render] Executando detecção automática de enquadramento (FFmpeg)...`);
+            const cropRes = await detectCropWithLocalFFmpeg(sourceForCrop);
+            if (cropRes && cropRes.crop_top > 5) {
+              console.log(`[DarkClips Render] ✅ Enquadramento automático aplicado: cropTop: ${cropRes.crop_top}%, cropBottom: ${cropRes.crop_bottom}%, aspect: ${cropRes.aspect_ratio}`);
+              effectiveVideoPlacement = {
+                ...effectiveVideoPlacement,
+                cropTop: cropRes.crop_top,
+                cropBottom: cropRes.crop_bottom,
+                aspectRatio: cropRes.aspect_ratio || '16:9',
+                fitMode: 'cover',
+              };
+            }
+          }
+        } catch (cropErr: any) {
+          console.warn('[DarkClips Render] Aviso na detecção automática de crop:', cropErr.message);
+        }
+      }
+
       for (const baseUrl of CANDIDATE_URLS) {
         const cleanBase = baseUrl.replace(/\/+$/, '');
         const renderEndpoint = cleanBase.endsWith('/render') ? cleanBase : `${cleanBase}/render`;
@@ -190,6 +224,7 @@ export async function POST(req: Request) {
               callbackUrl,
               inputProps: {
                 ...inputProps,
+                videoPlacement: effectiveVideoPlacement,
                 videoUrl: sourceVideoUrl,
                 // Cap: Dark Clips max 15 segundos
                 durationInSeconds: Math.min(durationInSeconds, 15),

@@ -12,7 +12,7 @@ const execFilePromise = promisify(execFile);
  * Detecção de Área de Vídeo 100% LOCAL e GRATUITA usando o filtro cropdetect nativo do FFmpeg.
  * Não utiliza LLM, não gasta tokens e executa em milissegundos no servidor.
  */
-async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
+export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
   has_header_text: boolean;
   crop_top: number;
   crop_bottom: number;
