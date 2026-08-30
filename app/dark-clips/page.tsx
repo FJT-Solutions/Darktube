@@ -1060,7 +1060,7 @@ export default function DarkClipsPage() {
     }
 
     setDetectingCrop(true);
-    const toastId = toast.loading("🔍 Analisando frame com IA para identificar vídeo e recortar legendas...");
+    const toastId = toast.loading("⚡ Analisando enquadramento com FFmpeg local (Custo R$ 0,00)...");
 
     try {
       const res = await fetch("/api/dark-clips/detect-crop", {
@@ -1075,8 +1075,8 @@ export default function DarkClipsPage() {
       const data = await res.json();
       if (data.success && data.detection) {
         const d = data.detection;
-        // Aplica o enquadramento detectado
-        const calculatedCropTop = typeof d.crop_top === "number" ? d.crop_top : (d.has_header_text ? 20 : 0);
+        // Aplica o enquadramento detectado pelo FFmpeg
+        const calculatedCropTop = typeof d.crop_top === "number" ? d.crop_top : 22;
         const calculatedCropBottom = typeof d.crop_bottom === "number" ? d.crop_bottom : 0;
         
         setVideoPlacement((v) => ({
@@ -1087,24 +1087,12 @@ export default function DarkClipsPage() {
           fitMode: "cover",
         }));
 
-        if (d.headline_main) {
-          setHeadline((h) => ({
-            ...h,
-            mainText: d.headline_main,
-            subText: d.headline_sub || h.subText,
-          }));
-        }
-
-        if (d.detected_text) {
-          toast.success(`🎉 Texto detectado: "${d.detected_text.slice(0, 45)}..." • Corte superior de ${calculatedCropTop}% aplicado!`, { id: toastId });
-        } else {
-          toast.success(`🎉 Área de vídeo identificada! Enquadramento e corte superior de ${calculatedCropTop}% aplicados.`, { id: toastId });
-        }
+        toast.success(`⚡ Vídeo isolado com sucesso pelo FFmpeg! Corte superior de ${calculatedCropTop}% aplicado (100% Grátis).`, { id: toastId });
       } else {
         toast.error("Não foi possível detectar a área do vídeo automaticamente.", { id: toastId });
       }
     } catch {
-      toast.error("Erro ao comunicar com o serviço de visão computacional.", { id: toastId });
+      toast.error("Erro ao comunicar com o analisador de vídeo.", { id: toastId });
     } finally {
       setDetectingCrop(false);
     }
@@ -2666,20 +2654,20 @@ export default function DarkClipsPage() {
                         )}
                       </div>
 
-                      {/* Botão de Auto-Identificação e Recorte com IA */}
+                      {/* Botão de Auto-Identificação e Recorte Local FFmpeg */}
                       <Button
                         type="button"
                         size="sm"
                         disabled={detectingCrop}
                         onClick={() => handleAutoDetectCrop()}
-                        className="w-full h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-black shadow-sm"
+                        className="w-full h-8 text-xs font-bold gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-sm"
                       >
                         {detectingCrop ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <Wand2 className="h-3.5 w-3.5" />
+                          <Sliders className="h-3.5 w-3.5" />
                         )}
-                        ✨ Auto-Identificar Vídeo & Isolar Cena (IA)
+                        ⚡ Auto-Detectar & Isolar Vídeo (FFmpeg • 100% Grátis)
                       </Button>
 
                       {/* Botões de Recorte Rápido de Topo */}
