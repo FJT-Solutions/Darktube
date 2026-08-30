@@ -224,6 +224,7 @@ async function handleDarkClipsRender(req, res) {
     const concurrency = Math.max(1, Math.min(parseInt(process.env.RENDER_CONCURRENCY || '8', 10), 12));
     console.log(`[Remotion DarkClips] Renderizando ${comp.id} (${durationInFrames} frames, concorrência: ${concurrency})...`);
 
+    let lastLoggedPct = -1;
     await renderMedia({
       composition: comp,
       serveUrl,
@@ -232,7 +233,7 @@ async function handleDarkClipsRender(req, res) {
       concurrency,
       maxRetries: 3,
       imageFormat: 'jpeg',
-      jpegQuality: 90,
+      jpegQuality: 88,
       inputProps: finalInputProps,
       gl: null,
       browserExecutable: CHROME_PATH,
@@ -245,8 +246,9 @@ async function handleDarkClipsRender(req, res) {
       onProgress: ({ progress, renderedDoneInFrames }) => {
         const pct = Math.floor(progress * 100);
         const done = renderedDoneInFrames || Math.floor(progress * comp.durationInFrames);
-        if (pct % 20 === 0) {
-          console.log(`[Remotion DarkClips] Progresso: ${pct}% (${done}/${comp.durationInFrames})`);
+        if (pct !== lastLoggedPct && (pct % 10 === 0 || pct === 90 || pct === 95 || pct === 99 || pct === 100)) {
+          lastLoggedPct = pct;
+          console.log(`[Remotion DarkClips] 🎬 Progresso: ${pct}% (${done}/${comp.durationInFrames} frames)`);
         }
       },
       timeoutInMilliseconds: 300_000,
