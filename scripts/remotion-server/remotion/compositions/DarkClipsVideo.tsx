@@ -209,9 +209,12 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     pan_y,
     panX = 0,
     pan_x,
-  } = videoPlacement;
+    videoWidth: propVidWidth,
+    videoHeight: propVidHeight,
+    videoAspectRatio: propVidAspect,
+  } = (videoPlacement || {}) as any;
 
-  const activeFitMode = fit_mode || fitMode || 'cover';
+  const activeFitMode = fit_mode || fitMode || 'contain';
   const activeCropTop = crop_top ?? cropTop ?? 0;
   const activeCropBottom = crop_bottom ?? cropBottom ?? 0;
   const activePanY = pan_y ?? panY ?? 0;
@@ -219,7 +222,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
 
   const isContain = activeFitMode === 'contain';
 
-  // Priorização do vídeo: em modo cover com corte, expande a área limpa eliminando bordas indesejadas
+  // Em modo contain, o vídeo original é sempre 100% preservado sem cortes.
+  // Em modo cover manual, respeita cortes específicos se definidos pelo usuário.
   const visibleHeightRatio = Math.max(0.2, (100 - activeCropTop - activeCropBottom) / 100);
   const autoExpandZoom = (!isContain && (activeCropTop > 0 || activeCropBottom > 0)) ? (1 / visibleHeightRatio) : 1;
   const autoShiftY = (!isContain && (activeCropTop > 0 || activeCropBottom > 0))
@@ -228,6 +232,34 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
 
   const totalZoom = ((zoom || 100) / 100) * autoExpandZoom;
   const totalPanY = activePanY + autoShiftY;
+
+  // ── Sizing Responsivo Inteligente da Moldura do Vídeo (Canvas 1080x1920) ──
+  const resolvedVideoAspect = propVidAspect || (propVidWidth && propVidHeight ? propVidWidth / propVidHeight : 9 / 16);
+  const resolvedFrameAspect =
+    aspectRatio === '16:9' ? 16 / 9 :
+    aspectRatio === '4:3' ? 4 / 3 :
+    aspectRatio === '1:1' ? 1 :
+    aspectRatio === '4:5' ? 4 / 5 :
+    aspectRatio === '9:16' ? 9 / 16 :
+    resolvedVideoAspect;
+
+  const maxAllowedWidth = Math.round(1080 * ((scale || 92) / 100));
+  // Limite vertical seguro no canvas 1080x1920 para não sobrepor o cabeçalho nem o rodapé
+  const maxAllowedHeight = resolvedFrameAspect <= 9 / 16
+    ? 1120
+    : resolvedFrameAspect <= 4 / 5
+    ? 1080
+    : resolvedFrameAspect <= 1
+    ? 980
+    : 620;
+
+  let containerWidth = maxAllowedWidth;
+  let containerHeight = Math.round(containerWidth / resolvedFrameAspect);
+
+  if (containerHeight > maxAllowedHeight) {
+    containerHeight = maxAllowedHeight;
+    containerWidth = Math.round(containerHeight * resolvedFrameAspect);
+  }
 
   // ── 4. Background Defaults ──
   const {
@@ -565,8 +597,10 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
           style={{
             position: 'absolute',
             top: `${yOffset}%`,
-            transform: 'translateY(-50%)',
-            width: `${scale}%`,
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: `${containerWidth}px`,
+            height: `${containerHeight}px`,
             borderRadius: `${borderRadius}px`,
             overflow: 'hidden',
             boxShadow: isLightBg
@@ -575,19 +609,6 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               ? '0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255,255,255,0.15)'
               : 'none',
             backgroundColor: 'transparent',
-            aspectRatio:
-              aspectRatio === '16:9'
-                ? '16/9'
-                : aspectRatio === '4:3'
-                ? '4/3'
-                : aspectRatio === '1:1'
-                ? '1/1'
-                : aspectRatio === '4:5'
-                ? '4/5'
-                : aspectRatio === '9:16'
-                ? '9/16'
-                : undefined,
-            maxHeight: aspectRatio === '9:16' ? '74%' : aspectRatio === '4:5' ? '68%' : '62%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -620,8 +641,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 style={{
                   width: '100%',
                   height: '100%',
-                  maxHeight: '100%',
-                  objectFit: activeFitMode === 'cover' ? 'cover' : 'contain',
+                  objectFit: isContain ? 'contain' : (activeFitMode === 'cover' ? 'cover' : 'contain'),
                   borderRadius: `${borderRadius}px`,
                   transform: `scale(${totalZoom}) translate(${activePanX}%, ${totalPanY}%)`,
                   transformOrigin: 'center center',

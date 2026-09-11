@@ -147,6 +147,8 @@ async function handleDarkClipsRender(req, res) {
     const outputFilePath = path.join(OUTPUT_DIR, outputFileName);
 
     let resolvedVideoUrl = inputProps.videoUrl || '';
+    let detectedVideoDuration = null;
+    let detectedVideoMeta = { w: 1080, h: 1920, dur: 15 };
     if (resolvedVideoUrl.startsWith('/api/storage/')) {
       resolvedVideoUrl = `https://darktube.fjt-solutions.com${resolvedVideoUrl}`;
     }
@@ -195,6 +197,7 @@ async function handleDarkClipsRender(req, res) {
 
           const meta = await getVideoMeta();
           detectedVideoDuration = meta.dur;
+          detectedVideoMeta = meta;
           console.log(`[Remotion DarkClips] ⏱️ Duração real detectada: ${meta.dur.toFixed(1)}s (${meta.w}x${meta.h})`);
 
           // Video original preservado 100% — sem corte automatico.
@@ -214,10 +217,24 @@ async function handleDarkClipsRender(req, res) {
       : Math.round(durationInSeconds * 30);
     console.log(`[Remotion DarkClips] 🎞️ Renderizando duração completa: ${durationInSeconds.toFixed(1)}s (${durationInFrames} frames)`);
 
+    const videoAspect = (detectedVideoMeta.w && detectedVideoMeta.h)
+      ? (detectedVideoMeta.w / detectedVideoMeta.h)
+      : (9 / 16);
+
     const finalInputProps = {
       ...inputProps,
       videoUrl: resolvedVideoUrl,
       durationInSeconds,
+      videoWidth: detectedVideoMeta.w || 1080,
+      videoHeight: detectedVideoMeta.h || 1920,
+      videoAspectRatio: videoAspect,
+      videoPlacement: {
+        ...(inputProps.videoPlacement || {}),
+        fitMode: inputProps.videoPlacement?.fitMode || inputProps.videoPlacement?.fit_mode || 'contain',
+        videoWidth: detectedVideoMeta.w || 1080,
+        videoHeight: detectedVideoMeta.h || 1920,
+        videoAspectRatio: videoAspect,
+      },
     };
 
     const chromiumArgs = [

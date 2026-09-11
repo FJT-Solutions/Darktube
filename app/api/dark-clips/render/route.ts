@@ -176,8 +176,10 @@ export async function POST(req: Request) {
 
       // ── Enquadramento de Vídeo ──
       // Respeita os parâmetros manuais do usuário. A detecção temporal de cabeçalhos estáticos
-      // é executada diretamente no Remotion Server (FFmpeg multi-frame) preservando 100% de conteúdos dinâmicos.
       let effectiveVideoPlacement = { ...(inputProps.videoPlacement || {}) };
+      if (!effectiveVideoPlacement.fitMode && !effectiveVideoPlacement.fit_mode) {
+        effectiveVideoPlacement.fitMode = 'contain';
+      }
 
       for (const baseUrl of CANDIDATE_URLS) {
         const cleanBase = baseUrl.replace(/\/+$/, '');

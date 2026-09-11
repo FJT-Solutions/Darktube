@@ -311,6 +311,9 @@ export interface DarkClipsVideoProps {
     pan_y?: number;
     panX?: number; // -50 - 50 percentage
     pan_x?: number;
+    videoWidth?: number;
+    videoHeight?: number;
+    videoAspectRatio?: number;
   };
 
   // Background
