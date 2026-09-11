@@ -39,7 +39,7 @@ export async function generateAiRemodelForClip(params: RemodelAiParams): Promise
     authorHandle = '@darkclips',
     platform = 'instagram',
     theme = '',
-    style = 'meme-ironic',
+    style = 'viral-retention',
     mainTextMode = 'ai',
     mainTextFixed = '',
     mainTextMaxWords = 8,
@@ -55,27 +55,28 @@ export async function generateAiRemodelForClip(params: RemodelAiParams): Promise
   } = params;
 
   const promptInstructions = `
-Você é o Diretor Criativo e Especialista Máximo em Copywriting Viral, Retenção e Memes do DarkTube.
-Sua missão é analisar os DADOS REAIS DESTE VÍDEO CAPTURADO e criar os textos e gancho (Setup + Reação/Punchline) 100% INÉDITOS E TOTALMENTE PERSONALIZADOS para o acontecimento/história real deste clipe.
+Você é o Diretor Criativo e Especialista em Copywriting Viral do DarkTube, focado em transformar vídeos em clipes de altíssima retenção para Instagram Reels, TikTok e YouTube Shorts.
+
+SUA MISSÃO FUNDAMENTAL É A FIDELIDADE TOTAL AO CONTEÚDO REAL DO VÍDEO E À SUA LEGENDA ORIGINAL:
+Você DEVE ler com atenção a legenda e transcrição original do vídeo e entender exatamente do que ele se trata:
+- Se for sobre celebridades, atrizes ou comparação de patrimônio/carreira (ex: Sadie Sink vs Zendaya): extraia as entidades reais e crie uma headline factual e magnética sobre a comparação e evolução das carreiras (Ex.: "SADIE SINK VS ZENDAYA", "A EVOLUÇÃO DAS DUAS MAIORES ESTRELAS JOVENS" ou "QUEM ACUMULOU A MAIOR FORTUNA?").
+- Se for sobre dublagem de séries/animes (ex: Avatar A Lenda de Aang): crie ganchos diretos sobre a atuação e dublagem (Ex.: "DUBLAGEM BRASILEIRA VS AMERICANA", "A VERSÃO BRASILEIRA FICOU MUITO MELHOR?").
+- Se for sobre animes/personagens e lutas (ex: Toph dobradora de terra): crie ganchos sobre a personagem e o feito (Ex.: "A MAIOR DOBRADORA DE TERRA", "ELA CONTINUA SENDO A MAIS PODEROSA").
+- Se for finanças, curiosidades científicas, esportes, notícias, fatos ou humor: crie ganchos 100% fiéis ao tema específico tratado.
+- PROIBIÇÃO ABSOLUTA: NUNCA invente frases genéricas desconexas como "Quando a vida te surpreende", "Quando eu vou em um lugar", "Comprei um mic novo", etc., a não ser que o vídeo trate literalmente disso!
 
 DADOS REAIS DO VÍDEO CAPTURADO:
-- Transcrição / Legenda / Contexto Original do Vídeo: "${originalCaption || 'Vídeo de situação inusitada / meme viral'}"
+- Transcrição / Legenda / Contexto Original do Vídeo: "${originalCaption || 'Vídeo viral em formato vertical'}"
 - Criador do Vídeo: "${authorName || ''} (${authorHandle || ''})"
 - Plataforma de Origem: "${platform || 'instagram'}"
-- Direcionamento / Tema Desejado pelo Usuário: "${theme || 'Identificação e humor viral brasileiro'}"
-- Estilo: "${style}"
+${theme ? `- Direcionamento Específico Solicitado: "${theme}"` : ''}
 
 DIRETRIZES DE CRIAÇÃO E LIMITES DE PALAVRAS POR CAMPO:
-1. PROIBIÇÃO ABSOLUTA DE TEMPLATES GENÉRICOS:
-   - É ESTRITAMENTE PROIBIDO reutilizar frases prontas de exemplos ou templates (como "comprei um mic novo", "o desgraçado entrando na call", "quando eu digo que vou só em um lugar", etc.), a menos que o vídeo capturado trate literalmente disso.
-2. CONTEXTUALIZAÇÃO TOTAL AO VÍDEO:
-   - Identifique e extraia o tema e a ação CENTRAL descrita na legenda/contexto do vídeo (ex: se fala do Dinossauro do Google Chrome e internet caindo, crie ganchos sobre internet/desespero/jogo offline; se fala de trabalho, sobre CLT/chefe; se fala de finanças, sobre boletos/banco; se fala de academia, sobre treino/dor; se fala de games, sobre jogos; se fala de pets, sobre animais).
-3. CONTROLE DE PALAVRAS E MODOS (OBRIGATÓRIO):
-   - "headline_main": ${mainTextMode === 'manual' && mainTextFixed ? `Copie exatamente o texto fixo fornecido: "${mainTextFixed}"` : `Frase de abertura/setup curta em MAIÚSCULAS respeitando RIGOROSAMENTE o limite de NO MÁXIMO ${mainTextMaxWords || 8} PALAVRAS.`}
-   - "headline_sub": ${subTextMode === 'manual' && subTextFixed ? `Copie exatamente o texto fixo fornecido: "${subTextFixed}"` : `Frase de reação / punchline complementar respeitando RIGOROSAMENTE o limite de NO MÁXIMO ${subTextMaxWords || 6} PALAVRAS.`}
-   - "cta_text": ${ctaMode === 'manual' && fixedCta ? `Copie exatamente o CTA fixo fornecido: "${fixedCta}"` : `Chamada para ação moderna de rodapé respeitando o limite de NO MÁXIMO ${ctaMaxWords || 6} PALAVRAS.`}
-   - "post_caption": Legenda magnética para o feed do Instagram/TikTok/Shorts, contextualizando a história e terminando com uma pergunta envolvente que force comentários.
-   - "hashtags": Array com 8 a 12 hashtags específicas do nicho do vídeo e tendências no Brasil.
+1. "headline_main": ${mainTextMode === 'manual' && mainTextFixed ? `Copie exatamente o texto fixo fornecido: "${mainTextFixed}"` : `Frase de abertura/setup curta em MAIÚSCULAS resumindo o tema central com RIGOROSO limite de NO MÁXIMO ${mainTextMaxWords || 8} PALAVRAS.`}
+2. "headline_sub": ${subTextMode === 'manual' && subTextFixed ? `Copie exatamente o texto fixo fornecido: "${subTextFixed}"` : `Frase de reação / pergunta / curiosidade complementar em MAIÚSCULAS com RIGOROSO limite de NO MÁXIMO ${subTextMaxWords || 6} PALAVRAS.`}
+3. "cta_text": ${ctaMode === 'manual' && fixedCta ? `Copie exatamente o CTA fixo fornecido: "${fixedCta}"` : `Chamada para ação moderna de rodapé respeitando o limite de NO MÁXIMO ${ctaMaxWords || 6} PALAVRAS.`}
+4. "post_caption": Legenda rica e contextualizada para o feed do Instagram/TikTok/Shorts, resumindo os acontecimentos ou fatos citados na legenda original e terminando com uma pergunta envolvente para comentários.
+5. "hashtags": Array com 8 a 12 hashtags específicas do tema real e nicho do vídeo.
 
 RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown envolventes):
 {
@@ -104,12 +105,12 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
           messages: [
             {
               role: 'system',
-              content: 'Você é um assistente criativo e especialista em memes virais que analisa contextos reais de vídeos e responde apenas com objetos JSON estritos, respeitando limites exatos de palavras por campo.'
+              content: 'Você é um assistente criativo e especialista em copywriting de vídeos virais que analisa contextos reais e responde apenas com objetos JSON estritos, fiel ao conteúdo e respeitando limites exatos de palavras por campo.'
             },
             { role: 'user', content: promptInstructions }
           ],
           response_format: { type: 'json_object' },
-          temperature: 0.85
+          temperature: 0.7
         })
       });
 
@@ -132,7 +133,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
     const apiKey = userGeminiKey || systemGeminiKey;
     if (apiKey) {
       try {
-        console.log('[Remodel AI] Usando Gemini AI para remodelagem...');
+        console.log('[Remodel AI] Usando Gemini AI para remodelagem fiel ao contexto...');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(promptInstructions);
@@ -147,15 +148,16 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
 
   // ── 3. Dynamic Contextual Fallback if all AI fails ──
   if (!responseJson) {
-    const contextWords = (originalCaption || '').replace(/[^\w\s]/gi, '').split(/\s+/).filter((w: string) => w.length > 4);
-    const keyword = contextWords[0] ? contextWords[0].toUpperCase() : 'ISSO';
+    const cleaned = (originalCaption || '').replace(/[^\w\s]/gi, ' ').trim();
+    const words = cleaned.split(/\s+/).filter((w: string) => w.length >= 3);
+    const primaryTopic = words.slice(0, 5).join(' ').toUpperCase() || 'VEJA ESSE VÍDEO:';
 
     responseJson = {
-      headline_main: mainTextMode === 'manual' && mainTextFixed ? mainTextFixed : `QUANDO VOCÊ MENOS ESPERA E ACONTECE ${keyword}:`,
-      headline_sub: subTextMode === 'manual' && subTextFixed ? subTextFixed : "A REAÇÃO DE QUEM NÃO TEM MAIS NADA A PERDER:",
+      headline_main: mainTextMode === 'manual' && mainTextFixed ? mainTextFixed : primaryTopic,
+      headline_sub: subTextMode === 'manual' && subTextFixed ? subTextFixed : "CONFIRA ESSA HISTÓRIA:",
       cta_text: (ctaMode === 'manual' || fixedCta) && fixedCta ? fixedCta.trim() : `Siga ${authorHandle} para mais vídeos!`,
-      post_caption: originalCaption ? `${originalCaption.slice(0, 120)}... O que você faria nessa situação? 😂👇` : "Marca aquele amigo que precisa ver isso 😂👇",
-      hashtags: ["#memesbrasil", "#humor", "#engraçado", "#viral", "#reels", "#fyp", "#shorts"]
+      post_caption: originalCaption ? `${originalCaption.slice(0, 160)}... O que você achou disso? Comente abaixo! 👇` : "Deixe sua opinião nos comentários! 👇",
+      hashtags: ["#viral", "#curiosidades", "#reels", "#fyp", "#shorts"]
     };
   }
 

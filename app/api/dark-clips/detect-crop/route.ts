@@ -69,11 +69,6 @@ export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
       const remainingBottom = originalHeight - (y + h);
       let cropBottomPct = Math.max(0, Math.round((remainingBottom / originalHeight) * 100));
 
-      // Heurística de segurança para memes verticais 9:16 com vídeo 16:9
-      if (originalHeight > originalWidth && cropTopPct === 0 && h < originalHeight * 0.8) {
-        cropTopPct = 22;
-      }
-
       // Identificar a proporção do vídeo útil detectado
       const ratioVal = w / h;
       let ratioStr = '16:9';
@@ -148,15 +143,15 @@ export async function POST(req: Request) {
       localResult = await detectCropWithLocalFFmpeg(sourceForDetection);
     }
 
-    // Fallback matemático se FFmpeg não puder ler stream remoto diretamente
+    // Fallback seguro se FFmpeg não puder ler stream remoto diretamente: preserva o vídeo intacto
     if (!localResult) {
       localResult = {
-        has_header_text: true,
-        crop_top: 22,
+        has_header_text: false,
+        crop_top: 0,
         crop_bottom: 0,
-        aspect_ratio: '16:9',
+        aspect_ratio: '9:16',
         w: 1080,
-        h: 608,
+        h: 1920,
         originalWidth: 1080,
         originalHeight: 1920,
       };

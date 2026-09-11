@@ -206,75 +206,90 @@ async function handleDarkClipsRender(req, res) {
 
           if (meta.h > meta.w) {
             try {
-              const rawFramePath = path.join(OUTPUT_DIR, `scan_${jobId}.raw`);
-              const seekSec = Math.min(2, Math.max(0.5, meta.dur * 0.1)).toFixed(1);
-              
-              await new Promise((resolve, reject) => {
-                execFile('ffmpeg', [
-                  '-ss', seekSec,
-                  '-i', inputFilePath,
-                  '-vframes', '1',
-                  '-f', 'rawvideo',
-                  '-pix_fmt', 'rgb24',
-                  '-y', rawFramePath,
-                ], { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
-              });
+              // Extrair 3 frames ao longo do tempo (15%, 50%, 80%) em baixa resolução (270x480) para análise temporal instantânea
+              const t1 = Math.max(0.5, meta.dur * 0.15).toFixed(1);
+              const t2 = (meta.dur * 0.50).toFixed(1);
+              const t3 = (meta.dur * 0.80).toFixed(1);
 
-              if (fs.existsSync(rawFramePath)) {
-                const buf = fs.readFileSync(rawFramePath);
-                const w = meta.w;
-                const h = meta.h;
+              const scanW = 270;
+              const scanH = 480;
 
-                let topY = 0;
-                let bottomY = h;
-                let foundTop = false;
+              const f1Path = path.join(OUTPUT_DIR, `temp_f1_${jobId}.raw`);
+              const f2Path = path.join(OUTPUT_DIR, `temp_f2_${jobId}.raw`);
+              const f3Path = path.join(OUTPUT_DIR, `temp_f3_${jobId}.raw`);
 
-                // Escaneia de cima para baixo
-                for (let y = 0; y < h; y += 4) {
-                  const lIdx = (y * w + Math.min(15, Math.floor(w * 0.02))) * 3;
-                  const rIdx = (y * w + Math.max(w - 16, Math.floor(w * 0.98))) * 3;
-                  const isLBlack = buf[lIdx] < 28 && buf[lIdx+1] < 28 && buf[lIdx+2] < 28;
-                  const isRBlack = buf[rIdx] < 28 && buf[rIdx+1] < 28 && buf[rIdx+2] < 28;
-                  
-                  if (!isLBlack && !isRBlack) {
-                    if (!foundTop) {
-                      topY = y;
-                      foundTop = true;
-                    }
-                    bottomY = y;
+              await Promise.all([
+                new Promise((res, rej) => execFile('ffmpeg', ['-ss', t1, '-i', inputFilePath, '-vframes', '1', '-vf', `scale=${scanW}:${scanH}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-y', f1Path], { timeout: 15000 }, (e) => e ? rej(e) : res())),
+                new Promise((res, rej) => execFile('ffmpeg', ['-ss', t2, '-i', inputFilePath, '-vframes', '1', '-vf', `scale=${scanW}:${scanH}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-y', f2Path], { timeout: 15000 }, (e) => e ? rej(e) : res())),
+                new Promise((res, rej) => execFile('ffmpeg', ['-ss', t3, '-i', inputFilePath, '-vframes', '1', '-vf', `scale=${scanW}:${scanH}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-y', f3Path], { timeout: 15000 }, (e) => e ? rej(e) : res())),
+              ]);
+
+              if (fs.existsSync(f1Path) && fs.existsSync(f2Path) && fs.existsSync(f3Path)) {
+                const b1 = fs.readFileSync(f1Path);
+                const b2 = fs.readFileSync(f2Path);
+                const b3 = fs.readFileSync(f3Path);
+
+                try { fs.unlinkSync(f1Path); } catch (_) {}
+                try { fs.unlinkSync(f2Path); } catch (_) {}
+                try { fs.unlinkSync(f3Path); } catch (_) {}
+
+                // Mede a variação temporal (movimento) linha por linha
+                let rowMotion = [];
+                for (let y = 0; y < scanH; y++) {
+                  let diffSum = 0;
+                  let brightCount = 0;
+
+                  for (let x = 0; x < scanW; x += 2) {
+                    const idx = (y * scanW + x) * 3;
+                    const r1 = b1[idx], g1 = b1[idx+1], b_1 = b1[idx+2];
+                    const r2 = b2[idx], g2 = b2[idx+1], b_2 = b2[idx+2];
+                    const r3 = b3[idx], g3 = b3[idx+1], b_3 = b3[idx+2];
+
+                    if (r1 > 45 || g1 > 45 || b_1 > 45) brightCount++;
+
+                    const d12 = Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b_1 - b_2);
+                    const d23 = Math.abs(r2 - r3) + Math.abs(g2 - g3) + Math.abs(b_2 - b_3);
+                    diffSum += (d12 + d23) / 6;
+                  }
+
+                  const avgMotion = diffSum / (scanW / 2);
+                  const isBright = brightCount > (scanW * 0.04);
+                  rowMotion.push({ y, avgMotion, isBright });
+                }
+
+                // Identifica se há cabeçalho ESTÁTICO partindo do topo (ex: avatar do canal, @, headline congelada)
+                // Um cabeçalho estático tem pixels visíveis (isBright = true), mas ZERO movimento ao longo do tempo (avgMotion < 9).
+                // Se houver texto dinâmico (ex: anos mudando 2012 -> 2016 ou valores), avgMotion será >= 14 e o corte para!
+                let staticHeaderRows = 0;
+                let hasStaticHeader = false;
+
+                for (let y = 0; y < Math.round(scanH * 0.40); y++) {
+                  const r = rowMotion[y];
+                  if (r.isBright && r.avgMotion < 9) {
+                    staticHeaderRows = y + 1;
+                    hasStaticHeader = true;
+                  } else if (r.avgMotion >= 14) {
+                    // Encontrou conteúdo dinâmico (vídeo em movimento ou texto dinâmico que muda com o tempo)
+                    break;
                   }
                 }
 
-                try { fs.unlinkSync(rawFramePath); } catch (_) {}
-
-                // Adiciona margem de segurança de 4px para cortar qualquer resíduo de texto
-                topY = Math.min(topY + 6, h);
-                bottomY = Math.max(bottomY - 6, topY + 100);
-                const cleanH = bottomY - topY;
-
-                // Se identificou barras de texto (topo > 5% ou base < 95%)
-                if (foundTop && cleanH > 100 && (topY > h * 0.05 || bottomY < h * 0.95)) {
-                  const cw = w % 2 === 0 ? w : w - 1;
+                // Se identificou um cabeçalho fixo com pelo menos 6% da altura e terminando antes de 38%
+                if (hasStaticHeader && staticHeaderRows > (scanH * 0.06)) {
+                  const cutTop = Math.round((staticHeaderRows / scanH) * meta.h);
+                  const cleanH = meta.h - cutTop;
+                  const cw = meta.w % 2 === 0 ? meta.w : meta.w - 1;
                   const ch = cleanH % 2 === 0 ? cleanH : cleanH - 1;
-                  const cy = topY % 2 === 0 ? topY : topY + 1;
+                  const cy = cutTop % 2 === 0 ? cutTop : cutTop + 1;
                   finalCropFilter = `crop=${cw}:${ch}:0:${cy}`;
-                  console.log(`[Remotion DarkClips] 🎯 Retângulo do vídeo isolado: ${w}x${h} → ${finalCropFilter} (Topo cortado: ${topY}px, Base cortada: ${h - bottomY}px)`);
+                  console.log(`[Remotion DarkClips] 🎯 Cabeçalho estático isolado e removido: corte no topo de ${cutTop}px (${Math.round((cutTop / meta.h) * 100)}%). Conteúdo dinâmico preservado!`);
+                } else {
+                  console.log(`[Remotion DarkClips] ✅ Vídeo com conteúdo dinâmico integral detectado (sem cabeçalho estático congelado). Preservando 100% do quadro original!`);
                 }
               }
             } catch (scanErr) {
-              console.warn('[Remotion DarkClips] Aviso no scan de bordas:', scanErr.message);
+              console.warn('[Remotion DarkClips] Aviso na análise temporal:', scanErr.message);
             }
-          }
-
-          // Se for 9:16 e o scan falhou, aplica corte padrão de segurança para memes
-          if (!finalCropFilter && meta.h > meta.w) {
-            const cutTop = Math.round(meta.h * 0.24);
-            const cutBottom = Math.round(meta.h * 0.24);
-            const ch = meta.h - cutTop - cutBottom;
-            const cw = meta.w % 2 === 0 ? meta.w : meta.w - 1;
-            const cy = cutTop % 2 === 0 ? cutTop : cutTop + 1;
-            finalCropFilter = `crop=${cw}:${ch % 2 === 0 ? ch : ch - 1}:0:${cy}`;
-            console.log(`[Remotion DarkClips] 📐 Aplicando enquadramento central 16:9/4:3: ${finalCropFilter}`);
           }
 
           // Aplicar o corte físico ao arquivo de vídeo se necessário
