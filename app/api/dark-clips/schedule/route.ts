@@ -31,16 +31,21 @@ export async function GET() {
               if (dlRes.ok) {
                 const arrayBuf = await dlRes.arrayBuffer();
                 const buffer = Buffer.from(arrayBuf);
-                const filename = `rendered_darkclip_${post.id}.mp4`;
-                const permanentUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
-                await pool.query(
-                  'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
-                  ['rendered', permanentUrl, post.id]
-                );
-                post.status = 'rendered';
-                post.rendered_video_url = permanentUrl;
-                post.error_message = undefined;
-                break;
+                // Valida integridade do MP4: tamanho mínimo e presença do átomo 'moov'
+                if (buffer.length > 10000 && buffer.includes(Buffer.from('moov'))) {
+                  const filename = `rendered_darkclip_${post.id}.mp4`;
+                  const permanentUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                  await pool.query(
+                    'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
+                    ['rendered', permanentUrl, post.id]
+                  );
+                  post.status = 'rendered';
+                  post.rendered_video_url = permanentUrl;
+                  post.error_message = undefined;
+                  break;
+                } else {
+                  console.log(`[DarkClips Reconcile] ⏳ Arquivo detectado para ${post.id}, mas ainda sem átomo 'moov'. Aguardando...`);
+                }
               }
             }
           } catch (e) {}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Sparkles,
   Download,
@@ -65,13 +65,21 @@ import {
 
 function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: string }) {
   const [downloading, setDownloading] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const effectiveUrl = useMemo(() => {
+    if (!videoUrl) return '';
+    const sep = videoUrl.includes('?') ? '&' : '?';
+    return `${videoUrl}${sep}cb=${retryCount > 0 ? retryCount : '1'}`;
+  }, [videoUrl, retryCount]);
 
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDownloading(true);
     try {
-      const res = await fetch(videoUrl);
+      const res = await fetch(effectiveUrl);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -82,7 +90,7 @@ function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: str
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(videoUrl, "_blank");
+      window.open(effectiveUrl, "_blank");
     } finally {
       setDownloading(false);
     }
@@ -90,7 +98,7 @@ function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: str
 
   return (
     <div className="flex items-center gap-1.5">
-      <Dialog>
+      <Dialog onOpenChange={(open) => { if (open) { setVideoError(false); } }}>
         <DialogTrigger asChild>
           <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold">
             <Play className="h-3 w-3 fill-current" />
@@ -115,14 +123,36 @@ function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: str
             </Button>
           </DialogHeader>
           <div className="aspect-[9/16] max-h-[75vh] w-full bg-black flex items-center justify-center p-2">
-            <video
-              src={videoUrl}
-              controls
-              autoPlay
-              playsInline
-              preload="auto"
-              className="w-full h-full max-h-[72vh] object-contain rounded-xl shadow-lg"
-            />
+            {videoError ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center gap-3">
+                <AlertCircle className="h-8 w-8 text-amber-400" />
+                <p className="text-xs text-muted-foreground">Não foi possível carregar a reprodução direta no navegador.</p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setVideoError(false); setRetryCount((c) => c + 1); }}
+                    className="text-xs gap-1 border-primary/40 text-primary"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Tentar Novamente
+                  </Button>
+                  <Button size="sm" onClick={handleDownload} className="text-xs gap-1">
+                    <Download className="h-3 w-3" /> Baixar MP4
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <video
+                key={effectiveUrl}
+                src={effectiveUrl}
+                controls
+                autoPlay
+                playsInline
+                preload="auto"
+                onError={() => setVideoError(true)}
+                className="w-full h-full max-h-[72vh] object-contain rounded-xl shadow-lg"
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>

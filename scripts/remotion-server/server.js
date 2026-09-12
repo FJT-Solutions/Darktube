@@ -273,6 +273,8 @@ async function handleDarkClipsRender(req, res) {
       delayRenderTimeoutInMilliseconds: 300_000,
     });
 
+    const stagingFilePath = path.join(OUTPUT_DIR, `staging_${outputFileName}`);
+
     const concurrency = Math.max(1, Math.min(parseInt(process.env.RENDER_CONCURRENCY || '6', 10), 8));
     console.log(`[Remotion DarkClips] Renderizando ${comp.id} (${durationInFrames} frames, concorrência: ${concurrency})...`);
 
@@ -280,7 +282,7 @@ async function handleDarkClipsRender(req, res) {
     await renderMedia({
       composition: comp,
       serveUrl,
-      outputLocation: outputFilePath,
+      outputLocation: stagingFilePath,
       codec: 'h264',
       concurrency,
       maxRetries: 3,
@@ -308,17 +310,24 @@ async function handleDarkClipsRender(req, res) {
     });
 
     // Garante compatibilidade 100% universal com navegadores, iOS, Android e Windows Media Player (+faststart e yuv420p)
-    const faststartFilePath = path.join(OUTPUT_DIR, `play_${outputFileName}`);
+    // O arquivo final (outputFilePath) SÓ existirá após esta etapa, prevenindo downloads prematuros durante a renderização
     try {
-      console.log(`[Remotion DarkClips] Formatando MP4 com yuv420p +faststart...`);
-      execSync(`ffmpeg -i "${outputFilePath}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 192k -y "${faststartFilePath}"`, { timeout: 180000 });
-      if (fs.existsSync(faststartFilePath) && fs.statSync(faststartFilePath).size > 1000) {
-        fs.unlinkSync(outputFilePath);
-        fs.renameSync(faststartFilePath, outputFilePath);
+      console.log(`[Remotion DarkClips] Formatando MP4 com yuv420p +faststart para arquivo final...`);
+      execSync(`ffmpeg -i "${stagingFilePath}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 192k -y "${outputFilePath}"`, { timeout: 180000 });
+      if (fs.existsSync(outputFilePath) && fs.statSync(outputFilePath).size > 1000) {
+        try { fs.unlinkSync(stagingFilePath); } catch (_) {}
         console.log(`[Remotion DarkClips] ✅ MP4 formatado com yuv420p +faststart para compatibilidade universal!`);
+      } else {
+        if (fs.existsSync(stagingFilePath)) {
+          fs.renameSync(stagingFilePath, outputFilePath);
+          console.warn(`[Remotion DarkClips] ⚠️ Usando staging como fallback para outputFilePath`);
+        }
       }
     } catch (postErr) {
       console.warn(`[Remotion DarkClips] Aviso no pós-processamento faststart:`, postErr.message);
+      if (fs.existsSync(stagingFilePath)) {
+        fs.renameSync(stagingFilePath, outputFilePath);
+      }
     }
 
     const videoUrl = STORAGE_BASE_URL

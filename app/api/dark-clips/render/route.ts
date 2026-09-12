@@ -262,14 +262,19 @@ export async function POST(req: Request) {
               if (dlRes.ok) {
                 const arrayBuf = await dlRes.arrayBuffer();
                 const buffer = Buffer.from(arrayBuf);
-                const filename = `rendered_darkclip_${initialPost.id}.mp4`;
-                renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
-                await pool.query(
-                  'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
-                  ['rendered', renderedVideoUrl, initialPost.id]
-                );
-                console.log(`[DarkClips Render] 🎉 Render salvo com sucesso no DarkTube após polling: ${renderedVideoUrl}`);
-                break;
+                // Valida integridade do MP4: tamanho mínimo e presença do átomo 'moov'
+                if (buffer.length > 10000 && buffer.includes(Buffer.from('moov'))) {
+                  const filename = `rendered_darkclip_${initialPost.id}.mp4`;
+                  renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                  await pool.query(
+                    'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
+                    ['rendered', renderedVideoUrl, initialPost.id]
+                  );
+                  console.log(`[DarkClips Render] 🎉 Render íntegro salvo com sucesso no DarkTube após polling: ${renderedVideoUrl}`);
+                  break;
+                } else {
+                  console.log(`[DarkClips Render] ⏳ Arquivo detectado (${buffer.length} bytes), mas ainda sem átomo 'moov'. Aguardando finalização do Remotion...`);
+                }
               }
             }
           } catch (pollErr: any) {}

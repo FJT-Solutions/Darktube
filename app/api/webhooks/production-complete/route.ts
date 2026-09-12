@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db-client';
+import { uploadMediaFile } from '@/lib/storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,13 +56,45 @@ export async function POST(req: NextRequest) {
     // Atualizar dark_clips_posts caso o historyId pertença a um render de Dark Clips
     try {
       if (isValidUuid(historyId)) {
+        let finalVideoUrl = videoUrl;
+        if (status === 'completed' && videoUrl) {
+          try {
+            const CANDIDATE_URLS = [
+              'http://n8n-remotionservice-ry6eh9:3001',
+              process.env.REMOTION_SERVICE_URL?.replace(/\/render$/, ''),
+              process.env.REMOTION_SERVER_URL,
+              'http://localhost:3001',
+            ].filter(Boolean) as string[];
+
+            const cleanPath = videoUrl.startsWith('http') ? new URL(videoUrl).pathname : videoUrl;
+            for (const base of CANDIDATE_URLS) {
+              const fetchUrl = `${base.replace(/\/+$/, '')}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+              try {
+                const checkRes = await fetch(fetchUrl);
+                if (checkRes.ok) {
+                  const arrayBuf = await checkRes.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuf);
+                  if (buffer.length > 10000 && buffer.includes(Buffer.from('moov'))) {
+                    const filename = `rendered_darkclip_${historyId}.mp4`;
+                    finalVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
+                    console.log(`[Production Webhook] ✅ Vídeo final persistido com sucesso no storage DB: ${finalVideoUrl}`);
+                    break;
+                  }
+                }
+              } catch (_) {}
+            }
+          } catch (persistErr) {
+            console.warn('[Production Webhook] Falha ao persistir vídeo no storage_files:', persistErr);
+          }
+        }
+
         await pool.query(
           `UPDATE public.dark_clips_posts SET
             status = $1,
             rendered_video_url = COALESCE($2, rendered_video_url),
             error_message = $3
            WHERE id = $4`,
-          [status === 'completed' ? 'rendered' : 'failed', videoUrl || null, error || null, historyId]
+          [status === 'completed' ? 'rendered' : 'failed', finalVideoUrl || null, error || null, historyId]
         );
       }
     } catch (dcErr) {
