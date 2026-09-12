@@ -198,7 +198,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     borderRadius = 24,
     hasShadow = true,
     aspectRatio = 'auto',
-    fitMode = 'cover',
+    fitMode = 'contain',
     fit_mode,
     zoom = 100,
     cropTop = 0,
