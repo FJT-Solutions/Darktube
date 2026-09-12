@@ -217,10 +217,12 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   const activePanY = pan_y ?? panY ?? 0;
   const activePanX = pan_x ?? panX ?? 0;
 
-  // Priorização 100% do vídeo: expande a área limpa da cena eliminando textos do topo e base
+  const isContain = activeFitMode === 'contain';
+
+  // Priorização do vídeo: em modo cover com corte, expande a área limpa eliminando bordas indesejadas
   const visibleHeightRatio = Math.max(0.2, (100 - activeCropTop - activeCropBottom) / 100);
-  const autoExpandZoom = (activeCropTop > 0 || activeCropBottom > 0) ? (1 / visibleHeightRatio) : 1;
-  const autoShiftY = (activeCropTop > 0 || activeCropBottom > 0)
+  const autoExpandZoom = (!isContain && (activeCropTop > 0 || activeCropBottom > 0)) ? (1 / visibleHeightRatio) : 1;
+  const autoShiftY = (!isContain && (activeCropTop > 0 || activeCropBottom > 0))
     ? -((activeCropTop - activeCropBottom) / 2)
     : 0;
 
@@ -585,7 +587,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 : aspectRatio === '9:16'
                 ? '9/16'
                 : undefined,
-            maxHeight: '62%',
+            maxHeight: aspectRatio === '9:16' ? '74%' : aspectRatio === '4:5' ? '68%' : '62%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -603,7 +605,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 clipPath:
-                  activeCropTop > 0 || activeCropBottom > 0
+                  !isContain && (activeCropTop > 0 || activeCropBottom > 0)
                     ? `inset(${activeCropTop}% 0% ${activeCropBottom}% 0%)`
                     : undefined,
               }}

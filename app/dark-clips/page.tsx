@@ -1189,8 +1189,7 @@ export default function DarkClipsPage() {
       }
 
       toast.loading(`🎬 Renderizando vídeo 9:16 (1080x1920) no Remotion...`, { id: renderToastId });
-      // Cap: Dark Clips são memes curtos — max 15s independente da duração do vídeo fonte
-      const clipDuration = Math.min(clipToRender.duration || 15, 15);
+      const clipDuration = clipToRender.duration || 30;
       const res = await fetch("/api/dark-clips/render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2475,10 +2474,65 @@ export default function DarkClipsPage() {
                       </p>
                     </div>
 
-                    {/* Posição Y */}
+                    {/* Modo de Enquadramento (Fit Mode) */}
+                    <div className="space-y-1.5 pt-1 border-t border-border/40">
+                      <Label className="text-xs font-semibold">Modo de Enquadramento</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={(videoPlacement.fitMode || "cover") === "cover" ? "default" : "outline"}
+                          onClick={() => setVideoPlacement((v) => ({ ...v, fitMode: "cover" }))}
+                          className="text-xs h-8 font-semibold"
+                        >
+                          🖼️ Preencher Moldura (Cover)
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={videoPlacement.fitMode === "contain" ? "default" : "outline"}
+                          onClick={() => setVideoPlacement((v) => ({ ...v, fitMode: "contain" }))}
+                          className="text-xs h-8 font-semibold"
+                        >
+                          📐 Vídeo Inteiro (Contain)
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        {videoPlacement.fitMode === "contain"
+                          ? "Mostra 100% do vídeo original dentro da moldura, sem nenhum corte."
+                          : "Preenche toda a moldura da janela central. Use o Deslocamento Y abaixo se precisar ajustar o enquadramento."}
+                      </p>
+                    </div>
+
+                    {/* Proporção da Moldura (Aspect Ratio) */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold">Proporção da Moldura Central</Label>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                          { id: "auto", label: "Auto" },
+                          { id: "4:5", label: "4:5" },
+                          { id: "1:1", label: "1:1" },
+                          { id: "9:16", label: "9:16" },
+                          { id: "16:9", label: "16:9" },
+                        ].map((ar) => (
+                          <Button
+                            key={ar.id}
+                            type="button"
+                            size="sm"
+                            variant={(videoPlacement.aspectRatio || "auto") === ar.id ? "default" : "outline"}
+                            onClick={() => setVideoPlacement((v) => ({ ...v, aspectRatio: ar.id }))}
+                            className="text-xs h-7 px-1 font-mono font-bold"
+                          >
+                            {ar.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Posição Y da Moldura */}
                     <div className="space-y-1.5 pt-1 border-t border-border/40">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold">Posição Vertical do Vídeo (Y)</span>
+                        <span className="font-semibold">Posição Vertical da Moldura (Y)</span>
                         <div className="flex items-center gap-1">
                           <Input
                             type="number"
@@ -2506,7 +2560,7 @@ export default function DarkClipsPage() {
                     {/* Escala */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold">Tamanho / Escala do Vídeo</span>
+                        <span className="font-semibold">Tamanho / Largura da Moldura</span>
                         <div className="flex items-center gap-1">
                           <Input
                             type="number"
@@ -2529,6 +2583,37 @@ export default function DarkClipsPage() {
                         step={1}
                         onValueChange={([scale]) => setVideoPlacement((v) => ({ ...v, scale }))}
                       />
+                    </div>
+
+                    {/* Deslocamento Vertical do Vídeo (Pan Y) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold">Ajuste de Enquadramento Vertical (Pan Y)</span>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={videoPlacement.panY || 0}
+                            onChange={(e) =>
+                              setVideoPlacement((v) => ({
+                                ...v,
+                                panY: e.target.value === "" ? 0 : Number(e.target.value),
+                              }))
+                            }
+                            className="w-16 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                          />
+                          <span className="text-[11px] font-mono text-primary font-bold">%</span>
+                        </div>
+                      </div>
+                      <Slider
+                        value={[Math.min(50, Math.max(-50, videoPlacement.panY || 0))]}
+                        min={-50}
+                        max={50}
+                        step={1}
+                        onValueChange={([panY]) => setVideoPlacement((v) => ({ ...v, panY }))}
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        Permite subir ou descer a cena interna para focar no rosto ou ação sem cortar detalhes.
+                      </p>
                     </div>
 
                     {/* Bordas Arredondadas */}

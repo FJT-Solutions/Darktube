@@ -12,12 +12,6 @@ export interface SubtitleWord {
   endInSeconds: number;
 }
 
-export interface DarkClipsVideoProps {
-  videoUrl?: string;
-  durationInSeconds?: number;
-  endInSeconds: number;
-}
-
 /**
  * Estilo de animação Ken Burns e Motion OS por cena.
  */
@@ -227,3 +221,153 @@ export interface ScriptSegmentMedia {
   voiceoverText?: string;
   imagePrompt?: string;
 }
+
+// ─────────────────────────────────────────────
+// Dark Clips Remotion Types
+// ─────────────────────────────────────────────
+
+export interface DarkClipsVideoProps {
+  videoUrl?: string;
+  durationInSeconds?: number;
+  muted?: boolean;
+  
+  // Header
+  profileHeader?: {
+    avatarUrl?: string;
+    name?: string;
+    handle?: string;
+    badgeType?: 'none' | 'blue' | 'gold' | 'gray';
+    showHeader?: boolean;
+    paddingTop?: number;
+    yOffset?: number;
+    textAlign?: 'left' | 'center' | 'right';
+    scale?: number; // 50 to 180 percentage
+    avatarSize?: number; // px
+    fontSize?: number; // px
+  };
+
+  // Headline
+  headline?: {
+    mainText?: string;
+    subText?: string;
+    showMainText?: boolean;
+    showSubText?: boolean;
+    fontFamily?: string;
+    mainTextFontFamily?: string;
+    subTextFontFamily?: string;
+    fontSize?: number;
+    mainTextFontSize?: number;
+    subTextFontSize?: number;
+    primaryColor?: string; // e.g. '#FACC15'
+    secondaryColor?: string; // e.g. '#FFFFFF'
+    textAlign?: 'left' | 'center' | 'right';
+    mainTextAlign?: 'left' | 'center' | 'right';
+    subTextAlign?: 'left' | 'center' | 'right';
+    uppercase?: boolean;
+    mainTextUppercase?: boolean;
+    subTextUppercase?: boolean;
+    textShadow?: boolean;
+    yOffset?: number;
+    mainTextYOffset?: number; // percentage or px
+    subTextYOffset?: number; // percentage or px
+  };
+
+  // Watermark / Marca d'água
+  watermark?: {
+    enabled?: boolean;
+    type?: 'text' | 'image' | 'both';
+    shape?: 'circle' | 'rounded' | 'square';
+    text?: string;
+    imageUrl?: string;
+    position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom';
+    textPosition?: 'right' | 'left' | 'top' | 'bottom';
+    xOffset?: number; // 0 - 100 percentage
+    yOffset?: number; // 0 - 100 percentage
+    opacity?: number; // 10 - 100 percentage
+    fontSize?: number; // px
+    imageSize?: number; // px
+    scale?: number; // 50 - 180 percentage
+    color?: string;
+    hasShadow?: boolean;
+    borderWidth?: number; // px
+    borderColor?: string;
+  };
+
+  // Video Placement
+  videoPlacement?: {
+    yOffset?: number; // 0 - 100 percentage
+    scale?: number; // 50 - 100 percentage
+    borderRadius?: number; // px
+    hasShadow?: boolean;
+    aspectRatio?: string; // 'auto' | '1:1' | '4:5' | '9:16' | '16:9' | '4:3'
+    fitMode?: 'contain' | 'cover';
+    fit_mode?: 'contain' | 'cover';
+    zoom?: number; // 100 - 250 percentage
+    cropTop?: number; // 0 - 50 percentage
+    crop_top?: number;
+    cropBottom?: number; // 0 - 50 percentage
+    crop_bottom?: number;
+    panY?: number; // -50 - 50 percentage
+    pan_y?: number;
+    panX?: number; // -50 - 50 percentage
+    pan_x?: number;
+  };
+
+  // Background
+  background?: {
+    type?: 'black' | 'white' | 'blur' | 'gradient' | 'neon' | 'zinc' | 'color';
+    blurIntensity?: number;
+    overlayOpacity?: number;
+    customColor?: string;
+  };
+
+  // Footer / CTA
+  footer?: {
+    showFooter?: boolean;
+    text?: string;
+    fontSize?: number;
+    color?: string;
+    yOffset?: number;
+    textAlign?: 'left' | 'center' | 'right';
+    scale?: number;
+  };
+
+  // Setas Animadas / Indicadores de Ação (Único ou Múltiplos Containers)
+  arrows?: DarkClipArrowItem;
+  arrowsList?: DarkClipArrowItem[];
+}
+
+export type DarkClipArrowType = 
+  | 'chevron'
+  | 'stem'
+  | 'block'
+  | 'curved'
+  | 'pointer'
+  | 'target'
+  | 'cursor'
+  | 'double'
+  | 'doodle'
+  | 'circle-arrow';
+
+export interface DarkClipArrowItem {
+  id?: string;
+  enabled?: boolean;
+  arrowType?: DarkClipArrowType;
+  arrow_type?: DarkClipArrowType;
+  direction?: 'right' | 'left' | 'up' | 'down' | 'down-right' | 'up-right';
+  rotation?: number; // 0 to 360 degrees
+  style?: 'bounce' | 'pulse' | 'trail';
+  count?: number;
+  xOffset?: number;
+  x_offset?: number;
+  yOffset?: number;
+  y_offset?: number;
+  color?: string;
+  emojiSkinTone?: 'default' | 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark';
+  size?: number;
+  scale?: number;
+  text?: string;
+  textColor?: string;
+  text_color?: string;
+}
+
