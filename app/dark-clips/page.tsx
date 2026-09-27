@@ -210,6 +210,19 @@ const ARROW_SHAPE_OPTIONS = [
   { id: "circle-arrow", label: "Botão Circular", icon: "🔘" },
 ] as const;
 
+function isValidVideoUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return false;
+  }
+  return (
+    trimmed.startsWith('/api/storage/') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://')
+  );
+}
+
 export default function DarkClipsPage() {
   // Main Tab Navigation: "modeler" (🎨 Layout & Templates) | "creation" (🎬 Criação & Clipes)
   const [activeTab, setActiveTab] = useState<"modeler" | "creation">("modeler");
@@ -1232,7 +1245,17 @@ export default function DarkClipsPage() {
     }
   }
 
-  async function handleRender(targetClip?: DarkClip) {
+  async function handleRender(
+    targetClip?: DarkClip,
+    scheduleOptions?: {
+      targetAccounts?: string[];
+      facebookPageId?: string;
+      dispatchNow?: boolean;
+      scheduledAt?: string;
+      postCaption?: string;
+      postHashtags?: string[];
+    }
+  ) {
     const clipToRender = targetClip || selectedClip;
     if (!clipToRender?.video_url) {
       toast.error("Selecione um clipe de vídeo para renderizar.");
@@ -1289,6 +1312,12 @@ export default function DarkClipsPage() {
           clipId: clipToRender.id,
           title: currentHeadline.mainText || "Dark Clip Meme",
           durationInSeconds: clipDuration,
+          targetAccounts: scheduleOptions?.targetAccounts || [],
+          facebookPageId: scheduleOptions?.facebookPageId,
+          dispatchNow: scheduleOptions?.dispatchNow ?? false,
+          scheduledAt: scheduleOptions?.scheduledAt,
+          postCaption: scheduleOptions?.postCaption || postCaption,
+          postHashtags: scheduleOptions?.postHashtags || postHashtags,
           inputProps: {
             videoUrl: clipToRender.video_url,
             durationInSeconds: clipDuration,
@@ -1305,14 +1334,14 @@ export default function DarkClipsPage() {
             headline_main: currentHeadline.mainText,
             headline_sub: currentHeadline.subText,
             cta_text: currentFooter.text,
-            post_caption: postCaption,
-            hashtags: postHashtags,
+            post_caption: scheduleOptions?.postCaption || postCaption,
+            hashtags: scheduleOptions?.postHashtags || postHashtags,
           },
         }),
       });
       const data = await res.json();
       if (data.success) {
-        if (data.videoUrl) {
+        if (data.videoUrl && isValidVideoUrl(data.videoUrl)) {
           setRenderedUrl(data.videoUrl);
           toast.success("🎉 Vídeo MP4 1080x1920 renderizado com sucesso!", { id: renderToastId });
         } else {
@@ -1348,28 +1377,51 @@ export default function DarkClipsPage() {
     }
 
     setIsPublishingNow(true);
-    const toastId = dispatchNow ? toast.loading("🚀 Preparando vídeo e despachando publicação...") : undefined;
+    const toastId = toast.loading(dispatchNow ? "🚀 Preparando vídeo e despachando publicação..." : "📅 Salvando agendamento...");
 
     try {
-      let finalVideoUrl = renderedUrl;
-      if (!finalVideoUrl) {
-        if (toastId) toast.loading("Renderizando clipe em 1080x1920 antes de publicar...", { id: toastId });
-        finalVideoUrl = await handleRender(selectedClip);
-        if (!finalVideoUrl) {
-          if (toastId) toast.error("Não foi possível renderizar o vídeo para postagem.", { id: toastId });
+      const scheduledDateTime = scheduleDate && scheduleTime ? `${scheduleDate}T${scheduleTime}:00` : new Date().toISOString();
+
+      // Caso 1: O vídeo AINDA NÃO está renderizado
+      // Dispara a produção no Remotion já vinculada às redes e agendamento.
+      // O backend cria APENAS UM post no banco e despacha automaticamente para as redes sociais assim que o Remotion terminar.
+      if (!isValidVideoUrl(renderedUrl)) {
+        toast.loading("🎬 Renderizando clipe em 1080x1920 no Remotion antes de publicar...", { id: toastId });
+        const renderResult = await handleRender(selectedClip, {
+          targetAccounts,
+          facebookPageId: selectedFacebookPage,
+          dispatchNow,
+          scheduledAt: scheduledDateTime,
+          postCaption,
+          postHashtags,
+        });
+
+        if (!renderResult) {
+          toast.error("Não foi possível iniciar a produção do vídeo para postagem.", { id: toastId });
           setIsPublishingNow(false);
           return;
         }
+
+        if (dispatchNow) {
+          toast.success("🚀 Produção iniciada! O vídeo será postado no Facebook/redes automaticamente assim que o Remotion concluir a produção.", { id: toastId });
+        } else {
+          toast.success("📅 Produção iniciada! O clipe ficará agendado para postagem após o término do render.", { id: toastId });
+        }
+        setIsPublishingNow(false);
+        return;
       }
 
-      const scheduledDateTime = scheduleDate && scheduleTime ? `${scheduleDate}T${scheduleTime}:00` : new Date().toISOString();
+      // Caso 2: O vídeo JÁ FOI renderizado (possui renderedUrl válido)
+      // Atualiza o registro existente no banco e despacha imediatamente
+      const existingPost = scheduledPosts.find((p) => (p.rendered_video_url && p.rendered_video_url === renderedUrl) || p.clip_id === selectedClip.id);
       const res = await fetch("/api/dark-clips/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          postId: existingPost?.id,
           clipId: selectedClip.id,
           title: headline.mainText || "Meme Dark Clips",
-          renderedVideoUrl: finalVideoUrl,
+          renderedVideoUrl: renderedUrl,
           remodelData: {
             headline_main: headline.mainText,
             headline_sub: headline.subText,
@@ -1392,11 +1444,10 @@ export default function DarkClipsPage() {
         }
         fetchInitialData();
       } else {
-        if (toastId) toast.error(data.error || "Erro ao despachar publicação.", { id: toastId });
+        toast.error(data.error || "Erro ao despachar publicação.", { id: toastId });
       }
     } catch {
-      if (toastId) toast.error("Erro ao salvar agendamento.", { id: toastId });
-      else toast.error("Erro ao salvar agendamento.");
+      toast.error("Erro ao salvar agendamento.", { id: toastId });
     } finally {
       setIsPublishingNow(false);
     }
@@ -4307,7 +4358,7 @@ export default function DarkClipsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       {clips.map((clip) => {
                         const isSelected = selectedClip?.id === clip.id;
-                        const renderedPost = scheduledPosts.find((p) => p.clip_id === clip.id && p.rendered_video_url);
+                        const renderedPost = scheduledPosts.find((p) => p.clip_id === clip.id && isValidVideoUrl(p.rendered_video_url));
 
                         return (
                           <div
@@ -4321,8 +4372,8 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
-                                  if (renderedPost?.rendered_video_url) {
-                                    setRenderedUrl(renderedPost.rendered_video_url);
+                                  if (isValidVideoUrl(renderedPost?.rendered_video_url)) {
+                                    setRenderedUrl(renderedPost!.rendered_video_url!);
                                   } else {
                                     setRenderedUrl(null);
                                   }
@@ -4357,7 +4408,7 @@ export default function DarkClipsPage() {
                                 >
                                   {clip.platform === 'upload' ? '📁 UPLOAD' : clip.platform}
                                 </Badge>
-                                {renderedPost?.rendered_video_url && (
+                                {isValidVideoUrl(renderedPost?.rendered_video_url) && (
                                   <Badge className="absolute top-1 right-1 text-[8px] px-1.5 py-0 bg-emerald-600 text-white font-bold shadow-sm">
                                     ✓ PRONTO
                                   </Badge>
@@ -4384,8 +4435,8 @@ export default function DarkClipsPage() {
                                 onClick={() => {
                                   setSelectedClip(clip);
                                   if (clip.video_url) setSampleVideoUrl(clip.video_url);
-                                  if (renderedPost?.rendered_video_url) {
-                                    setRenderedUrl(renderedPost.rendered_video_url);
+                                  if (isValidVideoUrl(renderedPost?.rendered_video_url)) {
+                                    setRenderedUrl(renderedPost!.rendered_video_url!);
                                   } else {
                                     setRenderedUrl(null);
                                   }
@@ -4407,9 +4458,9 @@ export default function DarkClipsPage() {
                                 {isSelected ? "Selecionado ✓" : "Selecionar"}
                               </Button>
 
-                              {renderedPost?.rendered_video_url && (
+                              {isValidVideoUrl(renderedPost?.rendered_video_url) && (
                                 <DarkClipsVideoModal
-                                  videoUrl={renderedPost.rendered_video_url}
+                                  videoUrl={renderedPost!.rendered_video_url!}
                                   title={clip.author_handle || "Dark Clip 9:16"}
                                 />
                               )}
@@ -4840,15 +4891,15 @@ export default function DarkClipsPage() {
                                 )}
 
                                 {/* Assistir Prévia do Vídeo MP4 */}
-                                {post.rendered_video_url && (
+                                {isValidVideoUrl(post.rendered_video_url) && (
                                   <DarkClipsVideoModal
-                                    videoUrl={post.rendered_video_url}
+                                    videoUrl={post.rendered_video_url!}
                                     title={post.title || "Dark Clip 9:16"}
                                   />
                                 )}
 
                                 {/* Carregar no Estúdio de Agendamento */}
-                                {post.rendered_video_url && (
+                                {isValidVideoUrl(post.rendered_video_url) && (
                                   <Button
                                     size="sm"
                                     variant="outline"

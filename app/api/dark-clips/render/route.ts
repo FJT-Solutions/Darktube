@@ -7,6 +7,7 @@ import { VideoCaptureService } from '@/lib/video-capture';
 import { sanitizeVideo } from '@/lib/video-sanitizer';
 import { generateAiRemodelForClip } from '../remodel-ai/route';
 import { logger } from '@/lib/logger';
+import { triggerSocialDispatcher } from '@/lib/social-dispatcher';
 import fs from 'fs';
 import path from 'path';
 
@@ -35,6 +36,12 @@ export async function POST(req: Request) {
       inputProps,
       durationInSeconds = 15,
       remodelData,
+      targetAccounts = [],
+      facebookPageId,
+      dispatchNow = false,
+      scheduledAt,
+      postCaption,
+      postHashtags,
     } = body;
 
     if (!inputProps || !inputProps.videoUrl) {
@@ -153,18 +160,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // 1. Criar registro imediato no Histórico de Produções com status 'rendering'
+    // 1. Criar registro imediato no Histórico de Produções
     const postTitle = title || finalRemodelData.headline_main || clipRecord?.author_handle || 'Dark Clip Render';
+    const isFutureSchedule = Boolean(scheduledAt && new Date(scheduledAt) > new Date());
+    const initialStatus = dispatchNow ? 'publishing' : (isFutureSchedule ? 'scheduled' : 'rendering');
+
     const initialPost = await saveDarkClipPost({
       user_id: user?.id,
       clip_id: clipId,
       title: postTitle,
-      remodel_data: finalRemodelData || {
-        headline_main: inputProps.headline?.mainText,
-        headline_sub: inputProps.headline?.subText,
-        cta_text: inputProps.footer?.text,
+      remodel_data: {
+        ...(finalRemodelData || {}),
+        headline_main: inputProps.headline?.mainText || finalRemodelData?.headline_main,
+        headline_sub: inputProps.headline?.subText || finalRemodelData?.headline_sub,
+        cta_text: inputProps.footer?.text || finalRemodelData?.cta_text,
+        post_caption: postCaption || finalRemodelData?.post_caption,
+        hashtags: postHashtags || finalRemodelData?.hashtags,
+        facebook_page_id: facebookPageId,
+        dispatch_now: Boolean(dispatchNow),
       },
-      status: 'rendering',
+      status: initialStatus,
+      target_accounts: targetAccounts || [],
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : new Date().toISOString(),
     });
 
     const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://darktube.fjt-solutions.com'}/api/webhooks/production-complete`;
@@ -174,6 +191,42 @@ export async function POST(req: Request) {
       let renderedVideoUrl = '';
       let lastError = '';
       let activeBaseUrl = '';
+
+      const finalizeRenderedPost = async (url: string) => {
+        renderedVideoUrl = url;
+        const shouldDispatch = Boolean(
+          (initialStatus === 'publishing' || dispatchNow || (initialStatus === 'scheduled' && (!scheduledAt || new Date(scheduledAt) <= new Date()))) &&
+          targetAccounts && targetAccounts.length > 0
+        );
+        const nextStatus = shouldDispatch ? 'publishing' : (initialStatus === 'scheduled' ? 'scheduled' : 'rendered');
+        await pool.query(
+          'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
+          [nextStatus, url, initialPost.id]
+        );
+        if (shouldDispatch) {
+          logger.info(`Iniciando auto-dispatch para ${initialPost.id} após render...`, { context: 'Render' });
+          await triggerSocialDispatcher({
+            post: {
+              ...initialPost,
+              status: 'publishing',
+              rendered_video_url: url,
+              target_accounts: targetAccounts,
+              remodel_data: {
+                ...initialPost.remodel_data,
+                facebook_page_id: facebookPageId,
+                post_caption: postCaption,
+                hashtags: postHashtags,
+              },
+            },
+            videoUrl: url,
+            targetAccounts,
+            facebookPageId,
+            caption: postCaption,
+            hashtags: postHashtags,
+            title: postTitle,
+          });
+        }
+      };
 
       // ── Enquadramento de Vídeo ──
       // Respeita os parâmetros manuais do usuário. A detecção temporal de cabeçalhos estáticos
@@ -232,11 +285,7 @@ export async function POST(req: Request) {
               }
 
               if (renderedVideoUrl) {
-                await saveDarkClipPost({
-                  id: initialPost.id,
-                  rendered_video_url: renderedVideoUrl,
-                  status: 'rendered',
-                });
+                await finalizeRenderedPost(renderedVideoUrl);
                 break;
               }
             }
@@ -272,10 +321,7 @@ export async function POST(req: Request) {
                 if (buffer.length > 10000 && buffer.includes(Buffer.from('moov'))) {
                   const filename = `rendered_darkclip_${initialPost.id}.mp4`;
                   renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
-                  await pool.query(
-                    'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
-                    ['rendered', renderedVideoUrl, initialPost.id]
-                  );
+                  await finalizeRenderedPost(renderedVideoUrl);
                   logger.success(`Render íntegro salvo com sucesso após polling`, { context: 'Render', data: { renderedVideoUrl } });
                   break;
                 } else {

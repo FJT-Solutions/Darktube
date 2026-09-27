@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db-client';
 import { uploadMediaFile } from '@/lib/storage';
+import { triggerSocialDispatcher } from '@/lib/social-dispatcher';
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,14 +89,32 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        await pool.query(
+        const dcUpdate = await pool.query(
           `UPDATE public.dark_clips_posts SET
             status = $1,
             rendered_video_url = COALESCE($2, rendered_video_url),
             error_message = $3
-           WHERE id = $4`,
+           WHERE id = $4
+           RETURNING *`,
           [status === 'completed' ? 'rendered' : 'failed', finalVideoUrl || null, error || null, historyId]
         );
+
+        if (status === 'completed' && dcUpdate.rows.length > 0 && finalVideoUrl) {
+          const postRow = dcUpdate.rows[0];
+          const targets = typeof postRow.target_accounts === 'string' ? JSON.parse(postRow.target_accounts) : (postRow.target_accounts || []);
+          const remodel = typeof postRow.remodel_data === 'string' ? JSON.parse(postRow.remodel_data) : (postRow.remodel_data || {});
+          const shouldDispatch = Boolean(
+            targets.length > 0 &&
+            (postRow.status === 'publishing' || remodel.dispatch_now || (postRow.status === 'scheduled' && (!postRow.scheduled_at || new Date(postRow.scheduled_at) <= new Date())))
+          );
+          if (shouldDispatch) {
+            console.log(`[Production Webhook] 🚀 Disparando publicação automática para ${historyId} (${targets.join(', ')})...`);
+            await triggerSocialDispatcher({
+              post: { ...postRow, target_accounts: targets, remodel_data: remodel, rendered_video_url: finalVideoUrl },
+              videoUrl: finalVideoUrl,
+            });
+          }
+        }
       }
     } catch (dcErr) {
       console.warn('[Production Webhook] Nota ao atualizar dark_clips_posts:', dcErr);

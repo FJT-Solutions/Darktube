@@ -51,10 +51,12 @@ def dispatch_uploads(
     delay_seconds: int = DEFAULT_STAGGER_DELAY_SECONDS,
     facebook_page_id: str = None
 ) -> Dict[str, Any]:
-    # Se video_path for uma URL ou rota relativa (/api/storage/...), baixa para arquivo local
-    temp_downloaded_file = None
-    if video_path.startswith("http://") or video_path.startswith("https://") or video_path.startswith("/api/"):
-        target_url = video_path if video_path.startswith("http") else f"http://localhost:3000{video_path}"
+    # Se video_path for um arquivo local existente no disco, usa diretamente
+    if Path(video_path).is_file():
+        video_file = Path(video_path).resolve()
+    elif video_path.startswith("http://") or video_path.startswith("https://") or video_path.startswith("/api/"):
+        base_site = os.environ.get("NEXTAUTH_URL") or os.environ.get("NEXT_PUBLIC_SITE_URL") or os.environ.get("NEXT_PUBLIC_APP_URL") or "http://localhost:3000"
+        target_url = video_path if video_path.startswith("http") else f"{base_site.rstrip('/')}{video_path if video_path.startswith('/') else '/' + video_path}"
         print(f"[*] Baixando vídeo para arquivo local de: {target_url}...")
         try:
             import urllib.request
@@ -62,10 +64,13 @@ def dispatch_uploads(
             temp_dir.mkdir(parents=True, exist_ok=True)
             temp_downloaded_file = temp_dir / f"dispatch_{int(time.time())}.mp4"
             urllib.request.urlretrieve(target_url, str(temp_downloaded_file))
+            if not temp_downloaded_file.exists() or temp_downloaded_file.stat().st_size < 10000:
+                size_b = temp_downloaded_file.stat().st_size if temp_downloaded_file.exists() else 0
+                raise ValueError(f"Arquivo baixado inválido ({size_b} bytes) de {target_url}. Verifique se o vídeo foi renderizado com sucesso.")
             video_file = temp_downloaded_file
             print(f"[*] Vídeo baixado com sucesso ({video_file.stat().st_size / (1024*1024):.2f} MB): {video_file.name}")
         except Exception as dl_err:
-            raise FileNotFoundError(f"Erro ao baixar vídeo da URL {target_url}: {dl_err}")
+            raise FileNotFoundError(f"Erro ao obter vídeo para upload: {dl_err}")
     else:
         video_file = Path(video_path).resolve()
         if not video_file.exists():
@@ -200,17 +205,44 @@ def main():
 
     # Se informado post_id e ao menos uma rede teve sucesso, atualiza status no banco
     if args.post_id and any(r.get("success") for r in results.values()):
-        try:
-            import urllib.request
-            req = urllib.request.Request(
-                "http://localhost:3000/api/dark-clips/schedule",
-                data=json.dumps({"action": "mark_published", "postId": args.post_id}).encode("utf-8"),
-                headers={"Content-Type": "application/json"}
-            )
-            urllib.request.urlopen(req, timeout=10)
-            print(f"[*] ✅ Status da publicação {args.post_id} atualizado para 'published' no banco!")
-        except Exception as upd_err:
-            print(f"[*] [!] Aviso ao atualizar status no banco: {upd_err}")
+        updated_db = False
+        db_url = os.environ.get("DATABASE_URL")
+        if db_url:
+            try:
+                import psycopg2
+                conn = psycopg2.connect(db_url)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE public.dark_clips_posts SET status = %s, published_at = NOW(), error_message = NULL WHERE id = %s",
+                    ("published", args.post_id)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                updated_db = True
+                print(f"[*] ✅ Status da publicação {args.post_id} atualizado para 'published' no PostgreSQL!")
+            except Exception as pg_err:
+                print(f"[*] [!] Aviso ao atualizar status no PostgreSQL diretamente: {pg_err}")
+
+        if not updated_db:
+            base_site = os.environ.get("NEXTAUTH_URL") or os.environ.get("NEXT_PUBLIC_SITE_URL") or os.environ.get("NEXT_PUBLIC_APP_URL") or "http://localhost:3000"
+            for candidate_base in [base_site, "http://localhost:3000", "http://127.0.0.1:3000"]:
+                try:
+                    import urllib.request
+                    endpoint = f"{candidate_base.rstrip('/')}/api/dark-clips/schedule"
+                    req = urllib.request.Request(
+                        endpoint,
+                        data=json.dumps({"action": "mark_published", "postId": args.post_id}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"}
+                    )
+                    urllib.request.urlopen(req, timeout=10)
+                    print(f"[*] ✅ Status da publicação {args.post_id} atualizado para 'published' via {endpoint}!")
+                    updated_db = True
+                    break
+                except Exception as upd_err:
+                    pass
+            if not updated_db:
+                print(f"[*] [!] Não foi possível notificar o endpoint de status da publicação {args.post_id}.")
 
     # Se ao menos uma rede teve sucesso, retorna código 0
     if any(r.get("success") for r in results.values()):
