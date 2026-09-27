@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db-client';
+import { logger } from '@/lib/logger';
 
 export async function GET(
   request: NextRequest,
@@ -103,7 +104,11 @@ export async function GET(
 
     return new NextResponse('File not found', { status: 404 });
   } catch (error: any) {
-    console.error('Error proxying video file stream:', error);
+    if (error?.code === 'ECONNRESET' || error?.message?.includes('aborted') || error?.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+      logger.debug('Cliente encerrou streaming de vídeo', { context: 'Storage' });
+      return new Response(null, { status: 499 });
+    }
+    logger.error('Error proxying video file stream:', error, { context: 'Storage' });
     return new NextResponse('Internal server error', { status: 500 });
   }
 }

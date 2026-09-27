@@ -1,0 +1,4 @@
+# Ignora todos os arquivos de sessão e credenciais sensíveis
+*
+!.gitignore
+!README.md

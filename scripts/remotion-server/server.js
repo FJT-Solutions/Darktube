@@ -5,6 +5,7 @@ const { renderMedia, selectComposition } = require('@remotion/renderer');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
+const { triggerSocialUpload } = require('./trigger-uploader');
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -335,6 +336,18 @@ async function handleDarkClipsRender(req, res) {
       : `/storage/${outputFileName}`;
 
     console.log(`[Remotion DarkClips] ✅ Render concluído: ${videoUrl}`);
+
+    // Disparo automático e autônomo para redes sociais (se solicitado)
+    if (req.body?.autoUpload || inputProps.autoUpload || process.env.AUTO_UPLOAD_SOCIAL === 'true') {
+      triggerSocialUpload({
+        outputFilePath,
+        title: inputProps.title || '',
+        caption: req.body?.uploadCaption || inputProps.uploadCaption || inputProps.title || '',
+        link: req.body?.uploadLink || inputProps.uploadLink || '',
+        videoUrl,
+        platforms: req.body?.uploadPlatforms || inputProps.uploadPlatforms || 'all'
+      });
+    }
 
     if (callbackUrl) {
       await sendCallback(callbackUrl, { historyId: jobId, status: 'completed', video_url: videoUrl });
@@ -716,6 +729,18 @@ async function renderAsync(historyId, composition, callbackUrl) {
     const videoUrl = STORAGE_BASE_URL
       ? `${STORAGE_BASE_URL}/render_${historyId}.mp4`
       : `/storage/render_${historyId}.mp4`;
+
+    // Disparo automático e autônomo para redes sociais (se solicitado)
+    if (composition?.autoUpload || process.env.AUTO_UPLOAD_SOCIAL === 'true') {
+      triggerSocialUpload({
+        outputFilePath,
+        title: composition?.title || '',
+        caption: composition?.uploadCaption || composition?.title || '',
+        link: composition?.uploadLink || '',
+        videoUrl,
+        platforms: composition?.uploadPlatforms || 'all'
+      });
+    }
 
     await sendCallback(callbackUrl, { historyId, status: 'completed', video_url: videoUrl });
 

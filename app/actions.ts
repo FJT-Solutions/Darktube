@@ -12,6 +12,9 @@ import { headers } from "next/headers"
 import { sendAccessGrantedEmail, sendPasswordResetEmail } from "@/lib/email"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { pool } from "@/lib/db-client"
+import fs from "fs"
+import path from "path"
+import { logger } from "@/lib/logger"
 
 async function assertAdmin(userId: string) {
     const profile = await db.getProfileById(userId)
@@ -420,10 +423,10 @@ export async function approveInviteAction(inviteId: string) {
         }
 
         // 4. Send Custom Email
-        console.log(`[Admin] Sending welcome email to ${invite.email}`)
+        logger.info(`Enviando e-mail de boas-vindas para ${invite.email}`, { context: 'Admin' })
         const emailResult = await sendAccessGrantedEmail(invite.email, invite.name, actionLink)
         if (!emailResult.success) {
-             console.warn("[Admin] Email failed but proceeding:", emailResult.error)
+            logger.warn(`Falha ao enviar e-mail de boas-vindas: ${emailResult.error}`, { context: 'Admin' })
         }
 
         // 5. Cleanup Invite - Update to 'approved'
@@ -768,12 +771,82 @@ export async function checkUserAccessAction(email: string) {
 
 export async function getBlotatoAccountsAction() {
     try {
-        const user = await getCurrentUser()
-        if (!user) return []
-        return await db.getBlotatoAccounts(user.id)
+        const user = await getCurrentUser();
+        if (!user) return [];
+
+        const dbAccounts = await db.getBlotatoAccounts(user.id);
+        const SESSIONS_DIR = path.resolve(process.cwd(), 'scripts/social-uploader/sessions');
+        const nativeAccounts: any[] = [];
+
+        // 1. Incorpora páginas do Facebook sincronizadas
+        const fbPagesFile = path.join(SESSIONS_DIR, 'facebook_pages.json');
+        if (fs.existsSync(fbPagesFile)) {
+            try {
+                const fbPages = JSON.parse(fs.readFileSync(fbPagesFile, 'utf-8'));
+                for (const pg of fbPages) {
+                    nativeAccounts.push({
+                        id: `fb_page_${pg.id}`,
+                        user_id: user.id,
+                        platform: 'facebook',
+                        account_id: pg.id,
+                        label: `Facebook: ${pg.name}`,
+                        page_id: pg.id,
+                        page_name: pg.name,
+                        avatar_url: pg.avatarUrl || null,
+                        created_at: new Date().toISOString()
+                    });
+                }
+            } catch (e) {}
+        }
+
+        // Se não houver páginas indexadas mas facebook_cookies.json existir, adiciona o perfil do Facebook
+        const fbCookiesFile = path.join(SESSIONS_DIR, 'facebook_cookies.json');
+        if (fs.existsSync(fbCookiesFile) && nativeAccounts.filter(a => a.platform === 'facebook').length === 0) {
+            nativeAccounts.push({
+                id: 'native_facebook',
+                user_id: user.id,
+                platform: 'facebook',
+                account_id: 'facebook',
+                label: 'Facebook Reels (Perfil Principal)',
+                created_at: new Date().toISOString()
+            });
+        }
+
+        // 2. Incorpora outras redes conectadas nativamente
+        const platformsToCheck = [
+            { platform: 'youtube', file: 'youtube_cookies.json', label: 'YouTube Shorts' },
+            { platform: 'tiktok', file: 'tiktok_cookies.json', label: 'TikTok' },
+            { platform: 'instagram', file: 'instagram_cookies.json', label: 'Instagram Reels' },
+            { platform: 'pinterest', file: 'pinterest_cookies.json', label: 'Pinterest' },
+            { platform: 'kwai', file: 'kwai_cookies.json', label: 'Kwai' },
+            { platform: 'threads', file: 'threads_cookies.json', label: 'Threads' }
+        ];
+
+        for (const item of platformsToCheck) {
+            if (fs.existsSync(path.join(SESSIONS_DIR, item.file))) {
+                nativeAccounts.push({
+                    id: `native_${item.platform}`,
+                    user_id: user.id,
+                    platform: item.platform,
+                    account_id: item.platform,
+                    label: item.label,
+                    created_at: new Date().toISOString()
+                });
+            }
+        }
+
+        // Une sem duplicação
+        const allAccounts = [...nativeAccounts];
+        for (const dba of dbAccounts) {
+            if (!allAccounts.some(a => a.platform === dba.platform && a.account_id === dba.account_id && a.page_id === dba.page_id)) {
+                allAccounts.push(dba);
+            }
+        }
+
+        return allAccounts;
     } catch (error) {
-        console.error("Error in getBlotatoAccountsAction:", error)
-        return []
+        console.error("Error in getBlotatoAccountsAction:", error);
+        return [];
     }
 }
 
@@ -1022,7 +1095,7 @@ export async function getSmartRecommendationsAction(limit = 12) {
 
     // Helper: search YouTube with fallback
     async function searchYouTube(query: string, searchLimit: number) {
-        console.log("[SmartRecommendations] Buscando YouTube:", query)
+        logger.debug(`Buscando recomendações no YouTube: ${query}`, { context: 'AI' })
         try {
             const results = await YouTube.search(query, {
                 limit: searchLimit,
@@ -1290,7 +1363,7 @@ export async function resetPasswordAction(email: string) {
         const resetToken = await signJWT({ email: user.email, purpose: 'reset-password' }, 2 * 3600)
         const actionLink = `${siteUrl}/setup-password?token=${resetToken}`
 
-        console.log(`[Auth] Sending password reset email to ${user.email}`)
+        logger.info(`Enviando e-mail de redefinição de senha para ${user.email}`, { context: 'Auth' })
         const emailResult = await sendPasswordResetEmail(user.email, user.full_name || 'Usuário', actionLink)
         
         if (!emailResult.success) {

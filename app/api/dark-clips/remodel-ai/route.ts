@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getUserApiKey } from '@/lib/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { logger } from '@/lib/logger';
 
 export interface RemodelAiParams {
   originalCaption?: string;
@@ -93,7 +94,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
   // ── 1. Try OpenAI if user has API key ──
   if (userOpenAiKey && userOpenAiKey.trim().length > 10) {
     try {
-      console.log('[Remodel AI] Usando chave OpenAI (GPT-4o) do usuário...');
+      logger.info('Gerando remodelagem via OpenAI (GPT-4o-mini)...', { context: 'AI' });
       const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -119,12 +120,13 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
         const content = data.choices?.[0]?.message?.content;
         if (content) {
           responseJson = JSON.parse(content);
+          logger.success('Remodelagem gerada com sucesso via OpenAI', { context: 'AI' });
         }
       } else {
-        console.warn('[Remodel AI] OpenAI error:', await gptRes.text());
+        logger.warn(`OpenAI error: ${await gptRes.text()}`, { context: 'AI' });
       }
     } catch (openAiErr) {
-      console.warn('[Remodel AI] OpenAI execution failed, falling back to Gemini:', openAiErr);
+      logger.warn('Falha na execução OpenAI, tentando fallback para Gemini:', openAiErr, { context: 'AI' });
     }
   }
 
@@ -133,15 +135,16 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
     const apiKey = userGeminiKey || systemGeminiKey;
     if (apiKey) {
       try {
-        console.log('[Remodel AI] Usando Gemini AI para remodelagem fiel ao contexto...');
+        logger.info('Gerando remodelagem via Gemini AI...', { context: 'AI' });
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(promptInstructions);
         const text = result.response.text();
         const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
         responseJson = JSON.parse(cleanJson);
+        logger.success('Remodelagem gerada com sucesso via Gemini AI', { context: 'AI' });
       } catch (gemErr) {
-        console.warn('[Remodel AI] Gemini error:', gemErr);
+        logger.warn('Falha na geração via Gemini:', gemErr, { context: 'AI' });
       }
     }
   }
@@ -227,7 +230,7 @@ export async function POST(req: Request) {
       data: responseJson
     });
   } catch (err: any) {
-    console.error('Error in remodel-ai:', err);
+    logger.error('Erro na rota remodel-ai:', err, { context: 'AI' });
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

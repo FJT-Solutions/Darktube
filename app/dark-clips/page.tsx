@@ -517,6 +517,10 @@ export default function DarkClipsPage() {
 
   // Scheduling State
   const [targetAccounts, setTargetAccounts] = useState<string[]>([]);
+  const [facebookPages, setFacebookPages] = useState<Array<{ id: string; name: string; url: string; avatarUrl?: string }>>([]);
+  const [selectedFacebookPage, setSelectedFacebookPage] = useState<string>("");
+  const [loadingFbPages, setLoadingFbPages] = useState<boolean>(false);
+  const [connectedPlatforms, setConnectedPlatforms] = useState<Record<string, boolean>>({});
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("18:00");
   const [postCaption, setPostCaption] = useState("");
@@ -524,16 +528,58 @@ export default function DarkClipsPage() {
   const [isRendering, setIsRendering] = useState(false);
   const [renderingClipIds, setRenderingClipIds] = useState<string[]>([]);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const [isPublishingNow, setIsPublishingNow] = useState<boolean>(false);
+
+  async function handleSyncFacebookPages() {
+    setLoadingFbPages(true);
+    try {
+      const res = await fetch("/api/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refresh_facebook_pages" }),
+      }).then((r) => r.json());
+
+      if (res?.facebookPages && res.facebookPages.length > 0) {
+        setFacebookPages(res.facebookPages);
+        setSelectedFacebookPage(res.facebookPages[0].id);
+        toast.success(`🎉 ${res.facebookPages.length} páginas do Facebook sincronizadas!`);
+      } else {
+        const getRes = await fetch("/api/social").then((r) => r.json()).catch(() => ({}));
+        if (getRes?.facebookPages && getRes.facebookPages.length > 0) {
+          setFacebookPages(getRes.facebookPages);
+          setSelectedFacebookPage(getRes.facebookPages[0].id);
+          toast.success(`${getRes.facebookPages.length} páginas carregadas!`);
+        } else {
+          toast.error("Nenhuma página do Facebook encontrada.");
+        }
+      }
+    } catch {
+      toast.error("Erro ao sincronizar páginas do Facebook.");
+    } finally {
+      setLoadingFbPages(false);
+    }
+  }
 
   // Load data on mount
   useEffect(() => {
     fetchInitialData();
   }, []);
 
-  // Polling ativo quando há algum clipe em processamento/renderização
+  const selectedClipRef = React.useRef(selectedClip);
+  selectedClipRef.current = selectedClip;
+
+  // Polling inteligente e otimizado quando há algum clipe em processamento/renderização ativa
   useEffect(() => {
-    const hasRendering = scheduledPosts.some((p) => p.status === 'rendering' || p.status === 'publishing') || renderingClipIds.length > 0 || isRendering;
-    if (!hasRendering) return;
+    // Apenas considerar posts em renderização recentes (menos de 15 minutos) para evitar loops infinitos com jobs órfãos
+    const now = Date.now();
+    const hasRecentRenderingPost = scheduledPosts.some((p) => {
+      if (p.status !== 'rendering' && p.status !== 'publishing') return false;
+      const createdTime = p.created_at ? new Date(p.created_at).getTime() : 0;
+      return (now - createdTime) < 15 * 60 * 1000;
+    });
+
+    const shouldPoll = hasRecentRenderingPost || renderingClipIds.length > 0 || isRendering;
+    if (!shouldPoll) return;
 
     const interval = setInterval(async () => {
       try {
@@ -541,31 +587,47 @@ export default function DarkClipsPage() {
         const data = await res.json();
         if (data.success && data.posts) {
           setScheduledPosts(data.posts);
-          if (selectedClip) {
-            const match = data.posts.find((p: any) => p.clip_id === selectedClip.id && p.rendered_video_url);
+          const currentClip = selectedClipRef.current;
+          if (currentClip) {
+            const match = data.posts.find((p: any) => p.clip_id === currentClip.id && p.rendered_video_url);
             if (match && match.status === 'rendered') {
               setRenderedUrl(match.rendered_video_url);
-              setRenderingClipIds((prev) => prev.filter((id) => id !== selectedClip.id));
+              setRenderingClipIds((prev) => prev.filter((id) => id !== currentClip.id));
             }
           }
         }
       } catch (e) {
-        console.error("Polling dark clips error:", e);
+        // Silencioso em caso de abort/cancel
       }
-    }, 4000);
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [scheduledPosts, renderingClipIds, isRendering, selectedClip]);
+  }, [renderingClipIds.length, isRendering]);
 
   async function fetchInitialData() {
     setLoading(true);
     try {
-      const [clipsRes, presetsRes, postsRes, accountsData] = await Promise.all([
+      const [clipsRes, presetsRes, postsRes, accountsData, socialData] = await Promise.all([
         fetch("/api/dark-clips/import").then((r) => r.json()),
         fetch("/api/dark-clips/presets").then((r) => r.json()),
         fetch("/api/dark-clips/schedule").then((r) => r.json()),
         getBlotatoAccountsAction(),
+        fetch("/api/social").then((r) => r.json()).catch(() => ({})),
       ]);
+
+      if (socialData?.accounts) {
+        const conn: Record<string, boolean> = {};
+        for (const [k, v] of Object.entries(socialData.accounts as Record<string, any>)) {
+          conn[k] = !!v.connected;
+        }
+        setConnectedPlatforms(conn);
+        setTargetAccounts((prev) => prev.filter((plat) => conn[plat]));
+      }
+
+      if (socialData?.facebookPages && socialData.facebookPages.length > 0) {
+        setFacebookPages(socialData.facebookPages);
+        setSelectedFacebookPage((prev) => prev || socialData.facebookPages[0].id);
+      }
 
       if (clipsRes.success && clipsRes.clips) {
         setClips(clipsRes.clips);
@@ -1280,13 +1342,22 @@ export default function DarkClipsPage() {
       return;
     }
 
+    if (targetAccounts.length === 0) {
+      toast.warning("Selecione ao menos uma rede conectada (ex: Facebook Reels, YouTube Shorts).");
+      return;
+    }
+
+    setIsPublishingNow(true);
+    const toastId = dispatchNow ? toast.loading("🚀 Preparando vídeo e despachando publicação...") : undefined;
+
     try {
       let finalVideoUrl = renderedUrl;
       if (!finalVideoUrl) {
-        toast.info("Renderizando clipe em 1080x1920 antes de agendar...");
+        if (toastId) toast.loading("Renderizando clipe em 1080x1920 antes de publicar...", { id: toastId });
         finalVideoUrl = await handleRender(selectedClip);
         if (!finalVideoUrl) {
-          toast.error("Não foi possível renderizar o vídeo para postagem.");
+          if (toastId) toast.error("Não foi possível renderizar o vídeo para postagem.", { id: toastId });
+          setIsPublishingNow(false);
           return;
         }
       }
@@ -1308,16 +1379,26 @@ export default function DarkClipsPage() {
           },
           scheduledAt: scheduledDateTime,
           targetAccounts,
+          facebookPageId: selectedFacebookPage,
           dispatchNow,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        toast.success(dispatchNow ? "🚀 Publicação despachada com sucesso!" : "📅 Publicação agendada!");
+        if (dispatchNow) {
+          toast.success("🚀 Publicação enviada com sucesso! Postando no feed em segundo plano.", { id: toastId });
+        } else {
+          toast.success("📅 Publicação agendada!");
+        }
         fetchInitialData();
+      } else {
+        if (toastId) toast.error(data.error || "Erro ao despachar publicação.", { id: toastId });
       }
     } catch {
-      toast.error("Erro ao salvar agendamento.");
+      if (toastId) toast.error("Erro ao salvar agendamento.", { id: toastId });
+      else toast.error("Erro ao salvar agendamento.");
+    } finally {
+      setIsPublishingNow(false);
     }
   }
 
@@ -4468,44 +4549,131 @@ export default function DarkClipsPage() {
                         </div>
                       ) : null}
 
-                      {/* Painel de Agendamento & Publicação Automática (Integrado) */}
+                      {/* Painel de Agendamento & Publicação Automática */}
                       <div className="space-y-4">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-primary" />
-                          <h4 className="text-xs font-bold">Agendamento & Publicação Automática (Blotato)</h4>
+                          <h4 className="text-xs font-bold">Agendamento & Publicação Automática</h4>
                         </div>
 
                         {/* Destination Accounts */}
                         <div>
-                          <Label className="text-xs font-semibold">Contas de Destino</Label>
-                          {blotatoAccounts.length === 0 ? (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Nenhuma conta Blotato conectada em <a href="/credentials" className="text-primary underline">Credenciais</a>.
-                            </p>
-                          ) : (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {blotatoAccounts.map((acc) => {
-                                const isChecked = targetAccounts.includes(acc.id);
-                                return (
-                                  <button
-                                    key={acc.id}
+                          <Label className="text-xs font-semibold">Redes de Destino</Label>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {["tiktok", "instagram", "facebook", "youtube", "pinterest", "kwai", "threads", "telegram"].map((plat) => {
+                              const isChecked = targetAccounts.includes(plat);
+                              const isConnected = !!connectedPlatforms[plat];
+                              const platLabels: Record<string, string> = {
+                                tiktok: "TikTok",
+                                instagram: "Instagram Reels",
+                                facebook: "Facebook Reels",
+                                youtube: "YouTube Shorts",
+                                pinterest: "Pinterest",
+                                kwai: "Kwai",
+                                threads: "Threads",
+                                telegram: "Telegram"
+                              };
+                              return (
+                                <button
+                                  key={plat}
+                                  type="button"
+                                  onClick={() => {
+                                    if (!isConnected) {
+                                      toast.info(`${platLabels[plat]} não está conectada. Acesse Credenciais para conectar.`);
+                                      return;
+                                    }
+                                    if (isChecked) {
+                                      setTargetAccounts((prev) => prev.filter((id) => id !== plat));
+                                    } else {
+                                      setTargetAccounts((prev) => [...prev, plat]);
+                                      if (plat === 'facebook' && facebookPages.length === 0) {
+                                        handleSyncFacebookPages();
+                                      }
+                                    }
+                                  }}
+                                  title={isConnected ? `${platLabels[plat]} (Conectada)` : `${platLabels[plat]} (Desconectada - acesse Credenciais)`}
+                                  className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                    !isConnected
+                                      ? "opacity-35 cursor-not-allowed border-dashed bg-secondary/10 text-muted-foreground/60 hover:opacity-50"
+                                      : isChecked
+                                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                      : "bg-secondary/40 text-foreground border-border hover:border-primary/50"
+                                  }`}
+                                >
+                                  {isChecked && <Check className="h-3 w-3" />}
+                                  {isConnected && !isChecked && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block mr-0.5" />}
+                                  {platLabels[plat]}
+                                  {!isConnected && <span className="text-[9px] font-normal text-muted-foreground ml-0.5">(Off)</span>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {targetAccounts.includes("facebook") && (
+                            <div className="mt-3 p-3 rounded-xl border border-blue-500/30 bg-blue-500/[0.05] space-y-2 animate-in fade-in">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                                  🚩 Publicar na Página do Facebook:
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-muted-foreground font-semibold">
+                                    {loadingFbPages 
+                                      ? "Sincronizando..." 
+                                      : facebookPages.length > 0 
+                                      ? `${facebookPages.length} páginas detectadas` 
+                                      : 'Nenhuma página carregada'}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
                                     type="button"
-                                    onClick={() => {
-                                      if (isChecked) setTargetAccounts((prev) => prev.filter((id) => id !== acc.id));
-                                      else setTargetAccounts((prev) => [...prev, acc.id]);
-                                    }}
-                                    className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                                      isChecked
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-secondary/40 text-muted-foreground border-border"
-                                    }`}
+                                    disabled={loadingFbPages}
+                                    onClick={handleSyncFacebookPages}
+                                    className="h-5 text-[10px] px-1.5 text-blue-400 hover:text-blue-300 font-semibold gap-1"
+                                    title="Sincronizar páginas do Facebook"
                                   >
-                                    {isChecked && <Check className="h-3 w-3" />}
-                                    {acc.label || acc.page_name || acc.platform}
-                                  </button>
-                                );
-                              })}
+                                    <RefreshCw className={`h-2.5 w-2.5 ${loadingFbPages ? 'animate-spin' : ''}`} />
+                                    {loadingFbPages ? 'Atualizando...' : 'Atualizar'}
+                                  </Button>
+                                </div>
+                              </div>
+                              {loadingFbPages ? (
+                                <div className="text-[11px] text-blue-400 bg-blue-500/10 p-2.5 rounded-lg border border-blue-500/20 flex items-center gap-2">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-400" />
+                                  <span>Buscando páginas da sua conta do Facebook...</span>
+                                </div>
+                              ) : facebookPages.length > 0 ? (
+                                <select
+                                  value={selectedFacebookPage}
+                                  onChange={(e) => setSelectedFacebookPage(e.target.value)}
+                                  className="w-full h-9 px-3 bg-background border border-blue-500/40 rounded-lg text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                                >
+                                  {facebookPages.map((pg) => (
+                                    <option key={pg.id} value={pg.id}>
+                                      {pg.name} (ID: {pg.id})
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="text-[11px] text-amber-400/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 flex items-center justify-between">
+                                  <span>Nenhuma página sincronizada encontrada.</span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    type="button"
+                                    disabled={loadingFbPages}
+                                    className="h-6 text-[10px] px-2 text-blue-400 hover:text-blue-300 font-bold"
+                                    onClick={handleSyncFacebookPages}
+                                  >
+                                    Carregar Páginas
+                                  </Button>
+                                </div>
+                              )}
                             </div>
+                          )}
+                          {targetAccounts.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground mt-1.5">
+                              Selecione as redes acima ou conecte novas contas em <a href="/credentials" className="text-primary underline">Credenciais</a>.
+                            </p>
                           )}
                         </div>
 
@@ -4556,19 +4724,21 @@ export default function DarkClipsPage() {
                         {/* Dispatch Actions */}
                         <div className="flex gap-3 pt-2">
                           <Button
+                            disabled={isPublishingNow}
                             onClick={() => handleSchedulePost(false)}
-                            className="flex-1 text-xs font-bold gap-1.5 h-9"
+                            className="flex-1 text-xs font-bold gap-1.5 h-9 disabled:opacity-50"
                           >
                             <Calendar className="h-3.5 w-3.5" />
                             Agendar Postagem
                           </Button>
                           <Button
                             variant="secondary"
+                            disabled={isPublishingNow}
                             onClick={() => handleSchedulePost(true)}
-                            className="flex-1 text-xs font-bold gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                            className="flex-1 text-xs font-bold gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700 text-white border-none disabled:opacity-60 shadow-sm"
                           >
-                            <Send className="h-3.5 w-3.5" />
-                            Publicar Agora
+                            {isPublishingNow ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                            {isPublishingNow ? "Despachando..." : "Publicar Agora"}
                           </Button>
                         </div>
                       </div>

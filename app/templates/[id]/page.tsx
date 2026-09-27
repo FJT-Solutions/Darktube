@@ -38,7 +38,9 @@ import {
   PlayCircle,
   Clapperboard,
   Download,
+  Edit
 } from "lucide-react"
+import { TemplateConfigDialog } from "@/components/template-config-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -243,6 +245,7 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
   const [template, setTemplate] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [linkedAccounts, setLinkedAccounts] = useState<any[]>([])
 
   useEffect(() => {
@@ -366,6 +369,10 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setIsEditing(true)} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm">
+              <Edit className="h-4 w-4" />
+              Editar Configurações
+            </Button>
             <Button variant="outline" size="sm" onClick={copyToClipboard} className="gap-2">
               {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
               {copied ? "Copiado" : "Copiar Blueprint"}
@@ -606,6 +613,19 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
       </div>
+
+      {/* MODAL DE EDIÇÃO DE TEMPLATE */}
+      {isEditing && template && (
+        <TemplateConfigDialog
+          open={isEditing}
+          onOpenChange={setIsEditing}
+          initialData={template}
+          onSuccess={fetchTemplate}
+          video={template.video_data || { title: template.video_title, id: template.video_id }}
+          analysis={template.template_data || {}}
+          script=""
+        />
+      )}
     </div>
   )
 }

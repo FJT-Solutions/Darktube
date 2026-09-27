@@ -6,6 +6,7 @@ import { pool } from '@/lib/db-client';
 import { VideoCaptureService } from '@/lib/video-capture';
 import { sanitizeVideo } from '@/lib/video-sanitizer';
 import { generateAiRemodelForClip } from '../remodel-ai/route';
+import { logger } from '@/lib/logger';
 import fs from 'fs';
 import path from 'path';
 
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
         try {
           const originalUrl = (clipRecord.original_url && !clipRecord.original_url.startsWith('blob:')) ? clipRecord.original_url : (sourceVideoUrl.startsWith('blob:') ? '' : sourceVideoUrl);
           if (originalUrl && originalUrl.startsWith('http') && !originalUrl.includes('/api/storage/')) {
-            console.log(`[DarkClips Render] Auto-healing clipe ${clipId} a partir de: ${originalUrl}`);
+            logger.info(`Auto-healing clipe ${clipId} a partir de: ${originalUrl.slice(0, 60)}...`, { context: 'Render' });
             const dl = await VideoCaptureService.downloadFromUrl(originalUrl);
             if (dl.videoPath && fs.existsSync(dl.videoPath)) {
               const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
@@ -86,11 +87,11 @@ export async function POST(req: Request) {
 
               // Atualizar registro no banco para que nunca mais tenha blob:
               await pool.query('UPDATE public.dark_clips SET video_url = $1 WHERE id = $2', [sourceVideoUrl, clipId]);
-              console.log(`[DarkClips Render] ✅ Clipe recuperado e salvo em: ${sourceVideoUrl}`);
+              logger.success(`Clipe recuperado e persistido com sucesso`, { context: 'Render', data: { sourceVideoUrl } });
             }
           }
         } catch (healErr: any) {
-          console.warn('[DarkClips Render] Aviso ao recuperar vídeo original:', healErr.message);
+          logger.warn(`Aviso ao recuperar vídeo original: ${healErr.message}`, { context: 'Render' });
         }
       }
     }
@@ -181,10 +182,12 @@ export async function POST(req: Request) {
         effectiveVideoPlacement.fitMode = 'contain';
       }
 
+      let serverConnected = false;
+
       for (const baseUrl of CANDIDATE_URLS) {
         const cleanBase = baseUrl.replace(/\/+$/, '');
         const renderEndpoint = cleanBase.endsWith('/render') ? cleanBase : `${cleanBase}/render`;
-        console.log(`[DarkClips Render] Despachando para Remotion Server em ${renderEndpoint} (Job: ${initialPost.id})...`);
+        logger.info(`Despachando para Remotion Server em ${cleanBase} (Job: ${initialPost.id})`, { context: 'Render' });
 
         try {
           activeBaseUrl = cleanBase;
@@ -205,11 +208,13 @@ export async function POST(req: Request) {
             }),
           });
 
+          serverConnected = true;
+
           if (res.ok) {
             const data = await res.json();
             const rawUrl = data.videoUrl || data.url || '';
             if (rawUrl) {
-              console.log(`[DarkClips Render] ✅ Render concluído via ${cleanBase}: ${rawUrl}. Persistindo no storage...`);
+              logger.success(`Render concluído via ${cleanBase}. Persistindo no storage...`, { context: 'Render' });
 
               try {
                 const fetchUrl = rawUrl.startsWith('http') ? rawUrl : `${cleanBase}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
@@ -219,10 +224,10 @@ export async function POST(req: Request) {
                   const buffer = Buffer.from(arrayBuf);
                   const filename = `rendered_${path.basename(rawUrl)}`;
                   renderedVideoUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
-                  console.log(`[DarkClips Render] ✅ MP4 persistido com sucesso em: ${renderedVideoUrl}`);
+                  logger.success(`MP4 persistido com sucesso`, { context: 'Render', data: { renderedVideoUrl } });
                 }
               } catch (persistErr: any) {
-                console.warn('[DarkClips Render] Aviso ao persistir MP4 no storage:', persistErr.message);
+                logger.warn(`Aviso ao persistir MP4 no storage: ${persistErr.message}`, { context: 'Render' });
                 renderedVideoUrl = rawUrl;
               }
 
@@ -237,17 +242,18 @@ export async function POST(req: Request) {
             }
           } else {
             lastError = await res.text();
-            console.warn(`[DarkClips Render] Resposta não-OK de ${cleanBase}:`, lastError);
+            logger.warn(`Resposta não-OK de ${cleanBase}: ${lastError}`, { context: 'Render' });
           }
         } catch (err: any) {
           lastError = err?.message;
-          console.warn(`[DarkClips Render] Conexão HTTP direta encerrou (${cleanBase}): ${lastError}. Iniciando monitoramento de storage...`);
+          logger.debug(`Endpoint ${cleanBase} não respondeu: ${lastError}`, { context: 'Render' });
         }
       }
 
-      // Se a conexão HTTP encerrou (timeout natural após 5 min), o Remotion continua processando em background.
-      // Vamos monitorar a saída do storage do Remotion por até 12 minutos.
-      if (!renderedVideoUrl && activeBaseUrl) {
+      // Se a conexão HTTP com um servidor ativo encerrou (timeout natural após 5 min), o Remotion continua processando em background.
+      // Vamos monitorar a saída do storage do Remotion por até 12 minutos APENAS se algum servidor respondeu.
+      if (!renderedVideoUrl && serverConnected && activeBaseUrl) {
+        logger.info(`Monitorando storage do Remotion em ${activeBaseUrl}...`, { context: 'Render' });
         const expectedFileUrl = `${activeBaseUrl}/storage/darkclip_${initialPost.id}.mp4`;
         const startTime = Date.now();
         const maxWaitMs = 12 * 60 * 1000; // 12 minutos
@@ -257,7 +263,7 @@ export async function POST(req: Request) {
           try {
             const checkRes = await fetch(expectedFileUrl, { method: 'HEAD' });
             if (checkRes.ok) {
-              console.log(`[DarkClips Render] ✅ Arquivo final detectado no Remotion via polling: ${expectedFileUrl}`);
+              logger.info(`Arquivo detectado no Remotion via polling: ${expectedFileUrl}`, { context: 'Render' });
               const dlRes = await fetch(expectedFileUrl);
               if (dlRes.ok) {
                 const arrayBuf = await dlRes.arrayBuffer();
@@ -270,10 +276,10 @@ export async function POST(req: Request) {
                     'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
                     ['rendered', renderedVideoUrl, initialPost.id]
                   );
-                  console.log(`[DarkClips Render] 🎉 Render íntegro salvo com sucesso no DarkTube após polling: ${renderedVideoUrl}`);
+                  logger.success(`Render íntegro salvo com sucesso após polling`, { context: 'Render', data: { renderedVideoUrl } });
                   break;
                 } else {
-                  console.log(`[DarkClips Render] ⏳ Arquivo detectado (${buffer.length} bytes), mas ainda sem átomo 'moov'. Aguardando finalização do Remotion...`);
+                  logger.debug(`Arquivo detectado (${buffer.length} bytes), aguardando átomo 'moov'...`, { context: 'Render' });
                 }
               }
             }
@@ -282,7 +288,7 @@ export async function POST(req: Request) {
       }
 
       if (!renderedVideoUrl && lastError) {
-        console.error(`[DarkClips Render] Render falhou definitivamente para ${initialPost.id}: ${lastError}`);
+        logger.error(`Render falhou definitivamente para ${initialPost.id}: ${lastError}`, { context: 'Render' });
         try {
           await pool.query('UPDATE public.dark_clips_posts SET status = $1, error_message = $2 WHERE id = $3', ['failed', lastError, initialPost.id]);
         } catch (e) {}
@@ -292,7 +298,7 @@ export async function POST(req: Request) {
         activeClipRenders.delete(activeLockClipId);
       }
     })().catch((bgErr) => {
-      console.error('[DarkClips Render] Erro inesperado em background render:', bgErr);
+      logger.error('Erro inesperado em background render:', bgErr, { context: 'Render' });
       if (activeLockClipId) activeClipRenders.delete(activeLockClipId);
     });
 

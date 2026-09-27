@@ -77,7 +77,11 @@ export function ProductionNotifier() {
     }
 
     checkStatus()
-    timer = setInterval(checkStatus, 5000)
+    timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        checkStatus()
+      }
+    }, 10000)
 
     return () => clearInterval(timer)
   }, [])

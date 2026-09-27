@@ -483,10 +483,57 @@ export function TemplateConfigDialog({
   async function fetchAccounts() {
     setFetchingAccounts(true)
     try {
-      const result = await getBlotatoAccountsAction()
-      const data = result || []
-      setAccounts(data)
-      if (data.length === 1 && selectedAccounts.length === 0) setSelectedAccounts([data[0].id])
+      const [result, socialRes] = await Promise.all([
+        getBlotatoAccountsAction(),
+        fetch("/api/social").then(r => r.json()).catch(() => ({}))
+      ]);
+      const data: any[] = [...(result || [])];
+
+      // Garante que todas as redes conectadas em /api/social estejam na lista
+      if (socialRes?.accounts) {
+        for (const [platform, info] of Object.entries(socialRes.accounts as Record<string, any>)) {
+          if (info.connected && platform !== 'facebook') {
+            if (!data.some((a: any) => a.platform === platform || a.id === `native_${platform}`)) {
+              data.push({
+                id: `native_${platform}`,
+                platform,
+                account_id: platform,
+                label: info.label || platform,
+                page_name: info.label || platform,
+              });
+            }
+          }
+        }
+      }
+
+      // Garante que todas as páginas do Facebook de /api/social estejam na lista
+      if (socialRes?.facebookPages && socialRes.facebookPages.length > 0) {
+        for (const pg of socialRes.facebookPages) {
+          const id = `fb_page_${pg.id}`;
+          if (!data.some((a: any) => a.id === id || a.account_id === pg.id || a.page_id === pg.id)) {
+            data.push({
+              id,
+              platform: 'facebook',
+              account_id: pg.id,
+              label: `Facebook: ${pg.name}`,
+              page_id: pg.id,
+              page_name: pg.name,
+              avatar_url: pg.avatarUrl || null,
+            });
+          }
+        }
+      } else if (socialRes?.accounts?.facebook?.connected && !data.some((a: any) => a.platform === 'facebook')) {
+        data.push({
+          id: 'native_facebook',
+          platform: 'facebook',
+          account_id: 'facebook',
+          label: 'Facebook Reels (Perfil Principal)',
+          page_name: 'Facebook Reels',
+        });
+      }
+
+      setAccounts(data);
+      if (data.length === 1 && selectedAccounts.length === 0) setSelectedAccounts([data[0].id]);
     } catch (err) { console.error(err) }
     finally { setFetchingAccounts(false) }
   }
@@ -1280,7 +1327,7 @@ export function TemplateConfigDialog({
               {/* Accounts */}
               <div className="space-y-3">
                 <Label className="flex items-center gap-2 text-sm font-semibold">
-                  <Users className="h-4 w-4 text-primary" /> Contas de Destino (Blotato)
+                  <Users className="h-4 w-4 text-primary" /> Redes e Páginas de Destino
                 </Label>
                 {fetchingAccounts ? (
                   <div className="flex items-center justify-center p-6 bg-secondary/10 rounded-xl border border-dashed">
@@ -1303,7 +1350,7 @@ export function TemplateConfigDialog({
                   </div>
                 ) : (
                   <div className="text-center p-6 bg-secondary/10 rounded-xl border border-dashed">
-                    <p className="text-sm text-muted-foreground">Nenhuma conta vinculada.</p>
+                    <p className="text-sm text-muted-foreground">Nenhuma rede conectada. Conecte em <a href="/credentials" className="text-primary underline">Credenciais</a>.</p>
                   </div>
                 )}
               </div>

@@ -20,8 +20,10 @@ import {
   Search,
   Filter,
   Users,
-  Mic2
+  Mic2,
+  Edit
 } from "lucide-react"
+import { TemplateConfigDialog } from "@/components/template-config-dialog"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -45,6 +47,7 @@ import { formatNumber } from "@/lib/metrics"
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<any[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
 
@@ -55,12 +58,28 @@ export default function TemplatesPage() {
   async function fetchTemplates() {
     setLoading(true)
     try {
-      const [templatesData, accountsData] = await Promise.all([
+      const [templatesData, accountsData, socialRes] = await Promise.all([
         getRemodelingTemplatesAction(),
-        getBlotatoAccountsAction()
+        getBlotatoAccountsAction(),
+        fetch("/api/social").then(r => r.json()).catch(() => ({}))
       ])
+      const mergedAccounts = [...(accountsData || [])]
+      if (socialRes?.facebookPages) {
+        for (const pg of socialRes.facebookPages) {
+          const id = `fb_page_${pg.id}`
+          if (!mergedAccounts.some(a => a.id === id || a.account_id === pg.id || a.page_id === pg.id)) {
+            mergedAccounts.push({
+              id,
+              platform: 'facebook',
+              account_id: pg.id,
+              label: `Facebook: ${pg.name}`,
+              page_name: pg.name,
+            })
+          }
+        }
+      }
       setTemplates(templatesData || [])
-      setAccounts(accountsData || [])
+      setAccounts(mergedAccounts)
     } catch (err) {
       toast.error("Erro ao carregar templates.")
     } finally {
@@ -158,6 +177,9 @@ export default function TemplatesPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setEditingTemplate(template)}>
+                        <Edit className="mr-2 h-4 w-4" /> Editar Configurações
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => toggleStatus(template.id, template.is_active)}>
                         {template.is_active ? (
                           <><Pause className="mr-2 h-4 w-4" /> Pausar</>
@@ -186,11 +208,11 @@ export default function TemplatesPage() {
                   </Badge>
                 </div>
 
-                {/* Blotato Accounts */}
+                {/* Redes e Páginas de Destino */}
                 {template.target_accounts && template.target_accounts.length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     <p className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
-                      <Users className="h-3 w-3" /> Contas de Destino:
+                      <Users className="h-3 w-3" /> Redes de Destino:
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {template.target_accounts.map((accId: string) => {
@@ -226,10 +248,19 @@ export default function TemplatesPage() {
                 </div>
               </CardContent>
 
-              <CardFooter className="p-4 pt-0 border-t bg-secondary/10">
-                <Button variant="ghost" className="w-full justify-between h-8 text-xs font-medium hover:bg-primary/10 hover:text-primary mt-3" asChild>
+              <CardFooter className="p-4 pt-0 border-t bg-secondary/10 flex items-center gap-2 mt-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setEditingTemplate(template)}
+                  className="h-8 text-xs font-semibold flex-1 border-primary/30 hover:bg-primary/10 hover:text-primary"
+                >
+                  <Edit className="h-3.5 w-3.5 mr-1.5" />
+                  Editar
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs font-medium hover:bg-primary/10 hover:text-primary flex-1 justify-between" asChild>
                   <Link href={`/templates/${template.id}`}>
-                    Abrir Estratégia
+                    Estratégia
                     <ChevronRight className="h-3 w-3" />
                   </Link>
                 </Button>
@@ -250,6 +281,19 @@ export default function TemplatesPage() {
             <Link href="/minerar">Ir para Mineração</Link>
           </Button>
         </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE TEMPLATE */}
+      {editingTemplate && (
+        <TemplateConfigDialog
+          open={!!editingTemplate}
+          onOpenChange={(open) => !open && setEditingTemplate(null)}
+          initialData={editingTemplate}
+          onSuccess={fetchTemplates}
+          video={editingTemplate.video_data || { title: editingTemplate.video_title, id: editingTemplate.video_id }}
+          analysis={editingTemplate.template_data || {}}
+          script=""
+        />
       )}
     </div>
   )

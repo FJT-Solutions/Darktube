@@ -39,6 +39,7 @@ export const RemotionPreviewPlayer: React.FC<RemotionPlayerProps> = ({
         controls
         autoPlay={false}
         loop
+        acknowledgeRemotionLicense
       />
     </div>
   );

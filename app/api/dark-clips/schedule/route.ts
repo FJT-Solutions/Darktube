@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import path from 'path';
+import fs from 'fs';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getDarkClipPosts, saveDarkClipPost, deleteDarkClipPost, updateDarkClipPostStatus, getUserApiKey } from '@/lib/database';
 import { uploadMediaFile } from '@/lib/storage';
 import { pool } from '@/lib/db-client';
+import { logger } from '@/lib/logger';
 
 const CANDIDATE_URLS = [
   'http://n8n-remotionservice-ry6eh9:3001',
@@ -26,7 +29,7 @@ export async function GET() {
           try {
             const checkRes = await fetch(fileCandidate, { method: 'HEAD' });
             if (checkRes.ok) {
-              console.log(`[DarkClips Reconcile] ✅ Encontrado vídeo renderizado pronto para ${post.id}: ${fileCandidate}`);
+              logger.success(`Vídeo renderizado reconciliado para ${post.id}`, { context: 'Scheduler', data: { fileCandidate } });
               const dlRes = await fetch(fileCandidate);
               if (dlRes.ok) {
                 const arrayBuf = await dlRes.arrayBuffer();
@@ -44,7 +47,7 @@ export async function GET() {
                   post.error_message = undefined;
                   break;
                 } else {
-                  console.log(`[DarkClips Reconcile] ⏳ Arquivo detectado para ${post.id}, mas ainda sem átomo 'moov'. Aguardando...`);
+                  logger.debug(`Arquivo detectado para ${post.id}, aguardando átomo 'moov'...`, { context: 'Scheduler' });
                 }
               }
             }
@@ -63,6 +66,11 @@ export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
     const body = await req.json();
+    if (body.action === 'mark_published' && body.postId) {
+      await updateDarkClipPostStatus(body.postId, 'published', body.renderedVideoUrl);
+      return NextResponse.json({ success: true });
+    }
+
     const {
       clipId,
       title,
@@ -71,6 +79,7 @@ export async function POST(req: Request) {
       scheduledAt,
       targetAccounts = [],
       dispatchNow = false,
+      facebookPageId,
     } = body;
 
     const post = await saveDarkClipPost({
@@ -84,11 +93,52 @@ export async function POST(req: Request) {
       target_accounts: targetAccounts,
     });
 
-    // If dispatchNow is requested, notify n8n / webhook
-    if (dispatchNow && user) {
+    // If dispatchNow is requested, trigger native sovereign dispatcher & webhook
+    if (dispatchNow) {
+      // 1. Aciona o despachante nativo autônomo (Zero Aprovação)
+      try {
+        const { spawn } = require('child_process');
+        const uploaderScript = path.resolve(process.cwd(), 'scripts/social-uploader/dispatcher.py');
+        const logDir = path.resolve(process.cwd(), 'scripts/social-uploader/sessions');
+        const logFile = path.join(logDir, 'dispatcher.log');
+        if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+        const outLog = fs.openSync(logFile, 'a');
+
+        const captionText = `${remodelData?.post_caption || remodelData?.caption || post.title} ${(remodelData?.hashtags || []).map((h: string) => h.startsWith('#') ? h : `#${h}`).join(' ')}`;
+        const platformsArg = targetAccounts && targetAccounts.length > 0 ? targetAccounts.join(',') : 'all';
+
+        // Garante URL acessível para download local
+        const fullVideoUrl = renderedVideoUrl.startsWith('http')
+          ? renderedVideoUrl
+          : `http://localhost:3000${renderedVideoUrl.startsWith('/') ? '' : '/'}${renderedVideoUrl}`;
+
+        const spawnArgs = [
+          uploaderScript,
+          '--video', fullVideoUrl,
+          '--caption', captionText,
+          '--title', post.title,
+          '--video-url', fullVideoUrl,
+          '--platforms', platformsArg,
+          '--post-id', post.id
+        ];
+        if (facebookPageId) {
+          spawnArgs.push('--facebook-page-id', facebookPageId);
+        }
+
+        const child = spawn('python', ['-u', ...spawnArgs], {
+          detached: true,
+          stdio: ['ignore', outLog, outLog]
+        });
+        child.unref();
+        logger.scheduler(`Despachante nativo acionado para redes: ${platformsArg}`, { logFile });
+      } catch (uErr: any) {
+        logger.warn(`Aviso ao disparar redes sociais nativas: ${uErr?.message}`, { context: 'Scheduler' });
+      }
+
+      // 2. Se houver webhook n8n configurado, notifica
       try {
         let webhookUrl = await getUserApiKey(user.id, 'n8n_webhook');
-        if (!webhookUrl) webhookUrl = process.env.N8N_PRODUCTION_WEBHOOK_URL || 'https://n8n.fjt-solutions.com/webhook/darktube_producao';
+        if (!webhookUrl) webhookUrl = process.env.N8N_PRODUCTION_WEBHOOK_URL;
 
         if (webhookUrl) {
           await fetch(webhookUrl, {
@@ -107,16 +157,15 @@ export async function POST(req: Request) {
               timestamp: new Date().toISOString()
             })
           });
-          await updateDarkClipPostStatus(post.id, 'published', renderedVideoUrl);
         }
       } catch (dispatchErr: any) {
-        console.error('[Schedule API] Webhook dispatch error:', dispatchErr);
+        logger.error('Webhook dispatch error:', dispatchErr, { context: 'Scheduler' });
       }
     }
 
     return NextResponse.json({ success: true, post });
   } catch (err: any) {
-    console.error('Error in schedule API:', err);
+    logger.error('Erro na rota schedule API:', err, { context: 'Scheduler' });
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

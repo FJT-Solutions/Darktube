@@ -1,6 +1,6 @@
-// app/api/storage/[filename]/route.ts
 import { NextResponse } from 'next/server'
 import { pool } from '@/lib/db-client'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: Request,
@@ -114,7 +114,11 @@ export async function GET(
       },
     })
   } catch (error: any) {
-    console.error('Error fetching file from database storage:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    if (error?.code === 'ECONNRESET' || error?.message?.includes('aborted') || error?.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+      logger.debug('Cliente encerrou download/streaming de arquivo', { context: 'Storage' });
+      return new Response(null, { status: 499 });
+    }
+    logger.error('Error fetching file from database storage:', error, { context: 'Storage' });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

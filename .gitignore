@@ -56,3 +56,8 @@ public/*.mp4
 
 # Scratch scripts and temporary research clones
 /scratch/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc

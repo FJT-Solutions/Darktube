@@ -362,6 +362,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           loop={true}
           initiallyMuted={true}
           initialVolume={0}
+          acknowledgeRemotionLicense={true}
         />
 
         {/* ── Platform Simulation Overlays (Proportionally Scaled with Stage) ── */}
