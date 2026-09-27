@@ -138,7 +138,7 @@ class Logger {
       case 'error':
         return `${colors.red}${colors.bold}[ERROR]${colors.reset}`;
       default:
-        return `[${level.toUpperCase()}]`;
+        return `[${String(level).toUpperCase()}]`;
     }
   }
 

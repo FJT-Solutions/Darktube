@@ -39,7 +39,7 @@ export async function GET() {
                   const permanentUrl = await uploadMediaFile(buffer, filename, 'video/mp4');
 
                   const targets = Array.isArray(post.target_accounts) ? post.target_accounts : [];
-                  const remodel = post.remodel_data || {};
+                  const remodel = (post.remodel_data || {}) as any;
                   const shouldDispatch = Boolean(
                     targets.length > 0 &&
                     (post.status === 'publishing' || remodel.dispatch_now || (post.status === 'scheduled' && (!post.scheduled_at || new Date(post.scheduled_at) <= new Date())))

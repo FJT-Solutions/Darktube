@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const publicRoutes = ['/login', '/invite', '/auth/callback', '/pending', '/setup-password', '/api/storage', '/storage']
+  const publicRoutes = ['/login', '/invite', '/auth/callback', '/pending', '/setup-password', '/api/storage', '/storage', '/api/webhooks', '/api/dark-clips/schedule']
   const isPublic = pathname === '/' || publicRoutes.some(r => pathname.startsWith(r))
 
   const sessionCookie = request.cookies.get('darktube_session')

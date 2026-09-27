@@ -89,6 +89,34 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Inspeciona o registro do post antes de atualizar para identificar se ele deve ser despachado imediatamente
+        let finalPostStatus = status === 'completed' ? 'rendered' : 'failed';
+        let shouldDispatch = false;
+
+        const existingDc = await pool.query(
+          'SELECT id, user_id, clip_id, title, status, target_accounts, remodel_data, scheduled_at FROM public.dark_clips_posts WHERE id = $1',
+          [historyId]
+        );
+
+        if (status === 'completed' && existingDc.rows.length > 0) {
+          const currentPost = existingDc.rows[0];
+          const targets = typeof currentPost.target_accounts === 'string'
+            ? JSON.parse(currentPost.target_accounts)
+            : (currentPost.target_accounts || []);
+          const remodel = typeof currentPost.remodel_data === 'string'
+            ? JSON.parse(currentPost.remodel_data)
+            : (currentPost.remodel_data || {});
+
+          const hasTargets = Array.isArray(targets) && targets.length > 0;
+          const isImmediate = currentPost.status === 'publishing' || Boolean(remodel.dispatch_now);
+          const isDueScheduled = currentPost.status === 'scheduled' && (!currentPost.scheduled_at || new Date(currentPost.scheduled_at) <= new Date());
+
+          if (hasTargets && (isImmediate || isDueScheduled)) {
+            finalPostStatus = 'publishing';
+            shouldDispatch = true;
+          }
+        }
+
         const dcUpdate = await pool.query(
           `UPDATE public.dark_clips_posts SET
             status = $1,
@@ -96,24 +124,18 @@ export async function POST(req: NextRequest) {
             error_message = $3
            WHERE id = $4
            RETURNING *`,
-          [status === 'completed' ? 'rendered' : 'failed', finalVideoUrl || null, error || null, historyId]
+          [finalPostStatus, finalVideoUrl || null, error || null, historyId]
         );
 
-        if (status === 'completed' && dcUpdate.rows.length > 0 && finalVideoUrl) {
+        if (shouldDispatch && dcUpdate.rows.length > 0 && finalVideoUrl) {
           const postRow = dcUpdate.rows[0];
           const targets = typeof postRow.target_accounts === 'string' ? JSON.parse(postRow.target_accounts) : (postRow.target_accounts || []);
           const remodel = typeof postRow.remodel_data === 'string' ? JSON.parse(postRow.remodel_data) : (postRow.remodel_data || {});
-          const shouldDispatch = Boolean(
-            targets.length > 0 &&
-            (postRow.status === 'publishing' || remodel.dispatch_now || (postRow.status === 'scheduled' && (!postRow.scheduled_at || new Date(postRow.scheduled_at) <= new Date())))
-          );
-          if (shouldDispatch) {
-            console.log(`[Production Webhook] 🚀 Disparando publicação automática para ${historyId} (${targets.join(', ')})...`);
-            await triggerSocialDispatcher({
-              post: { ...postRow, target_accounts: targets, remodel_data: remodel, rendered_video_url: finalVideoUrl },
-              videoUrl: finalVideoUrl,
-            });
-          }
+          console.log(`[Production Webhook] 🚀 Disparando publicação automática para ${historyId} (${targets.join(', ')})...`);
+          await triggerSocialDispatcher({
+            post: { ...postRow, target_accounts: targets, remodel_data: remodel, rendered_video_url: finalVideoUrl },
+            videoUrl: finalVideoUrl,
+          });
         }
       }
     } catch (dcErr) {

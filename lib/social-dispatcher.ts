@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger';
 import { getPythonCommand, safeSpawn } from '@/lib/python-runtime';
 import { getUserApiKey } from '@/lib/database';
 
+const activePostDispatches = new Set<string>();
+
 export function isValidVideoUrl(url?: string | null): boolean {
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
@@ -14,6 +16,7 @@ export function isValidVideoUrl(url?: string | null): boolean {
   }
   return (
     trimmed.startsWith('/api/storage/') ||
+    trimmed.startsWith('/storage/') ||
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://')
   );
@@ -45,9 +48,20 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
     return { success: false, error: 'Post ID is required' };
   }
 
+  // Prevent duplicate concurrent launches for the same post ID
+  if (activePostDispatches.has(post.id)) {
+    logger.info(`[Social Dispatcher] Post ${post.id} já está em processo de despacho ativo. Ignorando chamada concorrente.`, {
+      context: 'Scheduler',
+    });
+    return { success: true };
+  }
+  activePostDispatches.add(post.id);
+  setTimeout(() => activePostDispatches.delete(post.id), 5 * 60 * 1000);
+
   // 1. Resolve and validate the video URL
   let videoUrl = options.videoUrl || post.rendered_video_url || '';
   if (!isValidVideoUrl(videoUrl)) {
+    activePostDispatches.delete(post.id);
     logger.warn(`[Social Dispatcher] Post ${post.id} não possui vídeo renderizado válido (${videoUrl}). Disparo adiado.`, {
       context: 'Scheduler',
     });
@@ -57,6 +71,7 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
   // 2. Resolve target accounts
   const targetAccounts = options.targetAccounts || post.target_accounts || [];
   if (!targetAccounts || targetAccounts.length === 0) {
+    activePostDispatches.delete(post.id);
     logger.info(`[Social Dispatcher] Post ${post.id} não possui contas de destino selecionadas. Nenhum upload necessário.`, {
       context: 'Scheduler',
     });
@@ -99,6 +114,37 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
       }
     } catch (dbErr: any) {
       logger.warn(`[Social Dispatcher] Aviso ao extrair buffer do banco: ${dbErr?.message}`, { context: 'Scheduler' });
+    }
+  }
+
+  // If videoUrl is Remotion storage path (/storage/darkclip_....mp4) and not on disk yet, fetch from candidates
+  if (!fs.existsSync(videoArg) && videoUrl.includes('/storage/')) {
+    const CANDIDATE_URLS = [
+      'http://n8n-remotionservice-ry6eh9:3001',
+      process.env.REMOTION_SERVICE_URL?.replace(/\/render$/, ''),
+      process.env.REMOTION_SERVER_URL,
+      'http://localhost:3001',
+    ].filter(Boolean) as string[];
+
+    const cleanPath = videoUrl.startsWith('http') ? new URL(videoUrl).pathname : videoUrl;
+    for (const base of CANDIDATE_URLS) {
+      const fetchUrl = `${base.replace(/\/+$/, '')}${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
+      try {
+        const checkRes = await fetch(fetchUrl);
+        if (checkRes.ok) {
+          const arrayBuf = await checkRes.arrayBuffer();
+          const buffer = Buffer.from(arrayBuf);
+          if (buffer.length > 10000) {
+            const localTempPath = path.join(tempDir, `dispatch_${post.id}.mp4`);
+            fs.writeFileSync(localTempPath, buffer);
+            videoArg = localTempPath;
+            logger.info(`[Social Dispatcher] Vídeo baixado do container Remotion para disco local (${(buffer.length / (1024 * 1024)).toFixed(2)} MB): ${localTempPath}`, {
+              context: 'Scheduler',
+            });
+            break;
+          }
+        }
+      } catch (_) {}
     }
   }
 

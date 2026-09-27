@@ -126,7 +126,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
         logger.warn(`OpenAI error: ${await gptRes.text()}`, { context: 'AI' });
       }
     } catch (openAiErr) {
-      logger.warn('Falha na execução OpenAI, tentando fallback para Gemini:', openAiErr, { context: 'AI' });
+      logger.warn(`Falha na execução OpenAI, tentando fallback para Gemini: ${openAiErr}`, { context: 'AI' });
     }
   }
 
@@ -144,7 +144,7 @@ RETORNE EXCLUSIVAMENTE UM JSON VÁLIDO no seguinte formato (sem blocos markdown 
         responseJson = JSON.parse(cleanJson);
         logger.success('Remodelagem gerada com sucesso via Gemini AI', { context: 'AI' });
       } catch (gemErr) {
-        logger.warn('Falha na geração via Gemini:', gemErr, { context: 'AI' });
+        logger.warn(`Falha na geração via Gemini: ${gemErr}`, { context: 'AI' });
       }
     }
   }

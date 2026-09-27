@@ -244,6 +244,26 @@ def main():
             if not updated_db:
                 print(f"[*] [!] Não foi possível notificar o endpoint de status da publicação {args.post_id}.")
 
+    elif args.post_id and not any(r.get("success") for r in results.values()):
+        # Registra falha explícita no banco para não ficar preso em 'publishing'
+        errors_summary = "; ".join(f"{p}: {r.get('error', 'Falha desconhecida')}" for p, r in results.items())
+        db_url = os.environ.get("DATABASE_URL")
+        if db_url:
+            try:
+                import psycopg2
+                conn = psycopg2.connect(db_url)
+                cur = conn.cursor()
+                cur.execute(
+                    "UPDATE public.dark_clips_posts SET status = %s, error_message = %s WHERE id = %s",
+                    ("failed", errors_summary[:500], args.post_id)
+                )
+                conn.commit()
+                cur.close()
+                conn.close()
+                print(f"[*] [!] Status da publicação {args.post_id} marcado como 'failed' no PostgreSQL: {errors_summary}")
+            except Exception as pg_err:
+                print(f"[*] [!] Aviso ao registrar falha no PostgreSQL: {pg_err}")
+
     # Se ao menos uma rede teve sucesso, retorna código 0
     if any(r.get("success") for r in results.values()):
         sys.exit(0)

@@ -83,8 +83,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies for pytubefix, requests, playwright
-RUN pip3 install --no-cache-dir --break-system-packages pytubefix requests playwright
+# Install python dependencies for pytubefix, requests, playwright, psycopg2-binary
+RUN pip3 install --no-cache-dir --break-system-packages pytubefix requests playwright psycopg2-binary
 
 # Install chromium and system dependencies for Playwright headless automation
 RUN mkdir -p /ms-playwright \

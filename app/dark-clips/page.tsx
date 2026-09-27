@@ -218,6 +218,7 @@ function isValidVideoUrl(url?: string | null): boolean {
   }
   return (
     trimmed.startsWith('/api/storage/') ||
+    trimmed.startsWith('/storage/') ||
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://')
   );
@@ -581,17 +582,18 @@ export default function DarkClipsPage() {
   const selectedClipRef = React.useRef(selectedClip);
   selectedClipRef.current = selectedClip;
 
-  // Polling inteligente e otimizado quando há algum clipe em processamento/renderização ativa
-  useEffect(() => {
-    // Apenas considerar posts em renderização recentes (menos de 15 minutos) para evitar loops infinitos com jobs órfãos
+  // Polling inteligente e otimizado quando há algum clipe em processamento/renderização ou publicação ativa
+  const hasActiveJob = useMemo(() => {
     const now = Date.now();
-    const hasRecentRenderingPost = scheduledPosts.some((p) => {
+    return scheduledPosts.some((p) => {
       if (p.status !== 'rendering' && p.status !== 'publishing') return false;
       const createdTime = p.created_at ? new Date(p.created_at).getTime() : 0;
       return (now - createdTime) < 15 * 60 * 1000;
     });
+  }, [scheduledPosts]);
 
-    const shouldPoll = hasRecentRenderingPost || renderingClipIds.length > 0 || isRendering;
+  useEffect(() => {
+    const shouldPoll = hasActiveJob || renderingClipIds.length > 0 || isRendering;
     if (!shouldPoll) return;
 
     const interval = setInterval(async () => {
@@ -602,8 +604,8 @@ export default function DarkClipsPage() {
           setScheduledPosts(data.posts);
           const currentClip = selectedClipRef.current;
           if (currentClip) {
-            const match = data.posts.find((p: any) => p.clip_id === currentClip.id && p.rendered_video_url);
-            if (match && match.status === 'rendered') {
+            const match = data.posts.find((p: any) => p.clip_id === currentClip.id && isValidVideoUrl(p.rendered_video_url));
+            if (match) {
               setRenderedUrl(match.rendered_video_url);
               setRenderingClipIds((prev) => prev.filter((id) => id !== currentClip.id));
             }
@@ -612,10 +614,10 @@ export default function DarkClipsPage() {
       } catch (e) {
         // Silencioso em caso de abort/cancel
       }
-    }, 5000);
+    }, 4000);
 
     return () => clearInterval(interval);
-  }, [renderingClipIds.length, isRendering]);
+  }, [hasActiveJob, renderingClipIds.length, isRendering]);
 
   async function fetchInitialData() {
     setLoading(true);
@@ -4835,9 +4837,10 @@ export default function DarkClipsPage() {
                       <div className="space-y-3">
                         {scheduledPosts.map((post) => {
                           const isPublished = post.status === "published";
+                          const isPublishing = post.status === "publishing";
                           const isRendered = (post.status as string) === "rendered" || (post.status as string) === "completed";
+                          const isRendering = (post.status as string) === "rendering";
                           const isFailed = post.status === "failed" || (post.status as string) === "error";
-                          const isRendering = (post.status as string) === "rendering" || post.status === "publishing";
 
                           return (
                             <div
@@ -4868,8 +4871,13 @@ export default function DarkClipsPage() {
 
                               <div className="flex items-center gap-2 shrink-0 flex-wrap">
                                 {isPublished ? (
-                                  <Badge className="text-[10px] uppercase bg-emerald-600 text-white font-bold">
-                                    ✓ Publicado
+                                  <Badge className="text-[10px] uppercase bg-emerald-600 hover:bg-emerald-600 text-white font-bold flex items-center gap-1">
+                                    <Check className="h-3 w-3" /> Publicado
+                                  </Badge>
+                                ) : isPublishing ? (
+                                  <Badge className="text-[10px] uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold animate-pulse flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Publicando...
                                   </Badge>
                                 ) : isRendered ? (
                                   <Badge className="text-[10px] uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
