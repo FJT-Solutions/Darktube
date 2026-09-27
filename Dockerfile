@@ -71,18 +71,25 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Install runtime dependencies required by the application
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
     python3-pip \
+    python-is-python3 \
     ca-certificates \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure pip3 is available and install pytubefix
-RUN pip3 install --no-cache-dir --break-system-packages pytubefix
+# Install python dependencies for pytubefix, requests, playwright
+RUN pip3 install --no-cache-dir --break-system-packages pytubefix requests playwright
+
+# Install chromium and system dependencies for Playwright headless automation
+RUN mkdir -p /ms-playwright \
+    && python3 -m playwright install --with-deps chromium \
+    && chmod -R 777 /ms-playwright
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -90,8 +97,13 @@ RUN adduser --system --uid 1001 nextjs
 # Copy standalone output including the public and static copied inside .next/standalone
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 
-# Create temporary directory and set permissions for nextjs user
-RUN mkdir -p /app/tmp/videos /app/tmp/frames && chmod -R 777 /app/tmp && chown -R nextjs:nodejs /app/tmp
+# Copy scripts directory (social-uploader, remotion-server, etc.)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+# Create temporary directories and sessions directory with write permissions for nextjs user
+RUN mkdir -p /app/tmp/videos /app/tmp/frames /app/scripts/social-uploader/sessions \
+    && chmod -R 777 /app/tmp /app/scripts/social-uploader/sessions \
+    && chown -R nextjs:nodejs /app/tmp /app/scripts/social-uploader/sessions
 
 USER nextjs
 EXPOSE 3000

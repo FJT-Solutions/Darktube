@@ -19,7 +19,21 @@ function triggerSocialUpload({
 
     console.log(`[Social Uploader] 🚀 Disparando upload multicanal em background...`);
 
-    const child = spawn('python', [
+    const fs = require('fs');
+    let pythonCmd = process.env.PYTHON_CMD;
+    if (!pythonCmd) {
+      if (process.platform === 'win32') {
+        pythonCmd = 'python';
+      } else if (fs.existsSync('/usr/bin/python3')) {
+        pythonCmd = '/usr/bin/python3';
+      } else if (fs.existsSync('/usr/bin/python')) {
+        pythonCmd = '/usr/bin/python';
+      } else {
+        pythonCmd = 'python3';
+      }
+    }
+
+    const child = spawn(pythonCmd, [
       uploaderScript,
       '--video', outputFilePath,
       '--caption', finalCaption,
@@ -30,6 +44,10 @@ function triggerSocialUpload({
     ], {
       detached: true,
       stdio: 'ignore'
+    });
+
+    child.on('error', (err) => {
+      console.warn(`[Social Uploader] Erro ao spawnar processo python (${pythonCmd}):`, err.message);
     });
 
     child.unref();

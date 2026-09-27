@@ -6,6 +6,7 @@ import { getDarkClipPosts, saveDarkClipPost, deleteDarkClipPost, updateDarkClipP
 import { uploadMediaFile } from '@/lib/storage';
 import { pool } from '@/lib/db-client';
 import { logger } from '@/lib/logger';
+import { getPythonCommand, safeSpawn } from '@/lib/python-runtime';
 
 const CANDIDATE_URLS = [
   'http://n8n-remotionservice-ry6eh9:3001',
@@ -125,7 +126,8 @@ export async function POST(req: Request) {
           spawnArgs.push('--facebook-page-id', facebookPageId);
         }
 
-        const child = spawn('python', ['-u', ...spawnArgs], {
+        const pythonCmd = getPythonCommand();
+        const child = safeSpawn(pythonCmd, ['-u', ...spawnArgs], {
           detached: true,
           stdio: ['ignore', outLog, outLog]
         });
