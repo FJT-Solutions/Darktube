@@ -18,6 +18,10 @@ import argparse
 from pathlib import Path
 from typing import List, Dict, Any
 
+current_dir = Path(__file__).resolve().parent
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
+
 from config import SUPPORTED_PLATFORMS, DEFAULT_STAGGER_DELAY_SECONDS, SESSIONS_DIR
 from uploaders import (
     TikTokUploader,
@@ -229,13 +233,17 @@ def main():
             for candidate_base in [base_site, "http://localhost:3000", "http://127.0.0.1:3000"]:
                 try:
                     import urllib.request
+                    import ssl
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
                     endpoint = f"{candidate_base.rstrip('/')}/api/dark-clips/schedule"
                     req = urllib.request.Request(
                         endpoint,
                         data=json.dumps({"action": "mark_published", "postId": args.post_id}).encode("utf-8"),
                         headers={"Content-Type": "application/json"}
                     )
-                    urllib.request.urlopen(req, timeout=10)
+                    urllib.request.urlopen(req, context=ctx, timeout=10)
                     print(f"[*] ✅ Status da publicação {args.post_id} atualizado para 'published' via {endpoint}!")
                     updated_db = True
                     break
@@ -247,6 +255,7 @@ def main():
     elif args.post_id and not any(r.get("success") for r in results.values()):
         # Registra falha explícita no banco para não ficar preso em 'publishing'
         errors_summary = "; ".join(f"{p}: {r.get('error', 'Falha desconhecida')}" for p, r in results.items())
+        updated_db = False
         db_url = os.environ.get("DATABASE_URL")
         if db_url:
             try:
@@ -260,9 +269,31 @@ def main():
                 conn.commit()
                 cur.close()
                 conn.close()
+                updated_db = True
                 print(f"[*] [!] Status da publicação {args.post_id} marcado como 'failed' no PostgreSQL: {errors_summary}")
             except Exception as pg_err:
                 print(f"[*] [!] Aviso ao registrar falha no PostgreSQL: {pg_err}")
+
+        if not updated_db:
+            base_site = os.environ.get("NEXTAUTH_URL") or os.environ.get("NEXT_PUBLIC_SITE_URL") or os.environ.get("NEXT_PUBLIC_APP_URL") or "http://localhost:3000"
+            for candidate_base in [base_site, "http://localhost:3000", "http://127.0.0.1:3000"]:
+                try:
+                    import urllib.request
+                    import ssl
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    endpoint = f"{candidate_base.rstrip('/')}/api/dark-clips/schedule"
+                    req = urllib.request.Request(
+                        endpoint,
+                        data=json.dumps({"action": "mark_failed", "postId": args.post_id, "error": errors_summary[:500]}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"}
+                    )
+                    urllib.request.urlopen(req, context=ctx, timeout=10)
+                    print(f"[*] [!] Status da publicação {args.post_id} marcado como 'failed' via {endpoint}!")
+                    break
+                except Exception:
+                    pass
 
     # Se ao menos uma rede teve sucesso, retorna código 0
     if any(r.get("success") for r in results.values()):

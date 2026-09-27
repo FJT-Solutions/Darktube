@@ -47,3 +47,13 @@ DEFAULT_USER_AGENT = (
 
 # Intervalo padrão de segurança entre postagens (em segundos)
 DEFAULT_STAGGER_DELAY_SECONDS = int(os.getenv("SOCIAL_STAGGER_DELAY_SECONDS", "30"))
+
+# Argumentos seguros para execução do Chromium headless em ambientes Docker/Linux/Windows
+DEFAULT_CHROMIUM_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--disable-setuid-sandbox",
+    "--no-first-run"
+]

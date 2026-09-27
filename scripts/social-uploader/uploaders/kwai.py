@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 from playwright.sync_api import sync_playwright
 
 from uploaders.base import BaseUploader
-from config import SESSIONS_DIR, DEFAULT_USER_AGENT
+from config import SESSIONS_DIR, DEFAULT_USER_AGENT, DEFAULT_CHROMIUM_ARGS
 
 class KwaiUploader(BaseUploader):
     def __init__(self):
@@ -42,7 +42,7 @@ class KwaiUploader(BaseUploader):
             with sync_playwright() as p:
                 browser = p.chromium.launch(
                     headless=True,
-                    args=["--disable-blink-features=AutomationControlled"]
+                    args=DEFAULT_CHROMIUM_ARGS
                 )
                 context = browser.new_context(
                     user_agent=DEFAULT_USER_AGENT,

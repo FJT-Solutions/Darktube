@@ -13,6 +13,7 @@ from uploaders.base import BaseUploader
 from config import (
     SESSIONS_DIR, 
     DEFAULT_USER_AGENT, 
+    DEFAULT_CHROMIUM_ARGS,
     THREADS_USER_ID, 
     THREADS_ACCESS_TOKEN
 )
@@ -89,7 +90,7 @@ class ThreadsUploader(BaseUploader):
                 cookies = json.load(f)
 
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
+                browser = p.chromium.launch(headless=True, args=DEFAULT_CHROMIUM_ARGS)
                 context = browser.new_context(user_agent=DEFAULT_USER_AGENT, viewport={"width": 1280, "height": 800})
                 context.add_cookies(cookies)
 

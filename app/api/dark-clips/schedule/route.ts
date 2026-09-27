@@ -112,6 +112,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
+    if (body.action === 'mark_failed' && body.postId) {
+      await pool.query('UPDATE public.dark_clips_posts SET status = $1, error_message = $2 WHERE id = $3', [
+        'failed',
+        body.error || 'Falha no upload das redes sociais',
+        body.postId,
+      ]);
+      return NextResponse.json({ success: true });
+    }
+
     const {
       postId,
       clipId,

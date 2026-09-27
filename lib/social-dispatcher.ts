@@ -195,14 +195,21 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
       spawnArgs.push('--facebook-page-id', facebookPageId);
     }
 
+    const scriptDir = path.resolve(process.cwd(), 'scripts/social-uploader');
     const pythonCmd = getPythonCommand();
     const child = safeSpawn(pythonCmd, ['-u', ...spawnArgs], {
+      cwd: scriptDir,
       detached: true,
       stdio: ['ignore', outLog, outLog],
       env: {
         ...process.env,
+        PYTHONPATH: `${scriptDir}${path.delimiter}${process.env.PYTHONPATH || ''}`,
         DATABASE_URL: process.env.DATABASE_URL || '',
       },
+    });
+
+    child.on('exit', (code, signal) => {
+      logger.info(`[Social Dispatcher] Processo Python finalizado (code: ${code}, signal: ${signal}) para post ${post.id}`, { context: 'Scheduler' });
     });
     child.unref();
 

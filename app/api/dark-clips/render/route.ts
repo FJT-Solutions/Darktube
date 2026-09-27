@@ -163,7 +163,9 @@ export async function POST(req: Request) {
     // 1. Criar registro imediato no Histórico de Produções
     const postTitle = title || finalRemodelData.headline_main || clipRecord?.author_handle || 'Dark Clip Render';
     const isFutureSchedule = Boolean(scheduledAt && new Date(scheduledAt) > new Date());
-    const initialStatus = dispatchNow ? 'publishing' : (isFutureSchedule ? 'scheduled' : 'rendering');
+    // O status inicial é sempre 'rendering' para que o usuário veja a produção antes da publicação.
+    // Assim que a renderização for concluída, o backend transiciona automaticamente para 'publishing'.
+    const initialStatus = isFutureSchedule ? 'scheduled' : 'rendering';
 
     const initialPost = await saveDarkClipPost({
       user_id: user?.id,
@@ -195,10 +197,10 @@ export async function POST(req: Request) {
       const finalizeRenderedPost = async (url: string) => {
         renderedVideoUrl = url;
         const shouldDispatch = Boolean(
-          (initialStatus === 'publishing' || dispatchNow || (initialStatus === 'scheduled' && (!scheduledAt || new Date(scheduledAt) <= new Date()))) &&
+          (dispatchNow || (isFutureSchedule && (!scheduledAt || new Date(scheduledAt) <= new Date()))) &&
           targetAccounts && targetAccounts.length > 0
         );
-        const nextStatus = shouldDispatch ? 'publishing' : (initialStatus === 'scheduled' ? 'scheduled' : 'rendered');
+        const nextStatus = shouldDispatch ? 'publishing' : (isFutureSchedule ? 'scheduled' : 'rendered');
         await pool.query(
           'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
           [nextStatus, url, initialPost.id]

@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 from playwright.sync_api import sync_playwright
 
 from uploaders.base import BaseUploader
-from config import SESSIONS_DIR, DEFAULT_USER_AGENT
+from config import SESSIONS_DIR, DEFAULT_USER_AGENT, DEFAULT_CHROMIUM_ARGS
 
 class FacebookUploader(BaseUploader):
     def __init__(self):
@@ -61,16 +61,13 @@ class FacebookUploader(BaseUploader):
                     context = p.chromium.launch_persistent_context(
                         user_data_dir=str(self.profile_dir),
                         headless=True,
-                        args=[
-                            "--disable-blink-features=AutomationControlled",
-                            "--no-sandbox"
-                        ]
+                        args=DEFAULT_CHROMIUM_ARGS
                     )
                     page = context.pages[0] if context.pages else context.new_page()
                 else:
                     browser = p.chromium.launch(
                         headless=True,
-                        args=["--disable-blink-features=AutomationControlled"]
+                        args=DEFAULT_CHROMIUM_ARGS
                     )
                     context = browser.new_context(
                         user_agent=DEFAULT_USER_AGENT,
@@ -123,30 +120,48 @@ class FacebookUploader(BaseUploader):
                                     target_option = page.locator(f'text="{target_page_name}"').first
                                     if target_option.count() > 0:
                                         target_option.click()
-                                        page.wait_for_timeout(2500)
+                                        page.wait_for_timeout(2000)
                                         print(f"[{self.name.upper()}] ✅ Página alternada para: {target_page_name}")
+                                        page.keyboard.press("Escape")
+                                        page.wait_for_timeout(500)
                     except Exception as page_switch_err:
                         print(f"[{self.name.upper()}] [!] Aviso ao alternar página: {page_switch_err}")
 
+                # Garante que qualquer overlay aberto seja fechado
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(500)
+
                 # 2. Upload do arquivo de vídeo
-                add_btn = page.locator('text="Adicionar vídeo"').first
-                if not add_btn.count() or not add_btn.is_visible():
-                    # Tenta botão alternativo de upload
-                    add_btn = page.locator('button:has-text("Adicionar vídeo"), div[role="button"]:has-text("Adicionar vídeo")').first
+                uploaded_via_input = False
+                file_input = page.locator('input[type="file"][accept*="video"], input[type="file"]').first
+                if file_input.count() > 0:
+                    try:
+                        file_input.set_input_files(str(path))
+                        uploaded_via_input = True
+                        print(f"[{self.name.upper()}] ✅ Vídeo inserido diretamente no input de arquivos.")
+                    except Exception as input_err:
+                        print(f"[{self.name.upper()}] Fallback para clique de upload: {input_err}")
 
-                if not add_btn.count():
-                    context.close()
-                    return {
-                        "success": False,
-                        "platform": self.name,
-                        "error": "Botão 'Adicionar vídeo' não encontrado no compositor do Facebook."
-                    }
+                if not uploaded_via_input:
+                    add_btn = page.locator('text="Adicionar vídeo"').first
+                    if not add_btn.count() or not add_btn.is_visible():
+                        add_btn = page.locator('button:has-text("Adicionar vídeo"), div[role="button"]:has-text("Adicionar vídeo")').first
 
-                print(f"[{self.name.upper()}] Inserindo vídeo no compositor...")
-                with page.expect_file_chooser(timeout=30000) as fc_info:
-                    add_btn.click()
-                file_chooser = fc_info.value
-                file_chooser.set_files(str(path))
+                    if not add_btn.count():
+                        context.close()
+                        return {
+                            "success": False,
+                            "platform": self.name,
+                            "error": "Botão 'Adicionar vídeo' não encontrado no compositor do Facebook."
+                        }
+
+                    print(f"[{self.name.upper()}] Inserindo vídeo no compositor...")
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(300)
+                    with page.expect_file_chooser(timeout=30000) as fc_info:
+                        add_btn.click(force=True)
+                    file_chooser = fc_info.value
+                    file_chooser.set_files(str(path))
 
                 # 3. Aguarda o upload do vídeo atingir 100%
                 print(f"[{self.name.upper()}] Aguardando compilação e upload atingir 100%...")
