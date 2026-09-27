@@ -1,11 +1,17 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Carrega variáveis de ambiente do .env na raiz do darktube se existir
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
-load_dotenv(PROJECT_ROOT / ".env")
+
+try:
+    from dotenv import load_dotenv
+    env_file = PROJECT_ROOT / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+except Exception:
+    pass
 
 # Diretório onde os cookies de sessão são armazenados com segurança
 SESSIONS_DIR = BASE_DIR / "sessions"

@@ -208,8 +208,34 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
       },
     });
 
-    child.on('exit', (code, signal) => {
+    child.on('exit', async (code, signal) => {
       logger.info(`[Social Dispatcher] Processo Python finalizado (code: ${code}, signal: ${signal}) para post ${post.id}`, { context: 'Scheduler' });
+      if (code !== 0) {
+        let errorSnippet = `Código de saída: ${code}`;
+        try {
+          if (fs.existsSync(logFile)) {
+            const rawLog = fs.readFileSync(logFile, 'utf-8');
+            const lines = rawLog.trim().split('\n').filter(Boolean);
+            if (lines.length > 0) {
+              errorSnippet = lines.slice(-10).join(' | ');
+            }
+          }
+        } catch (_) {}
+
+        logger.error(`[Social Dispatcher] Falha fatal no despachante Python para post ${post.id}: ${errorSnippet}`, { context: 'Scheduler' });
+
+        try {
+          await pool.query(
+            `UPDATE public.dark_clips_posts SET
+              status = 'failed',
+              error_message = COALESCE(error_message, $1)
+            WHERE id = $2 AND status = 'publishing'`,
+            [`Falha no processo de envio: ${errorSnippet.slice(0, 450)}`, post.id]
+          );
+        } catch (dbErr: any) {
+          logger.error(`[Social Dispatcher] Erro ao registrar falha no DB: ${dbErr?.message}`, { context: 'Scheduler' });
+        }
+      }
     });
     child.unref();
 
