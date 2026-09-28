@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle 
+  DialogContent,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +14,17 @@ import {
   CheckCircle2, 
   RefreshCw, 
   Lock, 
-  Globe, 
   CornerDownLeft, 
   Delete, 
-  ArrowRight,
-  Cookie,
-  Monitor,
-  MousePointer,
-  Sparkles
+  Cookie, 
+  Monitor, 
+  MousePointer, 
+  Sparkles,
+  Maximize2,
+  Minimize2,
+  X,
+  Keyboard,
+  Share2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +49,7 @@ export function CloudAuthModal({
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [quickText, setQuickText] = useState("");
   const [isInteracting, setIsInteracting] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Ripple visual do clique
   const [clickRipple, setClickRipple] = useState<{ x: number; y: number } | null>(null);
@@ -58,9 +60,10 @@ export function CloudAuthModal({
   const [savingCookies, setSavingCookies] = useState(false);
 
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Inicia o navegador remoto assim que o modal abre
+  // Inicia o navegador remoto
   const startRemoteBrowser = useCallback(async () => {
     setStatus("starting");
     setScreenshot(null);
@@ -89,6 +92,7 @@ export function CloudAuthModal({
   useEffect(() => {
     if (open) {
       setManualCookiesMode(false);
+      setIsFullscreen(false);
       startRemoteBrowser();
     } else {
       if (sessionId) {
@@ -135,14 +139,14 @@ export function CloudAuthModal({
           }
         }
       } catch (_) {}
-    }, 900);
+    }, 850);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [sessionId, status, platformName, onSuccess, onOpenChange]);
 
-  // Envia ação de interação para o navegador
+  // Envia ação de interação para o navegador remoto
   const sendInteraction = async (payload: {
     type: "click" | "type" | "press" | "scroll" | "reload";
     x?: number;
@@ -177,25 +181,44 @@ export function CloudAuthModal({
     } catch (_) {}
   };
 
-  // Clique do usuário na tela do navegador remoto
+  // Clique do usuário com cálculo preciso de coordenadas (considerando letterboxing do object-contain)
   const handleViewportClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!imgRef.current) return;
+    const img = imgRef.current;
+    if (!img) return;
 
-    const rect = imgRef.current.getBoundingClientRect();
-    const clientX = e.clientX;
-    const clientY = e.clientY;
+    const rect = img.getBoundingClientRect();
+    const naturalAspect = 1280 / 800; // 1.6
+    const containerAspect = rect.width / rect.height;
 
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+    let renderedWidth = rect.width;
+    let renderedHeight = rect.height;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (containerAspect > naturalAspect) {
+      renderedWidth = rect.height * naturalAspect;
+      offsetX = (rect.width - renderedWidth) / 2;
+    } else {
+      renderedHeight = rect.width / naturalAspect;
+      offsetY = (rect.height - renderedHeight) / 2;
+    }
+
+    const clickX = e.clientX - rect.left - offsetX;
+    const clickY = e.clientY - rect.top - offsetY;
+
+    if (clickX < 0 || clickX > renderedWidth || clickY < 0 || clickY > renderedHeight) {
       return;
     }
 
-    // Calcula coordenadas relativas proporcionais à resolução 1280x800
-    const x = Math.round(((clientX - rect.left) / rect.width) * 1280);
-    const y = Math.round(((clientY - rect.top) / rect.height) * 800);
+    const x = Math.round((clickX / renderedWidth) * 1280);
+    const y = Math.round((clickY / renderedHeight) * 800);
 
-    // Efeito visual do clique
-    setClickRipple({ x: clientX - rect.left, y: clientY - rect.top });
-    setTimeout(() => setClickRipple(null), 400);
+    // Efeito visual do ripple exatamente onde clicou
+    if (containerRef.current) {
+      const cRect = containerRef.current.getBoundingClientRect();
+      setClickRipple({ x: e.clientX - cRect.left, y: e.clientY - cRect.top });
+      setTimeout(() => setClickRipple(null), 350);
+    }
 
     sendInteraction({ type: "click", x, y });
   };
@@ -207,7 +230,7 @@ export function CloudAuthModal({
 
   // Digitação direta no teclado quando a tela estiver em foco
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (["Tab", "Enter", "Backspace", "Escape", "ArrowUp", "ArrowDown"].includes(e.key)) {
+    if (["Tab", "Enter", "Backspace", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
       sendInteraction({ type: "press", key: e.key });
     } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -223,7 +246,7 @@ export function CloudAuthModal({
     setIsInteracting(true);
     sendInteraction({ type: "type", text: quickText }).then(() => {
       if (pressEnter) {
-        setTimeout(() => sendInteraction({ type: "press", key: "Enter" }), 150);
+        setTimeout(() => sendInteraction({ type: "press", key: "Enter" }), 120);
       }
       setQuickText("");
       setIsInteracting(false);
@@ -264,37 +287,61 @@ export function CloudAuthModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden bg-zinc-950 border-zinc-800 text-zinc-100 shadow-2xl rounded-2xl gap-0">
-        {/* Barra de Janela do Navegador */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900/90 border-b border-zinc-800/80 select-none">
-          <div className="flex items-center gap-2">
+      <DialogContent 
+        className={`p-0 overflow-hidden bg-zinc-950 border-zinc-800 text-zinc-100 shadow-2xl gap-0 flex flex-col transition-all duration-200 ${
+          isFullscreen 
+            ? "fixed inset-0 w-screen h-screen max-w-none rounded-none border-none z-50" 
+            : "w-[94vw] max-w-6xl h-[86vh] rounded-2xl"
+        }`}
+      >
+        {/* ================= BARRA SUPERIOR DO NAVEGADOR ================= */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 select-none shrink-0">
+          {/* Lado Esquerdo: Controles de Janela e Identificação */}
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <span className="h-3 w-3 rounded-full bg-red-500/80 inline-block" />
-              <span className="h-3 w-3 rounded-full bg-amber-500/80 inline-block" />
-              <span className="h-3 w-3 rounded-full bg-emerald-500/80 inline-block" />
+              <button 
+                type="button" 
+                onClick={() => onOpenChange(false)}
+                className="h-3 w-3 rounded-full bg-red-500 hover:brightness-125 transition-all cursor-pointer"
+                title="Fechar Navegador"
+              />
+              <button 
+                type="button" 
+                onClick={() => setIsFullscreen(false)}
+                className="h-3 w-3 rounded-full bg-amber-500 hover:brightness-125 transition-all cursor-pointer"
+                title="Restaurar Tamanho"
+              />
+              <button 
+                type="button" 
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="h-3 w-3 rounded-full bg-emerald-500 hover:brightness-125 transition-all cursor-pointer"
+                title="Tela Cheia"
+              />
             </div>
-            <div className="h-4 w-px bg-zinc-700/60 mx-1" />
+
+            <div className="h-4 w-px bg-zinc-700/60" />
+
             <div className="flex items-center gap-2">
-              <span className="p-1 rounded bg-zinc-800 text-zinc-300">
+              <span className="p-1 rounded bg-zinc-800 text-zinc-200 border border-zinc-700/50">
                 <Monitor className="h-3.5 w-3.5" />
               </span>
-              <span className="text-xs font-semibold text-zinc-200">
+              <span className="text-xs font-bold text-zinc-200 tracking-wide">
                 {platformName}
               </span>
             </div>
           </div>
 
-          {/* Barra de URL do Navegador */}
-          <div className="flex-1 max-w-lg mx-4">
-            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-950/80 border border-zinc-800 rounded-lg text-xs text-zinc-400">
+          {/* Centro: Barra de Endereço / URL */}
+          <div className="flex-1 max-w-xl mx-4">
+            <div className="flex items-center gap-2 px-3 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-xs">
               <Lock className="h-3 w-3 text-emerald-400 shrink-0" />
-              <span className="truncate font-mono text-[11px] text-zinc-300">
-                {url || "Carregando página segura..."}
+              <span className="truncate font-mono text-[11px] text-zinc-300 flex-1">
+                {url || "https://www.facebook.com/login/"}
               </span>
               <button
                 type="button"
                 onClick={() => sendInteraction({ type: "reload" })}
-                className="ml-auto text-zinc-500 hover:text-zinc-200 transition-colors"
+                className="text-zinc-400 hover:text-zinc-100 transition-colors p-0.5"
                 title="Recarregar Página"
               >
                 <RefreshCw className="h-3 w-3" />
@@ -302,57 +349,75 @@ export function CloudAuthModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] font-semibold tracking-wider text-emerald-400 border-emerald-500/30 bg-emerald-500/10 gap-1.5 py-0.5">
+          {/* Lado Direito: Status e Ações */}
+          <div className="flex items-center gap-2 pr-6">
+            <Badge variant="outline" className="text-[10px] font-semibold text-emerald-400 border-emerald-500/30 bg-emerald-500/10 gap-1.5 py-0.5 px-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Ao Vivo
+              Nuvem Ao Vivo
             </Badge>
-            <button
+
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              title={isFullscreen ? "Sair da Tela Cheia" : "Expandir Tela Cheia"}
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setManualCookiesMode(!manualCookiesMode)}
-              className="text-[11px] text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 transition-colors flex items-center gap-1"
-              title="Alternar para colar cookies JSON"
+              className="h-7 text-[11px] px-2.5 bg-zinc-900 border-zinc-700/60 text-zinc-300 hover:bg-zinc-800 gap-1"
             >
               <Cookie className="h-3 w-3" />
-              {manualCookiesMode ? "Ver Navegador" : "Colar Cookies"}
-            </button>
+              {manualCookiesMode ? "Ver Tela" : "Cookies"}
+            </Button>
           </div>
         </div>
 
-        {/* ---------------- SUCESSO ---------------- */}
+        {/* ================= CONTEÚDO PRINCIPAL ================= */}
+
+        {/* 1. ESTADO DE SUCESSO */}
         {status === "success" && (
-          <div className="py-20 flex flex-col items-center justify-center space-y-3 text-center bg-zinc-950">
-            <div className="h-16 w-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-400 animate-bounce">
-              <CheckCircle2 className="h-9 w-9" />
+          <div className="flex-1 flex flex-col items-center justify-center space-y-4 text-center bg-zinc-950 p-6">
+            <div className="h-20 w-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-400 animate-bounce shadow-xl shadow-emerald-500/10">
+              <CheckCircle2 className="h-11 w-11" />
             </div>
-            <span className="text-lg font-bold text-emerald-300">Conectado com Sucesso!</span>
-            <p className="text-xs text-zinc-400 max-w-sm">
-              Sua sessão foi detectada e salva no banco PostgreSQL. O DarkTube já pode publicar nessa conta.
-            </p>
+            <div className="space-y-1">
+              <span className="text-xl font-bold text-emerald-300 block">Conectado com Sucesso!</span>
+              <p className="text-xs text-zinc-400 max-w-md leading-relaxed">
+                A sessão foi detectada e salva com segurança no banco PostgreSQL. O DarkTube já pode publicar automaticamente nesta conta.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* ---------------- MODO MANUAL DE COOKIES (FALLBACK) ---------------- */}
+        {/* 2. MODO MANUAL DE COOKIES (FALLBACK) */}
         {manualCookiesMode && status !== "success" && (
-          <div className="p-6 space-y-4 bg-zinc-950">
-            <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-start gap-2.5 text-xs text-emerald-200">
+          <div className="flex-1 p-6 space-y-4 bg-zinc-950 overflow-y-auto">
+            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-start gap-3 text-xs text-emerald-200">
               <Sparkles className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                Você pode colar a lista de cookies exportada do <strong>Cookie-Editor</strong> para conectar imediatamente sem interagir com o navegador.
+                Você pode colar a lista de cookies exportada do <strong>Cookie-Editor</strong> para conectar imediatamente sem precisar interagir com a tela.
               </p>
             </div>
             <Textarea
-              rows={8}
+              rows={12}
               placeholder='[ { "name": "c_user", "value": "..." }, ... ]'
               value={importJsonText}
               onChange={(e) => setImportJsonText(e.target.value)}
-              className="bg-zinc-900 border-zinc-800 font-mono text-xs resize-none"
+              className="bg-zinc-900 border-zinc-800 font-mono text-xs resize-none h-[calc(100%-140px)]"
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" size="sm" onClick={() => setManualCookiesMode(false)} className="text-xs">
-                Voltar ao Navegador
+                Voltar à Tela do Navegador
               </Button>
-              <Button size="sm" onClick={handleSaveCookiesDirect} disabled={savingCookies} className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5">
+              <Button size="sm" onClick={handleSaveCookiesDirect} disabled={savingCookies} className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 px-4">
                 {savingCookies ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                 Salvar Cookies
               </Button>
@@ -360,16 +425,17 @@ export function CloudAuthModal({
           </div>
         )}
 
-        {/* ---------------- TELA DO NAVEGADOR REMOTO (STREAMING) ---------------- */}
+        {/* 3. TELA DO NAVEGADOR REMOTO (INTERATIVO) */}
         {!manualCookiesMode && status !== "success" && (
-          <div className="flex flex-col bg-zinc-950">
-            {/* Viewport Interativo */}
+          <div className="flex-1 flex flex-col min-h-0 bg-zinc-950 overflow-hidden">
+            {/* Viewport Interativo com Suporte a Fullscreen e Proporção Perfeita */}
             <div
+              ref={containerRef}
               tabIndex={0}
               onKeyDown={handleKeyDown}
               onWheel={handleViewportWheel}
               onClick={handleViewportClick}
-              className="relative w-full aspect-[16/10] max-h-[500px] bg-zinc-900 flex items-center justify-center overflow-hidden cursor-crosshair focus:outline-none select-none border-b border-zinc-800/80"
+              className="relative flex-1 w-full bg-zinc-950 flex items-center justify-center overflow-hidden cursor-crosshair focus:outline-none select-none"
             >
               {screenshot ? (
                 <>
@@ -377,39 +443,53 @@ export function CloudAuthModal({
                     ref={imgRef}
                     src={screenshot}
                     alt="Navegador Remoto"
-                    className="w-full h-full object-contain pointer-events-none"
+                    className="w-full h-full object-contain pointer-events-none drop-shadow-2xl"
                   />
                   {clickRipple && (
                     <span
-                      className="absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-red-500 bg-red-500/30 animate-ping pointer-events-none"
+                      className="absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-red-500 bg-red-500/40 animate-ping pointer-events-none"
                       style={{ left: `${clickRipple.x}px`, top: `${clickRipple.y}px` }}
                     />
                   )}
                 </>
               ) : (
-                <div className="flex flex-col items-center justify-center gap-3 text-zinc-400">
-                  <div className="h-10 w-10 rounded-full border-2 border-red-500/20 border-t-red-500 animate-spin" />
-                  <span className="text-xs font-medium">Carregando tela do navegador na nuvem...</span>
+                <div className="flex flex-col items-center justify-center gap-3 text-zinc-400 py-16">
+                  <div className="relative">
+                    <div className="h-12 w-12 rounded-full border-2 border-red-500/20 border-t-red-500 animate-spin" />
+                    <Monitor className="h-5 w-5 text-red-400 absolute inset-0 m-auto" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <span className="text-sm font-semibold text-zinc-200 block">
+                      Iniciando Navegador em Nuvem...
+                    </span>
+                    <p className="text-xs text-zinc-500">
+                      Carregando tela de login de {platformName}. Aguarde alguns instantes.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Barra Inferior de Digitação Rápida e Teclas Especiais */}
-            <div className="p-3 bg-zinc-900/90 flex flex-wrap items-center gap-2">
-              <form onSubmit={(e) => handleSendQuickText(e, false)} className="flex-1 flex items-center gap-1.5 min-w-[280px]">
-                <Input
-                  type="text"
-                  placeholder="Digitar texto / e-mail / senha no campo ativo..."
-                  value={quickText}
-                  onChange={(e) => setQuickText(e.target.value)}
-                  className="bg-zinc-950 border-zinc-800 text-xs h-8 focus:border-red-500"
-                />
+            {/* ================= BARRA INFERIOR DE TECLADO E DIGITAÇÃO RÁPIDA ================= */}
+            <div className="p-3 bg-zinc-900/95 border-t border-zinc-800 flex flex-wrap items-center gap-2.5 shrink-0">
+              {/* Campo para digitar texto com envio imediato */}
+              <form onSubmit={(e) => handleSendQuickText(e, false)} className="flex-1 flex items-center gap-2 min-w-[320px]">
+                <div className="relative flex-1">
+                  <Keyboard className="h-3.5 w-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    type="text"
+                    placeholder="Digite ou cole seu e-mail / senha aqui..."
+                    value={quickText}
+                    onChange={(e) => setQuickText(e.target.value)}
+                    className="bg-zinc-950 border-zinc-800 pl-8 text-xs h-8 focus:border-red-500 placeholder:text-zinc-500"
+                  />
+                </div>
                 <Button 
                   type="submit" 
                   size="sm" 
                   disabled={!quickText.trim() || isInteracting}
-                  className="h-8 text-xs font-medium px-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
-                  title="Digitar texto no navegador"
+                  className="h-8 text-xs font-semibold px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/50"
+                  title="Digitar texto no campo focado"
                 >
                   Digitar
                 </Button>
@@ -418,21 +498,22 @@ export function CloudAuthModal({
                   size="sm" 
                   onClick={() => handleSendQuickText(undefined, true)}
                   disabled={!quickText.trim() || isInteracting}
-                  className="h-8 text-xs font-medium px-2.5 bg-red-600 hover:bg-red-700 text-white gap-1"
-                  title="Digitar texto e pressionar Enter"
+                  className="h-8 text-xs font-semibold px-3 bg-red-600 hover:bg-red-700 text-white gap-1 shadow-md shadow-red-600/20"
+                  title="Digitar texto e enviar Enter"
                 >
                   <CornerDownLeft className="h-3 w-3" />
                   Enter
                 </Button>
               </form>
 
-              <div className="flex items-center gap-1">
+              {/* Botões de Ações de Teclado */}
+              <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => sendInteraction({ type: "press", key: "Tab" })}
-                  className="h-8 text-[11px] px-2 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+                  className="h-8 text-xs px-2.5 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
                   title="Pular para próximo campo (Tab)"
                 >
                   Tab ⇥
@@ -442,7 +523,7 @@ export function CloudAuthModal({
                   variant="outline"
                   size="sm"
                   onClick={() => sendInteraction({ type: "press", key: "Enter" })}
-                  className="h-8 text-[11px] px-2 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+                  className="h-8 text-xs px-2.5 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
                   title="Enviar tecla Enter"
                 >
                   Enter ↵
@@ -452,16 +533,17 @@ export function CloudAuthModal({
                   variant="outline"
                   size="sm"
                   onClick={() => sendInteraction({ type: "press", key: "Backspace" })}
-                  className="h-8 text-[11px] px-2 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+                  className="h-8 text-xs px-2 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
                   title="Apagar caractere (Backspace)"
                 >
-                  <Delete className="h-3 w-3" />
+                  <Delete className="h-3.5 w-3.5" />
                 </Button>
               </div>
 
-              <div className="text-[11px] text-zinc-500 flex items-center gap-1.5 ml-auto">
-                <MousePointer className="h-3 w-3 text-red-400" />
-                <span>Clique diretamente na imagem para focar e interagir.</span>
+              {/* Dica de uso */}
+              <div className="text-[11px] text-zinc-400 flex items-center gap-1.5 ml-auto">
+                <MousePointer className="h-3 w-3 text-red-400 animate-pulse" />
+                <span>Clique diretamente na tela para focar nos campos ou botões.</span>
               </div>
             </div>
           </div>

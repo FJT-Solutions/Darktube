@@ -54,6 +54,8 @@ export async function POST(req: Request) {
       }
 
       const ok = CloudAuthManager.interact(sessionId, { type, x, y, text, key, deltaY });
+      // Aguarda o processamento do comando e geração do frame atualizado
+      await new Promise((r) => setTimeout(r, 140));
       const current = CloudAuthManager.getSession(sessionId);
       return NextResponse.json({ success: ok, session: current });
     }
