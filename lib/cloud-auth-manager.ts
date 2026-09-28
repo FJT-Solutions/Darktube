@@ -9,27 +9,17 @@ export interface CloudAuthSessionState {
   sessionId: string;
   userId?: string;
   platform: string;
-  mode: 'credentials' | 'qr_code';
   status:
     | 'idle'
     | 'starting'
     | 'navigating'
-    | 'logging_in'
-    | 'waiting'
-    | 'needs_2fa'
-    | 'submitting_code'
-    | 'device_prompt'
-    | 'waiting_device_approval'
-    | 'qr_code'
-    | 'qr_code_update'
-    | 'captcha_puzzle'
+    | 'streaming'
     | 'success'
     | 'error'
     | 'cancelled';
   message: string;
-  promptNumber?: string;
+  url?: string;
   screenshot?: string;
-  qrImage?: string;
   cookiesCount?: number;
   lastUpdated: number;
 }
@@ -46,17 +36,14 @@ const SESSIONS_DIR = path.resolve(process.cwd(), 'scripts/social-uploader/sessio
 
 export class CloudAuthManager {
   /**
-   * Inicia uma nova sessão de autenticação na nuvem para uma plataforma
+   * Inicia o Navegador Visual Remoto para a plataforma indicada
    */
   static startSession(params: {
     sessionId: string;
     userId?: string;
     platform: string;
-    mode?: 'credentials' | 'qr_code';
-    username?: string;
-    password?: string;
   }): CloudAuthSessionState {
-    const { sessionId, userId, platform, mode = 'credentials', username = '', password = '' } = params;
+    const { sessionId, userId, platform } = params;
 
     // Cancela sessão anterior com mesmo ID se existir
     this.cancelSession(sessionId);
@@ -72,14 +59,13 @@ export class CloudAuthManager {
       sessionId,
       userId,
       platform,
-      mode,
       status: 'starting',
-      message: `Iniciando autenticação em nuvem para ${platform.toUpperCase()}...`,
+      message: `Iniciando Navegador Remoto para ${platform.toUpperCase()}...`,
       lastUpdated: Date.now(),
     };
 
     const scriptDir = path.resolve(process.cwd(), 'scripts/social-uploader');
-    const child = safeSpawn(pythonCmd, ['-u', scriptPath, '--platform', platform, '--mode', mode], {
+    const child = safeSpawn(pythonCmd, ['-u', scriptPath, '--platform', platform], {
       cwd: scriptDir,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
@@ -88,24 +74,19 @@ export class CloudAuthManager {
       },
     });
 
-    // Timeout de segurança: 5 minutos
+    // Timeout de segurança: 10 minutos para o usuário interagir à vontade
     const timeoutId = setTimeout(() => {
-      logger.info(`[CloudAuth] Sessão ${sessionId} expirou por inatividade.`);
+      logger.info(`[RemoteBrowser] Sessão ${sessionId} expirou por inatividade.`);
       this.cancelSession(sessionId);
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     const record: ActiveSessionRecord = { state, child, timeoutId };
     activeSessions.set(sessionId, record);
 
-    // Envia o comando inicial para o script Python via stdin
-    const startPayload = JSON.stringify({
-      command: 'start',
-      username,
-      password,
-    });
-    child.stdin?.write(startPayload + '\n');
+    // Envia o comando de inicialização
+    child.stdin?.write(JSON.stringify({ command: 'start' }) + '\n');
 
-    // Lê os eventos emitidos pelo Python via stdout
+    // Lê os eventos do Python via stdout
     let buffer = '';
     child.stdout?.on('data', async (chunk: Buffer) => {
       buffer += chunk.toString('utf-8');
@@ -120,7 +101,7 @@ export class CloudAuthManager {
             const event = JSON.parse(rawJson);
             await this.handlePythonEvent(sessionId, event);
           } catch (e: any) {
-            logger.warn(`[CloudAuth] Erro ao parsear evento: ${e?.message} | Linha: ${trimmed.slice(0, 80)}`);
+            logger.warn(`[RemoteBrowser] Erro ao parsear evento: ${e?.message}`);
           }
         }
       }
@@ -129,16 +110,16 @@ export class CloudAuthManager {
     child.stderr?.on('data', (errChunk: Buffer) => {
       const errText = errChunk.toString('utf-8').trim();
       if (errText) {
-        logger.warn(`[CloudAuth ${platform}] stderr: ${errText.slice(0, 200)}`);
+        logger.warn(`[RemoteBrowser ${platform}] stderr: ${errText.slice(0, 160)}`);
       }
     });
 
     child.on('exit', (code, signal) => {
-      logger.info(`[CloudAuth] Processo Python finalizado (code: ${code}, signal: ${signal}) para sessão ${sessionId}`);
+      logger.info(`[RemoteBrowser] Processo finalizado (code: ${code}) para sessão ${sessionId}`);
       const current = activeSessions.get(sessionId);
       if (current && current.state.status !== 'success' && current.state.status !== 'error') {
         current.state.status = 'error';
-        current.state.message = current.state.message || 'Processo encerrado antes de concluir a autenticação.';
+        current.state.message = 'Navegador remoto encerrado.';
         current.state.lastUpdated = Date.now();
       }
     });
@@ -158,12 +139,11 @@ export class CloudAuthManager {
     state.message = event.message || state.message;
     state.lastUpdated = Date.now();
 
-    if (event.promptNumber !== undefined) state.promptNumber = event.promptNumber;
+    if (event.url !== undefined) state.url = event.url;
     if (event.screenshot !== undefined) state.screenshot = event.screenshot;
-    if (event.qrImage !== undefined) state.qrImage = event.qrImage;
     if (event.cookiesCount !== undefined) state.cookiesCount = event.cookiesCount;
 
-    // Se concluiu com sucesso, salva cookies no banco de dados para persistência total
+    // Se o login foi concluído com sucesso
     if (event.status === 'success') {
       const { cookies } = event;
       if (cookies && state.userId) {
@@ -171,7 +151,7 @@ export class CloudAuthManager {
           const cookiesStr = JSON.stringify(cookies);
           await upsertUserApiKey(state.userId, `social_session_${state.platform}_cookies`, cookiesStr);
           await upsertUserApiKey(state.userId, `social_session_${state.platform}_expired`, '');
-          logger.info(`[CloudAuth] Sessão de ${state.platform} salva no banco de dados para usuário ${state.userId}!`);
+          logger.info(`[RemoteBrowser] Sucesso! Cookies de ${state.platform} persistidos no banco PostgreSQL.`);
 
           // Se for Facebook, tenta sincronizar as páginas gerenciadas
           if (state.platform === 'facebook') {
@@ -186,17 +166,51 @@ export class CloudAuthManager {
             }
           }
         } catch (dbErr: any) {
-          logger.error(`[CloudAuth] Erro ao persistir cookies no banco: ${dbErr?.message}`);
+          logger.error(`[RemoteBrowser] Erro ao salvar cookies: ${dbErr?.message}`);
         }
       }
 
-      // Encerra processo filho com delay de 2s para limpeza graciosa
       setTimeout(() => {
         try {
           child.kill();
         } catch (_) {}
       }, 2000);
     }
+  }
+
+  /**
+   * Envia interação do usuário (clique, digitação, tecla, scroll, reload) para o navegador
+   */
+  static interact(
+    sessionId: string,
+    action: {
+      type: 'click' | 'type' | 'press' | 'scroll' | 'reload';
+      x?: number;
+      y?: number;
+      text?: string;
+      key?: string;
+      deltaY?: number;
+    }
+  ): boolean {
+    const record = activeSessions.get(sessionId);
+    if (!record || !record.child.stdin?.writable) return false;
+
+    let payload: any = { command: action.type };
+
+    if (action.type === 'click') {
+      payload = { command: 'click', x: action.x, y: action.y };
+    } else if (action.type === 'type') {
+      payload = { command: 'type', text: action.text };
+    } else if (action.type === 'press') {
+      payload = { command: 'press', key: action.key };
+    } else if (action.type === 'scroll') {
+      payload = { command: 'scroll', deltaY: action.deltaY };
+    } else if (action.type === 'reload') {
+      payload = { command: 'reload' };
+    }
+
+    record.child.stdin.write(JSON.stringify(payload) + '\n');
+    return true;
   }
 
   /**
@@ -209,26 +223,7 @@ export class CloudAuthManager {
   }
 
   /**
-   * Submete código 2FA digitado pelo usuário
-   */
-  static submit2FACode(sessionId: string, code: string): boolean {
-    const record = activeSessions.get(sessionId);
-    if (!record || !record.child.stdin?.writable) return false;
-
-    record.state.status = 'submitting_code';
-    record.state.message = 'Verificando código 2FA...';
-    record.state.lastUpdated = Date.now();
-
-    const payload = JSON.stringify({
-      command: 'submit_2fa',
-      code: code.trim(),
-    });
-    record.child.stdin.write(payload + '\n');
-    return true;
-  }
-
-  /**
-   * Cancela uma sessão ativa e limpa os recursos
+   * Cancela uma sessão ativa
    */
   static cancelSession(sessionId: string): boolean {
     const record = activeSessions.get(sessionId);
@@ -247,7 +242,7 @@ export class CloudAuthManager {
     } catch (_) {}
 
     record.state.status = 'cancelled';
-    record.state.message = 'Sessão cancelada.';
+    record.state.message = 'Navegador encerrado.';
     activeSessions.delete(sessionId);
     return true;
   }

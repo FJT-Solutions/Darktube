@@ -29,35 +29,36 @@ export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
     const body = await req.json();
-    const { action, platform, mode, username, password, sessionId, code } = body;
+    const { action, platform, sessionId, type, x, y, text, key, deltaY } = body;
 
+    // Inicia o Navegador Visual Remoto
     if (action === 'start') {
       if (!platform) {
         return NextResponse.json({ success: false, error: 'Plataforma é obrigatória' }, { status: 400 });
       }
 
-      const generatedId = sessionId || `auth_${platform}_${crypto.randomBytes(6).toString('hex')}`;
+      const generatedId = sessionId || `remote_${platform}_${crypto.randomBytes(6).toString('hex')}`;
       const session = CloudAuthManager.startSession({
         sessionId: generatedId,
         userId: user?.id,
         platform,
-        mode: mode || 'credentials',
-        username: username || '',
-        password: password || '',
       });
 
       return NextResponse.json({ success: true, session });
     }
 
-    if (action === 'submit_2fa') {
-      if (!sessionId || !code) {
-        return NextResponse.json({ success: false, error: 'sessionId e code são obrigatórios' }, { status: 400 });
+    // Interação do usuário com o navegador (clique, digitação, rolagem, reload)
+    if (action === 'interact') {
+      if (!sessionId || !type) {
+        return NextResponse.json({ success: false, error: 'sessionId e type são obrigatórios' }, { status: 400 });
       }
 
-      const ok = CloudAuthManager.submit2FACode(sessionId, code);
-      return NextResponse.json({ success: ok });
+      const ok = CloudAuthManager.interact(sessionId, { type, x, y, text, key, deltaY });
+      const current = CloudAuthManager.getSession(sessionId);
+      return NextResponse.json({ success: ok, session: current });
     }
 
+    // Cancela e fecha o navegador
     if (action === 'cancel') {
       if (!sessionId) {
         return NextResponse.json({ success: false, error: 'sessionId é obrigatório' }, { status: 400 });
