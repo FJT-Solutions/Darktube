@@ -21,6 +21,7 @@ import {
   FileCode,
   Upload
 } from "lucide-react";
+import { CloudAuthModal } from "@/components/cloud-auth-modal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +64,11 @@ export function SocialConnections() {
   const [importJsonText, setImportJsonText] = useState("");
   const [savingImport, setSavingImport] = useState(false);
 
+  // Cloud Auth Modal
+  const [cloudAuthOpen, setCloudAuthOpen] = useState(false);
+  const [cloudAuthPlatform, setCloudAuthPlatform] = useState("");
+  const [cloudAuthPlatformName, setCloudAuthPlatformName] = useState("");
+
   const fetchStatus = async () => {
     try {
       setLoading(true);
@@ -94,58 +100,16 @@ export function SocialConnections() {
   }, []);
 
 
-  const handleConnect = async (platform: string) => {
+  const handleConnect = (platform: string, platformName?: string) => {
     if (platform === "telegram") {
       setShowTelegramConfig(true);
       return;
     }
 
-    try {
-      setConnecting(platform);
-
-      const res = await fetch("/api/social", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "connect", platform })
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        toast.info(`Iniciando conexão com ${platform.toUpperCase()}...`, {
-          description: "A janela do navegador foi aberta. Faça seu login nela."
-        });
-
-        // Inicia verificação periódica inteligente em tempo real
-        let attempts = 0;
-        const pollInterval = setInterval(async () => {
-          attempts++;
-          try {
-            const checkRes = await fetch("/api/social");
-            const checkData = await checkRes.json();
-            if (checkData.success && checkData.accounts) {
-              setAccounts(checkData.accounts);
-              if (checkData.accounts[platform]?.connected) {
-                clearInterval(pollInterval);
-                setConnecting(null);
-                toast.success(`🎉 ${checkData.accounts[platform].label || platform.toUpperCase()} conectado com sucesso!`);
-                return;
-              }
-            }
-          } catch (e) {}
-
-          if (attempts > 120) {
-            clearInterval(pollInterval);
-            setConnecting(null);
-          }
-        }, 2500);
-      } else {
-        setConnecting(null);
-        toast.error(data.error || `Não foi possível iniciar login para ${platform}.`);
-      }
-    } catch (err: any) {
-      toast.error(`Erro ao conectar: ${err.message}`);
-      setConnecting(null);
-    }
+    const targetName = platformName || accounts[platform]?.label || platform.toUpperCase();
+    setCloudAuthPlatform(platform);
+    setCloudAuthPlatformName(targetName);
+    setCloudAuthOpen(true);
   };
 
   const handleDisconnect = async (platform: string) => {
@@ -312,14 +276,7 @@ export function SocialConnections() {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => {
-                          if (isHeadlessServer) {
-                            setImportPlatform(item.key);
-                            setImportModalOpen(true);
-                          } else {
-                            handleConnect(item.key);
-                          }
-                        }}
+                        onClick={() => handleConnect(item.key, item.name)}
                         className="flex-1 h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1 shadow-sm"
                       >
                         <RefreshCw className="h-3 w-3" />
@@ -349,7 +306,7 @@ export function SocialConnections() {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => handleConnect(item.key)}
+                        onClick={() => handleConnect(item.key, item.name)}
                         disabled={isBusy}
                         className="flex-1 h-8 text-xs font-semibold"
                       >
@@ -487,6 +444,15 @@ export function SocialConnections() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Interativo de Autenticação em Nuvem */}
+      <CloudAuthModal
+        open={cloudAuthOpen}
+        onOpenChange={setCloudAuthOpen}
+        platform={cloudAuthPlatform}
+        platformName={cloudAuthPlatformName}
+        onSuccess={fetchStatus}
+      />
     </div>
   );
 }
