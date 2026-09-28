@@ -19,9 +19,9 @@ export async function GET() {
     const user = await getCurrentUser();
     const posts = await getDarkClipPosts(user?.id);
 
-    // 1. Auto-reconciliação de renders diretamente do storage do Remotion (mesmo com timeout inicial)
+    // 1. Auto-reconciliação de renders diretamente do storage do Remotion (apenas se ainda estiver em 'rendering')
     for (const post of posts) {
-      if (!isValidVideoUrl(post.rendered_video_url) || post.status === 'rendering' || post.status === 'failed') {
+      if (post.status === 'rendering' && !isValidVideoUrl(post.rendered_video_url)) {
         for (const baseUrl of CANDIDATE_URLS) {
           const cleanBase = baseUrl.replace(/\/+$/, '');
           const fileCandidate = `${cleanBase}/storage/darkclip_${post.id}.mp4`;

@@ -12,14 +12,21 @@ const SESSIONS_DIR = path.resolve(process.cwd(), 'scripts/social-uploader/sessio
 const SESSION_MAP: Record<string, string> = {
   facebook_cookies: 'facebook_cookies.json',
   facebook_pages: 'facebook_pages.json',
+  facebook_expired: 'facebook_expired.json',
   youtube_cookies: 'youtube_cookies.json',
   youtube_credentials: 'youtube_credentials.json',
+  youtube_expired: 'youtube_expired.json',
   instagram_cookies: 'instagram_cookies.json',
   instagram_session: 'instagram_session.json',
+  instagram_expired: 'instagram_expired.json',
   tiktok_cookies: 'tiktok_cookies.json',
+  tiktok_expired: 'tiktok_expired.json',
   pinterest_cookies: 'pinterest_cookies.json',
+  pinterest_expired: 'pinterest_expired.json',
   kwai_cookies: 'kwai_cookies.json',
+  kwai_expired: 'kwai_expired.json',
   threads_cookies: 'threads_cookies.json',
+  threads_expired: 'threads_expired.json',
 };
 
 /**
@@ -98,34 +105,51 @@ export async function GET() {
     const isFilePresent = (...fileNames: string[]) => 
       fileNames.some(f => fs.existsSync(path.join(SESSIONS_DIR, f)));
 
-    const accounts: Record<string, { connected: boolean; label: string; details?: string }> = {
+    const isExpired = (platform: string) =>
+      fs.existsSync(path.join(SESSIONS_DIR, `${platform}_expired.json`));
+
+    const accounts: Record<string, { connected: boolean; expired?: boolean; label: string; details?: string }> = {
       tiktok: {
         connected: isFilePresent('tiktok_cookies.json'),
+        expired: isExpired('tiktok'),
         label: 'TikTok',
+        details: isExpired('tiktok') ? '⚠️ Sessão Expirada' : undefined,
       },
       instagram: {
         connected: isFilePresent('instagram_session.json', 'instagram_cookies.json'),
+        expired: isExpired('instagram'),
         label: 'Instagram Reels',
+        details: isExpired('instagram') ? '⚠️ Sessão Expirada' : undefined,
       },
       facebook: {
         connected: isFilePresent('facebook_cookies.json', 'instagram_session.json'),
+        expired: isExpired('facebook'),
         label: 'Facebook Reels',
+        details: isExpired('facebook') ? '⚠️ Sessão Expirada' : undefined,
       },
       youtube: {
         connected: isFilePresent('youtube_credentials.json', 'youtube_cookies.json'),
+        expired: isExpired('youtube'),
         label: 'YouTube Shorts',
+        details: isExpired('youtube') ? '⚠️ Sessão Expirada' : undefined,
       },
       pinterest: {
         connected: isFilePresent('pinterest_cookies.json'),
+        expired: isExpired('pinterest'),
         label: 'Pinterest',
+        details: isExpired('pinterest') ? '⚠️ Sessão Expirada' : undefined,
       },
       kwai: {
         connected: isFilePresent('kwai_cookies.json'),
+        expired: isExpired('kwai'),
         label: 'Kwai',
+        details: isExpired('kwai') ? '⚠️ Sessão Expirada' : undefined,
       },
       threads: {
         connected: isFilePresent('threads_cookies.json') || Boolean(process.env.THREADS_ACCESS_TOKEN),
+        expired: isExpired('threads'),
         label: 'Threads',
+        details: isExpired('threads') ? '⚠️ Sessão Expirada' : undefined,
       },
       telegram: {
         connected: telegramConnected,
@@ -143,7 +167,11 @@ export async function GET() {
     }
 
     if (facebookPages.length > 0 && accounts.facebook) {
-      accounts.facebook.details = `${facebookPages.length} páginas sincronizadas`;
+      if (accounts.facebook.expired) {
+        accounts.facebook.details = `⚠️ Sessão Expirada (${facebookPages.length} páginas)`;
+      } else {
+        accounts.facebook.details = `${facebookPages.length} páginas sincronizadas`;
+      }
     }
 
     const isHeadless = process.platform !== 'win32' && !process.env.DISPLAY;
@@ -197,8 +225,16 @@ export async function POST(req: Request) {
       const content = typeof sessionData === 'string' ? sessionData : JSON.stringify(sessionData, null, 2);
       
       fs.writeFileSync(filePath, content, 'utf-8');
+
+      // Limpa flag de sessão expirada
+      const expFile = path.join(SESSIONS_DIR, `${platform}_expired.json`);
+      if (fs.existsSync(expFile)) {
+        try { fs.unlinkSync(expFile); } catch (_) {}
+      }
+
       if (user) {
         await upsertUserApiKey(user.id, `social_session_${platform}_cookies`, content);
+        await upsertUserApiKey(user.id, `social_session_${platform}_expired`, '');
       }
 
       return NextResponse.json({ success: true, message: `Sessão de ${platform} importada com sucesso!` });
@@ -206,16 +242,16 @@ export async function POST(req: Request) {
 
     if (action === 'disconnect' && platform) {
       const filesToDelete: Record<string, string[]> = {
-        facebook: ['facebook_cookies.json', 'facebook_pages.json', 'facebook_groups.json', 'instagram_session.json'],
-        youtube: ['youtube_cookies.json', 'youtube_credentials.json'],
-        instagram: ['instagram_cookies.json', 'instagram_session.json'],
-        tiktok: ['tiktok_cookies.json'],
-        pinterest: ['pinterest_cookies.json'],
-        kwai: ['kwai_cookies.json'],
-        threads: ['threads_cookies.json'],
+        facebook: ['facebook_cookies.json', 'facebook_pages.json', 'facebook_groups.json', 'instagram_session.json', 'facebook_expired.json'],
+        youtube: ['youtube_cookies.json', 'youtube_credentials.json', 'youtube_expired.json'],
+        instagram: ['instagram_cookies.json', 'instagram_session.json', 'instagram_expired.json'],
+        tiktok: ['tiktok_cookies.json', 'tiktok_expired.json'],
+        pinterest: ['pinterest_cookies.json', 'pinterest_expired.json'],
+        kwai: ['kwai_cookies.json', 'kwai_expired.json'],
+        threads: ['threads_cookies.json', 'threads_expired.json'],
       };
 
-      const targets = filesToDelete[platform] || [`${platform}_cookies.json`];
+      const targets = filesToDelete[platform] || [`${platform}_cookies.json`, `${platform}_expired.json`];
       for (const f of targets) {
         const p = path.join(SESSIONS_DIR, f);
         if (fs.existsSync(p)) {

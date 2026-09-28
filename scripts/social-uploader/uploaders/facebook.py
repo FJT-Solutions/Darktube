@@ -96,10 +96,22 @@ class FacebookUploader(BaseUploader):
                 print(f"[{self.name.upper()}] URL após carregamento: {current_url}")
                 if "login.php" in current_url or "/login/" in current_url or "/login?" in current_url:
                     context.close()
+                    expired_file = SESSIONS_DIR / "facebook_expired.json"
+                    try:
+                        with open(expired_file, "w", encoding="utf-8") as ef:
+                            json.dump({
+                                "expired": True, 
+                                "reason": "Redirecionado para tela de login do Facebook", 
+                                "timestamp": time.time(),
+                                "url": current_url
+                            }, ef)
+                    except Exception:
+                        pass
                     return {
                         "success": False,
                         "platform": self.name,
-                        "error": "Sessão do Facebook expirou. Acesse Credenciais e conecte novamente."
+                        "error": "Sessão do Facebook expirou. Acesse Credenciais e conecte novamente.",
+                        "expired": True
                     }
 
                 # 1. Seleciona a página do Facebook desejada se houver alvo especificado
@@ -246,6 +258,12 @@ class FacebookUploader(BaseUploader):
                     pass
 
                 print(f"[{self.name.upper()}] 🎉 Reel publicado com sucesso no Facebook!")
+                expired_file = SESSIONS_DIR / "facebook_expired.json"
+                if expired_file.exists():
+                    try:
+                        expired_file.unlink()
+                    except Exception:
+                        pass
                 context.close()
 
                 return {

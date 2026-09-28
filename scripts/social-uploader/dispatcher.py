@@ -279,9 +279,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except BaseException as fatal_err:
-        if isinstance(fatal_err, SystemExit) and fatal_err.code == 0:
-            sys.exit(0)
+    except SystemExit as exit_err:
+        sys.exit(exit_err.code)
+    except Exception as fatal_err:
         import traceback
         traceback.print_exc()
         print(f"\n[FATAL ERROR] Falha no despachante: {fatal_err}", file=sys.stderr)
@@ -293,9 +293,9 @@ if __name__ == "__main__":
                 p_id = sys.argv[idx + 1]
                 break
         
-        if p_id and not (isinstance(fatal_err, SystemExit) and fatal_err.code == 0):
+        if p_id:
             err_msg = str(fatal_err) if str(fatal_err) else "Erro fatal na execução do despachante Python"
             update_post_status(p_id, "failed", err_msg)
         
-        sys.exit(fatal_err.code if isinstance(fatal_err, SystemExit) else 1)
+        sys.exit(1)
 

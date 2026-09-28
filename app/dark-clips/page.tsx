@@ -535,6 +535,7 @@ export default function DarkClipsPage() {
   const [selectedFacebookPage, setSelectedFacebookPage] = useState<string>("");
   const [loadingFbPages, setLoadingFbPages] = useState<boolean>(false);
   const [connectedPlatforms, setConnectedPlatforms] = useState<Record<string, boolean>>({});
+  const [expiredPlatforms, setExpiredPlatforms] = useState<Record<string, boolean>>({});
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("18:00");
   const [postCaption, setPostCaption] = useState("");
@@ -632,10 +633,13 @@ export default function DarkClipsPage() {
 
       if (socialData?.accounts) {
         const conn: Record<string, boolean> = {};
+        const exp: Record<string, boolean> = {};
         for (const [k, v] of Object.entries(socialData.accounts as Record<string, any>)) {
           conn[k] = !!v.connected;
+          exp[k] = !!v.expired;
         }
         setConnectedPlatforms(conn);
+        setExpiredPlatforms(exp);
         setTargetAccounts((prev) => prev.filter((plat) => conn[plat]));
       }
 
@@ -1375,6 +1379,23 @@ export default function DarkClipsPage() {
 
     if (targetAccounts.length === 0) {
       toast.warning("Selecione ao menos uma rede conectada (ex: Facebook Reels, YouTube Shorts).");
+      return;
+    }
+
+    const expiredSelected = targetAccounts.filter((plat) => expiredPlatforms[plat]);
+    if (expiredSelected.length > 0 && dispatchNow) {
+      const platLabelsMap: Record<string, string> = {
+        facebook: "Facebook Reels",
+        youtube: "YouTube Shorts",
+        instagram: "Instagram Reels",
+        tiktok: "TikTok",
+        pinterest: "Pinterest",
+        kwai: "Kwai",
+        threads: "Threads",
+        telegram: "Telegram",
+      };
+      const names = expiredSelected.map((p) => platLabelsMap[p] || p).join(", ");
+      toast.error(`A conta ${names} está com a sessão expirada! Reconecte em Credenciais antes de publicar.`);
       return;
     }
 
@@ -4616,6 +4637,7 @@ export default function DarkClipsPage() {
                             {["tiktok", "instagram", "facebook", "youtube", "pinterest", "kwai", "threads", "telegram"].map((plat) => {
                               const isChecked = targetAccounts.includes(plat);
                               const isConnected = !!connectedPlatforms[plat];
+                              const isExpired = !!expiredPlatforms[plat];
                               const platLabels: Record<string, string> = {
                                 tiktok: "TikTok",
                                 instagram: "Instagram Reels",
@@ -4635,6 +4657,9 @@ export default function DarkClipsPage() {
                                       toast.info(`${platLabels[plat]} não está conectada. Acesse Credenciais para conectar.`);
                                       return;
                                     }
+                                    if (isExpired) {
+                                      toast.warning(`Sessão de ${platLabels[plat]} expirada! Reconecte em Credenciais.`);
+                                    }
                                     if (isChecked) {
                                       setTargetAccounts((prev) => prev.filter((id) => id !== plat));
                                     } else {
@@ -4644,9 +4669,13 @@ export default function DarkClipsPage() {
                                       }
                                     }
                                   }}
-                                  title={isConnected ? `${platLabels[plat]} (Conectada)` : `${platLabels[plat]} (Desconectada - acesse Credenciais)`}
+                                  title={isExpired ? `${platLabels[plat]} (Sessão Expirada - Reconecte em Credenciais)` : isConnected ? `${platLabels[plat]} (Conectada)` : `${platLabels[plat]} (Desconectada - acesse Credenciais)`}
                                   className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
-                                    !isConnected
+                                    isExpired
+                                      ? isChecked
+                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/60 ring-1 ring-amber-500/40"
+                                        : "bg-amber-500/10 text-amber-400 border-amber-500/30 hover:border-amber-500/50"
+                                      : !isConnected
                                       ? "opacity-35 cursor-not-allowed border-dashed bg-secondary/10 text-muted-foreground/60 hover:opacity-50"
                                       : isChecked
                                       ? "bg-primary text-primary-foreground border-primary shadow-sm"
@@ -4654,9 +4683,14 @@ export default function DarkClipsPage() {
                                   }`}
                                 >
                                   {isChecked && <Check className="h-3 w-3" />}
-                                  {isConnected && !isChecked && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block mr-0.5" />}
+                                  {isExpired && <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping inline-block mr-0.5" />}
+                                  {isConnected && !isExpired && !isChecked && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block mr-0.5" />}
                                   {platLabels[plat]}
-                                  {!isConnected && <span className="text-[9px] font-normal text-muted-foreground ml-0.5">(Off)</span>}
+                                  {isExpired ? (
+                                    <span className="text-[9px] font-bold text-amber-400 ml-0.5">(Expirado ⚠️)</span>
+                                  ) : !isConnected ? (
+                                    <span className="text-[9px] font-normal text-muted-foreground ml-0.5">(Off)</span>
+                                  ) : null}
                                 </button>
                               );
                             })}
@@ -4774,6 +4808,24 @@ export default function DarkClipsPage() {
                           </div>
                         </div>
 
+                        {/* Alerta de contas com sessão expirada selecionadas */}
+                        {targetAccounts.some((p) => expiredPlatforms[p]) && (
+                          <div className="p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 flex items-center justify-between text-xs text-amber-200 animate-in fade-in">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">⚠️</span>
+                              <span>
+                                A conta <strong>{targetAccounts.filter((p) => expiredPlatforms[p]).map((p) => p === "facebook" ? "Facebook Reels" : p).join(", ")}</strong> está com sessão expirada!
+                              </span>
+                            </div>
+                            <a
+                              href="/credentials"
+                              className="text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 flex items-center gap-1 shrink-0 transition-colors"
+                            >
+                              Reconectar em Credenciais 🔗
+                            </a>
+                          </div>
+                        )}
+
                         {/* Dispatch Actions */}
                         <div className="flex gap-3 pt-2">
                           <Button
@@ -4862,8 +4914,16 @@ export default function DarkClipsPage() {
                                     {post.created_at ? new Date(post.created_at).toLocaleString("pt-BR") : post.scheduled_at ? new Date(post.scheduled_at).toLocaleString("pt-BR") : "Recentemente"}
                                   </span>
                                   {post.error_message && (
-                                    <span className="text-red-400 truncate max-w-xs" title={post.error_message}>
-                                      • Erro: {post.error_message}
+                                    <span className="text-red-400 truncate max-w-sm flex items-center gap-1 flex-wrap" title={post.error_message}>
+                                      <span>• Erro: {post.error_message}</span>
+                                      {(post.error_message.toLowerCase().includes("expirou") || post.error_message.toLowerCase().includes("sessão") || post.error_message.toLowerCase().includes("session")) && (
+                                        <a
+                                          href="/credentials"
+                                          className="text-amber-400 hover:text-amber-300 font-bold underline ml-1 inline-flex items-center gap-0.5"
+                                        >
+                                          [Reconectar 🔗]
+                                        </a>
+                                      )}
                                     </span>
                                   )}
                                 </div>

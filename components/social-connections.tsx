@@ -38,6 +38,7 @@ import { toast } from "sonner";
 
 interface SocialAccountStatus {
   connected: boolean;
+  expired?: boolean;
   label: string;
   details?: string;
 }
@@ -327,11 +328,15 @@ export function SocialConnections() {
           const isBusy = connecting === item.key;
           const Icon = item.icon;
 
+          const isExpired = Boolean(status.connected && status.expired);
+
           return (
             <Card 
               key={item.key} 
               className={`border transition-all duration-200 ${
-                status.connected 
+                isExpired
+                  ? "border-amber-500/50 bg-amber-500/[0.04] shadow-sm shadow-amber-500/10 ring-1 ring-amber-500/20"
+                  : status.connected 
                   ? "border-emerald-500/30 bg-emerald-500/[0.03]" 
                   : "border-border/60 bg-card/40 hover:border-border"
               }`}
@@ -343,11 +348,18 @@ export function SocialConnections() {
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-sm leading-none">{item.name}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="font-semibold text-sm leading-none">{item.name}</h3>
+                        {isExpired && (
+                          <Badge variant="outline" className="text-[9px] font-bold text-amber-400 border-amber-500/40 bg-amber-500/10 px-1 py-0">
+                            ⚠️ EXPIRADO
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5 mt-1.5">
-                        <span className={`h-2 w-2 rounded-full ${status.connected ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground/40"}`} />
-                        <span className="text-[11px] text-muted-foreground font-medium">
-                          {status.connected ? "Conectado" : "Não conectado"}
+                        <span className={`h-2 w-2 rounded-full ${isExpired ? "bg-amber-400 animate-ping" : status.connected ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground/40"}`} />
+                        <span className={`text-[11px] font-medium ${isExpired ? "text-amber-400 font-bold" : "text-muted-foreground"}`}>
+                          {isExpired ? "Sessão Expirada" : status.connected ? "Conectado" : "Não conectado"}
                         </span>
                       </div>
                     </div>
@@ -355,7 +367,35 @@ export function SocialConnections() {
                 </div>
 
                 <div className="pt-2 border-t border-border/40 flex items-center gap-2 justify-between">
-                  {status.connected ? (
+                  {isExpired ? (
+                    <>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          if (isHeadlessServer) {
+                            setImportPlatform(item.key);
+                            setImportModalOpen(true);
+                          } else {
+                            handleConnect(item.key);
+                          }
+                        }}
+                        className="flex-1 h-8 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1 shadow-sm"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Reconectar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDisconnect(item.key)}
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                        title="Desconectar"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  ) : status.connected ? (
                     <Button
                       variant="ghost"
                       size="sm"
