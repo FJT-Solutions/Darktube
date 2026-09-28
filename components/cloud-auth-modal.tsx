@@ -23,10 +23,12 @@ import {
   Maximize2,
   Minimize2,
   X,
-  Keyboard,
-  Share2
+  Mail,
+  KeyRound,
+  Rocket
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface CloudAuthModalProps {
   open: boolean;
@@ -47,8 +49,11 @@ export function CloudAuthModal({
   const [status, setStatus] = useState<string>("idle");
   const [url, setUrl] = useState<string>("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [quickText, setQuickText] = useState("");
-  const [isInteracting, setIsInteracting] = useState(false);
+  
+  // Preenchimento direto
+  const [inputEmail, setInputEmail] = useState("");
+  const [inputPassword, setInputPassword] = useState("");
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   // Ripple visual do clique
@@ -59,8 +64,9 @@ export function CloudAuthModal({
   const [importJsonText, setImportJsonText] = useState("");
   const [savingCookies, setSavingCookies] = useState(false);
 
-  const imgRef = useRef<HTMLImageElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hiddenInputRef = useRef<HTMLInputElement | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   // Inicia o navegador remoto
@@ -93,6 +99,8 @@ export function CloudAuthModal({
     if (open) {
       setManualCookiesMode(false);
       setIsFullscreen(false);
+      setInputEmail("");
+      setInputPassword("");
       startRemoteBrowser();
     } else {
       if (sessionId) {
@@ -107,7 +115,8 @@ export function CloudAuthModal({
       setStatus("idle");
       setScreenshot(null);
       setUrl("");
-      setQuickText("");
+      setInputEmail("");
+      setInputPassword("");
       setClickRipple(null);
     }
   }, [open, startRemoteBrowser]);
@@ -148,12 +157,16 @@ export function CloudAuthModal({
 
   // Envia ação de interação para o navegador remoto
   const sendInteraction = async (payload: {
-    type: "click" | "type" | "press" | "scroll" | "reload";
+    type: "click" | "type" | "press" | "scroll" | "reload" | "fill_field" | "fill_and_submit";
     x?: number;
     y?: number;
     text?: string;
     key?: string;
     deltaY?: number;
+    field?: "email" | "password" | "submit";
+    value?: string;
+    email?: string;
+    password?: string;
   }) => {
     if (!sessionId) return;
 
@@ -181,44 +194,27 @@ export function CloudAuthModal({
     } catch (_) {}
   };
 
-  // Clique do usuário com cálculo preciso de coordenadas (considerando letterboxing do object-contain)
-  const handleViewportClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const img = imgRef.current;
-    if (!img) return;
+  // Clique do usuário na tela com mapeamento pixel-perfect 1:1 e foco no teclado físico
+  const handleWrapperClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Garante que o teclado físico continue ativo
+    hiddenInputRef.current?.focus();
 
-    const rect = img.getBoundingClientRect();
-    const naturalAspect = 1280 / 800; // 1.6
-    const containerAspect = rect.width / rect.height;
+    if (!wrapperRef.current) return;
 
-    let renderedWidth = rect.width;
-    let renderedHeight = rect.height;
-    let offsetX = 0;
-    let offsetY = 0;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
-    if (containerAspect > naturalAspect) {
-      renderedWidth = rect.height * naturalAspect;
-      offsetX = (rect.width - renderedWidth) / 2;
-    } else {
-      renderedHeight = rect.width / naturalAspect;
-      offsetY = (rect.height - renderedHeight) / 2;
-    }
-
-    const clickX = e.clientX - rect.left - offsetX;
-    const clickY = e.clientY - rect.top - offsetY;
-
-    if (clickX < 0 || clickX > renderedWidth || clickY < 0 || clickY > renderedHeight) {
+    if (clickX < 0 || clickX > rect.width || clickY < 0 || clickY > rect.height) {
       return;
     }
 
-    const x = Math.round((clickX / renderedWidth) * 1280);
-    const y = Math.round((clickY / renderedHeight) * 800);
+    const x = Math.round((clickX / rect.width) * 1280);
+    const y = Math.round((clickY / rect.height) * 800);
 
-    // Efeito visual do ripple exatamente onde clicou
-    if (containerRef.current) {
-      const cRect = containerRef.current.getBoundingClientRect();
-      setClickRipple({ x: e.clientX - cRect.left, y: e.clientY - cRect.top });
-      setTimeout(() => setClickRipple(null), 350);
-    }
+    // Efeito visual do ripple
+    setClickRipple({ x: clickX, y: clickY });
+    setTimeout(() => setClickRipple(null), 350);
 
     sendInteraction({ type: "click", x, y });
   };
@@ -228,29 +224,37 @@ export function CloudAuthModal({
     sendInteraction({ type: "scroll", deltaY: e.deltaY });
   };
 
-  // Digitação direta no teclado quando a tela estiver em foco
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+  // Digitação direta no teclado físico via sink invisível
+  const handlePhysicalKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["Tab", "Enter", "Backspace", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
       sendInteraction({ type: "press", key: e.key });
-    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      sendInteraction({ type: "type", text: e.key });
     }
   };
 
-  // Envia texto da barra de digitação rápida
-  const handleSendQuickText = (e?: React.FormEvent, pressEnter = false) => {
-    if (e) e.preventDefault();
-    if (!quickText) return;
+  const handlePhysicalInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const val = e.currentTarget.value;
+    if (val) {
+      sendInteraction({ type: "type", text: val });
+      e.currentTarget.value = "";
+    }
+  };
 
-    setIsInteracting(true);
-    sendInteraction({ type: "type", text: quickText }).then(() => {
-      if (pressEnter) {
-        setTimeout(() => sendInteraction({ type: "press", key: "Enter" }), 120);
-      }
-      setQuickText("");
-      setIsInteracting(false);
+  // Preenche e submete credenciais diretamente
+  const handleFillAndSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!inputEmail.trim() && !inputPassword.trim()) {
+      toast.error("Preencha o e-mail ou a senha para preencher na tela.");
+      return;
+    }
+
+    setIsSubmittingForm(true);
+    await sendInteraction({
+      type: "fill_and_submit",
+      email: inputEmail.trim(),
+      password: inputPassword.trim(),
     });
+    setIsSubmittingForm(false);
   };
 
   const handleSaveCookiesDirect = async () => {
@@ -288,11 +292,13 @@ export function CloudAuthModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className={`p-0 overflow-hidden bg-zinc-950 border-zinc-800 text-zinc-100 shadow-2xl gap-0 flex flex-col transition-all duration-200 ${
+        showCloseButton={false}
+        className={cn(
+          "p-0 overflow-hidden bg-zinc-950 border-zinc-800 text-zinc-100 shadow-2xl gap-0 flex flex-col transition-all duration-200",
           isFullscreen 
-            ? "fixed inset-0 w-screen h-screen max-w-none rounded-none border-none z-50" 
-            : "w-[94vw] max-w-6xl h-[86vh] rounded-2xl"
-        }`}
+            ? "!fixed !inset-0 !w-screen !h-screen !max-w-none !rounded-none !border-none z-50" 
+            : "!w-[96vw] sm:!max-w-[1280px] !h-[92vh] !max-h-[94vh] rounded-2xl"
+        )}
       >
         {/* ================= BARRA SUPERIOR DO NAVEGADOR ================= */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 select-none shrink-0">
@@ -350,7 +356,7 @@ export function CloudAuthModal({
           </div>
 
           {/* Lado Direito: Status e Ações */}
-          <div className="flex items-center gap-2 pr-6">
+          <div className="flex items-center gap-2">
             <Badge variant="outline" className="text-[10px] font-semibold text-emerald-400 border-emerald-500/30 bg-emerald-500/10 gap-1.5 py-0.5 px-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Nuvem Ao Vivo
@@ -377,6 +383,15 @@ export function CloudAuthModal({
               <Cookie className="h-3 w-3" />
               {manualCookiesMode ? "Ver Tela" : "Cookies"}
             </Button>
+
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 ml-1"
+              title="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -428,30 +443,40 @@ export function CloudAuthModal({
         {/* 3. TELA DO NAVEGADOR REMOTO (INTERATIVO) */}
         {!manualCookiesMode && status !== "success" && (
           <div className="flex-1 flex flex-col min-h-0 bg-zinc-950 overflow-hidden">
-            {/* Viewport Interativo com Suporte a Fullscreen e Proporção Perfeita */}
+            {/* Viewport Interativo com Proporção Exata e Centralização Perfeita */}
             <div
               ref={containerRef}
-              tabIndex={0}
-              onKeyDown={handleKeyDown}
-              onWheel={handleViewportWheel}
-              onClick={handleViewportClick}
-              className="relative flex-1 w-full bg-zinc-950 flex items-center justify-center overflow-hidden cursor-crosshair focus:outline-none select-none"
+              onClick={() => hiddenInputRef.current?.focus()}
+              className="relative flex-1 w-full bg-zinc-950 flex items-center justify-center overflow-hidden p-2 select-none focus:outline-none"
             >
+              {/* Input invisível que captura teclado físico em tempo real */}
+              <input
+                ref={hiddenInputRef}
+                type="text"
+                className="opacity-0 pointer-events-none absolute -top-10 left-0 w-1 h-1"
+                onKeyDown={handlePhysicalKeyDown}
+                onInput={handlePhysicalInput}
+                autoFocus
+              />
               {screenshot ? (
-                <>
+                <div
+                  ref={wrapperRef}
+                  onClick={handleWrapperClick}
+                  onWheel={handleViewportWheel}
+                  className="relative aspect-[16/10] max-h-full max-w-full shadow-2xl border border-zinc-800 rounded-lg overflow-hidden cursor-crosshair bg-black"
+                >
                   <img
-                    ref={imgRef}
                     src={screenshot}
                     alt="Navegador Remoto"
-                    className="w-full h-full object-contain pointer-events-none drop-shadow-2xl"
+                    className="w-full h-full object-fill pointer-events-none drop-shadow-2xl"
                   />
                   {clickRipple && (
                     <span
-                      className="absolute h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-red-500 bg-red-500/40 animate-ping pointer-events-none"
+                      className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-red-500 bg-red-500/50 animate-ping pointer-events-none"
                       style={{ left: `${clickRipple.x}px`, top: `${clickRipple.y}px` }}
                     />
                   )}
-                </>
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center gap-3 text-zinc-400 py-16">
                   <div className="relative">
@@ -460,7 +485,7 @@ export function CloudAuthModal({
                   </div>
                   <div className="text-center space-y-1">
                     <span className="text-sm font-semibold text-zinc-200 block">
-                      Iniciando Navegador em Nuvem...
+                      Iniciando Navegador na Nuvem...
                     </span>
                     <p className="text-xs text-zinc-500">
                       Carregando tela de login de {platformName}. Aguarde alguns instantes.
@@ -470,43 +495,47 @@ export function CloudAuthModal({
               )}
             </div>
 
-            {/* ================= BARRA INFERIOR DE TECLADO E DIGITAÇÃO RÁPIDA ================= */}
+            {/* ================= BARRA INFERIOR DE PREENCHIMENTO RÁPIDO E CONTROLES ================= */}
             <div className="p-3 bg-zinc-900/95 border-t border-zinc-800 flex flex-wrap items-center gap-2.5 shrink-0">
-              {/* Campo para digitar texto com envio imediato */}
-              <form onSubmit={(e) => handleSendQuickText(e, false)} className="flex-1 flex items-center gap-2 min-w-[320px]">
-                <div className="relative flex-1">
-                  <Keyboard className="h-3.5 w-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <form onSubmit={handleFillAndSubmit} className="flex-1 flex flex-wrap items-center gap-2 min-w-[340px]">
+                {/* Campo E-mail */}
+                <div className="relative flex-1 min-w-[180px]">
+                  <Mail className="h-3.5 w-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <Input
                     type="text"
-                    placeholder="Digite ou cole seu e-mail / senha aqui..."
-                    value={quickText}
-                    onChange={(e) => setQuickText(e.target.value)}
+                    placeholder="E-mail ou Telefone..."
+                    value={inputEmail}
+                    onChange={(e) => setInputEmail(e.target.value)}
                     className="bg-zinc-950 border-zinc-800 pl-8 text-xs h-8 focus:border-red-500 placeholder:text-zinc-500"
                   />
                 </div>
+
+                {/* Campo Senha */}
+                <div className="relative flex-1 min-w-[160px]">
+                  <KeyRound className="h-3.5 w-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    placeholder="Sua Senha..."
+                    value={inputPassword}
+                    onChange={(e) => setInputPassword(e.target.value)}
+                    className="bg-zinc-950 border-zinc-800 pl-8 text-xs h-8 focus:border-red-500 placeholder:text-zinc-500"
+                  />
+                </div>
+
+                {/* Botão de Ação: Preencher & Entrar */}
                 <Button 
                   type="submit" 
                   size="sm" 
-                  disabled={!quickText.trim() || isInteracting}
-                  className="h-8 text-xs font-semibold px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/50"
-                  title="Digitar texto no campo focado"
+                  disabled={(!inputEmail.trim() && !inputPassword.trim()) || isSubmittingForm}
+                  className="h-8 text-xs font-semibold px-3.5 bg-red-600 hover:bg-red-700 text-white gap-1.5 shadow-md shadow-red-600/20"
+                  title="Preencher campos na tela e submeter"
                 >
-                  Digitar
-                </Button>
-                <Button 
-                  type="button" 
-                  size="sm" 
-                  onClick={() => handleSendQuickText(undefined, true)}
-                  disabled={!quickText.trim() || isInteracting}
-                  className="h-8 text-xs font-semibold px-3 bg-red-600 hover:bg-red-700 text-white gap-1 shadow-md shadow-red-600/20"
-                  title="Digitar texto e enviar Enter"
-                >
-                  <CornerDownLeft className="h-3 w-3" />
-                  Enter
+                  {isSubmittingForm ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+                  Preencher & Entrar
                 </Button>
               </form>
 
-              {/* Botões de Ações de Teclado */}
+              {/* Ações Auxiliares de Teclado */}
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -526,7 +555,8 @@ export function CloudAuthModal({
                   className="h-8 text-xs px-2.5 bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
                   title="Enviar tecla Enter"
                 >
-                  Enter ↵
+                  <CornerDownLeft className="h-3 w-3" />
+                  Enter
                 </Button>
                 <Button
                   type="button"
@@ -540,10 +570,10 @@ export function CloudAuthModal({
                 </Button>
               </div>
 
-              {/* Dica de uso */}
+              {/* Dica */}
               <div className="text-[11px] text-zinc-400 flex items-center gap-1.5 ml-auto">
                 <MousePointer className="h-3 w-3 text-red-400 animate-pulse" />
-                <span>Clique diretamente na tela para focar nos campos ou botões.</span>
+                <span>Clique diretamente na tela para interagir ou use o formulário rápido.</span>
               </div>
             </div>
           </div>

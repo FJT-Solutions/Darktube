@@ -179,17 +179,21 @@ export class CloudAuthManager {
   }
 
   /**
-   * Envia interação do usuário (clique, digitação, tecla, scroll, reload) para o navegador
+   * Envia interação do usuário (clique, digitação, tecla, scroll, reload, preenchimento direto) para o navegador
    */
   static interact(
     sessionId: string,
     action: {
-      type: 'click' | 'type' | 'press' | 'scroll' | 'reload';
+      type: 'click' | 'type' | 'press' | 'scroll' | 'reload' | 'fill_field' | 'fill_and_submit';
       x?: number;
       y?: number;
       text?: string;
       key?: string;
       deltaY?: number;
+      field?: 'email' | 'password' | 'submit';
+      value?: string;
+      email?: string;
+      password?: string;
     }
   ): boolean {
     const record = activeSessions.get(sessionId);
@@ -207,6 +211,10 @@ export class CloudAuthManager {
       payload = { command: 'scroll', deltaY: action.deltaY };
     } else if (action.type === 'reload') {
       payload = { command: 'reload' };
+    } else if (action.type === 'fill_field') {
+      payload = { command: 'fill_field', field: action.field, value: action.value };
+    } else if (action.type === 'fill_and_submit') {
+      payload = { command: 'fill_and_submit', email: action.email, password: action.password };
     }
 
     record.child.stdin.write(JSON.stringify(payload) + '\n');

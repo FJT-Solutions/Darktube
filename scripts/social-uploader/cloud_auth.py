@@ -3,7 +3,7 @@ cloud_auth.py - Navegador Visual Remoto Interativo na Nuvem para DarkTube
 
 Arquitetura Queue-Driven Single-Threaded:
 Todas as operações do Playwright rodam na thread principal (evitando greenlet switch errors).
-Uma thread leve lê comandos do stdin e os enfileira na fila de execução.
+Suporta cliques de mouse com coordenadas exatas, digitação, teclas especiais e preenchimento direto.
 """
 
 import sys
@@ -184,11 +184,11 @@ def main():
         last_stream_time = time.time()
         last_cookie_check = time.time()
 
-        # Loop principal de eventos (tudo na mesma thread principal!)
+        # Loop principal de eventos na thread principal do Playwright
         while running:
             has_command = False
 
-            # Processa todos os comandos pendentes na fila
+            # Processa comandos da fila
             try:
                 while True:
                     data = command_queue.get_nowait()
@@ -199,19 +199,76 @@ def main():
                         x = max(0, min(VIEWPORT_WIDTH, float(data.get("x", 0))))
                         y = max(0, min(VIEWPORT_HEIGHT, float(data.get("y", 0))))
                         page.mouse.click(x, y)
+
+                    elif cmd == "fill_field":
+                        field = data.get("field")
+                        val = data.get("value", "")
+                        if field == "email":
+                            loc = page.locator('input[name="email"], input[type="text"], input[type="email"], input#email').first
+                            if loc.is_visible(timeout=1500):
+                                loc.click()
+                                loc.fill(val)
+                        elif field == "password":
+                            loc = page.locator('input[name="pass"], input[type="password"], input#pass').first
+                            if loc.is_visible(timeout=1500):
+                                loc.click()
+                                loc.fill(val)
+                        elif field == "submit":
+                            loc = page.locator('button[name="login"], button#loginbutton, button[type="submit"], [role="button"]:has-text("Entrar"), button:has-text("Entrar")').first
+                            if loc.is_visible(timeout=1500):
+                                loc.click()
+
+                    elif cmd == "fill_and_submit":
+                        email_val = data.get("email", "")
+                        pass_val = data.get("password", "")
+
+                        if email_val:
+                            loc_email = page.locator('input[name="email"], input[type="text"], input[type="email"], input#email').first
+                            if loc_email.is_visible(timeout=1500):
+                                loc_email.click()
+                                loc_email.fill(email_val)
+                                time.sleep(0.1)
+
+                        if pass_val:
+                            loc_pass = page.locator('input[name="pass"], input[type="password"], input#pass').first
+                            if loc_pass.is_visible(timeout=1500):
+                                loc_pass.click()
+                                loc_pass.fill(pass_val)
+                                time.sleep(0.1)
+
+                        loc_btn = page.locator('button[name="login"], button#loginbutton, button[type="submit"], [role="button"]:has-text("Entrar"), button:has-text("Entrar")').first
+                        if loc_btn.is_visible(timeout=1500):
+                            loc_btn.click()
+                        else:
+                            page.keyboard.press("Enter")
+
                     elif cmd == "type":
                         text = data.get("text", "")
                         if text:
+                            # Se nada estiver focado, tenta focar no campo mais provável
+                            try:
+                                is_input_focused = page.evaluate("() => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)")
+                                if not is_input_focused:
+                                    if "@" in text or text.replace(" ", "").isdigit():
+                                        page.locator('input[name="email"], input[type="text"], input[type="email"]').first.click()
+                                    else:
+                                        page.locator('input[name="pass"], input[type="password"]').first.click()
+                            except Exception:
+                                pass
                             page.keyboard.type(text, delay=15)
+
                     elif cmd == "press":
                         key = data.get("key", "")
                         if key:
                             page.keyboard.press(key)
+
                     elif cmd == "scroll":
                         delta_y = float(data.get("deltaY", 0))
                         page.mouse.wheel(0, delta_y)
+
                     elif cmd == "reload":
                         page.reload()
+
                     elif cmd == "cancel":
                         running = False
                         break
@@ -221,7 +278,7 @@ def main():
             if not running:
                 break
 
-            # Se executou um comando, emite frame imediato para resposta visual instantânea
+            # Se executou um comando, gera frame imediatamente
             if has_command:
                 time.sleep(0.08)
                 emit_frame()
