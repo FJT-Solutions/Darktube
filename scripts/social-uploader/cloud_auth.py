@@ -104,6 +104,7 @@ class CloudAuthSession:
                 "--disable-gpu",
                 "--no-first-run",
                 "--no-default-browser-check",
+                "--lang=pt-BR,pt",
             ]
 
             user_data_dir = SESSIONS_DIR / "profiles" / f"cloud_{self.platform}"
@@ -112,6 +113,8 @@ class CloudAuthSession:
             self.context = self.p.chromium.launch_persistent_context(
                 user_data_dir=str(user_data_dir),
                 headless=True,
+                locale="pt-BR",
+                extra_http_headers={"Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"},
                 user_agent=DEFAULT_USER_AGENT,
                 viewport={"width": 1280, "height": 800},
                 args=browser_args,
@@ -177,16 +180,24 @@ class CloudAuthSession:
     def _handle_facebook_flow(self, username: str, password: str):
         emit({"status": "logging_in", "message": "Preenchendo credenciais no Facebook..."})
 
-        # Preenche email e senha
+        # 1. Trata banners de cookies (comuns em IPs europeus)
+        try:
+            cookie_accept = self.page.locator('button[data-cookiebanner="accept_button"], button:has-text("Autoriser"), button:has-text("Permitir"), button:has-text("Aceitar"), button:has-text("Allow"), button:has-text("Alle")').first
+            if cookie_accept.is_visible(timeout=2500):
+                cookie_accept.click()
+                time.sleep(1)
+        except Exception:
+            pass
+
+        # 2. Localiza e preenche usuário e senha
         try:
             email_input = self.page.locator('input#email, input[name="email"], input[type="text"]').first
-            email_input.fill(username, timeout=10000)
+            email_input.wait_for(state="visible", timeout=12000)
+            email_input.fill(username)
 
             pass_input = self.page.locator('input#pass, input[name="pass"], input[type="password"]').first
-            pass_input.fill(password, timeout=10000)
-
-            login_btn = self.page.locator('button#loginbutton, button[name="login"], button[type="submit"]').first
-            login_btn.click(timeout=10000)
+            pass_input.wait_for(state="visible", timeout=12000)
+            pass_input.fill(password)
         except Exception as e:
             emit({
                 "status": "error", 
@@ -195,7 +206,37 @@ class CloudAuthSession:
             })
             return
 
-        # Monitora a resposta do Facebook por até 60 segundos
+        # 3. Submissão segura e universal via tecla Enter no campo de senha
+        try:
+            pass_input.press("Enter")
+        except Exception:
+            pass
+
+        # Tenta também clicar no botão como reforço
+        submit_selectors = [
+            'button[name="login"]',
+            'button#loginbutton',
+            'button[type="submit"]',
+            '[data-testid="royal_login_button"]',
+            'button:has-text("Entrar")',
+            'button:has-text("Se connecter")',
+            'button:has-text("Log In")',
+            'button:has-text("Iniciar sesión")',
+            '[role="button"]:has-text("Entrar")',
+            '[role="button"]:has-text("Se connecter")',
+            '[role="button"]:has-text("Log In")',
+            'form button',
+        ]
+        for sel in submit_selectors:
+            try:
+                btn = self.page.locator(sel).first
+                if btn.is_visible(timeout=1000):
+                    btn.click(timeout=2000)
+                    break
+            except Exception:
+                continue
+
+        # Monitora a resposta do Facebook por até 90 segundos
         emit({"status": "waiting", "message": "Aguardando resposta do Facebook..."})
         start_time = time.time()
 
@@ -208,9 +249,18 @@ class CloudAuthSession:
                 self._handle_success()
                 return
 
+            # Se aparecer botão "Continuar como [Nome]"
+            try:
+                continue_btn = self.page.locator('button:has-text("Continuar como"), button:has-text("Continue as"), button:has-text("Continuer en tant que")').first
+                if continue_btn.is_visible(timeout=1000):
+                    continue_btn.click()
+                    time.sleep(2)
+            except Exception:
+                pass
+
             # Erro de senha ou credencial inválida
             page_text = self.page.content().lower()
-            if any(term in page_text for term in ["a senha que você inseriu está incorreta", "the password that you've entered is incorrect", "credenciais incorretas"]):
+            if any(term in page_text for term in ["a senha que você inseriu está incorreta", "the password that you've entered is incorrect", "le mot de passe que vous avez entré est incorrect", "credenciais incorretas"]):
                 emit({
                     "status": "error",
                     "message": "E-mail ou senha incorretos no Facebook. Verifique suas credenciais.",
@@ -231,7 +281,7 @@ class CloudAuthSession:
                 if code:
                     emit({"status": "submitting_code", "message": "Enviando código 2FA..."})
                     two_fa_input.fill(code)
-                    submit_btn = self.page.locator('button#checkpointSubmitButton, button[type="submit"], button:has-text("Continuar"), button:has-text("Continue")').first
+                    submit_btn = self.page.locator('button#checkpointSubmitButton, button[type="submit"], button:has-text("Continuar"), button:has-text("Continue"), button:has-text("Continuer")').first
                     if submit_btn.is_visible():
                         submit_btn.click()
                     else:
@@ -240,7 +290,7 @@ class CloudAuthSession:
                 continue
 
             # Verificação "Aprove em outro dispositivo / Aplicativo"
-            if any(term in page_text for term in ["aprove em outro", "abra seu app", "check your notifications", "approve from another device", "confirmar sua identidade"]):
+            if any(term in page_text for term in ["aprove em outro", "abra seu app", "check your notifications", "approve from another device", "confirmar sua identidade", "approuvez depuis un autre"]):
                 emit({
                     "status": "waiting_device_approval",
                     "message": "O Facebook enviou uma solicitação de login para seu smartphone. Abra o app do Facebook no celular e toque em 'Aprovar' ou 'Sim'.",
