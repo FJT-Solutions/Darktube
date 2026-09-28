@@ -19,9 +19,13 @@ export interface CloudAuthSessionState {
     | 'cancelled';
   message: string;
   url?: string;
+  title?: string;
   screenshot?: string;
   cookiesCount?: number;
   lastUpdated: number;
+  isPopup?: boolean;
+  pageCount?: number;
+  pages?: Array<{ index: number; title: string; url: string; isActive: boolean }>;
 }
 
 interface ActiveSessionRecord {
@@ -140,8 +144,12 @@ export class CloudAuthManager {
     state.lastUpdated = Date.now();
 
     if (event.url !== undefined) state.url = event.url;
+    if (event.title !== undefined) state.title = event.title;
     if (event.screenshot !== undefined) state.screenshot = event.screenshot;
     if (event.cookiesCount !== undefined) state.cookiesCount = event.cookiesCount;
+    if (event.isPopup !== undefined) state.isPopup = event.isPopup;
+    if (event.pageCount !== undefined) state.pageCount = event.pageCount;
+    if (event.pages !== undefined) state.pages = event.pages;
 
     // Se o login foi concluído com sucesso
     if (event.status === 'success') {
@@ -179,12 +187,12 @@ export class CloudAuthManager {
   }
 
   /**
-   * Envia interação do usuário (clique, digitação, tecla, scroll, reload, preenchimento direto) para o navegador
+   * Envia interação do usuário (clique, digitação, tecla, scroll, reload, preenchimento, abas) para o navegador
    */
   static interact(
     sessionId: string,
     action: {
-      type: 'click' | 'type' | 'press' | 'scroll' | 'reload' | 'fill_field' | 'fill_and_submit';
+      type: 'click' | 'type' | 'press' | 'scroll' | 'reload' | 'fill_field' | 'fill_and_submit' | 'switch_tab' | 'close_tab';
       x?: number;
       y?: number;
       text?: string;
@@ -194,6 +202,7 @@ export class CloudAuthManager {
       value?: string;
       email?: string;
       password?: string;
+      index?: number;
     }
   ): boolean {
     const record = activeSessions.get(sessionId);
@@ -215,6 +224,10 @@ export class CloudAuthManager {
       payload = { command: 'fill_field', field: action.field, value: action.value };
     } else if (action.type === 'fill_and_submit') {
       payload = { command: 'fill_and_submit', email: action.email, password: action.password };
+    } else if (action.type === 'switch_tab') {
+      payload = { command: 'switch_tab', index: action.index };
+    } else if (action.type === 'close_tab') {
+      payload = { command: 'close_tab', index: action.index };
     }
 
     record.child.stdin.write(JSON.stringify(payload) + '\n');

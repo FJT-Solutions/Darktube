@@ -2,8 +2,11 @@
 cloud_auth.py - Navegador Visual Remoto Interativo na Nuvem para DarkTube
 
 Arquitetura Queue-Driven Single-Threaded:
-Todas as operações do Playwright rodam na thread principal (evitando greenlet switch errors).
-Suporta cliques de mouse com coordenadas exatas, digitação, teclas especiais e preenchimento direto.
+- Suporte a Múltiplas Abas e Popups (ex: "Continuar com o Google" / OAuth)
+- Troca automática de foco para popups de autenticação
+- Anti-Detecção Stealth com WebGL habilitado para evitar telas brancas (Instagram, TikTok)
+- Loop de baixa latência (stream a cada 400ms, comandos imediatos com 30ms)
+- Digitação ultra-rápida e preenchimento direto
 """
 
 import sys
@@ -29,11 +32,11 @@ from auth_manager import is_logged_in_by_cookies, try_save_instagrapi_session
 
 LOGIN_URLS = {
     "facebook": "https://www.facebook.com/login/",
-    "instagram": "https://www.instagram.com/accounts/login/",
+    "instagram": "https://www.instagram.com/",
     "youtube": "https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue",
     "tiktok": "https://www.tiktok.com/login",
     "pinterest": "https://www.pinterest.com/login/",
-    "kwai": "https://creator.kwai.com/",
+    "kwai": "https://www.kwai.com/",
     "threads": "https://www.threads.net/login",
 }
 
@@ -72,7 +75,6 @@ def main():
 
     p = None
     context = None
-    page = None
 
     try:
         p = sync_playwright().start()
@@ -86,6 +88,9 @@ def main():
             "--no-first-run",
             "--no-default-browser-check",
             "--lang=pt-BR,pt",
+            "--enable-webgl",
+            "--ignore-certificate-errors",
+            f"--window-size={VIEWPORT_WIDTH},{VIEWPORT_HEIGHT}",
         ]
 
         user_data_dir = SESSIONS_DIR / "profiles" / f"remote_{platform}"
@@ -101,13 +106,41 @@ def main():
             args=browser_args,
         )
 
-        page = context.pages[0] if context.pages else context.new_page()
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            window.chrome = { runtime: {} };
-        """)
+        def setup_page_stealth(pg):
+            try:
+                pg.add_init_script("""
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                    window.chrome = { runtime: {} };
+                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                    Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US', 'en'] });
+                """)
+            except Exception:
+                pass
 
-        # Carrega cookies existentes para restaurar sessão anterior se houver
+        active_page = context.pages[0] if context.pages else context.new_page()
+        setup_page_stealth(active_page)
+
+        # Trata popups (ex: "Continuar com o Google" abre uma nova janela)
+        def handle_new_page(new_p):
+            nonlocal active_page
+            setup_page_stealth(new_p)
+            active_page = new_p
+
+            def on_page_close():
+                nonlocal active_page
+                valid = [pg for pg in context.pages if not pg.is_closed()]
+                if valid:
+                    active_page = valid[-1]
+                time.sleep(0.1)
+                emit_frame()
+
+            new_p.on("close", on_page_close)
+            time.sleep(0.2)
+            emit_frame()
+
+        context.on("page", handle_new_page)
+
+        # Carrega cookies existentes para restaurar sessão se houver
         cookie_file = SESSIONS_DIR / f"{platform}_cookies.json"
         if cookie_file.exists():
             try:
@@ -121,16 +154,27 @@ def main():
         emit({"status": "navigating", "message": f"Carregando {platform.upper()}..."})
 
         try:
-            page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
+            active_page.goto(target_url, timeout=30000, wait_until="domcontentloaded")
         except Exception as e:
             emit({"status": "error", "message": f"Erro ao acessar {target_url}: {str(e)}"})
             return
 
-        time.sleep(1.5)
+        time.sleep(1.2)
+
+        def get_current_page():
+            nonlocal active_page
+            if active_page.is_closed():
+                valid = [pg for pg in context.pages if not pg.is_closed()]
+                if valid:
+                    active_page = valid[-1]
+                else:
+                    active_page = context.new_page()
+            return active_page
 
         def capture_screenshot_base64() -> str:
             try:
-                img_bytes = page.screenshot(type="jpeg", quality=65)
+                curr = get_current_page()
+                img_bytes = curr.screenshot(type="jpeg", quality=55)
                 return f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
             except Exception:
                 return ""
@@ -138,10 +182,36 @@ def main():
         def emit_frame():
             shot = capture_screenshot_base64()
             if shot:
+                curr = get_current_page()
+                url = ""
+                title = ""
+                try:
+                    url = curr.url
+                    title = curr.title()
+                except Exception:
+                    pass
+
+                pages_info = []
+                for idx, pg in enumerate(context.pages):
+                    try:
+                        if not pg.is_closed():
+                            pages_info.append({
+                                "index": idx,
+                                "title": pg.title() or f"Aba {idx + 1}",
+                                "url": pg.url,
+                                "isActive": pg == curr,
+                            })
+                    except Exception:
+                        pass
+
                 emit({
                     "status": "streaming",
-                    "url": page.url,
+                    "url": url,
+                    "title": title,
                     "screenshot": shot,
+                    "pageCount": len(pages_info),
+                    "isPopup": len(pages_info) > 1 and curr != context.pages[0],
+                    "pages": pages_info,
                 })
 
         def handle_success():
@@ -174,7 +244,8 @@ def main():
             })
 
         # Verifica se já está logado
-        if is_logged_in_by_cookies(platform, context.cookies(), page.url):
+        curr = get_current_page()
+        if is_logged_in_by_cookies(platform, context.cookies(), curr.url):
             handle_success()
             return
 
@@ -194,28 +265,43 @@ def main():
                     data = command_queue.get_nowait()
                     has_command = True
                     cmd = data.get("command")
+                    curr = get_current_page()
 
                     if cmd == "click":
                         x = max(0, min(VIEWPORT_WIDTH, float(data.get("x", 0))))
                         y = max(0, min(VIEWPORT_HEIGHT, float(data.get("y", 0))))
-                        page.mouse.click(x, y)
+                        curr.mouse.click(x, y)
+
+                    elif cmd == "switch_tab":
+                        idx = int(data.get("index", 0))
+                        valid = [pg for pg in context.pages if not pg.is_closed()]
+                        if 0 <= idx < len(valid):
+                            active_page = valid[idx]
+
+                    elif cmd == "close_tab":
+                        idx = data.get("index")
+                        valid = [pg for pg in context.pages if not pg.is_closed()]
+                        if idx is not None and 0 <= idx < len(valid) and len(valid) > 1:
+                            valid[idx].close()
+                            remaining = [pg for pg in context.pages if not pg.is_closed()]
+                            active_page = remaining[-1] if remaining else context.new_page()
 
                     elif cmd == "fill_field":
                         field = data.get("field")
                         val = data.get("value", "")
                         if field == "email":
-                            loc = page.locator('input[name="email"], input[type="text"], input[type="email"], input#email').first
-                            if loc.is_visible(timeout=1500):
+                            loc = curr.locator('input[type="email"], input[name="email"], input[name="identifier"], input[type="text"], input#email').first
+                            if loc.is_visible(timeout=1200):
                                 loc.click()
                                 loc.fill(val)
                         elif field == "password":
-                            loc = page.locator('input[name="pass"], input[type="password"], input#pass').first
-                            if loc.is_visible(timeout=1500):
+                            loc = curr.locator('input[type="password"], input[name="pass"], input[name="Passwd"], input#pass').first
+                            if loc.is_visible(timeout=1200):
                                 loc.click()
                                 loc.fill(val)
                         elif field == "submit":
-                            loc = page.locator('button[name="login"], button#loginbutton, button[type="submit"], [role="button"]:has-text("Entrar"), button:has-text("Entrar")').first
-                            if loc.is_visible(timeout=1500):
+                            loc = curr.locator('button[type="submit"], button:has-text("Avançar"), button:has-text("Next"), button:has-text("Entrar"), button#loginbutton, [role="button"]:has-text("Avançar")').first
+                            if loc.is_visible(timeout=1200):
                                 loc.click()
 
                     elif cmd == "fill_and_submit":
@@ -223,51 +309,51 @@ def main():
                         pass_val = data.get("password", "")
 
                         if email_val:
-                            loc_email = page.locator('input[name="email"], input[type="text"], input[type="email"], input#email').first
-                            if loc_email.is_visible(timeout=1500):
+                            loc_email = curr.locator('input[type="email"], input[name="email"], input[name="identifier"], input[type="text"], input#email').first
+                            if loc_email.is_visible(timeout=1200):
                                 loc_email.click()
                                 loc_email.fill(email_val)
-                                time.sleep(0.1)
+                                time.sleep(0.05)
 
                         if pass_val:
-                            loc_pass = page.locator('input[name="pass"], input[type="password"], input#pass').first
-                            if loc_pass.is_visible(timeout=1500):
+                            loc_pass = curr.locator('input[type="password"], input[name="pass"], input[name="Passwd"], input#pass').first
+                            if loc_pass.is_visible(timeout=1200):
                                 loc_pass.click()
                                 loc_pass.fill(pass_val)
-                                time.sleep(0.1)
+                                time.sleep(0.05)
 
-                        loc_btn = page.locator('button[name="login"], button#loginbutton, button[type="submit"], [role="button"]:has-text("Entrar"), button:has-text("Entrar")').first
-                        if loc_btn.is_visible(timeout=1500):
+                        loc_btn = curr.locator('button[type="submit"], button:has-text("Avançar"), button:has-text("Next"), button:has-text("Entrar"), button#loginbutton, [role="button"]:has-text("Avançar")').first
+                        if loc_btn.is_visible(timeout=1200):
                             loc_btn.click()
                         else:
-                            page.keyboard.press("Enter")
+                            curr.keyboard.press("Enter")
 
                     elif cmd == "type":
                         text = data.get("text", "")
                         if text:
-                            # Se nada estiver focado, tenta focar no campo mais provável
+                            # Foco inteligente se nenhum input estiver focado
                             try:
-                                is_input_focused = page.evaluate("() => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)")
+                                is_input_focused = curr.evaluate("() => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)")
                                 if not is_input_focused:
-                                    if "@" in text or text.replace(" ", "").isdigit():
-                                        page.locator('input[name="email"], input[type="text"], input[type="email"]').first.click()
+                                    if "@" in text:
+                                        curr.locator('input[type="email"], input[name="email"], input[name="identifier"], input[type="text"]').first.click(timeout=1000)
                                     else:
-                                        page.locator('input[name="pass"], input[type="password"]').first.click()
+                                        curr.locator('input[type="password"], input[name="pass"]').first.click(timeout=1000)
                             except Exception:
                                 pass
-                            page.keyboard.type(text, delay=15)
+                            curr.keyboard.type(text, delay=2)
 
                     elif cmd == "press":
                         key = data.get("key", "")
                         if key:
-                            page.keyboard.press(key)
+                            curr.keyboard.press(key)
 
                     elif cmd == "scroll":
                         delta_y = float(data.get("deltaY", 0))
-                        page.mouse.wheel(0, delta_y)
+                        curr.mouse.wheel(0, delta_y)
 
                     elif cmd == "reload":
-                        page.reload()
+                        curr.reload()
 
                     elif cmd == "cancel":
                         running = False
@@ -278,9 +364,9 @@ def main():
             if not running:
                 break
 
-            # Se executou um comando, gera frame imediatamente
+            # Se executou comando, gera frame com resposta quase instantânea (30ms)
             if has_command:
-                time.sleep(0.08)
+                time.sleep(0.03)
                 emit_frame()
                 last_stream_time = time.time()
 
@@ -288,17 +374,18 @@ def main():
             now = time.time()
             if now - last_cookie_check > 1.0:
                 last_cookie_check = now
-                if is_logged_in_by_cookies(platform, context.cookies(), page.url):
+                curr = get_current_page()
+                if is_logged_in_by_cookies(platform, context.cookies(), curr.url):
                     handle_success()
-                    time.sleep(1.5)
+                    time.sleep(1.2)
                     break
 
-            # Streaming periódico de tela a cada 0.8s
-            if now - last_stream_time > 0.8:
+            # Streaming contínuo a cada 400ms para fluidez alta
+            if now - last_stream_time > 0.4:
                 emit_frame()
                 last_stream_time = now
 
-            time.sleep(0.04)
+            time.sleep(0.03)
 
     except Exception as err:
         emit({"status": "error", "message": f"Erro no navegador: {str(err)}"})

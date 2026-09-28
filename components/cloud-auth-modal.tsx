@@ -25,7 +25,9 @@ import {
   X,
   Mail,
   KeyRound,
-  Rocket
+  Rocket,
+  ExternalLink,
+  Layers
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,11 @@ export function CloudAuthModal({
   const [url, setUrl] = useState<string>("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   
+  // Abas e Popups (ex: Login com o Google)
+  const [isPopup, setIsPopup] = useState(false);
+  const [pageCount, setPageCount] = useState(1);
+  const [pages, setPages] = useState<Array<{ index: number; title: string; url: string; isActive: boolean }>>([]);
+
   // Preenchimento direto
   const [inputEmail, setInputEmail] = useState("");
   const [inputPassword, setInputPassword] = useState("");
@@ -74,6 +81,9 @@ export function CloudAuthModal({
     setStatus("starting");
     setScreenshot(null);
     setUrl("");
+    setIsPopup(false);
+    setPageCount(1);
+    setPages([]);
 
     try {
       const res = await fetch("/api/social/cloud-auth", {
@@ -115,13 +125,16 @@ export function CloudAuthModal({
       setStatus("idle");
       setScreenshot(null);
       setUrl("");
+      setIsPopup(false);
+      setPageCount(1);
+      setPages([]);
       setInputEmail("");
       setInputPassword("");
       setClickRipple(null);
     }
   }, [open, startRemoteBrowser]);
 
-  // Polling contínuo de frames e status do navegador
+  // Polling de alta frequência (400ms) para fluidez máxima
   useEffect(() => {
     if (!sessionId) return;
     if (["success", "error", "cancelled"].includes(status)) {
@@ -138,6 +151,9 @@ export function CloudAuthModal({
           setStatus(s.status);
           if (s.url) setUrl(s.url);
           if (s.screenshot) setScreenshot(s.screenshot);
+          if (s.isPopup !== undefined) setIsPopup(s.isPopup);
+          if (s.pageCount !== undefined) setPageCount(s.pageCount);
+          if (s.pages) setPages(s.pages);
 
           if (s.status === "success") {
             toast.success(`🎉 ${platformName} conectado com sucesso!`);
@@ -148,16 +164,16 @@ export function CloudAuthModal({
           }
         }
       } catch (_) {}
-    }, 850);
+    }, 400);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [sessionId, status, platformName, onSuccess, onOpenChange]);
 
-  // Envia ação de interação para o navegador remoto
+  // Envia ação de interação para o navegador remoto com resposta de tela imediata
   const sendInteraction = async (payload: {
-    type: "click" | "type" | "press" | "scroll" | "reload" | "fill_field" | "fill_and_submit";
+    type: "click" | "type" | "press" | "scroll" | "reload" | "fill_field" | "fill_and_submit" | "switch_tab" | "close_tab";
     x?: number;
     y?: number;
     text?: string;
@@ -167,6 +183,7 @@ export function CloudAuthModal({
     value?: string;
     email?: string;
     password?: string;
+    index?: number;
   }) => {
     if (!sessionId) return;
 
@@ -184,6 +201,10 @@ export function CloudAuthModal({
       if (data.success && data.session) {
         if (data.session.screenshot) setScreenshot(data.session.screenshot);
         if (data.session.url) setUrl(data.session.url);
+        if (data.session.isPopup !== undefined) setIsPopup(data.session.isPopup);
+        if (data.session.pageCount !== undefined) setPageCount(data.session.pageCount);
+        if (data.session.pages) setPages(data.session.pages);
+
         if (data.session.status === "success") {
           setStatus("success");
           toast.success(`🎉 ${platformName} conectado com sucesso!`);
@@ -335,6 +356,46 @@ export function CloudAuthModal({
                 {platformName}
               </span>
             </div>
+
+            {/* Abas Múltiplas / Indicador de Popup */}
+            {pages.length > 1 && (
+              <div className="flex items-center gap-1 ml-2">
+                {pages.map((pg) => (
+                  <div
+                    key={pg.index}
+                    onClick={() => sendInteraction({ type: "switch_tab", index: pg.index })}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] cursor-pointer transition-all border",
+                      pg.isActive
+                        ? "bg-zinc-800 text-zinc-100 border-zinc-700 shadow-sm"
+                        : "bg-zinc-950/60 text-zinc-400 border-zinc-850 hover:bg-zinc-800/60 hover:text-zinc-200"
+                    )}
+                  >
+                    {pg.url.includes("accounts.google") ? (
+                      <span className="font-semibold text-amber-400 flex items-center gap-1">
+                        🔑 Google
+                      </span>
+                    ) : (
+                      <span className="truncate max-w-[90px]">{pg.title || `Aba ${pg.index + 1}`}</span>
+                    )}
+
+                    {pages.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sendInteraction({ type: "close_tab", index: pg.index });
+                        }}
+                        className="text-zinc-400 hover:text-red-400 p-0.5"
+                        title="Fechar esta aba"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Centro: Barra de Endereço / URL */}
@@ -342,7 +403,7 @@ export function CloudAuthModal({
             <div className="flex items-center gap-2 px-3 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-xs">
               <Lock className="h-3 w-3 text-emerald-400 shrink-0" />
               <span className="truncate font-mono text-[11px] text-zinc-300 flex-1">
-                {url || "https://www.facebook.com/login/"}
+                {url || "Carregando..."}
               </span>
               <button
                 type="button"
@@ -357,10 +418,17 @@ export function CloudAuthModal({
 
           {/* Lado Direito: Status e Ações */}
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] font-semibold text-emerald-400 border-emerald-500/30 bg-emerald-500/10 gap-1.5 py-0.5 px-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Nuvem Ao Vivo
-            </Badge>
+            {isPopup ? (
+              <Badge variant="outline" className="text-[10px] font-semibold text-amber-400 border-amber-500/40 bg-amber-500/10 gap-1.5 py-0.5 px-2 animate-pulse">
+                <ExternalLink className="h-3 w-3" />
+                Pop-up Ativo
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] font-semibold text-emerald-400 border-emerald-500/30 bg-emerald-500/10 gap-1.5 py-0.5 px-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Ao Vivo (400ms)
+              </Badge>
+            )}
 
             <Button
               type="button"
@@ -423,7 +491,7 @@ export function CloudAuthModal({
             </div>
             <Textarea
               rows={12}
-              placeholder='[ { "name": "c_user", "value": "..." }, ... ]'
+              placeholder='[ { "name": "sessionid", "value": "..." }, ... ]'
               value={importJsonText}
               onChange={(e) => setImportJsonText(e.target.value)}
               className="bg-zinc-900 border-zinc-800 font-mono text-xs resize-none h-[calc(100%-140px)]"
@@ -443,6 +511,27 @@ export function CloudAuthModal({
         {/* 3. TELA DO NAVEGADOR REMOTO (INTERATIVO) */}
         {!manualCookiesMode && status !== "success" && (
           <div className="flex-1 flex flex-col min-h-0 bg-zinc-950 overflow-hidden">
+            {/* Aviso quando popup está ativo */}
+            {isPopup && (
+              <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-1.5 text-xs text-amber-200 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <ExternalLink className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+                  <span>
+                    <strong>Pop-up de autenticação aberto!</strong> Você está visualizando a janela do Google. Quando você terminar o login, a janela fecha sozinha e a conta conecta automaticamente.
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => sendInteraction({ type: "close_tab", index: pages.length - 1 })}
+                  className="h-6 text-[11px] px-2 text-amber-300 hover:text-white hover:bg-amber-500/20"
+                >
+                  Fechar Janela
+                </Button>
+              </div>
+            )}
+
             {/* Viewport Interativo com Proporção Exata e Centralização Perfeita */}
             <div
               ref={containerRef}
@@ -458,6 +547,7 @@ export function CloudAuthModal({
                 onInput={handlePhysicalInput}
                 autoFocus
               />
+
               {screenshot ? (
                 <div
                   ref={wrapperRef}
@@ -503,7 +593,7 @@ export function CloudAuthModal({
                   <Mail className="h-3.5 w-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <Input
                     type="text"
-                    placeholder="E-mail ou Telefone..."
+                    placeholder={isPopup ? "E-mail da Conta Google..." : "E-mail ou Telefone..."}
                     value={inputEmail}
                     onChange={(e) => setInputEmail(e.target.value)}
                     className="bg-zinc-950 border-zinc-800 pl-8 text-xs h-8 focus:border-red-500 placeholder:text-zinc-500"
@@ -515,7 +605,7 @@ export function CloudAuthModal({
                   <KeyRound className="h-3.5 w-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                   <Input
                     type="password"
-                    placeholder="Sua Senha..."
+                    placeholder={isPopup ? "Senha da Conta Google..." : "Sua Senha..."}
                     value={inputPassword}
                     onChange={(e) => setInputPassword(e.target.value)}
                     className="bg-zinc-950 border-zinc-800 pl-8 text-xs h-8 focus:border-red-500 placeholder:text-zinc-500"
@@ -531,7 +621,7 @@ export function CloudAuthModal({
                   title="Preencher campos na tela e submeter"
                 >
                   {isSubmittingForm ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
-                  Preencher & Entrar
+                  {isPopup ? "Preencher no Google 🚀" : "Preencher & Entrar"}
                 </Button>
               </form>
 
@@ -573,7 +663,7 @@ export function CloudAuthModal({
               {/* Dica */}
               <div className="text-[11px] text-zinc-400 flex items-center gap-1.5 ml-auto">
                 <MousePointer className="h-3 w-3 text-red-400 animate-pulse" />
-                <span>Clique diretamente na tela para interagir ou use o formulário rápido.</span>
+                <span>Clique diretamente na tela para digitar ou use o formulário rápido.</span>
               </div>
             </div>
           </div>

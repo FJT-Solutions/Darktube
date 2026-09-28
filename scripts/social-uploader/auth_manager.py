@@ -52,7 +52,7 @@ def is_logged_in_by_cookies(network: str, cookies: list, current_url: str) -> bo
         return cookie_dict.get("_auth") == "1"
 
     if network == "kwai":
-        return ("login" not in url_lower and "creator.kwai.com" in url_lower and bool(cookie_dict.get("userId") or cookie_dict.get("kwai_creator_token") or "dashboard" in url_lower))
+        return bool(cookie_dict.get("userId") or cookie_dict.get("user_id") or cookie_dict.get("kwai_creator_token") or cookie_dict.get("kwai_token") or ("creator.kwai.com" in url_lower and "login" not in url_lower and "dashboard" in url_lower))
 
     if network == "youtube":
         return ("accounts.google.com" not in url_lower and bool(cookie_dict.get("SAPISID") or cookie_dict.get("LOGIN_INFO")))

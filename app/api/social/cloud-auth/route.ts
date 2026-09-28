@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
     const body = await req.json();
-    const { action, platform, sessionId, type, x, y, text, key, deltaY, field, value, email, password } = body;
+    const { action, platform, sessionId, type, x, y, text, key, deltaY, field, value, email, password, index } = body;
 
     // Inicia o Navegador Visual Remoto
     if (action === 'start') {
@@ -47,15 +47,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, session });
     }
 
-    // Interação do usuário com o navegador (clique, digitação, rolagem, reload, preenchimento)
+    // Interação do usuário com o navegador (clique, digitação, rolagem, reload, preenchimento, abas)
     if (action === 'interact') {
       if (!sessionId || !type) {
         return NextResponse.json({ success: false, error: 'sessionId e type são obrigatórios' }, { status: 400 });
       }
 
-      const ok = CloudAuthManager.interact(sessionId, { type, x, y, text, key, deltaY, field, value, email, password });
-      // Aguarda o processamento do comando e geração do frame atualizado
-      await new Promise((r) => setTimeout(r, 140));
+      const ok = CloudAuthManager.interact(sessionId, { type, x, y, text, key, deltaY, field, value, email, password, index });
+      // Aguarda 60ms para que o frame gerado pela ação já venha no retorno
+      await new Promise((r) => setTimeout(r, 60));
       const current = CloudAuthManager.getSession(sessionId);
       return NextResponse.json({ success: ok, session: current });
     }
