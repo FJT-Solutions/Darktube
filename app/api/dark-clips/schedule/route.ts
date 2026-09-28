@@ -59,6 +59,7 @@ export async function GET() {
                     await triggerSocialDispatcher({
                       post: { ...post, rendered_video_url: permanentUrl },
                       videoUrl: permanentUrl,
+                      accountMap: remodel.selected_accounts_by_platform || remodel.selectedAccountsByPlatform,
                     });
                   }
                   break;
@@ -91,7 +92,11 @@ export async function GET() {
         targets.length > 0
       ) {
         logger.info(`[Scheduler] Horário atingido para post agendado ${post.id}. Despachando...`, { context: 'Scheduler' });
-        await triggerSocialDispatcher({ post });
+        const remodel = (post.remodel_data || {}) as any;
+        await triggerSocialDispatcher({
+          post,
+          accountMap: remodel.selected_accounts_by_platform || remodel.selectedAccountsByPlatform,
+        });
         post.status = 'publishing' as any;
       }
     }
@@ -131,7 +136,11 @@ export async function POST(req: Request) {
       targetAccounts = [],
       dispatchNow = false,
       facebookPageId,
+      selectedAccountsByPlatform,
+      accountMap,
     } = body;
+
+    const resolvedAccountMap = selectedAccountsByPlatform || accountMap || remodelData?.selected_accounts_by_platform || remodelData?.selectedAccountsByPlatform;
 
     // Se postId não foi fornecido explicitamente, procura registro existente para este clipId
     let targetPostId = postId;
@@ -157,6 +166,7 @@ export async function POST(req: Request) {
         ...(remodelData || {}),
         facebook_page_id: facebookPageId,
         dispatch_now: Boolean(dispatchNow),
+        selected_accounts_by_platform: resolvedAccountMap,
       },
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : new Date().toISOString(),
       status: dispatchNow ? 'publishing' : 'scheduled',
@@ -172,6 +182,7 @@ export async function POST(req: Request) {
           targetAccounts,
           facebookPageId,
           title: post.title,
+          accountMap: resolvedAccountMap,
         });
       } else {
         logger.info(`[Scheduler] Post ${post.id} salvo com status 'publishing', aguardando renderização do MP4 para despacho.`, {

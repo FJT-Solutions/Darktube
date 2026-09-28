@@ -5,10 +5,14 @@ import { getPythonCommand, safeSpawn } from './python-runtime';
 import { upsertUserApiKey } from './database';
 import { logger } from './logger';
 
+import { saveSocialAccount } from './social-accounts';
+
 export interface CloudAuthSessionState {
   sessionId: string;
   userId?: string;
   platform: string;
+  accountId?: string;
+  accountName?: string;
   status:
     | 'idle'
     | 'starting'
@@ -46,8 +50,10 @@ export class CloudAuthManager {
     sessionId: string;
     userId?: string;
     platform: string;
+    accountId?: string;
+    accountName?: string;
   }): CloudAuthSessionState {
-    const { sessionId, userId, platform } = params;
+    const { sessionId, userId, platform, accountId = 'default', accountName = '' } = params;
 
     // Cancela sessão anterior com mesmo ID se existir
     this.cancelSession(sessionId);
@@ -63,13 +69,20 @@ export class CloudAuthManager {
       sessionId,
       userId,
       platform,
+      accountId,
+      accountName,
       status: 'starting',
-      message: `Iniciando Navegador Remoto para ${platform.toUpperCase()}...`,
+      message: `Iniciando Navegador Remoto para ${accountName || platform.toUpperCase()}...`,
       lastUpdated: Date.now(),
     };
 
     const scriptDir = path.resolve(process.cwd(), 'scripts/social-uploader');
-    const child = safeSpawn(pythonCmd, ['-u', scriptPath, '--platform', platform], {
+    const spawnArgs = ['-u', scriptPath, '--platform', platform, '--account-id', accountId];
+    if (accountName) {
+      spawnArgs.push('--account-name', accountName);
+    }
+
+    const child = safeSpawn(pythonCmd, spawnArgs, {
       cwd: scriptDir,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
@@ -156,10 +169,30 @@ export class CloudAuthManager {
       const { cookies } = event;
       if (cookies && state.userId) {
         try {
+          const accId = state.accountId || event.accountId || 'default';
+          const filePrefix = accId === 'default' ? state.platform : `${state.platform}_${accId}`;
           const cookiesStr = JSON.stringify(cookies);
-          await upsertUserApiKey(state.userId, `social_session_${state.platform}_cookies`, cookiesStr);
-          await upsertUserApiKey(state.userId, `social_session_${state.platform}_expired`, '');
-          logger.info(`[RemoteBrowser] Sucesso! Cookies de ${state.platform} persistidos no banco PostgreSQL.`);
+
+          await upsertUserApiKey(state.userId, `social_session_${filePrefix}_cookies`, cookiesStr);
+          await upsertUserApiKey(state.userId, `social_session_${filePrefix}_expired`, '');
+
+          // Se for default, também mantém a chave legada
+          if (accId === 'default') {
+            await upsertUserApiKey(state.userId, `social_session_${state.platform}_cookies`, cookiesStr);
+            await upsertUserApiKey(state.userId, `social_session_${state.platform}_expired`, '');
+          }
+
+          // Registra ou atualiza no gerenciador de multi-contas
+          await saveSocialAccount(state.userId, {
+            id: accId,
+            platform: state.platform as any,
+            name: event.accountName || state.accountName || `${state.platform.toUpperCase()} (${accId})`,
+            username: event.username,
+            connected: true,
+            expired: false,
+          });
+
+          logger.info(`[RemoteBrowser] Sucesso! Conta ${accId} de ${state.platform} persistida no banco PostgreSQL.`);
 
           // Se for Facebook, tenta sincronizar as páginas gerenciadas
           if (state.platform === 'facebook') {

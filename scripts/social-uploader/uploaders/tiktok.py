@@ -12,9 +12,9 @@ from uploaders.base import BaseUploader
 from config import SESSIONS_DIR, DEFAULT_USER_AGENT, DEFAULT_CHROMIUM_ARGS
 
 class TikTokUploader(BaseUploader):
-    def __init__(self):
+    def __init__(self, cookie_file=None):
         super().__init__("tiktok")
-        self.cookie_file = SESSIONS_DIR / "tiktok_cookies.json"
+        self.cookie_file = Path(cookie_file) if cookie_file else SESSIONS_DIR / "tiktok_cookies.json"
 
     def upload(
         self, 

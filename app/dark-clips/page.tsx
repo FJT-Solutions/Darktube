@@ -531,6 +531,8 @@ export default function DarkClipsPage() {
 
   // Scheduling State
   const [targetAccounts, setTargetAccounts] = useState<string[]>([]);
+  const [multiAccounts, setMultiAccounts] = useState<any[]>([]);
+  const [selectedAccountsByPlatform, setSelectedAccountsByPlatform] = useState<Record<string, string>>({});
   const [facebookPages, setFacebookPages] = useState<Array<{ id: string; name: string; url: string; avatarUrl?: string }>>([]);
   const [selectedFacebookPage, setSelectedFacebookPage] = useState<string>("");
   const [loadingFbPages, setLoadingFbPages] = useState<boolean>(false);
@@ -641,6 +643,10 @@ export default function DarkClipsPage() {
         setConnectedPlatforms(conn);
         setExpiredPlatforms(exp);
         setTargetAccounts((prev) => prev.filter((plat) => conn[plat]));
+      }
+
+      if (socialData?.multiAccounts && Array.isArray(socialData.multiAccounts)) {
+        setMultiAccounts(socialData.multiAccounts);
       }
 
       if (socialData?.facebookPages && socialData.facebookPages.length > 0) {
@@ -1260,6 +1266,7 @@ export default function DarkClipsPage() {
       scheduledAt?: string;
       postCaption?: string;
       postHashtags?: string[];
+      selectedAccountsByPlatform?: Record<string, string>;
     }
   ) {
     const clipToRender = targetClip || selectedClip;
@@ -1324,6 +1331,8 @@ export default function DarkClipsPage() {
           scheduledAt: scheduleOptions?.scheduledAt,
           postCaption: scheduleOptions?.postCaption || postCaption,
           postHashtags: scheduleOptions?.postHashtags || postHashtags,
+          selectedAccountsByPlatform: scheduleOptions?.selectedAccountsByPlatform || selectedAccountsByPlatform,
+          accountMap: scheduleOptions?.selectedAccountsByPlatform || selectedAccountsByPlatform,
           inputProps: {
             videoUrl: clipToRender.video_url,
             durationInSeconds: clipDuration,
@@ -1342,6 +1351,7 @@ export default function DarkClipsPage() {
             cta_text: currentFooter.text,
             post_caption: scheduleOptions?.postCaption || postCaption,
             hashtags: scheduleOptions?.postHashtags || postHashtags,
+            selected_accounts_by_platform: scheduleOptions?.selectedAccountsByPlatform || selectedAccountsByPlatform,
           },
         }),
       });
@@ -1417,6 +1427,7 @@ export default function DarkClipsPage() {
           scheduledAt: scheduledDateTime,
           postCaption,
           postHashtags,
+          selectedAccountsByPlatform,
         });
 
         if (!renderResult) {
@@ -1451,11 +1462,14 @@ export default function DarkClipsPage() {
             cta_text: footer.text,
             post_caption: postCaption,
             hashtags: postHashtags,
+            selected_accounts_by_platform: selectedAccountsByPlatform,
           },
           scheduledAt: scheduledDateTime,
           targetAccounts,
           facebookPageId: selectedFacebookPage,
           dispatchNow,
+          selectedAccountsByPlatform,
+          accountMap: selectedAccountsByPlatform,
         }),
       });
       const data = await res.json();
@@ -4757,6 +4771,51 @@ export default function DarkClipsPage() {
                               )}
                             </div>
                           )}
+
+                          {/* Seletor Multi-Contas para plataformas com mais de 1 conta conectada */}
+                          {targetAccounts.map((plat) => {
+                            const platAccounts = multiAccounts.filter((a) => a.platform === plat && a.connected);
+                            if (platAccounts.length <= 1) return null;
+
+                            const platLabelsMap: Record<string, string> = {
+                              tiktok: "TikTok",
+                              instagram: "Instagram Reels",
+                              facebook: "Facebook Reels",
+                              youtube: "YouTube Shorts",
+                              pinterest: "Pinterest",
+                              kwai: "Kwai",
+                              threads: "Threads",
+                              telegram: "Telegram",
+                            };
+                            const platName = platLabelsMap[plat] || plat;
+                            const currentSelection = selectedAccountsByPlatform[plat] || "all";
+
+                            return (
+                              <div key={`multi-acc-select-${plat}`} className="mt-2.5 p-2.5 rounded-xl border border-primary/30 bg-primary/[0.04] space-y-1.5 animate-in fade-in">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs font-bold text-primary flex items-center gap-1.5">
+                                    👥 Conta de Postagem ({platName}):
+                                  </Label>
+                                  <span className="text-[10px] text-muted-foreground font-semibold">
+                                    {platAccounts.length} contas conectadas
+                                  </span>
+                                </div>
+                                <select
+                                  value={currentSelection}
+                                  onChange={(e) => setSelectedAccountsByPlatform((prev) => ({ ...prev, [plat]: e.target.value }))}
+                                  className="w-full h-8 px-2.5 bg-background border border-primary/40 rounded-lg text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                                >
+                                  <option value="all">🚀 Publicar em TODAS as contas de {platName} ({platAccounts.length})</option>
+                                  {platAccounts.map((acc) => (
+                                    <option key={acc.id} value={acc.id}>
+                                      {acc.name || acc.accountName || "Conta"} {acc.username ? `(@${acc.username})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          })}
+
                           {targetAccounts.length === 0 && (
                             <p className="text-[11px] text-muted-foreground mt-1.5">
                               Selecione as redes acima ou conecte novas contas em <a href="/credentials" className="text-primary underline">Credenciais</a>.

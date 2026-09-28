@@ -13,9 +13,9 @@ from uploaders.base import BaseUploader
 from config import SESSIONS_DIR, DEFAULT_USER_AGENT, DEFAULT_CHROMIUM_ARGS
 
 class FacebookUploader(BaseUploader):
-    def __init__(self):
+    def __init__(self, cookie_file=None):
         super().__init__("facebook_reels")
-        self.cookie_file = SESSIONS_DIR / "facebook_cookies.json"
+        self.cookie_file = Path(cookie_file) if cookie_file else SESSIONS_DIR / "facebook_cookies.json"
         self.pages_file = SESSIONS_DIR / "facebook_pages.json"
         self.profile_dir = SESSIONS_DIR / "profiles" / "facebook"
 

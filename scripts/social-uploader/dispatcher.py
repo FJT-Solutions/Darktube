@@ -53,7 +53,8 @@ def dispatch_uploads(
     platforms: List[str] = None,
     video_url: str = None,
     delay_seconds: int = DEFAULT_STAGGER_DELAY_SECONDS,
-    facebook_page_id: str = None
+    facebook_page_id: str = None,
+    account_map: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     # Se video_path for um arquivo local existente no disco, usa diretamente
     if Path(video_path).is_file():
@@ -89,59 +90,97 @@ def dispatch_uploads(
         if p_clean in UPLOADER_REGISTRY and p_clean not in active_platforms:
             active_platforms.append(p_clean)
 
+    account_map = account_map or {}
+
     print("\n" + "=" * 65)
-    print(f"🎬 [DESPACHANTE MULTICANAL DARKTUBE]")
+    print(f"🎬 [DESPACHANTE MULTICANAL DARKTUBE - MULTI-CONTAS]")
     print(f"   Vídeo: {video_file.name} ({video_file.stat().st_size / (1024*1024):.2f} MB)")
     print(f"   Plataformas Alvo: {', '.join(active_platforms)}")
     if facebook_page_id:
         print(f"   Facebook Page Alvo: {facebook_page_id}")
+    if account_map:
+        print(f"   Mapeamento de Contas: {account_map}")
     print("=" * 65 + "\n")
 
     results = {}
     for i, plat in enumerate(active_platforms):
-        print(f"\n[{i+1}/{len(active_platforms)}] 🚀 Processando upload para: {plat.upper()}")
+        acc_target = account_map.get(plat)
+        # acc_target pode ser uma lista de IDs, uma string única ou 'all'
+        acc_list = []
+        if isinstance(acc_target, list):
+            acc_list = acc_target
+        elif isinstance(acc_target, str) and acc_target and acc_target != "all":
+            acc_list = [acc_target]
+        elif acc_target == "all":
+            found_accs = []
+            if (SESSIONS_DIR / f"{plat}_cookies.json").exists():
+                found_accs.append("default")
+            for f in SESSIONS_DIR.glob(f"{plat}_*_cookies.json"):
+                stem = f.stem
+                prefix = f"{plat}_"
+                if stem.startswith(prefix):
+                    remainder = stem[len(prefix):]
+                    if remainder.endswith("_cookies"):
+                        remainder = remainder[:-8]
+                    if remainder and remainder not in found_accs:
+                        found_accs.append(remainder)
+            acc_list = found_accs if found_accs else ["default"]
+        else:
+            acc_list = ["default"]
 
-        try:
-            if plat == "facebook":
-                uploader = FacebookUploader()
-                res = uploader.upload(
-                    video_path=str(video_file),
-                    caption=caption,
-                    title=title,
-                    link=link,
-                    facebook_page_id=facebook_page_id
-                )
-            elif plat == "instagram":
-                uploader = InstagramFacebookUploader()
-                res = uploader.upload(
-                    video_path=str(video_file),
-                    caption=caption,
-                    title=title,
-                    link=link,
-                    share_to_facebook=False
-                )
-            else:
-                uploader_cls = UPLOADER_REGISTRY.get(plat)
-                uploader = uploader_cls()
-                res = uploader.upload(
-                    video_path=str(video_file),
-                    caption=caption,
-                    title=title,
-                    link=link,
-                    video_url=video_url
-                )
+        for acc_id in acc_list:
+            acc_label = f"{plat.upper()} ({acc_id})" if acc_id != "default" else plat.upper()
+            print(f"\n[{i+1}/{len(active_platforms)}] 🚀 Processando upload para: {acc_label}")
 
-            results[plat] = res
-            if res.get("success"):
-                print(f"   ✅ {plat.upper()}: Publicado com sucesso!")
-                if res.get("post_url"):
-                    print(f"      🔗 URL: {res['post_url']}")
-            else:
-                print(f"   ❌ {plat.upper()}: Falha - {res.get('error')}")
+            custom_cookie_file = None
+            if acc_id and acc_id != "default":
+                cand = SESSIONS_DIR / f"{plat}_{acc_id}_cookies.json"
+                if cand.exists():
+                    custom_cookie_file = cand
 
-        except Exception as e:
-            results[plat] = {"success": False, "platform": plat, "error": str(e)}
-            print(f"   ❌ {plat.upper()}: Erro inesperado - {e}")
+            try:
+                if plat == "facebook":
+                    uploader = FacebookUploader(cookie_file=custom_cookie_file)
+                    res = uploader.upload(
+                        video_path=str(video_file),
+                        caption=caption,
+                        title=title,
+                        link=link,
+                        facebook_page_id=facebook_page_id
+                    )
+                elif plat == "instagram":
+                    uploader = InstagramFacebookUploader(cookie_file=custom_cookie_file)
+                    res = uploader.upload(
+                        video_path=str(video_file),
+                        caption=caption,
+                        title=title,
+                        link=link,
+                        share_to_facebook=False
+                    )
+                else:
+                    uploader_cls = UPLOADER_REGISTRY.get(plat)
+                    uploader = uploader_cls(cookie_file=custom_cookie_file) if custom_cookie_file else uploader_cls()
+                    res = uploader.upload(
+                        video_path=str(video_file),
+                        caption=caption,
+                        title=title,
+                        link=link,
+                        video_url=video_url
+                    )
+
+                res_key = f"{plat}_{acc_id}" if acc_id != "default" else plat
+                results[res_key] = res
+                if res.get("success"):
+                    print(f"   ✅ {acc_label}: Publicado com sucesso!")
+                    if res.get("post_url"):
+                        print(f"      🔗 URL: {res['post_url']}")
+                else:
+                    print(f"   ❌ {acc_label}: Falha - {res.get('error')}")
+
+            except Exception as e:
+                res_key = f"{plat}_{acc_id}" if acc_id != "default" else plat
+                results[res_key] = {"success": False, "platform": plat, "error": str(e)}
+                print(f"   ❌ {acc_label}: Erro inesperado - {e}")
 
         # Aplica intervalo humano entre uploads (exceto no último)
         if i < len(active_platforms) - 1 and delay_seconds > 0:
@@ -238,6 +277,12 @@ def main():
         help="ID ou slug da página específica do Facebook para publicação"
     )
     parser.add_argument(
+        "--account-map",
+        type=str,
+        default="{}",
+        help="Mapeamento JSON de plataforma para conta específica ou lista de contas"
+    )
+    parser.add_argument(
         "--post-id",
         type=str,
         default="",
@@ -245,6 +290,13 @@ def main():
     )
 
     args = parser.parse_args()
+
+    account_map = {}
+    if getattr(args, "account_map", None):
+        try:
+            account_map = json.loads(args.account_map)
+        except Exception:
+            pass
 
     if args.platforms == "all":
         platforms_list = SUPPORTED_PLATFORMS
@@ -259,7 +311,8 @@ def main():
         platforms=platforms_list,
         video_url=args.video_url,
         delay_seconds=args.delay,
-        facebook_page_id=args.facebook_page_id
+        facebook_page_id=args.facebook_page_id,
+        account_map=account_map
     )
 
     # Se informado post_id e ao menos uma rede teve sucesso, atualiza status no banco

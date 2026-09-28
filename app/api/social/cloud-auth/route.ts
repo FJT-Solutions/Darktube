@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
     const body = await req.json();
-    const { action, platform, sessionId, type, x, y, text, key, deltaY, field, value, email, password, index } = body;
+    const { action, platform, sessionId, type, x, y, text, key, deltaY, field, value, email, password, index, accountId, accountName } = body;
 
     // Inicia o Navegador Visual Remoto
     if (action === 'start') {
@@ -37,11 +37,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: 'Plataforma é obrigatória' }, { status: 400 });
       }
 
-      const generatedId = sessionId || `remote_${platform}_${crypto.randomBytes(6).toString('hex')}`;
+      const generatedId = sessionId || `remote_${platform}_${accountId || 'default'}_${crypto.randomBytes(6).toString('hex')}`;
       const session = CloudAuthManager.startSession({
         sessionId: generatedId,
         userId: user?.id,
         platform,
+        accountId: accountId || 'default',
+        accountName,
       });
 
       return NextResponse.json({ success: true, session });

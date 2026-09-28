@@ -4,6 +4,7 @@ import fs from 'fs';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { getUserApiKey, upsertUserApiKey } from '@/lib/database';
 import { getPythonCommand, safeSpawn } from '@/lib/python-runtime';
+import { getSocialAccounts, saveSocialAccount, deleteSocialAccount } from '@/lib/social-accounts';
 
 export const dynamic = 'force-dynamic';
 
@@ -174,9 +175,12 @@ export async function GET() {
       }
     }
 
+    const multiAccounts = await getSocialAccounts(user?.id);
+
     return NextResponse.json({ 
       success: true, 
       accounts, 
+      multiAccounts,
       telegramChatId,
       facebookPages,
     });
@@ -237,7 +241,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: `Sessão de ${platform} importada com sucesso!` });
     }
 
+    if (action === 'disconnect_account' && platform && body.accountId) {
+      if (user) {
+        await deleteSocialAccount(user.id, platform, body.accountId);
+        return NextResponse.json({ success: true, message: 'Conta desconectada com sucesso!' });
+      }
+      return NextResponse.json({ success: false, error: 'Não autenticado' }, { status: 401 });
+    }
+
+    if (action === 'rename_account' && platform && body.accountId && body.name) {
+      if (user) {
+        await saveSocialAccount(user.id, {
+          id: body.accountId,
+          platform,
+          name: body.name,
+        });
+        return NextResponse.json({ success: true, message: 'Conta renomeada com sucesso!' });
+      }
+      return NextResponse.json({ success: false, error: 'Não autenticado' }, { status: 401 });
+    }
+
     if (action === 'disconnect' && platform) {
+      if (user) {
+        // Remove também do registro de multi-contas
+        const currentAccounts = await getSocialAccounts(user.id);
+        for (const acc of currentAccounts.filter(a => a.platform === platform)) {
+          await deleteSocialAccount(user.id, platform, acc.id);
+        }
+      }
       const filesToDelete: Record<string, string[]> = {
         facebook: ['facebook_cookies.json', 'facebook_pages.json', 'facebook_groups.json', 'instagram_session.json', 'facebook_expired.json'],
         youtube: ['youtube_cookies.json', 'youtube_credentials.json', 'youtube_expired.json'],

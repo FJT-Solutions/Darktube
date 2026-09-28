@@ -42,7 +42,11 @@ export async function POST(req: Request) {
       scheduledAt,
       postCaption,
       postHashtags,
+      selectedAccountsByPlatform,
+      accountMap,
     } = body;
+
+    const resolvedAccountMap = selectedAccountsByPlatform || accountMap || remodelData?.selected_accounts_by_platform || remodelData?.selectedAccountsByPlatform;
 
     if (!inputProps || !inputProps.videoUrl) {
       return NextResponse.json({ success: false, error: 'Video URL e inputProps são obrigatórios.' }, { status: 400 });
@@ -180,6 +184,7 @@ export async function POST(req: Request) {
         hashtags: postHashtags || finalRemodelData?.hashtags,
         facebook_page_id: facebookPageId,
         dispatch_now: Boolean(dispatchNow),
+        selected_accounts_by_platform: resolvedAccountMap,
       },
       status: initialStatus,
       target_accounts: targetAccounts || [],
@@ -218,6 +223,7 @@ export async function POST(req: Request) {
                 facebook_page_id: facebookPageId,
                 post_caption: postCaption,
                 hashtags: postHashtags,
+                selected_accounts_by_platform: resolvedAccountMap,
               },
             },
             videoUrl: url,
@@ -226,6 +232,7 @@ export async function POST(req: Request) {
             caption: postCaption,
             hashtags: postHashtags,
             title: postTitle,
+            accountMap: resolvedAccountMap,
           });
         }
       };

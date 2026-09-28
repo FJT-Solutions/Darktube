@@ -50,9 +50,15 @@ def emit(data: dict):
 def main():
     parser = argparse.ArgumentParser(description="Navegador Visual Remoto DarkTube")
     parser.add_argument("--platform", type=str, required=True)
+    parser.add_argument("--account-id", type=str, default="default")
+    parser.add_argument("--account-name", type=str, default="")
     args = parser.parse_args()
 
     platform = args.platform.lower()
+    account_id = args.account_id or "default"
+    account_name = args.account_name or ""
+    file_prefix = f"{platform}_{account_id}" if account_id != "default" else platform
+
     command_queue = queue.Queue()
     running = True
 
@@ -71,7 +77,8 @@ def main():
     reader_thread = threading.Thread(target=stdin_reader, daemon=True)
     reader_thread.start()
 
-    emit({"status": "starting", "message": f"Iniciando navegador virtual para {platform.upper()}..."})
+    display_name = account_name if account_name else f"{platform.upper()} ({account_id})"
+    emit({"status": "starting", "message": f"Iniciando navegador virtual para {display_name}..."})
 
     p = None
     context = None
@@ -93,7 +100,7 @@ def main():
             f"--window-size={VIEWPORT_WIDTH},{VIEWPORT_HEIGHT}",
         ]
 
-        user_data_dir = SESSIONS_DIR / "profiles" / f"remote_{platform}"
+        user_data_dir = SESSIONS_DIR / "profiles" / f"remote_{file_prefix}"
         user_data_dir.mkdir(parents=True, exist_ok=True)
 
         context = p.chromium.launch_persistent_context(
@@ -141,7 +148,7 @@ def main():
         context.on("page", handle_new_page)
 
         # Carrega cookies existentes para restaurar sessão se houver
-        cookie_file = SESSIONS_DIR / f"{platform}_cookies.json"
+        cookie_file = SESSIONS_DIR / f"{file_prefix}_cookies.json"
         if cookie_file.exists():
             try:
                 with open(cookie_file, "r", encoding="utf-8") as f:
@@ -219,7 +226,14 @@ def main():
             with open(cookie_file, "w", encoding="utf-8") as f:
                 json.dump(cookies, f, indent=2, ensure_ascii=False)
 
-            expired_file = SESSIONS_DIR / f"{platform}_expired.json"
+            # Se for default, também salva no arquivo legado
+            if account_id == "default":
+                default_file = SESSIONS_DIR / f"{platform}_cookies.json"
+                if default_file != cookie_file:
+                    with open(default_file, "w", encoding="utf-8") as f:
+                        json.dump(cookies, f, indent=2, ensure_ascii=False)
+
+            expired_file = SESSIONS_DIR / f"{file_prefix}_expired.json"
             if expired_file.exists():
                 try: expired_file.unlink()
                 except Exception: pass
@@ -236,11 +250,31 @@ def main():
                 except Exception:
                     pass
 
+            # Detecta nome ou usuário
+            detected_username = ""
+            try:
+                curr_url = get_current_page().url
+                if "instagram.com/" in curr_url:
+                    parts = curr_url.split("instagram.com/")[-1].split("/")[0].split("?")[0]
+                    if parts and parts not in ["accounts", "login", "explore", "reels", "direct"]:
+                        detected_username = parts
+                elif "tiktok.com/@" in curr_url:
+                    parts = curr_url.split("tiktok.com/@")[-1].split("/")[0].split("?")[0]
+                    if parts:
+                        detected_username = parts
+            except Exception:
+                pass
+
+            final_name = account_name if account_name else (f"@{detected_username}" if detected_username else f"{platform.upper()} ({account_id})")
+
             emit({
                 "status": "success",
-                "message": f"🎉 Conta {platform.upper()} conectada com sucesso!",
+                "message": f"🎉 Conta {final_name} conectada com sucesso!",
                 "cookies": cookies,
                 "cookiesCount": len(cookies),
+                "accountId": account_id,
+                "accountName": final_name,
+                "username": detected_username,
             })
 
         # Verifica se já está logado

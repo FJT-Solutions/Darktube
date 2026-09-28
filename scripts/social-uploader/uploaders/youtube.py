@@ -16,10 +16,10 @@ from config import (
 )
 
 class YouTubeUploader(BaseUploader):
-    def __init__(self):
+    def __init__(self, cookie_file=None):
         super().__init__("youtube_shorts")
         self.credentials_file = Path(YOUTUBE_CREDENTIALS_FILE)
-        self.cookie_file = SESSIONS_DIR / "youtube_cookies.json"
+        self.cookie_file = Path(cookie_file) if cookie_file else SESSIONS_DIR / "youtube_cookies.json"
 
     def upload(
         self, 

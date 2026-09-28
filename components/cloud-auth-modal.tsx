@@ -37,6 +37,8 @@ interface CloudAuthModalProps {
   onOpenChange: (open: boolean) => void;
   platform: string;
   platformName: string;
+  accountId?: string;
+  accountName?: string;
   onSuccess: () => void;
 }
 
@@ -45,6 +47,8 @@ export function CloudAuthModal({
   onOpenChange,
   platform,
   platformName,
+  accountId = "default",
+  accountName = "",
   onSuccess,
 }: CloudAuthModalProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -89,7 +93,12 @@ export function CloudAuthModal({
       const res = await fetch("/api/social/cloud-auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start", platform }),
+        body: JSON.stringify({ 
+          action: "start", 
+          platform,
+          accountId,
+          accountName,
+        }),
       });
       const data = await res.json();
       if (data.success && data.session) {
@@ -103,7 +112,7 @@ export function CloudAuthModal({
       setStatus("error");
       toast.error(`Erro: ${err.message}`);
     }
-  }, [platform]);
+  }, [platform, accountId, accountName]);
 
   useEffect(() => {
     if (open) {

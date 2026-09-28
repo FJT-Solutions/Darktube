@@ -19,9 +19,9 @@ from config import (
 )
 
 class ThreadsUploader(BaseUploader):
-    def __init__(self):
+    def __init__(self, cookie_file=None):
         super().__init__("threads")
-        self.cookie_file = SESSIONS_DIR / "threads_cookies.json"
+        self.cookie_file = Path(cookie_file) if cookie_file else SESSIONS_DIR / "threads_cookies.json"
 
     def upload(
         self, 

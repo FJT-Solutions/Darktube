@@ -10,10 +10,10 @@ from uploaders.base import BaseUploader
 from config import SESSIONS_DIR
 
 class InstagramFacebookUploader(BaseUploader):
-    def __init__(self):
+    def __init__(self, cookie_file=None):
         super().__init__("instagram_facebook")
         self.session_file = SESSIONS_DIR / "instagram_session.json"
-        self.cookie_file = SESSIONS_DIR / "instagram_cookies.json"
+        self.cookie_file = Path(cookie_file) if cookie_file else SESSIONS_DIR / "instagram_cookies.json"
 
     def upload(
         self, 

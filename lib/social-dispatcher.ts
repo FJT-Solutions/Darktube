@@ -4,6 +4,7 @@ import { pool } from '@/lib/db-client';
 import { logger } from '@/lib/logger';
 import { getPythonCommand, safeSpawn } from '@/lib/python-runtime';
 import { getUserApiKey } from '@/lib/database';
+import { restoreAccountCookiesToDisk, getSocialAccounts } from './social-accounts';
 
 const activePostDispatches = new Set<string>();
 
@@ -37,6 +38,7 @@ export interface DispatchOptions {
   videoUrl?: string;
   targetAccounts?: string[];
   facebookPageId?: string;
+  accountMap?: Record<string, any>;
   caption?: string;
   hashtags?: string[];
   title?: string;
@@ -182,6 +184,27 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
     const outLog = fs.openSync(logFile, 'a');
 
+    // Resolve mapeamento de multi-contas
+    const accountMap = options.accountMap || remodelData?.selected_accounts_by_platform || remodelData?.selectedAccountsByPlatform || {};
+    if (post.user_id && accountMap && Object.keys(accountMap).length > 0) {
+      const allRegisteredAccounts = await getSocialAccounts(post.user_id);
+      for (const [plat, accTarget] of Object.entries(accountMap)) {
+        if (accTarget === 'all') {
+          const platAccs = allRegisteredAccounts.filter((a) => a.platform === plat && a.connected);
+          for (const acc of platAccs) {
+            await restoreAccountCookiesToDisk(post.user_id, plat, acc.id);
+          }
+        } else {
+          const accList = Array.isArray(accTarget) ? accTarget : [accTarget];
+          for (const aId of accList) {
+            if (typeof aId === 'string' && aId) {
+              await restoreAccountCookiesToDisk(post.user_id, plat, aId);
+            }
+          }
+        }
+      }
+    }
+
     const spawnArgs = [
       uploaderScript,
       '--video', videoArg,
@@ -193,6 +216,9 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
     ];
     if (facebookPageId) {
       spawnArgs.push('--facebook-page-id', facebookPageId);
+    }
+    if (accountMap && Object.keys(accountMap).length > 0) {
+      spawnArgs.push('--account-map', JSON.stringify(accountMap));
     }
 
     const scriptDir = path.resolve(process.cwd(), 'scripts/social-uploader');
