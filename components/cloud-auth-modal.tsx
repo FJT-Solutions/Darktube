@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Loader2, 
   CheckCircle2, 
@@ -23,7 +24,9 @@ import {
   RefreshCw, 
   Lock, 
   Sparkles,
-  ExternalLink
+  Cookie,
+  FileCode,
+  ShieldAlert
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,7 +48,9 @@ export function CloudAuthModal({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [code2FA, setCode2FA] = useState("");
-  const [authMode, setAuthMode] = useState<"credentials" | "qr_code">("credentials");
+  const [authMode, setAuthMode] = useState<"credentials" | "qr_code" | "cookies">("credentials");
+  const [importJsonText, setImportJsonText] = useState("");
+  const [savingCookies, setSavingCookies] = useState(false);
   
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("idle");
@@ -77,8 +82,10 @@ export function CloudAuthModal({
       setUsername("");
       setPassword("");
       setCode2FA("");
+      setImportJsonText("");
       setIsSubmitting(false);
-      // Se for TikTok, padrão pode ser QR code
+      setSavingCookies(false);
+
       if (platform === "tiktok") {
         setAuthMode("qr_code");
       } else {
@@ -96,7 +103,7 @@ export function CloudAuthModal({
   // Polling de status enquanto houver sessão ativa e não finalizada
   useEffect(() => {
     if (!sessionId) return;
-    if (["success", "error", "cancelled"].includes(status)) {
+    if (["success", "error", "cancelled", "challenge_active"].includes(status)) {
       if (pollRef.current) clearInterval(pollRef.current);
       return;
     }
@@ -122,7 +129,7 @@ export function CloudAuthModal({
           }
         }
       } catch (_) {}
-    }, 2000);
+    }, 1500);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -201,6 +208,38 @@ export function CloudAuthModal({
     }
   };
 
+  const handleSaveCookies = async () => {
+    if (!importJsonText.trim()) {
+      toast.error("Cole o conteúdo JSON dos cookies.");
+      return;
+    }
+
+    setSavingCookies(true);
+    try {
+      const res = await fetch("/api/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "import_session",
+          platform,
+          sessionData: importJsonText.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || `🎉 ${platformName} conectado com sucesso!`);
+        onSuccess();
+        onOpenChange(false);
+      } else {
+        toast.error(data.error || "Erro ao salvar cookies.");
+      }
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setSavingCookies(false);
+    }
+  };
+
   const handleReset = () => {
     setStatus("idle");
     setStatusMessage("");
@@ -228,43 +267,59 @@ export function CloudAuthModal({
             </Badge>
           </div>
           <DialogDescription className="text-xs text-zinc-400">
-            Autenticação segura e automática. Suas chaves de sessão são criptografadas e salvas no banco de dados.
+            Autenticação segura. Suas chaves de sessão são criptografadas e salvas diretamente no banco PostgreSQL.
           </DialogDescription>
         </DialogHeader>
 
         {/* ---------------- ESTADO: IDLE / FORMULÁRIO INICIAL ---------------- */}
         {status === "idle" && (
           <div className="space-y-4 pt-1">
-            {platform === "tiktok" && (
-              <div className="grid grid-cols-2 gap-1 p-1 bg-zinc-900/80 rounded-lg border border-zinc-800/80">
+            {/* Seletor de Modo de Conexão */}
+            <div className="flex items-center gap-1 p-1 bg-zinc-900/80 rounded-lg border border-zinc-800/80">
+              <button
+                type="button"
+                onClick={() => setAuthMode("credentials")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                  authMode === "credentials" 
+                    ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm" 
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                Email e Senha
+              </button>
+
+              {platform === "tiktok" && (
                 <button
                   type="button"
                   onClick={() => setAuthMode("qr_code")}
-                  className={`py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
                     authMode === "qr_code" 
                       ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm" 
                       : "text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
                   <QrCode className="h-3.5 w-3.5" />
-                  Escanear QR Code
+                  QR Code
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMode("credentials")}
-                  className={`py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
-                    authMode === "credentials" 
-                      ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm" 
-                      : "text-zinc-400 hover:text-zinc-200"
-                  }`}
-                >
-                  <KeyRound className="h-3.5 w-3.5" />
-                  Email e Senha
-                </button>
-              </div>
-            )}
+              )}
 
-            {authMode === "credentials" ? (
+              <button
+                type="button"
+                onClick={() => setAuthMode("cookies")}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                  authMode === "cookies" 
+                    ? "bg-red-500/20 text-red-300 border border-red-500/30 shadow-sm" 
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Cookie className="h-3.5 w-3.5" />
+                Cookies
+              </button>
+            </div>
+
+            {/* MODO 1: CREDENCIAIS (USUÁRIO / SENHA) */}
+            {authMode === "credentials" && (
               <form onSubmit={handleStartAuth} className="space-y-3.5">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-zinc-300">
@@ -314,15 +369,18 @@ export function CloudAuthModal({
                   </Button>
                 </div>
               </form>
-            ) : (
+            )}
+
+            {/* MODO 2: QR CODE (TIKTOK) */}
+            {authMode === "qr_code" && (
               <div className="space-y-4 pt-1 text-center">
                 <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/50 flex flex-col items-center justify-center gap-2">
                   <QrCode className="h-10 w-10 text-red-400 animate-pulse" />
                   <p className="text-xs text-zinc-300 font-medium">
-                    O QR Code de login será gerado diretamente pelo servidor na nuvem.
+                    O QR Code de login será gerado na hora pelo servidor na nuvem.
                   </p>
                   <p className="text-[11px] text-zinc-500 leading-relaxed max-w-xs">
-                    Basta abrir o aplicativo do TikTok no celular, tocar em Escanear e confirmar o login.
+                    Abra o app do TikTok no celular, vá em Perfil &gt; Menu &gt; Escanear e aponte para o código.
                   </p>
                 </div>
                 <div className="flex justify-end gap-2">
@@ -343,7 +401,55 @@ export function CloudAuthModal({
                     className="text-xs font-semibold bg-red-600 hover:bg-red-700 text-white gap-1.5 px-4"
                   >
                     {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <QrCode className="h-3.5 w-3.5" />}
-                    Gerar QR Code de Login
+                    Gerar QR Code
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* MODO 3: COOKIES DA SESSÃO (1 CLIQUE / SEM CAPTCHA) */}
+            {authMode === "cookies" && (
+              <div className="space-y-3.5 pt-1">
+                <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-start gap-2.5 text-xs text-emerald-200">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed text-[11px]">
+                    <strong>Sem Bloqueios:</strong> Como os cookies vêm do seu próprio navegador onde você já está logado, o Facebook não ativa nenhum desafio ou captcha anti-bot.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-zinc-300">
+                    JSON de Cookies (Exportado do Cookie-Editor)
+                  </Label>
+                  <Textarea
+                    rows={6}
+                    placeholder='[ { "name": "c_user", "value": "..." }, ... ]'
+                    value={importJsonText}
+                    onChange={(e) => setImportJsonText(e.target.value)}
+                    className="bg-zinc-900 border-zinc-800 font-mono text-[11px] resize-none focus:border-red-500"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => onOpenChange(false)}
+                    className="text-xs text-zinc-400"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    onClick={handleSaveCookies}
+                    disabled={savingCookies || !importJsonText.trim()}
+                    className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 px-4"
+                  >
+                    {savingCookies ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                    Salvar Conexão
                   </Button>
                 </div>
               </div>
@@ -365,6 +471,58 @@ export function CloudAuthModal({
               <p className="text-[11px] text-zinc-500">
                 O navegador em nuvem está interagindo com a plataforma de forma segura.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- ESTADO: DESAFIO ANTI-BOT / CAPTCHA DETECTADO ---------------- */}
+        {status === "challenge_active" && (
+          <div className="space-y-3.5 py-1">
+            <div className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 flex items-start gap-3 text-xs text-amber-200">
+              <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold text-amber-300 block">Verificação Anti-Bot da Meta</span>
+                <p className="leading-relaxed text-[11px]">
+                  O Facebook detectou que a tentativa de login veio do datacenter da VPS e solicitou o desafio <em>&quot;Complete um desafio para verificar se você é humano&quot;</em>.
+                </p>
+              </div>
+            </div>
+
+            {screenshot && (
+              <div className="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900/40 p-1">
+                <img src={screenshot} alt="Desafio Meta" className="max-h-36 w-full object-contain rounded" />
+              </div>
+            )}
+
+            <div className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 space-y-2 text-xs">
+              <span className="font-semibold text-zinc-300 block">Como resolver agora:</span>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Como você já está logado no Facebook no seu próprio navegador, você pode conectar em 3 segundos importando os cookies (onde o Facebook nunca pede captcha), ou tentar novamente com suas credenciais.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleReset}
+                className="text-xs text-zinc-400"
+              >
+                Voltar
+              </Button>
+              <Button 
+                type="button" 
+                size="sm" 
+                onClick={() => {
+                  handleReset();
+                  setAuthMode("cookies");
+                }}
+                className="text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 px-3.5 shadow-sm"
+              >
+                <Cookie className="h-3.5 w-3.5" />
+                Conectar via Cookies (Sem Captcha)
+              </Button>
             </div>
           </div>
         )}

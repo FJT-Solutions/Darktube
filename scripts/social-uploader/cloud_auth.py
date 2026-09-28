@@ -258,8 +258,25 @@ class CloudAuthSession:
             except Exception:
                 pass
 
-            # Erro de senha ou credencial inválida
+            # Detecção IMEDIATA de desafio anti-bot / CAPTCHA (retorno instantâneo)
             page_text = self.page.content().lower()
+            if any(term in page_text for term in ["complete um desafio", "verificar se você é humano", "resolver um desafio", "pessoa real e não um bot", "arkose"]):
+                try:
+                    start_btn = self.page.locator('button:has-text("Iniciar"), button:has-text("Start"), button:has-text("Commencer")').first
+                    if start_btn.is_visible(timeout=1500):
+                        start_btn.click()
+                        time.sleep(2)
+                except Exception:
+                    pass
+
+                emit({
+                    "status": "challenge_active",
+                    "message": "O Facebook ativou uma verificação anti-bot ('Complete um desafio'). Como o servidor está em nuvem, o Meta exige resolução manual ou importação de cookies.",
+                    "screenshot": self.capture_screenshot_base64()
+                })
+                return
+
+            # Erro de senha ou credencial inválida
             if any(term in page_text for term in ["a senha que você inseriu está incorreta", "the password that you've entered is incorrect", "le mot de passe que vous avez entré est incorrect", "credenciais incorretas"]):
                 emit({
                     "status": "error",
