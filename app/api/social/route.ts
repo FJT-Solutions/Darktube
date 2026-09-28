@@ -174,14 +174,11 @@ export async function GET() {
       }
     }
 
-    const isHeadless = process.platform !== 'win32' && !process.env.DISPLAY;
-
     return NextResponse.json({ 
       success: true, 
       accounts, 
       telegramChatId,
       facebookPages,
-      isHeadlessServer: isHeadless,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -284,15 +281,6 @@ export async function POST(req: Request) {
     }
 
     if (action === 'connect' && platform) {
-      // Verifica se está rodando em servidor headless sem interface gráfica
-      const isHeadless = process.platform !== 'win32' && !process.env.DISPLAY;
-      if (isHeadless) {
-        return NextResponse.json({
-          success: false,
-          isRemote: true,
-          error: `O servidor está em ambiente de nuvem/Docker sem interface gráfica. Como o banco de dados é compartilhado, suas contas conectadas no DarkTube local no seu computador são sincronizadas automaticamente com o servidor! Abra o DarkTube localmente com sua conta ou cole os cookies JSON abaixo.`,
-        }, { status: 400 });
-      }
 
       const authScript = path.resolve(process.cwd(), 'scripts/social-uploader/auth_manager.py');
       if (!fs.existsSync(authScript)) {

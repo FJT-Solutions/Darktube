@@ -47,9 +47,7 @@ export function SocialConnections() {
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState<Record<string, SocialAccountStatus>>({});
   const [connecting, setConnecting] = useState<string | null>(null);
-  const [isHeadlessServer, setIsHeadlessServer] = useState(false);
-  const [syncingCloud, setSyncingCloud] = useState(false);
-  
+
   // Telegram inputs
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChatId, setTelegramChatId] = useState("");
@@ -78,9 +76,7 @@ export function SocialConnections() {
         if (data.facebookPages) {
           setFacebookPages(data.facebookPages);
         }
-        if (typeof data.isHeadlessServer === "boolean") {
-          setIsHeadlessServer(data.isHeadlessServer);
-        }
+
       }
     } catch (err: any) {
       console.error("Erro ao carregar conexões sociais:", err);
@@ -97,28 +93,6 @@ export function SocialConnections() {
     return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
-  const handleSyncCloud = async () => {
-    setSyncingCloud(true);
-    const toastId = toast.loading("Sincronizando sessões com o banco de dados compartilhado...");
-    try {
-      const res = await fetch("/api/social", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sync_sessions" }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("✅ Todas as sessões foram sincronizadas com sucesso com o banco!", { id: toastId });
-        await fetchStatus();
-      } else {
-        toast.error(data.error || "Erro ao sincronizar.", { id: toastId });
-      }
-    } catch (err: any) {
-      toast.error(`Falha na sincronização: ${err.message}`, { id: toastId });
-    } finally {
-      setSyncingCloud(false);
-    }
-  };
 
   const handleConnect = async (platform: string) => {
     if (platform === "telegram") {
@@ -166,16 +140,7 @@ export function SocialConnections() {
         }, 2500);
       } else {
         setConnecting(null);
-        if (data.isRemote) {
-          toast.warning("Servidor em Nuvem / Docker detectado", {
-            description: "Como o banco é compartilhado, suas contas já conectadas no seu DarkTube local são sincronizadas automaticamente! Você também pode importar os cookies JSON diretamente.",
-            duration: 8000,
-          });
-          setImportPlatform(platform);
-          setImportModalOpen(true);
-        } else {
-          toast.error(data.error || `Não foi possível iniciar login para ${platform}.`);
-        }
+        toast.error(data.error || `Não foi possível iniciar login para ${platform}.`);
       }
     } catch (err: any) {
       toast.error(`Erro ao conectar: ${err.message}`);
@@ -272,19 +237,6 @@ export function SocialConnections() {
 
   return (
     <div className="space-y-6">
-      {/* Alerta inteligente de Nuvem / Servidor Remoto */}
-      {isHeadlessServer && (
-        <div className="p-4 rounded-xl border border-sky-500/30 bg-sky-500/10 flex items-start gap-3.5 text-xs text-sky-200">
-          <Cloud className="h-5 w-5 text-sky-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <span className="font-bold text-sky-300 text-sm block">☁️ Servidor em Nuvem / Docker Ativo</span>
-            <p className="leading-relaxed">
-              Como o banco de dados PostgreSQL é compartilhado entre o seu PC e este servidor, todas as redes sociais que você conecta no <strong>DarkTube local</strong> são sincronizadas automaticamente com esta máquina de produção.
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold tracking-tight">Redes Sociais</h2>
@@ -296,18 +248,6 @@ export function SocialConnections() {
           <Badge variant="outline" className="px-3 py-1 font-semibold text-xs border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
             {connectedCount} de {platformsList.length} Conectadas
           </Badge>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncCloud}
-            disabled={syncingCloud}
-            className="h-8 text-xs font-semibold gap-1.5 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-            title="Sincronizar sessões entre local e o banco de dados compartilhado"
-          >
-            <Cloud className={`h-3.5 w-3.5 ${syncingCloud ? "animate-spin" : ""}`} />
-            Sincronizar Nuvem
-          </Button>
 
           <Button
             variant="ghost"
