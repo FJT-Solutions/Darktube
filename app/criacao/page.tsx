@@ -223,16 +223,22 @@ export default function CriacaoPage() {
   useEffect(() => {
     fetchAll()
 
-    const handleUpdate = () => fetchAll()
+    // Polling automático a cada 4 segundos para atualizar o status das produções em tempo real
+    const interval = setInterval(() => {
+      fetchAll(true)
+    }, 4000)
+
+    const handleUpdate = () => fetchAll(true)
     window.addEventListener("production-status-changed", handleUpdate)
 
     return () => {
+      clearInterval(interval)
       window.removeEventListener("production-status-changed", handleUpdate)
     }
   }, [])
 
-  async function fetchAll() {
-    setLoading(true)
+  async function fetchAll(isSilent = false) {
+    if (!isSilent) setLoading(true)
     try {
       const data = await getRemodelingTemplatesAction()
       setTemplates(data || [])
@@ -244,9 +250,9 @@ export default function CriacaoPage() {
         .slice(0, 10)
       setRecentHistory(flat)
     } catch {
-      toast.error("Erro ao carregar dados de criação.")
+      if (!isSilent) toast.error("Erro ao carregar dados de criação.")
     } finally {
-      setLoading(false)
+      if (!isSilent) setLoading(false)
     }
   }
 
