@@ -1,17 +1,18 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SpringPreset } from '../types';
+import { closedFormSpring } from '../../lib/motion';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TextSplit — anima cada letra/palavra individualmente com spring physics
-// Nunca usa CSS transitions/animations (proibido no Remotion headless render)
+// Usa closedFormSpring determinístico analítico da lib/motion
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SPRING_PRESETS: Record<SpringPreset, { damping: number; stiffness: number; mass: number }> = {
-  bouncy:   { damping: 8,  stiffness: 320, mass: 0.5 },
-  smooth:   { damping: 20, stiffness: 100, mass: 1.0 },
-  dramatic: { damping: 5,  stiffness: 500, mass: 0.3 },
-  gentle:   { damping: 30, stiffness: 80,  mass: 1.5 },
+const SPRING_PHYSICS: Record<SpringPreset, { k: number; d: number }> = {
+  bouncy:   { k: 280, d: 18 },
+  smooth:   { k: 120, d: 24 },
+  dramatic: { k: 450, d: 14 },
+  gentle:   { k: 80,  d: 28 },
 };
 
 // ─── Split-bounce: cada letra/palavra entra com spring staggered ─────────────────────
@@ -34,7 +35,7 @@ export const SplitBounceText: React.FC<{
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const config = SPRING_PRESETS[springPreset] ?? SPRING_PRESETS.bouncy;
+  const config = SPRING_PHYSICS[springPreset] ?? SPRING_PHYSICS.bouncy;
 
   // Se o texto for longo (frase inteira), divide por palavras. Se for palavra curta, por letras.
   const isSingleWord = text.length <= 16;
@@ -52,13 +53,8 @@ export const SplitBounceText: React.FC<{
       }}
     >
       {items.map((item, i) => {
-        const itemFrame = Math.max(0, frame - i * staggerFrames);
-
-        const progress = spring({
-          frame: itemFrame,
-          fps,
-          config,
-        });
+        const tSeconds = Math.max(0, (frame - i * staggerFrames) / fps);
+        const progress = closedFormSpring(tSeconds, config.k, config.d);
 
         const translateY = interpolate(progress, [0, 1], [60, 0]);
         const opacity = interpolate(progress, [0, 0.4], [0, 1], { extrapolateRight: 'clamp' });
@@ -274,7 +270,7 @@ export const KineticPopText: React.FC<{
   springConfig: { damping: number; stiffness: number; mass: number };
   frame: number;
 }> = ({ text, primaryColor, fps, isVertical, springConfig, frame }) => {
-  const scaleVal = spring({ frame: Math.max(0, frame), fps, config: springConfig });
+  const scaleVal = closedFormSpring(Math.max(0, frame / fps), 380, 16);
 
   const scaleX = interpolate(scaleVal, [0, 1], [0.2, 1], { extrapolateRight: 'clamp' });
   const scaleY = interpolate(scaleVal, [0, 0.5, 1], [2.2, 0.85, 1.0], { extrapolateRight: 'clamp' });

@@ -84,7 +84,41 @@ export type SpringPreset = 'bouncy' | 'smooth' | 'dramatic' | 'gentle';
  */
 export type CaptionStyle = 'pop' | 'karaoke' | 'subtitle';
 
-export type SceneType = 'LETTERING' | 'ILUSTRATIVA' | 'HYBRID' | 'DATA_VIZ' | 'CODE_TECH' | 'UI_SHOWCASE' | 'MAP_JOURNEY';
+export type SceneType =
+  | 'LETTERING'
+  | 'ILUSTRATIVA'
+  | 'HYBRID'
+  | 'DATA_VIZ'
+  | 'CODE_TECH'
+  | 'UI_SHOWCASE'
+  | 'MAP_JOURNEY'
+  | 'INFINITE_ZOOM'
+  | 'THREE_D';
+
+/**
+ * Efeitos sonoros procedurais gerados pelo sintetizador de áudio Darktube (sfx.mjs).
+ */
+export type SfxType =
+  | 'whoosh'
+  | 'whoosh-heavy'
+  | 'sub-drop'
+  | 'glitch-burst'
+  | 'camera-click'
+  | 'impact-boom'
+  | 'whip'
+  | 'counter-tick'
+  | 'cash-register'
+  | 'ding-bell'
+  | 'keyboard-typing'
+  | 'cinematic-riser'
+  | 'pop-clean'
+  | 'none';
+
+export interface SfxCue {
+  timeInSeconds: number;
+  type: SfxType;
+  volume?: number; // 0.0 a 1.0 (padrão: 0.8)
+}
 
 export interface LetteringLine {
   text: string;
@@ -178,6 +212,15 @@ export interface SceneSegment {
 
   /** Cor emocional da cena (hex, adicionado pelo AI Director) */
   emotionColor?: string;
+
+  /** Efeito sonoro procedural na entrada desta cena */
+  sfxOnEnter?: SfxType;
+
+  /** Efeito sonoro disparado em eventos de dados/infográficos */
+  sfxOnData?: SfxType;
+
+  /** Cues de efeitos sonoros customizados para esta cena */
+  sfxCues?: SfxCue[];
 }
 
 /**
@@ -208,6 +251,21 @@ export interface RemotionShortProps {
 
   /** Formato do vídeo */
   format?: 'vertical' | 'horizontal';
+
+  /** Lista global de cues de efeitos sonoros */
+  sfxCues?: SfxCue[];
+
+  /** Ativar sintetizador procedural de SFX (padrão: true) */
+  enableSfx?: boolean;
+
+  /** Ativar corte automático de silêncio (FFmpeg silencedetect) */
+  autoTrimSilence?: boolean;
+
+  /** Subframe Motion Blur (render 120fps -> tblend -> 30fps) */
+  motionBlur?: boolean;
+
+  /** Variações de hook para teste A/B */
+  hooks?: string[];
 }
 
 /**

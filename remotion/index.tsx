@@ -2,7 +2,37 @@ import React from 'react';
 import { Composition, registerRoot } from 'remotion';
 import { ShortVideoComposition } from './compositions/ShortVideo';
 import { DarkClipsVideoComposition } from './compositions/DarkClipsVideo';
+import { DataStoryViralComposition } from './compositions/templates/DataStoryViral';
+import { EditorialStoryComposition } from './compositions/templates/EditorialStory';
+import { HeroShotRevealComposition } from './compositions/templates/HeroShotReveal';
+import { UIMotionMorphComposition } from './compositions/templates/UIMotionMorph';
+import { MapJourneyComposition } from './compositions/templates/MapJourney';
+import { InfiniteZoomComposition } from './compositions/templates/InfiniteZoom';
 import { RemotionShortProps, DarkClipsVideoProps } from './types';
+
+const calculateShortMetadata = async ({ props }: { props: unknown }) => {
+  const shortProps = props as RemotionShortProps;
+  const scenesList = shortProps.scenes || [];
+  const fps = 30;
+  const DEFAULT_TRANSITION_FRAMES = 18;
+
+  let calcFrames = 0;
+  for (let i = 0; i < scenesList.length; i++) {
+    const scene = scenesList[i];
+    const sceneDur = Math.round((scene.durationSeconds || 5) * fps);
+    calcFrames += sceneDur;
+    if (i < scenesList.length - 1) {
+      const tStyle = scene.transitionIn || 'fade';
+      const tFrames = scene.transitionDurationFrames || (tStyle === 'none' ? 0 : DEFAULT_TRANSITION_FRAMES);
+      calcFrames -= tFrames;
+    }
+  }
+  const durationInFrames = Math.max(30, calcFrames);
+
+  return {
+    durationInFrames,
+  };
+};
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -70,29 +100,7 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
-        calculateMetadata={async ({ props }) => {
-          const shortProps = props as RemotionShortProps;
-          const scenesList = shortProps.scenes || [];
-          const fps = 30;
-          const DEFAULT_TRANSITION_FRAMES = 18;
-
-          let calcFrames = 0;
-          for (let i = 0; i < scenesList.length; i++) {
-            const scene = scenesList[i];
-            const sceneDur = Math.round((scene.durationSeconds || 5) * fps);
-            calcFrames += sceneDur;
-            if (i < scenesList.length - 1) {
-              const tStyle = scene.transitionIn || 'fade';
-              const tFrames = scene.transitionDurationFrames || (tStyle === 'none' ? 0 : DEFAULT_TRANSITION_FRAMES);
-              calcFrames -= tFrames;
-            }
-          }
-          const durationInFrames = Math.max(30, calcFrames);
-
-          return {
-            durationInFrames,
-          };
-        }}
+        calculateMetadata={calculateShortMetadata}
         defaultProps={{
           scenes: [
             {
@@ -131,6 +139,54 @@ export const RemotionRoot: React.FC = () => {
           watermarkText: 'DarkTube AI',
           format: 'vertical',
         } satisfies RemotionShortProps}
+      />
+      <Composition
+        id="DataStoryViral"
+        component={DataStoryViralComposition as any}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={calculateShortMetadata}
+      />
+      <Composition
+        id="EditorialStory"
+        component={EditorialStoryComposition as any}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={calculateShortMetadata}
+      />
+      <Composition
+        id="HeroShotReveal"
+        component={HeroShotRevealComposition as any}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={calculateShortMetadata}
+      />
+      <Composition
+        id="UIMotionMorph"
+        component={UIMotionMorphComposition as any}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={calculateShortMetadata}
+      />
+      <Composition
+        id="MapJourney"
+        component={MapJourneyComposition as any}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={calculateShortMetadata}
+      />
+      <Composition
+        id="InfiniteZoom"
+        component={InfiniteZoomComposition as any}
+        fps={30}
+        width={1080}
+        height={1920}
+        calculateMetadata={calculateShortMetadata}
       />
     </>
   );

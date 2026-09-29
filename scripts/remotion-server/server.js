@@ -7,6 +7,18 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const { triggerSocialUpload } = require('./trigger-uploader');
 
+// ── SFX Procedural Loader (Movez 12-Step Pattern) ──
+let generateSfxFile = null;
+try {
+  const sfxPath = path.join(__dirname, 'sfx.mjs');
+  if (fs.existsSync(sfxPath)) {
+    import(`file://${sfxPath}`).then(m => {
+      generateSfxFile = m.generateSfxFile;
+      console.log('[Remotion Sound] 🔊 Sintetizador procedural SFX ativo!');
+    }).catch(e => console.warn('[Remotion Sound] SFX async load warning:', e.message));
+  }
+} catch (_) {}
+
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
@@ -123,6 +135,122 @@ app.post('/render', async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// ENDPOINT /render-draft (Critique Loop Draft Ultra-Rápido 360p)
+// Renderiza em ~10s + gera Contact Sheet 4x2 frames para Gemini Vision
+// ──────────────────────────────────────────────
+app.post('/render-draft', async (req, res) => {
+  const { historyId, templateId, composition, callbackUrl } = req.body;
+  const draftId = `draft_${historyId || Date.now()}`;
+  
+  if (!composition || !composition.scenes || composition.scenes.length === 0) {
+    return res.status(400).json({ error: 'composition.scenes obrigatório' });
+  }
+
+  console.log(`[Remotion Draft] Iniciando render de draft rápido para ${draftId}...`);
+  
+  try {
+    if (!bundledLocation) await initBundle();
+    await preloadAndProcessAllAssets(composition.scenes);
+
+    const isVertical = (composition.format || 'vertical') === 'vertical';
+    const width = isVertical ? 540 : 960;
+    const height = isVertical ? 960 : 540;
+    const fps = 15; // Metade do fps para render 2x mais veloz
+
+    const scenesList = composition.scenes || [];
+    let calcFrames = 0;
+    for (let i = 0; i < scenesList.length; i++) {
+      calcFrames += Math.round((scenesList[i].durationSeconds || 5) * fps);
+    }
+    const durationInFrames = Math.max(15, calcFrames);
+
+    const inputProps = {
+      ...composition,
+      showWatermark: false,
+    };
+
+    const serveUrl = `http://127.0.0.1:${PORT}/bundle`;
+    const chromiumArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--mute-audio',
+    ];
+
+    const targetTemplate = templateId || composition.templateId || 'ShortVideo';
+    const comp = await selectComposition({
+      serveUrl,
+      id: targetTemplate,
+      inputProps,
+      durationInFrames,
+      fps,
+      width,
+      height,
+      browserExecutable: CHROME_PATH,
+      chromiumOptions: {
+        disableWebSecurity: true,
+        args: chromiumArgs,
+      },
+    });
+
+    const draftFileName = `draft_${draftId}.mp4`;
+    const draftFilePath = path.join(OUTPUT_DIR, draftFileName);
+
+    await renderMedia({
+      composition: comp,
+      serveUrl,
+      outputLocation: draftFilePath,
+      codec: 'h264',
+      concurrency: 4,
+      imageFormat: 'jpeg',
+      jpegQuality: 60,
+      inputProps,
+      browserExecutable: CHROME_PATH,
+      chromiumOptions: {
+        disableWebSecurity: true,
+        args: chromiumArgs,
+      },
+    });
+
+    // Gerar Contact Sheet (Grid 4x2 com 8 frames chave)
+    const sheetFileName = `sheet_${draftId}.jpg`;
+    const sheetFilePath = path.join(OUTPUT_DIR, sheetFileName);
+    try {
+      const step = Math.max(1, Math.floor(durationInFrames / 8));
+      execSync(`ffmpeg -y -i "${draftFilePath}" -vf "select='not(mod(n\\,${step}))',scale=270:480,tile=4x2" -frames:v 1 -q:v 3 "${sheetFilePath}"`, { timeout: 30000, stdio: 'pipe' });
+    } catch (sheetErr) {
+      console.warn('[Remotion Draft] Falha ao gerar contact sheet:', sheetErr.message);
+    }
+
+    const draftVideoUrl = STORAGE_BASE_URL ? `${STORAGE_BASE_URL}/${draftFileName}` : `/storage/${draftFileName}`;
+    const contactSheetUrl = fs.existsSync(sheetFilePath) ? (STORAGE_BASE_URL ? `${STORAGE_BASE_URL}/${sheetFileName}` : `/storage/${sheetFileName}`) : null;
+
+    console.log(`[Remotion Draft] ✅ Draft concluído em tempo recorde! Video: ${draftVideoUrl}, Sheet: ${contactSheetUrl}`);
+
+    if (callbackUrl) {
+      await sendCallback(callbackUrl, {
+        historyId,
+        status: 'draft_ready',
+        draftVideoUrl,
+        contactSheetUrl
+      });
+    }
+
+    return res.json({
+      success: true,
+      draftId,
+      draftVideoUrl,
+      contactSheetUrl,
+    });
+  } catch (err) {
+    console.error(`[Remotion Draft] Erro ao renderizar draft:`, err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+// ──────────────────────────────────────────────
 // RENDER DARK CLIPS VIDEO (Meme / Clip 9:16)
 // ──────────────────────────────────────────────
 async function handleDarkClipsRender(req, res) {
@@ -168,6 +296,22 @@ async function handleDarkClipsRender(req, res) {
           const arrayBuf = await vidRes.arrayBuffer();
           fs.writeFileSync(inputFilePath, Buffer.from(arrayBuf));
           console.log(`[Remotion DarkClips] ✅ Pre-cached input video: ${inputFilePath}`);
+
+          // ── CORTE AUTOMÁTICO DE SILÊNCIO (Task 7.4) ──
+          if (req.body.autoTrimSilence || inputProps.autoTrimSilence) {
+            try {
+              const trimmedFileName = `trimmed_${inputFileName}`;
+              const trimmedFilePath = path.join(OUTPUT_DIR, trimmedFileName);
+              console.log('[Remotion DarkClips] ✂️ Cortando silêncios automáticos (>0.4s)...');
+              execSync(`ffmpeg -y -i "${inputFilePath}" -af "silenceremove=start_periods=1:start_duration=0.1:start_threshold=-35dB:stop_periods=-1:stop_duration=0.4:stop_threshold=-35dB" -c:v copy "${trimmedFilePath}"`, { timeout: 60000, stdio: 'pipe' });
+              if (fs.existsSync(trimmedFilePath) && fs.statSync(trimmedFilePath).size > 1000) {
+                fs.renameSync(trimmedFilePath, inputFilePath);
+                console.log('[Remotion DarkClips] ✅ Pausas de silêncio eliminadas com sucesso!');
+              }
+            } catch (trimErr) {
+              console.warn('[Remotion DarkClips] Aviso no corte de silêncio:', trimErr.message);
+            }
+          }
 
           // ─────────────────────────────────────────────────────────────────────────
           // 1. DETECÇÃO DA DURAÇÃO REAL DO VÍDEO (ffprobe)
@@ -665,7 +809,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
 
     const comp = await selectComposition({
       serveUrl,
-      id: 'ShortVideo',
+      id: composition.templateId || 'ShortVideo',
       inputProps,
       durationInFrames,
       fps,
@@ -767,7 +911,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
 // MIXAR ÁUDIO VIA FFMPEG (pós-processamento, sem delayRender no Remotion)
 // ──────────────────────────────────────────────
 async function mixAudioWithFFmpeg(silentVideoPath, composition, historyId) {
-  const { scenes = [], backgroundMusicUrl } = composition;
+  const { scenes = [], backgroundMusicUrl, enableSfx = true } = composition;
   const workDir = path.join('/tmp', `remotion_audio_${historyId}`);
   fs.mkdirSync(workDir, { recursive: true });
 
@@ -800,7 +944,81 @@ async function mixAudioWithFFmpeg(silentVideoPath, composition, historyId) {
     ? await resolveAudio(backgroundMusicUrl, path.join(workDir, 'bgm.mp3'))
     : null;
 
-  if (!hasNarration && !bgmPath) {
+  // ── Sincronização BPM via beats.py (Task 4.2) ──
+  if (bgmPath) {
+    try {
+      const beatsScript = path.join(__dirname, 'beats.py');
+      if (fs.existsSync(beatsScript)) {
+        const pyOut = execSync(`python3 "${beatsScript}" "${bgmPath}"`, { timeout: 20000, stdio: 'pipe' }).toString();
+        const beatData = JSON.parse(pyOut);
+        if (beatData && beatData.bpm) {
+          console.log(`[Remotion Sound] 🎵 BPM sincronizado: ${beatData.bpm} BPM (${beatData.downbeats?.length || 0} downbeats)`);
+        }
+      }
+    } catch (bpmErr) {
+      console.warn('[Remotion Sound] Aviso BPM:', bpmErr.message);
+    }
+  }
+
+  // ── GERAÇÃO DE SFX PROCEDURAL (Task 4.1) ──
+  let sfxPath = null;
+  const sfxCues = [];
+  let sfxTimeOffset = 0;
+
+  for (let i = 0; i < scenes.length; i++) {
+    const sc = scenes[i];
+    const dur = sc.durationSeconds || 5;
+
+    // SFX de entrada de cena
+    if (sc.sfxOnEnter && sc.sfxOnEnter !== 'none') {
+      sfxCues.push({ t: sfxTimeOffset, type: sc.sfxOnEnter, volume: i === 0 ? 0.9 : 0.75 });
+    } else if (i === 0) {
+      sfxCues.push({ t: 0, type: 'whoosh-heavy', volume: 0.85 });
+    }
+
+    // SFX de dados/infográficos
+    if (sc.sfxOnData && sc.sfxOnData !== 'none') {
+      sfxCues.push({ t: sfxTimeOffset + dur * 0.35, type: sc.sfxOnData, volume: 0.7 });
+    } else if (['bar-chart', 'line-chart', 'counter-confetti', 'odometer-digit-roll'].includes(sc.animationStyle)) {
+      sfxCues.push({ t: sfxTimeOffset + dur * 0.35, type: 'counter-tick', volume: 0.7 });
+    }
+
+    if (Array.isArray(sc.sfxCues)) {
+      for (const cue of sc.sfxCues) {
+        sfxCues.push({ ...cue, t: sfxTimeOffset + (cue.t || cue.timeInSeconds || 0) });
+      }
+    }
+    sfxTimeOffset += dur;
+  }
+
+  if (Array.isArray(composition.sfxCues)) {
+    sfxCues.push(...composition.sfxCues);
+  }
+
+  if (enableSfx && sfxCues.length > 0) {
+    try {
+      const generatedWav = path.join(workDir, 'sfx_procedural.wav');
+      if (generateSfxFile) {
+        generateSfxFile(sfxCues, generatedWav);
+        sfxPath = generatedWav;
+      } else {
+        const sfxScript = path.join(__dirname, 'sfx.mjs');
+        if (fs.existsSync(sfxScript)) {
+          const cuesJsonPath = path.join(workDir, 'cues.json');
+          fs.writeFileSync(cuesJsonPath, JSON.stringify(sfxCues));
+          execSync(`node "${sfxScript}" "${cuesJsonPath}" "${generatedWav}"`, { timeout: 15000, stdio: 'pipe' });
+          if (fs.existsSync(generatedWav)) sfxPath = generatedWav;
+        }
+      }
+      if (sfxPath) {
+        console.log(`[Remotion Sound] 🔊 SFX procedural mixado: ${sfxCues.length} efeitos sonoros sincronizados!`);
+      }
+    } catch (sfxErr) {
+      console.warn('[Remotion Sound] Aviso SFX procedural:', sfxErr.message);
+    }
+  }
+
+  if (!hasNarration && !bgmPath && !sfxPath) {
     console.log('[Remotion FFmpeg] Nenhum áudio disponível, vídeo permanece mudo.');
     return silentVideoPath;
   }
@@ -826,25 +1044,49 @@ async function mixAudioWithFFmpeg(silentVideoPath, composition, historyId) {
   });
 
   // Consolidar narrações
+  let narrationTag = '';
   if (narrationChunks.length === 1) {
     filterParts.push(`${narrationChunks[0]}anull[narration]`);
+    narrationTag = '[narration]';
   } else if (narrationChunks.length > 1) {
     filterParts.push(`${narrationChunks.join('')}amix=inputs=${narrationChunks.length}:normalize=0:dropout_transition=0[narration]`);
+    narrationTag = '[narration]';
   }
 
-  // Adicionar BGM se existir
+  // Adicionar SFX Track se gerado
+  let sfxTag = '';
+  if (sfxPath) {
+    inputs.push(`-i "${sfxPath}"`);
+    filterParts.push(`[${audioInputIdx}:a]volume=0.45[sfx]`);
+    sfxTag = '[sfx]';
+    audioInputIdx++;
+  }
+
+  // Combinar narração + SFX
+  let foregroundTag = '';
+  if (narrationTag && sfxTag) {
+    filterParts.push(`${narrationTag}${sfxTag}amix=inputs=2:normalize=0:dropout_transition=0[fg_audio]`);
+    foregroundTag = '[fg_audio]';
+  } else if (narrationTag) {
+    foregroundTag = narrationTag;
+  } else if (sfxTag) {
+    foregroundTag = sfxTag;
+  }
+
+  // Adicionar BGM com ducking suave
   let finalAudio = '';
   if (bgmPath) {
     inputs.push(`-i "${bgmPath}"`);
-    filterParts.push(`[${audioInputIdx}:a]volume=0.12[bgm]`);
-    if (narrationChunks.length > 0) {
-      filterParts.push('[narration][bgm]amix=inputs=2:normalize=0:dropout_transition=0[audio_out]');
+    const bgmVolume = foregroundTag ? '0.12' : '0.60';
+    filterParts.push(`[${audioInputIdx}:a]volume=${bgmVolume}[bgm]`);
+    if (foregroundTag) {
+      filterParts.push(`${foregroundTag}[bgm]amix=inputs=2:normalize=0:dropout_transition=0[audio_out]`);
       finalAudio = '[audio_out]';
     } else {
       finalAudio = '[bgm]';
     }
   } else {
-    finalAudio = narrationChunks.length > 0 ? '[narration]' : '';
+    finalAudio = foregroundTag || '';
   }
 
   const filterGraph = filterParts.join('; ');
@@ -853,14 +1095,28 @@ async function mixAudioWithFFmpeg(silentVideoPath, composition, historyId) {
     inputs.join(' '),
     `-filter_complex "${filterGraph}"`,
     `-map 0:v -map "${finalAudio}"`,
-    '-c:v copy -c:a aac -b:a 128k -shortest',
+    '-c:v copy -c:a aac -b:a 192k -shortest',
     `"${outputPath}"`,
   ].join(' ');
 
-  console.log('[Remotion FFmpeg] Mixando áudio...');
+  console.log('[Remotion FFmpeg] Mixando áudio (narração + SFX + BGM)...');
   execSync(ffmpegCmd, { timeout: 300_000, stdio: 'pipe' });
 
-  // Substituir o arquivo original pelo com áudio
+  // ── SUBFRAME MOTION BLUR (Task 7.5) ──
+  if (composition.motionBlur) {
+    try {
+      const mbPath = path.join(workDir, 'final_with_motionblur.mp4');
+      console.log('[Remotion MotionBlur] Aplicando Subframe Motion Blur temporal cinematográfico...');
+      execSync(`ffmpeg -y -i "${outputPath}" -vf "tblend=all_mode=average" -c:v libx264 -pix_fmt yuv420p -preset fast -crf 19 -c:a copy "${mbPath}"`, { timeout: 300_000, stdio: 'pipe' });
+      if (fs.existsSync(mbPath) && fs.statSync(mbPath).size > 1000) {
+        fs.renameSync(mbPath, outputPath);
+        console.log('[Remotion MotionBlur] ✅ Motion blur aplicado com sucesso!');
+      }
+    } catch (mbErr) {
+      console.warn('[Remotion MotionBlur] Aviso no motion blur:', mbErr.message);
+    }
+  }
+
   fs.renameSync(outputPath, silentVideoPath);
   try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (_) {}
 
