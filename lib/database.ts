@@ -777,6 +777,7 @@ export async function ensureDarkClipsTablesExist() {
             error_message TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE public.dark_clips_posts ADD COLUMN IF NOT EXISTS queue_order INT DEFAULT 0;
     `)
 }
 
@@ -979,8 +980,9 @@ export async function saveDarkClipPost(post: Partial<DarkClipPost>): Promise<Dar
                 status = COALESCE($5, status),
                 target_accounts = COALESCE($6, target_accounts),
                 published_at = COALESCE($7, published_at),
-                error_message = COALESCE($8, error_message)
-            WHERE id = $9
+                error_message = COALESCE($8, error_message),
+                queue_order = COALESCE($9, queue_order)
+            WHERE id = $10
             RETURNING *
         `
         const values = [
@@ -992,6 +994,7 @@ export async function saveDarkClipPost(post: Partial<DarkClipPost>): Promise<Dar
             post.target_accounts ? JSON.stringify(post.target_accounts) : null,
             post.published_at,
             post.error_message,
+            post.queue_order !== undefined ? post.queue_order : null,
             post.id
         ]
         const { rows } = await pool.query(query, values)
@@ -1000,8 +1003,8 @@ export async function saveDarkClipPost(post: Partial<DarkClipPost>): Promise<Dar
         const query = `
             INSERT INTO public.dark_clips_posts (
                 user_id, clip_id, title, rendered_video_url, remodel_data,
-                scheduled_at, status, target_accounts
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                scheduled_at, status, target_accounts, queue_order
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
         `
         const values = [
@@ -1012,7 +1015,8 @@ export async function saveDarkClipPost(post: Partial<DarkClipPost>): Promise<Dar
             JSON.stringify(post.remodel_data || {}),
             post.scheduled_at || null,
             post.status || 'draft',
-            JSON.stringify(post.target_accounts || [])
+            JSON.stringify(post.target_accounts || []),
+            post.queue_order || 0
         ]
         const { rows } = await pool.query(query, values)
         return rows[0]
@@ -1027,7 +1031,7 @@ export async function getDarkClipPosts(userId?: string): Promise<DarkClipPost[]>
         query += ` WHERE user_id = $1 OR user_id IS NULL`
         params.push(userId)
     }
-    query += ` ORDER BY scheduled_at ASC NULLS LAST, created_at DESC`
+    query += ` ORDER BY queue_order ASC NULLS LAST, scheduled_at ASC NULLS LAST, created_at DESC`
     const { rows } = await pool.query(query, params)
     return rows.map((r: any) => ({
         ...r,

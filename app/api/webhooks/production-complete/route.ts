@@ -137,6 +137,12 @@ export async function POST(req: NextRequest) {
             videoUrl: finalVideoUrl,
           });
         }
+
+        // Notifica a fila do Dark Clips para processar o próximo item
+        try {
+          const { processNextQueueItem } = await import('@/lib/dark-clips-queue');
+          setTimeout(() => processNextQueueItem(), 2000);
+        } catch (qErr) {}
       }
     } catch (dcErr) {
       console.warn('[Production Webhook] Nota ao atualizar dark_clips_posts:', dcErr);

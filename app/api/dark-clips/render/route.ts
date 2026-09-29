@@ -343,18 +343,37 @@ export async function POST(req: Request) {
       }
 
       if (!renderedVideoUrl && lastError) {
-        logger.error(`Render falhou definitivamente para ${initialPost.id}: ${lastError}`, { context: 'Render' });
-        try {
-          await pool.query('UPDATE public.dark_clips_posts SET status = $1, error_message = $2 WHERE id = $3', ['failed', lastError, initialPost.id]);
-        } catch (e) {}
+        // Verifica se o webhook de callback do Remotion já concluiu ou está processando o post
+        const currentCheck = await pool.query(
+          'SELECT status FROM public.dark_clips_posts WHERE id = $1',
+          [initialPost.id]
+        );
+        const currentStatus = currentCheck.rows[0]?.status;
+        if (currentStatus === 'completed' || currentStatus === 'rendered' || currentStatus === 'publishing' || currentStatus === 'published') {
+          logger.info(`[Render] Post ${initialPost.id} já foi finalizado via webhook de produção (${currentStatus}). Não sobrescrevendo com erro.`, { context: 'Render' });
+        } else if (serverConnected || lastError.includes('fetch failed')) {
+          logger.info(`[Render] Conexão HTTP encerrou por timeout após 5 min (vídeo longo), mas o Remotion continua processando em segundo plano via webhook. Mantendo status ${initialStatus} para aguardar callback.`, { context: 'Render' });
+        } else {
+          logger.error(`Render falhou definitivamente para ${initialPost.id}: ${lastError}`, { context: 'Render' });
+          try {
+            await pool.query('UPDATE public.dark_clips_posts SET status = $1, error_message = $2 WHERE id = $3', ['failed', lastError, initialPost.id]);
+          } catch (e) {}
+        }
       }
 
       if (activeLockClipId) {
         activeClipRenders.delete(activeLockClipId);
       }
+      try {
+        const { processNextQueueItem } = await import('@/lib/dark-clips-queue');
+        setTimeout(() => processNextQueueItem(), 2000);
+      } catch (qErr) {}
     })().catch((bgErr) => {
       logger.error('Erro inesperado em background render:', bgErr, { context: 'Render' });
       if (activeLockClipId) activeClipRenders.delete(activeLockClipId);
+      try {
+        import('@/lib/dark-clips-queue').then(m => setTimeout(() => m.processNextQueueItem(), 2000)).catch(() => {});
+      } catch (qErr) {}
     });
 
     // Resposta imediata para a interface não travar e o card entrar no Histórico

@@ -41,10 +41,14 @@ import {
   Move,
   Navigation,
   Smartphone,
-  History
+  History,
+  Pause,
+  PlayCircle,
+  ListOrdered
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
@@ -97,10 +101,10 @@ function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: str
   };
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1 shrink-0">
       <Dialog onOpenChange={(open) => { if (open) { setVideoError(false); } }}>
         <DialogTrigger asChild>
-          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold">
+          <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1 px-2 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold shrink-0">
             <Play className="h-3 w-3 fill-current" />
             Ver Vídeo
           </Button>
@@ -162,7 +166,7 @@ function DarkClipsVideoModal({ videoUrl, title }: { videoUrl: string; title: str
         variant="ghost"
         onClick={handleDownload}
         disabled={downloading}
-        className="h-7 w-7 p-0 text-primary hover:bg-primary/10"
+        className="h-7 w-7 p-0 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 shrink-0"
         title="Baixar Vídeo MP4"
       >
         {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
@@ -547,6 +551,139 @@ export default function DarkClipsPage() {
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
   const [isPublishingNow, setIsPublishingNow] = useState<boolean>(false);
 
+  // Bulk Multi-Select & Fila em Massa State
+  const [selectedClipIds, setSelectedClipIds] = useState<string[]>([]);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkModalMode, setBulkModalMode] = useState<'render' | 'publish'>('publish');
+  const [bulkIntervalMinutes, setBulkIntervalMinutes] = useState(15);
+  const [bulkTargetAccounts, setBulkTargetAccounts] = useState<string[]>([]);
+  const [bulkFacebookPageId, setBulkFacebookPageId] = useState<string>("");
+  const [bulkGenerateAiCopy, setBulkGenerateAiCopy] = useState(true);
+  const [isEnqueuing, setIsEnqueuing] = useState(false);
+  const [isQueuePausedUI, setIsQueuePausedUI] = useState(false);
+
+  // Multi-Selection Handlers
+  const toggleSelectClip = (clipId: string) => {
+    setSelectedClipIds((prev) =>
+      prev.includes(clipId) ? prev.filter((id) => id !== clipId) : [...prev, clipId]
+    );
+  };
+
+  const selectAllClips = () => {
+    setSelectedClipIds(clips.map((c) => c.id));
+    toast.info(`${clips.length} clipes selecionados para ações em massa.`);
+  };
+
+  const clearSelectedClips = () => {
+    setSelectedClipIds([]);
+  };
+
+  const openBulkModal = (mode: 'render' | 'publish') => {
+    if (selectedClipIds.length === 0) {
+      toast.warning("Selecione ao menos um clipe na lista.");
+      return;
+    }
+    setBulkModalMode(mode);
+    setBulkTargetAccounts(targetAccounts.length > 0 ? targetAccounts : ['facebook', 'youtube'].filter((p) => connectedPlatforms[p]));
+    setBulkFacebookPageId(selectedFacebookPage || (facebookPages[0]?.id || ""));
+    setIsBulkModalOpen(true);
+  };
+
+  const handleStartBulkQueue = async () => {
+    if (selectedClipIds.length === 0) {
+      toast.warning("Selecione ao menos um clipe para adicionar à fila.");
+      return;
+    }
+
+    if (bulkModalMode === 'publish' && bulkTargetAccounts.length === 0) {
+      toast.error("Selecione ao menos uma rede social de destino!", {
+        description: "Marque as redes conectadas para publicação ou alterne o modo para 'Apenas Produzir'.",
+        duration: 5000,
+      });
+      return;
+    }
+
+    setIsEnqueuing(true);
+    const toastId = toast.loading(`Enfileirando ${selectedClipIds.length} clipes na esteira de produção...`);
+
+    try {
+      const res = await fetch("/api/dark-clips/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clipIds: selectedClipIds,
+          mode: bulkModalMode,
+          targetAccounts: bulkTargetAccounts,
+          intervalMinutes: bulkIntervalMinutes,
+          facebookPageId: bulkFacebookPageId,
+          selectedAccountsByPlatform,
+          activePreset,
+          customOptions: {
+            generateAiCopy: bulkGenerateAiCopy,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`🚀 ${selectedClipIds.length} clipes adicionados à fila! O processamento começou.`, { id: toastId });
+        setIsBulkModalOpen(false);
+        setSelectedClipIds([]);
+        fetchInitialData();
+      } else {
+        toast.error(data.error || "Erro ao enfileirar clipes.", { id: toastId });
+      }
+    } catch {
+      toast.error("Falha ao se comunicar com a fila.", { id: toastId });
+    } finally {
+      setIsEnqueuing(false);
+    }
+  };
+
+  const handleDeleteSelectedClips = async () => {
+    if (!confirm(`Deseja realmente excluir os ${selectedClipIds.length} clipes selecionados?`)) return;
+    const count = selectedClipIds.length;
+    const toastId = toast.loading(`Excluindo ${count} clipes...`);
+    try {
+      for (const id of selectedClipIds) {
+        await fetch(`/api/dark-clips/import?id=${id}`, { method: "DELETE" }).catch(() => {});
+      }
+      setClips((prev) => prev.filter((c) => !selectedClipIds.includes(c.id)));
+      if (selectedClip && selectedClipIds.includes(selectedClip.id)) {
+        setSelectedClip(null);
+      }
+      setSelectedClipIds([]);
+      toast.success(`${count} clipes excluídos com sucesso!`, { id: toastId });
+    } catch {
+      toast.error("Erro ao excluir alguns clipes.", { id: toastId });
+    }
+  };
+
+  const handleQueueAction = async (action: 'pause' | 'resume' | 'clear') => {
+    try {
+      const res = await fetch("/api/dark-clips/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (action === 'pause') {
+          setIsQueuePausedUI(true);
+          toast.info("Fila pausada. O item atual terminará e os próximos aguardarão.");
+        } else if (action === 'resume') {
+          setIsQueuePausedUI(false);
+          toast.success("Fila retomada! Processando próximos itens.");
+        } else if (action === 'clear') {
+          toast.success("Itens pendentes removidos da fila!");
+        }
+        fetchInitialData();
+      }
+    } catch {
+      toast.error("Erro ao gerenciar fila.");
+    }
+  };
+
   async function handleSyncFacebookPages() {
     setLoadingFbPages(true);
     try {
@@ -589,9 +726,10 @@ export default function DarkClipsPage() {
   const hasActiveJob = useMemo(() => {
     const now = Date.now();
     return scheduledPosts.some((p) => {
-      if (p.status !== 'rendering' && p.status !== 'publishing') return false;
+      if (p.status === 'rendering' || p.status === 'publishing' || p.status === 'queued') return true;
       const createdTime = p.created_at ? new Date(p.created_at).getTime() : 0;
-      return (now - createdTime) < 15 * 60 * 1000;
+      // Se foi criado nos últimos 15 minutos e ainda não está publicado, continua monitorando o webhook/render
+      return (now - createdTime) < 15 * 60 * 1000 && p.status !== 'published';
     });
   }, [scheduledPosts]);
 
@@ -1388,7 +1526,10 @@ export default function DarkClipsPage() {
     }
 
     if (targetAccounts.length === 0) {
-      toast.warning("Selecione ao menos uma rede conectada (ex: Facebook Reels, YouTube Shorts).");
+      toast.error("Nenhuma rede social de destino selecionada!", {
+        description: "Selecione ao menos uma rede social conectada acima (ex: Facebook Reels, YouTube Shorts) para onde enviar o clipe.",
+        duration: 6000,
+      });
       return;
     }
 
@@ -4373,14 +4514,57 @@ export default function DarkClipsPage() {
                 {/* 1. Biblioteca de Clipes Minerados */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-sm font-bold flex items-center gap-2">
                         <Video className="h-4 w-4 text-primary" /> Clipes Disponíveis para Produção ({clips.length})
                       </h3>
-                      <Button variant="ghost" size="sm" onClick={fetchInitialData} className="h-8 text-xs gap-1">
+                      {selectedClipIds.length > 0 && (
+                        <Badge className="bg-primary/20 text-primary border border-primary/40 font-bold text-[11px] px-2 py-0.5 animate-in fade-in">
+                          {selectedClipIds.length} selecionado(s)
+                        </Badge>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={fetchInitialData} className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground">
                         <RefreshCw className="h-3 w-3" /> Atualizar
                       </Button>
                     </div>
+
+                    {clips.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={selectAllClips}
+                          className="h-7 text-xs font-semibold gap-1.5 border-border/80 hover:border-primary/50 text-foreground hover:bg-primary/10"
+                          title="Selecionar todos os clipes da lista"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                          Selecionar Todos ({clips.length})
+                        </Button>
+
+                        {selectedClipIds.length > 0 && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={clearSelectedClips}
+                              className="h-7 text-xs font-semibold gap-1 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                              title="Desmarcar todos os clipes selecionados"
+                            >
+                              Desmarcar ({selectedClipIds.length})
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              onClick={() => openBulkModal('publish')}
+                              className="h-7 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm animate-pulse"
+                            >
+                              <Send className="h-3 w-3" />
+                              Fila em Massa ({selectedClipIds.length})
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {clips.length === 0 ? (
@@ -4392,19 +4576,29 @@ export default function DarkClipsPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5">
                       {clips.map((clip) => {
                         const isSelected = selectedClip?.id === clip.id;
+                        const selectIndex = selectedClipIds.indexOf(clip.id);
+                        const isMultiSelected = selectIndex !== -1;
+                        const queueOrderNumber = selectIndex + 1;
+                        const queuedPost = scheduledPosts.find((p) => p.clip_id === clip.id && p.status === 'queued');
+                        const isRenderingThis = renderingClipIds.includes(clip.id) || scheduledPosts.some((p) => p.clip_id === clip.id && p.status === 'rendering');
                         const renderedPost = scheduledPosts.find((p) => p.clip_id === clip.id && isValidVideoUrl(p.rendered_video_url));
 
                         return (
                           <div
                             key={clip.id}
                             className={`group rounded-xl border p-3 bg-card transition-all relative overflow-hidden flex flex-col justify-between ${
-                              isSelected ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary" : "border-border hover:border-border/80"
+                              isMultiSelected
+                                ? "border-emerald-500 bg-emerald-500/[0.04] shadow-md shadow-emerald-500/10 ring-2 ring-emerald-500/40"
+                                : isSelected
+                                ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary"
+                                : "border-border hover:border-border/80"
                             }`}
                           >
                             <div>
+                              {/* Container de Thumbnail com Ações Visuais Claras */}
                               <div 
                                 onClick={() => {
                                   setSelectedClip(clip);
@@ -4415,8 +4609,30 @@ export default function DarkClipsPage() {
                                     setRenderedUrl(null);
                                   }
                                 }}
-                                className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-zinc-900 border border-border/40 relative mb-2 cursor-pointer group-hover:opacity-95 flex items-center justify-center"
+                                className="aspect-[9/16] max-h-[160px] rounded-lg overflow-hidden bg-zinc-900 border border-border/40 relative mb-2 cursor-pointer group-hover:opacity-95 flex items-center justify-center select-none"
                               >
+                                {/* Botão Circular Numerado (1, 2, 3...) de Ordem na Fila */}
+                                <button 
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    toggleSelectClip(clip.id);
+                                  }}
+                                  className={`absolute top-2 left-2 z-20 h-7 w-7 rounded-full flex items-center justify-center transition-all shadow-md backdrop-blur-md cursor-pointer select-none active:scale-90 ${
+                                    isMultiSelected
+                                      ? "bg-emerald-500 text-black font-black text-xs ring-2 ring-white border border-emerald-400 shadow-emerald-950/60 scale-105"
+                                      : "bg-black/60 hover:bg-black/90 text-white/70 hover:text-white border-2 border-white/70 hover:border-white hover:scale-110"
+                                  }`}
+                                  title={isMultiSelected ? `Item #${queueOrderNumber} na fila de produção (clique para desmarcar)` : "Clique para selecionar este clipe para a fila"}
+                                >
+                                  {isMultiSelected ? (
+                                    <span className="font-extrabold text-xs leading-none">{queueOrderNumber}</span>
+                                  ) : (
+                                    <span className="text-[11px] font-bold text-white/60 leading-none group-hover:text-white">+</span>
+                                  )}
+                                </button>
+
                                 {clip.thumbnail_url ? (
                                   <img 
                                     src={clip.thumbnail_url} 
@@ -4434,29 +4650,99 @@ export default function DarkClipsPage() {
                                     {clip.author_handle || "Vídeo"}
                                   </span>
                                 </div>
-                                <Badge className="absolute bottom-1 right-1 text-[9px] px-1 py-0 bg-black/80 font-mono">
+
+                                {/* Duração no canto inferior direito */}
+                                <Badge className="absolute bottom-1.5 right-1.5 text-[9px] px-1 py-0 bg-black/80 font-mono z-10">
                                   {clip.duration}s
                                 </Badge>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={`absolute top-1 left-1 text-[8px] px-1 py-0 uppercase ${
-                                    clip.platform === 'upload' ? 'bg-primary/20 text-primary border-primary/40' : ''
-                                  }`}
-                                >
-                                  {clip.platform === 'upload' ? '📁 UPLOAD' : clip.platform}
-                                </Badge>
-                                {isValidVideoUrl(renderedPost?.rendered_video_url) && (
-                                  <Badge className="absolute top-1 right-1 text-[8px] px-1.5 py-0 bg-emerald-600 text-white font-bold shadow-sm">
+
+                                {/* Rede / Origem no canto inferior esquerdo */}
+                                {clip.original_url && clip.original_url.startsWith('http') ? (
+                                  <a
+                                    href={clip.original_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute bottom-1.5 left-1.5 z-10"
+                                    title={`Abrir publicação original (${clip.platform})`}
+                                  >
+                                    <Badge 
+                                      variant="secondary" 
+                                      className={`text-[8px] px-1.5 py-0 uppercase hover:bg-zinc-700/90 cursor-pointer flex items-center gap-1 border border-white/10 ${
+                                        clip.platform === 'upload' ? 'bg-primary/20 text-primary border-primary/40' : ''
+                                      }`}
+                                    >
+                                      {clip.platform === 'upload' ? '📁 UPLOAD' : clip.platform}
+                                      <ExternalLink className="h-2 w-2 opacity-70" />
+                                    </Badge>
+                                  </a>
+                                ) : (
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={`absolute bottom-1.5 left-1.5 z-10 text-[8px] px-1 py-0 uppercase ${
+                                      clip.platform === 'upload' ? 'bg-primary/20 text-primary border-primary/40' : ''
+                                    }`}
+                                  >
+                                    {clip.platform === 'upload' ? '📁 UPLOAD' : clip.platform}
+                                  </Badge>
+                                )}
+
+                                {/* Badges de Status no Canto Superior Direito */}
+                                {queuedPost ? (
+                                  <Badge className="absolute top-2 right-2 text-[8px] px-1.5 py-0.5 bg-amber-500 text-black font-bold shadow-sm animate-pulse z-10">
+                                    🕒 NA FILA #{queuedPost.queue_order || ''}
+                                  </Badge>
+                                ) : isRenderingThis ? (
+                                  <Badge className="absolute top-2 right-2 text-[8px] px-1.5 py-0.5 bg-blue-600 text-white font-bold shadow-sm animate-pulse z-10">
+                                    ⚙️ PROCESSANDO
+                                  </Badge>
+                                ) : isValidVideoUrl(renderedPost?.rendered_video_url) ? (
+                                  <Badge className="absolute top-2 right-2 text-[8px] px-1.5 py-0.5 bg-emerald-600 text-white font-bold shadow-sm z-10">
                                     ✓ PRONTO
                                   </Badge>
+                                ) : null}
+                              </div>
+
+                              <div className="flex items-center justify-between gap-1.5 mt-0.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <p className="font-bold text-xs truncate text-primary">{clip.author_handle || clip.author_name}</p>
+                                  {isMultiSelected && (
+                                    <Badge className="h-4 px-1.5 text-[9px] font-black bg-emerald-500 text-black border-none shrink-0 shadow-xs">
+                                      #{queueOrderNumber} na Fila
+                                    </Badge>
+                                  )}
+                                </div>
+                                {clip.original_url && clip.original_url.startsWith('http') && (
+                                  <a
+                                    href={clip.original_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-[10px] text-zinc-300 hover:text-white bg-zinc-800/90 hover:bg-zinc-700/90 px-1.5 py-0.5 rounded border border-border/50 transition-colors shrink-0 font-medium"
+                                    title="Abrir post/vídeo original na plataforma em nova aba"
+                                  >
+                                    <ExternalLink className="h-2.5 w-2.5 text-primary" />
+                                    <span>Original</span>
+                                  </a>
                                 )}
                               </div>
 
-                              <p className="font-bold text-xs truncate text-primary">{clip.author_handle || clip.author_name}</p>
-
-                              <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
-                                {clip.original_caption || clip.original_url}
-                              </p>
+                              {clip.original_caption ? (
+                                <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
+                                  {clip.original_caption}
+                                </p>
+                              ) : clip.original_url && clip.original_url.startsWith('http') ? (
+                                <a
+                                  href={clip.original_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[10px] text-muted-foreground hover:text-primary underline line-clamp-1 mt-0.5 block truncate"
+                                  title={clip.original_url}
+                                >
+                                  {clip.original_url}
+                                </a>
+                              ) : null}
 
                               {clip.remodel_data?.headline_main ? (
                                 <div className="mt-1.5 p-1.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-300 font-semibold line-clamp-2 leading-tight">
@@ -4465,95 +4751,157 @@ export default function DarkClipsPage() {
                               ) : null}
                             </div>
 
-                            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border/40">
-                              <Button 
-                                size="sm" 
-                                variant={isSelected ? "default" : "outline"} 
-                                onClick={() => {
-                                  setSelectedClip(clip);
-                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
-                                  if (isValidVideoUrl(renderedPost?.rendered_video_url)) {
-                                    setRenderedUrl(renderedPost!.rendered_video_url!);
-                                  } else {
-                                    setRenderedUrl(null);
-                                  }
-                                  if (clip.remodel_data?.headline_main) {
-                                    setHeadline((h) => ({
-                                      ...h,
-                                      mainText: clip.remodel_data!.headline_main!,
-                                      subText: clip.remodel_data!.headline_sub || h.subText,
-                                    }));
-                                    if (clip.remodel_data.cta_text && footer.showFooter) {
-                                      setFooter((f) => ({ ...f, text: clip.remodel_data!.cta_text! }));
+                            <div className="mt-3 pt-2 border-t border-border/40 space-y-2">
+                              {/* Linha 1: Ações Principais (Estúdio + Produzir) */}
+                              <div className="flex items-center gap-1.5">
+                                {/* Botão de Abrir no Estúdio */}
+                                <Button 
+                                  size="sm" 
+                                  variant={isSelected ? "default" : "outline"} 
+                                  onClick={() => {
+                                    setSelectedClip(clip);
+                                    if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                    if (isValidVideoUrl(renderedPost?.rendered_video_url)) {
+                                      setRenderedUrl(renderedPost!.rendered_video_url!);
+                                    } else {
+                                      setRenderedUrl(null);
                                     }
-                                    if (clip.remodel_data.post_caption) setPostCaption(clip.remodel_data.post_caption);
-                                    if (clip.remodel_data.hashtags) setPostHashtags(clip.remodel_data.hashtags);
-                                  }
-                                }}
-                                className="flex-1 text-[11px] h-7 font-bold"
-                              >
-                                {isSelected ? "Selecionado ✓" : "Selecionar"}
-                              </Button>
+                                    if (clip.remodel_data?.headline_main) {
+                                      setHeadline((h) => ({
+                                        ...h,
+                                        mainText: clip.remodel_data!.headline_main!,
+                                        subText: clip.remodel_data!.headline_sub || h.subText,
+                                      }));
+                                      if (clip.remodel_data.cta_text && footer.showFooter) {
+                                        setFooter((f) => ({ ...f, text: clip.remodel_data!.cta_text! }));
+                                      }
+                                      if (clip.remodel_data.post_caption) setPostCaption(clip.remodel_data.post_caption);
+                                      if (clip.remodel_data.hashtags) setPostHashtags(clip.remodel_data.hashtags);
+                                    }
+                                  }}
+                                  className="flex-1 text-[11px] h-7 font-bold truncate min-w-0"
+                                  title="Abrir este clipe no Estúdio de Produção abaixo para personalizar layout e agendar individualmente"
+                                >
+                                  {isSelected ? "🎨 No Estúdio ✓" : "🎨 Abrir no Estúdio"}
+                                </Button>
 
-                              {isValidVideoUrl(renderedPost?.rendered_video_url) && (
-                                <DarkClipsVideoModal
-                                  videoUrl={renderedPost!.rendered_video_url!}
-                                  title={clip.author_handle || "Dark Clip 9:16"}
-                                />
-                              )}
-
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedClip(clip);
-                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
-                                  setIsEditingLayout(true);
-                                  setActiveTab('modeler');
-                                  toast.info('Clipe carregado no Canvas para ajuste temporário!');
-                                }}
-                                className="text-[11px] h-7 px-2 text-zinc-300 hover:text-white"
-                                title="Ajustar visual e posicionamento temporário deste clipe"
-                              >
-                                <Settings className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => {
-                                  setSelectedClip(clip);
-                                  if (clip.video_url) setSampleVideoUrl(clip.video_url);
-                                  handleRender(clip);
-                                }}
-                                disabled={isRendering || renderingClipIds.includes(clip.id)}
-                                className={`text-[11px] h-7 px-2.5 font-bold transition-all ${
-                                  renderingClipIds.includes(clip.id)
-                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait opacity-90"
-                                    : "text-red-400 border border-red-500/30 hover:bg-red-500/10"
-                                }`}
-                                title="Produzir clipe com o layout ativo"
-                              >
-                                {renderingClipIds.includes(clip.id) ? (
-                                  <div className="flex items-center gap-1">
-                                    <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
-                                    <span>Produzindo...</span>
-                                  </div>
+                                {isValidVideoUrl(renderedPost?.rendered_video_url) ? (
+                                  <DarkClipsVideoModal
+                                    videoUrl={renderedPost!.rendered_video_url!}
+                                    title={clip.author_handle || "Dark Clip 9:16"}
+                                  />
                                 ) : (
-                                  "🎬 Produzir"
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => {
+                                      setSelectedClip(clip);
+                                      if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                      handleRender(clip);
+                                    }}
+                                    disabled={isRendering || renderingClipIds.includes(clip.id)}
+                                    className={`text-[11px] h-7 px-2.5 font-bold transition-all shrink-0 ${
+                                      renderingClipIds.includes(clip.id)
+                                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait opacity-90"
+                                        : "text-red-400 border border-red-500/30 hover:bg-red-500/10"
+                                    }`}
+                                    title="Produzir clipe com o layout ativo"
+                                  >
+                                    {renderingClipIds.includes(clip.id) ? (
+                                      <div className="flex items-center gap-1">
+                                        <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                                        <span>Produzindo...</span>
+                                      </div>
+                                    ) : (
+                                      "🎬 Produzir"
+                                    )}
+                                  </Button>
                                 )}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteClip(clip.id);
-                                }}
-                                className="text-[11px] h-7 w-7 p-0 text-red-400/80 hover:text-red-400 hover:bg-red-950/20"
-                                title="Excluir este clipe da lista"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              </div>
+
+                              {/* Linha 2: Barra de Utilidades (Re-produzir, Link original, Settings, Excluir) */}
+                              <div className="flex items-center justify-between gap-1 text-muted-foreground pt-0.5">
+                                {isValidVideoUrl(renderedPost?.rendered_video_url) ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setSelectedClip(clip);
+                                      if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                      handleRender(clip);
+                                    }}
+                                    disabled={isRendering || renderingClipIds.includes(clip.id)}
+                                    className="h-6 text-[10px] px-2 gap-1 text-zinc-400 hover:text-red-400 hover:bg-red-950/20 font-semibold shrink-0"
+                                    title="Renderizar novamente este clipe com novo layout"
+                                  >
+                                    {renderingClipIds.includes(clip.id) ? (
+                                      <>
+                                        <Loader2 className="h-2.5 w-2.5 animate-spin text-amber-400" />
+                                        <span>Renderizando...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RefreshCw className="h-2.5 w-2.5" />
+                                        <span>Re-produzir</span>
+                                      </>
+                                    )}
+                                  </Button>
+                                ) : (
+                                  <span className="text-[10px] text-zinc-500 pl-1 font-mono">
+                                    {clip.duration ? `${clip.duration}s` : '9:16'}
+                                  </span>
+                                )}
+
+                                <div className="flex items-center gap-1 ml-auto shrink-0">
+                                  {clip.original_url && clip.original_url.startsWith('http') && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      asChild
+                                      className="h-6 w-6 p-0 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                      title={`Abrir vídeo original (${clip.platform})`}
+                                    >
+                                      <a
+                                        href={clip.original_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    </Button>
+                                  )}
+
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setSelectedClip(clip);
+                                      if (clip.video_url) setSampleVideoUrl(clip.video_url);
+                                      setIsEditingLayout(true);
+                                      setActiveTab('modeler');
+                                      toast.info('Clipe carregado no Canvas para ajuste temporário!');
+                                    }}
+                                    className="h-6 w-6 p-0 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                    title="Ajustar visual e posicionamento temporário deste clipe"
+                                  >
+                                    <Settings className="h-3 w-3" />
+                                  </Button>
+
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteClip(clip.id);
+                                    }}
+                                    className="h-6 w-6 p-0 text-red-400/80 hover:text-red-400 hover:bg-red-950/20"
+                                    title="Excluir este clipe da lista"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         );
@@ -4568,9 +4916,23 @@ export default function DarkClipsPage() {
                     <CardHeader className="p-4 pb-3 border-b border-border/40">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                          <CardTitle className="text-sm font-bold flex items-center gap-2">
-                            <Film className="h-4 w-4 text-primary" /> Estúdio de Produção: {selectedClip.author_handle || selectedClip.author_name}
-                          </CardTitle>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                              <Film className="h-4 w-4 text-primary" /> Estúdio de Produção: {selectedClip.author_handle || selectedClip.author_name}
+                            </CardTitle>
+                            {selectedClip.original_url && selectedClip.original_url.startsWith('http') && (
+                              <a
+                                href={selectedClip.original_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2 py-0.5 rounded-md border border-border/50 font-medium transition-colors"
+                                title="Abrir vídeo original em nova aba"
+                              >
+                                <ExternalLink className="h-3 w-3 text-primary" />
+                                <span>Ver Original ({selectedClip.platform})</span>
+                              </a>
+                            )}
+                          </div>
                           <CardDescription className="text-xs">
                             Renderize o vídeo em 1080x1920 e agende para suas redes sociais. O gancho viral é gerado de forma 100% automática a partir do vídeo original.
                           </CardDescription>
@@ -4817,9 +5179,15 @@ export default function DarkClipsPage() {
                           })}
 
                           {targetAccounts.length === 0 && (
-                            <p className="text-[11px] text-muted-foreground mt-1.5">
-                              Selecione as redes acima ou conecte novas contas em <a href="/credentials" className="text-primary underline">Credenciais</a>.
-                            </p>
+                            <div className="mt-2.5 p-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                                <span>Nenhuma rede selecionada. Clique nas redes conectadas acima para definir onde publicar.</span>
+                              </div>
+                              <a href="/credentials" className="text-primary underline text-[11px] font-semibold shrink-0">
+                                Credenciais 🔗
+                              </a>
+                            </div>
                           )}
                         </div>
 
@@ -4935,7 +5303,67 @@ export default function DarkClipsPage() {
                     </Button>
                   </CardHeader>
 
-                  <CardContent className="p-4">
+                  <CardContent className="p-4 space-y-4">
+                    {/* Monitor de Fila Ativa */}
+                    {(() => {
+                      const queuedPosts = scheduledPosts.filter((p) => p.status === 'queued');
+                      const activeRenderPost = scheduledPosts.find((p) => (p.status as string) === 'rendering');
+                      if (queuedPosts.length === 0 && !activeRenderPost) return null;
+
+                      return (
+                        <div className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-inner animate-in fade-in">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                              </span>
+                              <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                                <ListOrdered className="h-3.5 w-3.5 text-amber-400" />
+                                Fila de Produção Ativa ({queuedPosts.length} na espera{activeRenderPost ? ', 1 em processamento' : ''})
+                              </h4>
+                            </div>
+                            <p className="text-[11px] text-zinc-300">
+                              Processamento seguro sequencial (1 por vez) para máxima estabilidade e proteção contra bloqueios de redes.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleQueueAction(isQueuePausedUI ? 'resume' : 'pause')}
+                              className="h-7 text-xs font-semibold border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
+                            >
+                              {isQueuePausedUI ? (
+                                <>
+                                  <Play className="h-3 w-3 mr-1 fill-current" />
+                                  Retomar Fila
+                                </>
+                              ) : (
+                                <>
+                                  <Pause className="h-3 w-3 mr-1" />
+                                  Pausar Fila
+                                </>
+                              )}
+                            </Button>
+
+                            {queuedPosts.length > 0 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleQueueAction('clear')}
+                                className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30"
+                                title="Limpar itens pendentes na fila"
+                              >
+                                Limpar Fila ({queuedPosts.length})
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {scheduledPosts.length === 0 ? (
                       <div className="text-center py-10 border rounded-xl bg-card/50 border-dashed">
                         <History className="h-8 w-8 mx-auto text-muted-foreground mb-2 opacity-40" />
@@ -4947,6 +5375,7 @@ export default function DarkClipsPage() {
                     ) : (
                       <div className="space-y-3">
                         {scheduledPosts.map((post) => {
+                          const isQueued = post.status === "queued";
                           const isPublished = post.status === "published";
                           const isPublishing = post.status === "publishing";
                           const isRendered = (post.status as string) === "rendered" || (post.status as string) === "completed";
@@ -4989,7 +5418,12 @@ export default function DarkClipsPage() {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                                {isPublished ? (
+                                {isQueued ? (
+                                  <Badge variant="secondary" className="text-[10px] uppercase font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 flex items-center gap-1 animate-pulse">
+                                    <Clock className="h-3 w-3 text-amber-400" />
+                                    Na Fila {post.queue_order ? `#${post.queue_order}` : ''}
+                                  </Badge>
+                                ) : isPublished ? (
                                   <Badge className="text-[10px] uppercase bg-emerald-600 hover:bg-emerald-600 text-white font-bold flex items-center gap-1">
                                     <Check className="h-3 w-3" /> Publicado
                                   </Badge>
@@ -5215,6 +5649,310 @@ export default function DarkClipsPage() {
             </div>
           </div>
         )}
+
+        {/* ── Barra de Ações Flutuante em Massa ── */}
+        {selectedClipIds.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-zinc-950/95 border border-emerald-500/50 text-foreground px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5">
+            <div className="flex items-center gap-2 border-r border-border/60 pr-3">
+              <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-xs font-black shadow-xs">
+                {selectedClipIds.length}
+              </div>
+              <span className="text-xs font-semibold whitespace-nowrap">
+                {selectedClipIds.length === 1 ? "1 na fila (#1)" : `${selectedClipIds.length} na fila (#1 a #${selectedClipIds.length})`}
+              </span>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={() => openBulkModal('publish')}
+              className="h-8 text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-4 shadow-sm"
+            >
+              <Send className="h-3.5 w-3.5" />
+              Fila: Produzir & Publicar
+            </Button>
+
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => openBulkModal('render')}
+              className="h-8 text-xs font-bold gap-1.5 rounded-full px-3.5"
+            >
+              <Film className="h-3.5 w-3.5 text-primary" />
+              Apenas Produzir
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleDeleteSelectedClips}
+              className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded-full px-2.5"
+              title="Excluir clipes selecionados"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearSelectedClips}
+              className="h-8 w-8 p-0 text-xs text-zinc-400 hover:text-white rounded-full"
+              title="Limpar seleção"
+            >
+              ✕
+            </Button>
+          </div>
+        )}
+
+        {/* ── Modal de Configuração da Fila em Massa ── */}
+        <Dialog open={isBulkModalOpen} onOpenChange={setIsBulkModalOpen}>
+          <DialogContent className="sm:max-w-[540px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                <ListOrdered className="h-5 w-5 text-primary" />
+                Fila de Produção em Massa ({selectedClipIds.length} clipes)
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Configure a esteira de processamento dos vídeos minerados selecionados. Os vídeos serão renderizados em ordem com concorrência = 1 (1 por vez) para garantir estabilidade e fluidez.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              {/* Modo de Operação */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Modo de Operação</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBulkModalMode('publish')}
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 ${
+                      bulkModalMode === 'publish'
+                        ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/50'
+                        : 'border-border bg-card hover:border-border/80 text-muted-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
+                      <Send className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Produzir & Publicar</span>
+                    </div>
+                    <span className="text-[11px] text-zinc-400">
+                      Renderiza no Remotion e agenda/publica nas redes de destino selecionadas.
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBulkModalMode('render')}
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 ${
+                      bulkModalMode === 'render'
+                        ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/50'
+                        : 'border-border bg-card hover:border-border/80 text-muted-foreground'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-foreground">
+                      <Film className="h-3.5 w-3.5 text-primary" />
+                      <span>Apenas Produzir</span>
+                    </div>
+                    <span className="text-[11px] text-zinc-400">
+                      Gera apenas os vídeos MP4 1080x1920 prontos para download ou posterior envio.
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Configurações de Publicação (Apenas se mode === 'publish') */}
+              {bulkModalMode === 'publish' && (
+                <div className="space-y-3.5 p-3 rounded-xl border border-border/80 bg-zinc-900/40">
+                  {/* Redes de Destino */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Redes Sociais de Destino</Label>
+                      <span className="text-[11px] text-zinc-400">
+                        {bulkTargetAccounts.length} selecionada(s)
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {["tiktok", "instagram", "facebook", "youtube", "pinterest", "kwai", "threads", "telegram"].map((plat) => {
+                        const isChecked = bulkTargetAccounts.includes(plat);
+                        const isConnected = !!connectedPlatforms[plat];
+                        const isExpired = !!expiredPlatforms[plat];
+                        const platLabels: Record<string, string> = {
+                          tiktok: "TikTok",
+                          instagram: "Instagram Reels",
+                          facebook: "Facebook Reels",
+                          youtube: "YouTube Shorts",
+                          pinterest: "Pinterest",
+                          kwai: "Kwai",
+                          threads: "Threads",
+                          telegram: "Telegram"
+                        };
+
+                        return (
+                          <button
+                            key={`bulk-${plat}`}
+                            type="button"
+                            onClick={() => {
+                              if (!isConnected) {
+                                toast.info(`${platLabels[plat]} não está conectada. Acesse Credenciais.`);
+                                return;
+                              }
+                              if (isExpired) {
+                                toast.warning(`Sessão de ${platLabels[plat]} expirada! Reconecte em Credenciais.`);
+                              }
+                              if (isChecked) {
+                                setBulkTargetAccounts((prev) => prev.filter((id) => id !== plat));
+                              } else {
+                                setBulkTargetAccounts((prev) => [...prev, plat]);
+                                if (plat === 'facebook' && facebookPages.length === 0) {
+                                  handleSyncFacebookPages();
+                                }
+                              }
+                            }}
+                            className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1.5 ${
+                              !isConnected
+                                ? "opacity-35 cursor-not-allowed border-dashed bg-secondary/10 text-muted-foreground/60"
+                                : isChecked
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                : "bg-secondary/40 text-foreground border-border hover:border-primary/50"
+                            }`}
+                          >
+                            {isChecked && <Check className="h-3 w-3" />}
+                            <span>{platLabels[plat]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {bulkTargetAccounts.length === 0 && (
+                      <div className="mt-2 p-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[11px] flex items-center justify-between gap-2 animate-in fade-in">
+                        <div className="flex items-center gap-1.5">
+                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                          <span>Selecione ao menos uma rede social para publicar!</span>
+                        </div>
+                        <a href="/credentials" className="text-primary underline font-bold shrink-0">
+                          Credenciais 🔗
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Seletor de Página do Facebook se FB estiver marcado */}
+                  {bulkTargetAccounts.includes('facebook') && (
+                    <div className="space-y-1.5 pt-1">
+                      <Label className="text-xs font-semibold">Página do Facebook para Reels</Label>
+                      {loadingFbPages ? (
+                        <div className="text-[11px] text-blue-400 bg-blue-500/10 p-2 rounded-lg flex items-center gap-2">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Buscando páginas...</span>
+                        </div>
+                      ) : facebookPages.length > 0 ? (
+                        <select
+                          value={bulkFacebookPageId}
+                          onChange={(e) => setBulkFacebookPageId(e.target.value)}
+                          className="w-full h-8 px-2.5 bg-background border border-blue-500/40 rounded-lg text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+                        >
+                          {facebookPages.map((pg) => (
+                            <option key={`bulk-fb-${pg.id}`} value={pg.id}>
+                              {pg.name} (ID: {pg.id})
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-[11px] text-amber-400 bg-amber-500/10 p-2 rounded-lg flex items-center justify-between">
+                          <span>Nenhuma página encontrada.</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            disabled={loadingFbPages}
+                            onClick={handleSyncFacebookPages}
+                            className="h-6 text-[10px] text-blue-400"
+                          >
+                            Carregar Páginas
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Intervalo Anti-Spam entre Posts */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Intervalo Programado entre Postagens (Anti-Spam)</Label>
+                      <span className="text-[11px] text-emerald-400 font-medium">Recomendado: 15 a 30 min</span>
+                    </div>
+                    <select
+                      value={bulkIntervalMinutes}
+                      onChange={(e) => setBulkIntervalMinutes(Number(e.target.value))}
+                      className="w-full h-8 px-2.5 bg-background border border-border/80 rounded-lg text-xs font-medium text-foreground outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                    >
+                      <option value={5}>A cada 5 minutos (rápido)</option>
+                      <option value={10}>A cada 10 minutos</option>
+                      <option value={15}>A cada 15 minutos (recomendado)</option>
+                      <option value={30}>A cada 30 minutos (ótimo para engajamento)</option>
+                      <option value={60}>A cada 1 hora</option>
+                      <option value={120}>A cada 2 horas</option>
+                    </select>
+                    <p className="text-[10px] text-muted-foreground">
+                      Os horários de agendamento serão calculados progressivamente (ex: 1º vídeo agora, 2º em {bulkIntervalMinutes} min, 3º em {bulkIntervalMinutes * 2} min...).
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Opções de IA e Layout */}
+              <div className="p-3 rounded-xl border border-border/60 bg-card/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs font-semibold">Gerar Ganchos & Copy com IA</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      A IA analisará cada clipe para criar headlines magnéticas e legendas originais.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={bulkGenerateAiCopy}
+                    onCheckedChange={setBulkGenerateAiCopy}
+                  />
+                </div>
+
+                <div className="pt-1.5 border-t border-border/40 text-[11px] text-zinc-400 flex items-center justify-between">
+                  <span>Modelo de Layout:</span>
+                  <span className="font-bold text-primary">{activePreset?.name || "Padrão"}</span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBulkModalOpen(false)}
+                className="text-xs"
+                disabled={isEnqueuing}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleStartBulkQueue}
+                disabled={isEnqueuing || (bulkModalMode === 'publish' && bulkTargetAccounts.length === 0)}
+                className="text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {isEnqueuing ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Adicionando à Fila...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="h-3.5 w-3.5" />
+                    Iniciar Fila ({selectedClipIds.length} Vídeos)
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>

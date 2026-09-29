@@ -354,10 +354,11 @@ export interface DarkClipPost {
     hashtags?: string[]
   }
   scheduled_at?: string
-  status?: 'draft' | 'rendering' | 'rendered' | 'scheduled' | 'publishing' | 'published' | 'failed'
+  status?: 'draft' | 'queued' | 'rendering' | 'rendered' | 'scheduled' | 'publishing' | 'published' | 'failed'
   target_accounts?: string[]
   published_at?: string
   error_message?: string
+  queue_order?: number
   created_at?: string
 }
 

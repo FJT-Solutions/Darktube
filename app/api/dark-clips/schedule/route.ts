@@ -101,6 +101,18 @@ export async function GET() {
       }
     }
 
+    // 4. Se houver posts em 'queued' e nenhum em 'rendering', impulsiona o worker da fila
+    const hasQueued = posts.some((p) => p.status === 'queued');
+    const hasRendering = posts.some((p) => p.status === 'rendering');
+    if (hasQueued && !hasRendering) {
+      try {
+        const { processNextQueueItem, getIsQueuePaused } = await import('@/lib/dark-clips-queue');
+        if (!getIsQueuePaused()) {
+          setTimeout(() => processNextQueueItem(), 100);
+        }
+      } catch (e) {}
+    }
+
     return NextResponse.json({ success: true, posts });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
