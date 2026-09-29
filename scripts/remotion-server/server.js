@@ -577,8 +577,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
   const MAX_RENDER_SECONDS = Math.max(600, Math.min(3600, estimatedFrames * 3));
   console.log(`[Remotion Watchdog] Timeout global: ${MAX_RENDER_SECONDS}s (${(MAX_RENDER_SECONDS / 60).toFixed(1)} min) para ~${estimatedFrames} frames`);
 
-  // ── WATCHDOG 2: Stall detector — aborta se sem progresso por 10 minutos ──
-  const STALL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutos sem progresso = abort
+  // ── WATCHDOG 2: Stall detector — aborta se sem progresso por 3 minutos ──
+  const STALL_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos sem progresso = abort
   let lastProgressTime = Date.now();
   let lastProgressPercent = -1;
   let stallCheckInterval = null;
@@ -594,7 +594,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
     killZombieChromium();
   }, MAX_RENDER_SECONDS * 1000);
 
-  // Intervalo de stall detection (checa a cada 60s)
+  // Intervalo de stall detection (checa a cada 30s)
   stallCheckInterval = setInterval(() => {
     const elapsed = Date.now() - lastProgressTime;
     if (elapsed > STALL_TIMEOUT_MS) {
@@ -603,7 +603,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       if (abortController) abortController.abort();
       killZombieChromium();
     }
-  }, 60_000);
+  }, 30_000);
 
   try {
     if (!bundledLocation) await initBundle();
@@ -649,14 +649,16 @@ async function renderAsync(historyId, composition, callbackUrl) {
     const chromiumArgs = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
       '--disable-gpu',
+      '--disable-software-rasterizer',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
       '--disable-breakpad',
       '--mute-audio',
       '--no-first-run',
-      '--js-flags=--max-old-space-size=12288',
+      '--js-flags=--max-old-space-size=8192',
       '--disable-features=site-per-process,IsolateOrigins',
       '--enable-features=SharedArrayBuffer',
     ];
@@ -676,14 +678,14 @@ async function renderAsync(historyId, composition, callbackUrl) {
         enableMultiProcessOnLinux: true,
         gl: null,
       },
-      timeoutInMilliseconds: 300_000,
-      delayRenderTimeoutInMilliseconds: 300_000,
+      timeoutInMilliseconds: 60_000,
+      delayRenderTimeoutInMilliseconds: 60_000,
     });
 
-    // Concorrência dinâmica: respeita RENDER_CONCURRENCY (.env) ou payload (padrão: 6, máx: 16)
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '6', 10);
-    const concurrency = Math.max(1, Math.min(rawConcurrency, 16));
-    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 12288MB, SHM: 12GB)`);
+    // Concorrência dinâmica: respeita RENDER_CONCURRENCY (.env) ou payload (padrão: 4, máx: 6)
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
+    const concurrency = Math.max(1, Math.min(rawConcurrency, 6));
+    console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 8192MB, SHM: 2GB)`);
 
     let lastPercent = -1;
     await renderMedia({
@@ -692,7 +694,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       outputLocation: outputFilePath,
       codec: 'h264',
       concurrency,
-      maxRetries: 5,
+      maxRetries: 3,
       imageFormat: 'jpeg',
       jpegQuality: 85,
       inputProps,
@@ -714,8 +716,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
           console.log(`[Remotion Render] Renderizando: ${pct}% concluído (${doneFrames}/${comp.durationInFrames} frames)`);
         }
       },
-      timeoutInMilliseconds: 300_000,
-      delayRenderTimeoutInMilliseconds: 300_000,
+      timeoutInMilliseconds: 60_000,
+      delayRenderTimeoutInMilliseconds: 60_000,
     });
 
     if (renderAborted) throw new Error('Render abortado pelo watchdog (timeout ou stall)');

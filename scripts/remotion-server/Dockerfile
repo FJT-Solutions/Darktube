@@ -1,8 +1,9 @@
 FROM node:20-slim
 ENV NODE_OPTIONS="--dns-result-order=ipv4first --max-old-space-size=12288"
 RUN echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
-# Instalar dependências do Chromium e FFmpeg para o Remotion headless
+# Instalar dependências do Chromium, FFmpeg e Tini (init system para evitar processos zumbis)
 RUN apt-get update && apt-get install -y \
+    tini \
     chromium \
     ffmpeg \
     fonts-liberation \
@@ -37,4 +38,5 @@ RUN npm install --omit=dev
 
 EXPOSE 3001
 
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "server.js"]
