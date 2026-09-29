@@ -1,20 +1,21 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { SpringPreset } from '../types';
+import { closedFormSpring } from '../../lib/motion';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TextSplit — anima cada letra/palavra individualmente com spring physics
-// Nunca usa CSS transitions/animations (proibido no Remotion headless render)
+// Usa closedFormSpring determinístico analítico da lib/motion
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SPRING_PRESETS: Record<SpringPreset, { damping: number; stiffness: number; mass: number }> = {
-  bouncy:   { damping: 8,  stiffness: 320, mass: 0.5 },
-  smooth:   { damping: 20, stiffness: 100, mass: 1.0 },
-  dramatic: { damping: 5,  stiffness: 500, mass: 0.3 },
-  gentle:   { damping: 30, stiffness: 80,  mass: 1.5 },
+const SPRING_PHYSICS: Record<SpringPreset, { k: number; d: number }> = {
+  bouncy:   { k: 280, d: 18 },
+  smooth:   { k: 120, d: 24 },
+  dramatic: { k: 450, d: 14 },
+  gentle:   { k: 80,  d: 28 },
 };
 
-// ─── Split-bounce: cada letra entra com spring staggered ─────────────────────
+// ─── Split-bounce: cada letra/palavra entra com spring staggered ─────────────────────
 export const SplitBounceText: React.FC<{
   text: string;
   primaryColor: string;
@@ -34,9 +35,11 @@ export const SplitBounceText: React.FC<{
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const config = SPRING_PRESETS[springPreset] ?? SPRING_PRESETS.bouncy;
+  const config = SPRING_PHYSICS[springPreset] ?? SPRING_PHYSICS.bouncy;
 
-  const letters = text.split('');
+  // Se o texto for longo (frase inteira), divide por palavras. Se for palavra curta, por letras.
+  const isSingleWord = text.length <= 16;
+  const items = isSingleWord ? text.split('') : text.split(' ');
 
   return (
     <div
@@ -45,21 +48,19 @@ export const SplitBounceText: React.FC<{
         flexWrap: 'wrap',
         justifyContent: 'center',
         alignItems: 'flex-end',
-        gap: '0px',
+        gap: isSingleWord ? '0px' : '14px',
+        maxWidth: '92%',
       }}
     >
-      {letters.map((letter, i) => {
-        const letterFrame = Math.max(0, frame - i * staggerFrames);
+      {items.map((item, i) => {
+        const tSeconds = Math.max(0, (frame - i * staggerFrames) / fps);
+        const progress = closedFormSpring(tSeconds, config.k, config.d);
 
-        const progress = spring({
-          frame: letterFrame,
-          fps,
-          config,
-        });
-
-        const translateY = interpolate(progress, [0, 1], [80, 0]);
+        const translateY = interpolate(progress, [0, 1], [60, 0]);
         const opacity = interpolate(progress, [0, 0.4], [0, 1], { extrapolateRight: 'clamp' });
-        const scaleY = interpolate(progress, [0, 0.6, 1], [0.3, 1.15, 1.0], { extrapolateRight: 'clamp' });
+        const scale = interpolate(progress, [0, 0.6, 1], [0.5, 1.12, 1.0], { extrapolateRight: 'clamp' });
+
+        const isHighlight = i % 2 === 0;
 
         return (
           <span
@@ -68,19 +69,21 @@ export const SplitBounceText: React.FC<{
               display: 'inline-block',
               fontSize,
               fontWeight,
-              fontFamily: 'Montserrat, Inter, sans-serif',
-              color: letter === ' ' ? 'transparent' : color,
-              WebkitTextStroke: letter === ' ' ? 'none' : '2px rgba(0,0,0,0.6)',
-              textShadow: letter === ' ' ? 'none' : `0 4px 16px rgba(0,0,0,0.7), 0 0 40px ${primaryColor}44`,
-              transform: `translateY(${translateY}px) scaleY(${scaleY})`,
+              fontFamily: 'Montserrat, Inter, Impact, sans-serif',
+              textTransform: 'uppercase',
+              color: isHighlight ? primaryColor : color,
+              WebkitTextStroke: '4px #000000',
+              paintOrder: 'stroke fill',
+              textShadow: '0 6px 18px rgba(0,0,0,0.9)',
+              transform: `translateY(${translateY}px) scale(${scale})`,
               opacity,
               willChange: 'transform, opacity',
               transformOrigin: 'bottom center',
-              whiteSpace: letter === ' ' ? 'pre' : 'normal',
-              minWidth: letter === ' ' ? '0.3em' : undefined,
+              whiteSpace: isSingleWord && item === ' ' ? 'pre' : 'normal',
+              minWidth: isSingleWord && item === ' ' ? '0.3em' : undefined,
             }}
           >
-            {letter}
+            {item}
           </span>
         );
       })}
@@ -267,7 +270,7 @@ export const KineticPopText: React.FC<{
   springConfig: { damping: number; stiffness: number; mass: number };
   frame: number;
 }> = ({ text, primaryColor, fps, isVertical, springConfig, frame }) => {
-  const scaleVal = spring({ frame: Math.max(0, frame), fps, config: springConfig });
+  const scaleVal = closedFormSpring(Math.max(0, frame / fps), 380, 16);
 
   const scaleX = interpolate(scaleVal, [0, 1], [0.2, 1], { extrapolateRight: 'clamp' });
   const scaleY = interpolate(scaleVal, [0, 0.5, 1], [2.2, 0.85, 1.0], { extrapolateRight: 'clamp' });

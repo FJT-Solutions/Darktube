@@ -164,20 +164,31 @@ const SceneLayer: React.FC<{
   }
 
   // 2. CENA DATA_VIZ (Gráficos, Métricas, Contadores)
+  // O Diretor pode usar imagens como fundo e sobrepor gráficos/dados
   if (scene.sceneType === 'DATA_VIZ' || (scene.animationStyle && ['bar-chart', 'line-chart', 'counter-confetti', 'odometer-digit-roll'].includes(scene.animationStyle))) {
+    const bgImage = scene.imageUrl;
     return (
       <AbsoluteFill>
-        <LivingBackground
-          type={scene.livingBgType || 'concentric-rings'}
-          baseColor={scene.emotionColor || '#0B132B'}
-          accentColor={primaryColor}
-        />
+        {/* Fundo: imagem do usuário (se houver) ou LivingBackground */}
+        {bgImage ? (
+          <KenBurnsImage
+            imgUrl={bgImage}
+            durationFrames={durationFrames}
+            animationStyle="kenburns-up"
+            colorGrading={scene.colorGrading}
+          />
+        ) : (
+          <LivingBackground
+            type={scene.livingBgType || 'concentric-rings'}
+            baseColor={scene.emotionColor || '#0B132B'}
+            accentColor={primaryColor}
+          />
+        )}
+        {/* Overlay escuro para legibilidade quando há imagem de fundo */}
+        {bgImage && (
+          <AbsoluteFill style={{ background: 'rgba(0,0,0,0.55)', zIndex: 5 }} />
+        )}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '0 40px', zIndex: 30 }}>
-          {scene.captionText && (
-            <div style={{ fontSize: 44, fontWeight: 900, color: '#FFFFFF', textAlign: 'center', marginBottom: 40, textShadow: '0 4px 12px rgba(0,0,0,0.6)' }}>
-              {scene.captionText}
-            </div>
-          )}
           {scene.animationStyle === 'bar-chart' ? (
             <AnimatedBarChart isVertical={format === 'vertical'} />
           ) : (
@@ -189,68 +200,116 @@ const SceneLayer: React.FC<{
             </div>
           )}
         </div>
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
       </AbsoluteFill>
     );
   }
 
   // 3. CENA CODE_TECH (Terminal, Código, Hacker)
+  // O Diretor pode usar imagens como fundo e sobrepor terminal
   if (scene.sceneType === 'CODE_TECH' || scene.animationStyle === 'typing-code-block' || scene.animationStyle === 'terminal-3d') {
+    const bgImage = scene.imageUrl;
     return (
       <AbsoluteFill>
-        <LivingBackground
-          type={scene.livingBgType || 'mesh-gradient'}
-          baseColor={scene.emotionColor || '#050811'}
-          accentColor={primaryColor}
-        />
-        <CodeTerminalOverlay primaryColor={primaryColor} />
-        {scene.captionText && (
-          <div style={{ position: 'absolute', bottom: 180, width: '100%', textAlign: 'center', fontSize: 38, fontWeight: 900, color: '#FFFFFF', textShadow: '0 4px 12px rgba(0,0,0,0.8)', zIndex: 40 }}>
-            {scene.captionText}
-          </div>
+        {bgImage ? (
+          <KenBurnsImage
+            imgUrl={bgImage}
+            durationFrames={durationFrames}
+            animationStyle="kenburns-down"
+            colorGrading={scene.colorGrading}
+          />
+        ) : (
+          <LivingBackground
+            type={scene.livingBgType || 'mesh-gradient'}
+            baseColor={scene.emotionColor || '#050811'}
+            accentColor={primaryColor}
+          />
         )}
+        {bgImage && (
+          <AbsoluteFill style={{ background: 'rgba(0,0,0,0.65)', zIndex: 5 }} />
+        )}
+        <CodeTerminalOverlay primaryColor={primaryColor} />
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
       </AbsoluteFill>
     );
   }
 
-  // 4. CENA ILUSTRATIVA / PERSONAGEM RECORTADO 2.5D (Sem Fundo Poluído)
-  if (scene.sceneType === 'ILUSTRATIVA' || scene.sceneType === 'UI_SHOWCASE' || scene.subjectImageUrl || scene.foregroundUrl) {
-    return (
-      <AbsoluteFill>
+  // 4. CENA PADRÃO / CINEMÁTICA (2.5D Parallax ou Ken Burns + Overlays + Legendas Sincronizadas)
+  const fgImage = scene.subjectImageUrl || scene.foregroundUrl;
+  const bgImage = scene.imageUrl;
+  const intensity = scene.intensity ?? 0.8;
+
+  return (
+    <AbsoluteFill>
+      {/* CAMADA DE FUNDO / IMAGEM / 2.5D */}
+      {fgImage && bgImage ? (
+        <Parallax25DImage
+          bgUrl={bgImage}
+          fgUrl={fgImage}
+          durationFrames={durationFrames}
+          animationStyle={scene.animationStyle || 'parallax-up'}
+          colorGrading={scene.colorGrading}
+          format={format}
+        />
+      ) : bgImage ? (
+        <KenBurnsImage
+          imgUrl={bgImage}
+          durationFrames={durationFrames}
+          animationStyle={scene.animationStyle || 'kenburns-right'}
+          colorGrading={scene.colorGrading}
+        />
+      ) : (
         <LivingBackground
           type={scene.livingBgType || (sceneIndex % 2 === 0 ? 'concentric-rings' : 'ambient-particles')}
           baseColor={scene.emotionColor || '#070B19'}
           accentColor={primaryColor}
         />
-        <IllustrativeScene
-          subjectImageUrl={scene.subjectImageUrl || scene.foregroundUrl}
-          bgImageUrl={scene.imageUrl}
-          headlineText={scene.captionText}
-          badgeText={scene.badgeText}
-          badgeColor={scene.badgeColor || primaryColor}
-          primaryColor={primaryColor}
-          exitDirection={exitDirection}
-        />
-      </AbsoluteFill>
-    );
-  }
-
-  // 3. FALLBACK DINÂMICO
-  const intensity = scene.intensity ?? 0.8;
-  return (
-    <AbsoluteFill>
-      <LivingBackground
-        type={scene.livingBgType || 'dot-grid'}
-        baseColor={scene.emotionColor || '#0B132B'}
-        accentColor={primaryColor}
-      />
-      {scene.imageUrl && (
-        <KenBurnsImage
-          imgUrl={scene.imageUrl}
-          durationFrames={durationFrames}
-          animationStyle={scene.animationStyle || 'kenburns-right'}
-          colorGrading={scene.colorGrading}
-        />
       )}
+
+      {/* OVERLAYS VISUAIS (Light leak, Glitch, Flash, Partículas) */}
+      <OverlayLayer scene={scene} intensity={intensity} durationFrames={durationFrames} />
+
+      {/* BADGE DA CENA (se houver) */}
+      {scene.badgeText && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '12%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: scene.badgeColor || primaryColor,
+            color: '#000000',
+            fontWeight: 900,
+            fontSize: 28,
+            padding: '10px 24px',
+            borderRadius: 999,
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            zIndex: 35,
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}
+        >
+          {scene.badgeText}
+        </div>
+      )}
+
+      {/* LEGENDAS SINCRONIZADAS DINÂMICAS PALAVRA A PALAVRA / CHUNKS */}
       <CaptionLayer
         scene={scene}
         captionStyle={captionStyle}
@@ -260,6 +319,27 @@ const SceneLayer: React.FC<{
         format={format}
       />
     </AbsoluteFill>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OVERLAY LAYER — Efeitos de luz, glitch, flash e partículas
+// ─────────────────────────────────────────────────────────────────────────────
+const OverlayLayer: React.FC<{
+  scene: SceneSegment;
+  intensity: number;
+  durationFrames: number;
+}> = ({ scene, intensity, durationFrames }) => {
+  const overlay = scene.overlayEffect;
+  if (!overlay || overlay === 'none') return null;
+
+  return (
+    <>
+      {overlay === 'glitch' && <GlitchOverlay intensity={intensity} durationFrames={20} />}
+      {overlay === 'light-leak' && <LightLeakOverlay intensity={intensity} durationFrames={25} />}
+      {overlay === 'flash' && <FlashOverlay intensity={intensity} durationFrames={10} />}
+      {overlay === 'particles' && <ParticlesOverlay intensity={intensity} durationFrames={durationFrames} />}
+    </>
   );
 };
 
@@ -368,7 +448,7 @@ const Parallax25DImage: React.FC<{
         }}
       />
 
-      {/* Camada 2: Sujeito Recortado com Sombra de Contato Realista */}
+      {/* Camada 2: Sujeito Recortado — sem drop-shadow (caro em SW rendering) */}
       <div
         style={{
           position: 'absolute',
@@ -377,10 +457,21 @@ const Parallax25DImage: React.FC<{
           justifyContent: isVertical ? 'center' : 'flex-end',
           alignItems: 'center',
           transform: fgTransform,
-          willChange: 'transform',
           paddingRight: isVertical ? 0 : 60,
         }}
       >
+        {/* Sombra de contato simplificada — gradient overlay em vez de drop-shadow */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: isVertical ? '10%' : '25%',
+            right: 0,
+            height: '25%',
+            background: 'radial-gradient(ellipse at bottom center, rgba(0,0,0,0.6) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }}
+        />
         <Img
           src={fgUrl}
           style={{
@@ -388,9 +479,7 @@ const Parallax25DImage: React.FC<{
             height: '100%',
             objectFit: 'contain',
             objectPosition: 'center bottom',
-            filter: gradingFilter
-              ? `${gradingFilter} drop-shadow(0 25px 45px rgba(0,0,0,0.85))`
-              : 'drop-shadow(0 25px 45px rgba(0,0,0,0.85))',
+            filter: gradingFilter || 'none',
           }}
         />
       </div>
@@ -545,13 +634,17 @@ const CaptionLayer: React.FC<{
   const fontSize = isVertical ? 72 : 56;
 
   // ── POP: cada palavra aparece e desaparece individualmente ──────────────────
-  if (captionStyle === 'pop') {
-    const currentWord = words.find(
-      (w) => currentTimeInScene >= w.startInSeconds && currentTimeInScene < w.endInSeconds
-    );
+  // Usa pop quando: captionStyle='pop' OU quando há words disponíveis (priority: sync words)
+  const usePopMode = (captionStyle === 'pop' || words.length > 0) && words.length > 0;
+  if (usePopMode) {
+    const activeIndex = words.findIndex((w, i) => {
+      const nextWord = words[i + 1];
+      const end = nextWord ? nextWord.startInSeconds : (w.endInSeconds + 0.5);
+      return currentTimeInScene >= w.startInSeconds && currentTimeInScene < end;
+    });
 
-    if (!currentWord) return null;
-
+    if (activeIndex === -1) return null;
+    const currentWord = words[activeIndex];
     const wordFrame = frame - Math.round(currentWord.startInSeconds * fps);
 
     return (
@@ -592,7 +685,7 @@ const CaptionLayer: React.FC<{
             fontSize={fontSize + 20}
             frame={wordFrame}
           />
-        ) : textEffect === 'kinetic-pop' ? (
+        ) : (textEffect === 'kinetic-pop' || (textEffect as string) === 'kinetic') ? (
           <KineticPopText
             text={currentWord.word}
             primaryColor={primaryColor}

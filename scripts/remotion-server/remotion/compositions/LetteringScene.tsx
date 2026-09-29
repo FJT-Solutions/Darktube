@@ -1,6 +1,7 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, spring, interpolate } from 'remotion';
+import { useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { LetteringLine } from '../types';
+import { closedFormSpring } from '../../lib/motion';
 
 interface LetteringSceneProps {
   lines?: LetteringLine[];
@@ -100,12 +101,9 @@ export const LetteringScene: React.FC<LetteringSceneProps> = ({
                 const globalWordIndex = lineIdx * 3 + wordIdx;
                 const delay = globalWordIndex * 3.5; // Stagger é Lei (3-4f)
 
-                // Spring Validado (damping: 14, mass: 0.8)
-                const enterProgress = spring({
-                  frame: frame - delay,
-                  fps,
-                  config: { damping: 14, mass: 0.8 },
-                });
+                // Closed-form spring determinístico analítico
+                const tSec = Math.max(0, (frame - delay) / fps);
+                const enterProgress = closedFormSpring(tSec, 170, 24);
 
                 const enterY = interpolate(enterProgress, [0, 1], [60, 0], {
                   extrapolateLeft: 'clamp',
