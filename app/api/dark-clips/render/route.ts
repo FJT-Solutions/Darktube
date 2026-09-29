@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     const body = await req.json();
     const {
+      postId,
       clipId,
       title = 'Dark Clip Render',
       inputProps,
@@ -172,6 +173,7 @@ export async function POST(req: Request) {
     const initialStatus = isFutureSchedule ? 'scheduled' : 'rendering';
 
     const initialPost = await saveDarkClipPost({
+      id: postId,
       user_id: user?.id,
       clip_id: clipId,
       title: postTitle,

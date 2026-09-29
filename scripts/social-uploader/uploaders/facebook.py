@@ -94,23 +94,27 @@ class FacebookUploader(BaseUploader):
 
                 current_url = page.url.lower()
                 print(f"[{self.name.upper()}] URL após carregamento: {current_url}")
-                if "login.php" in current_url or "/login/" in current_url or "/login?" in current_url:
+                if "login" in current_url or "checkpoint" in current_url or "auth" in current_url or "two_step_verification" in current_url:
                     context.close()
-                    expired_file = SESSIONS_DIR / "facebook_expired.json"
-                    try:
-                        with open(expired_file, "w", encoding="utf-8") as ef:
-                            json.dump({
-                                "expired": True, 
-                                "reason": "Redirecionado para tela de login do Facebook", 
-                                "timestamp": time.time(),
-                                "url": current_url
-                            }, ef)
-                    except Exception:
-                        pass
+                    expired_files = [SESSIONS_DIR / "facebook_expired.json"]
+                    if self.cookie_file and self.cookie_file.name != "facebook_cookies.json":
+                        acc_stem = self.cookie_file.stem.replace("_cookies", "")
+                        expired_files.append(SESSIONS_DIR / f"{acc_stem}_expired.json")
+                    for ef_path in expired_files:
+                        try:
+                            with open(ef_path, "w", encoding="utf-8") as ef:
+                                json.dump({
+                                    "expired": True, 
+                                    "reason": "Redirecionado para tela de login do Facebook", 
+                                    "timestamp": time.time(),
+                                    "url": current_url
+                                }, ef)
+                        except Exception:
+                            pass
                     return {
                         "success": False,
                         "platform": self.name,
-                        "error": "Sessão do Facebook expirou. Acesse Credenciais e conecte novamente.",
+                        "error": "Sessão do Facebook expirou (redirecionado para tela de login). Acesse o menu Credenciais e reconecte sua conta do Facebook.",
                         "expired": True
                     }
 
@@ -264,6 +268,17 @@ class FacebookUploader(BaseUploader):
                         expired_file.unlink()
                     except Exception:
                         pass
+
+                # Salva cookies renovados pela Meta para evitar expiração prematura
+                try:
+                    updated_cookies = context.cookies()
+                    if updated_cookies and len(updated_cookies) > 0:
+                        with open(self.cookie_file, "w", encoding="utf-8") as f:
+                            json.dump(updated_cookies, f, indent=2)
+                        print(f"[{self.name.upper()}] 🔄 {len(updated_cookies)} cookies renovados salvos com sucesso!")
+                except Exception as ck_err:
+                    print(f"[{self.name.upper()}] [!] Aviso ao salvar cookies renovados: {ck_err}")
+
                 context.close()
 
                 return {

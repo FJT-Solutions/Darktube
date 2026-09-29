@@ -234,7 +234,13 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
       },
     });
 
+    child.on('error', (err) => {
+      activePostDispatches.delete(post.id);
+      logger.error(`[Social Dispatcher] Erro no processo Python para post ${post.id}: ${err.message}`, { context: 'Scheduler' });
+    });
+
     child.on('exit', async (code, signal) => {
+      activePostDispatches.delete(post.id);
       logger.info(`[Social Dispatcher] Processo Python finalizado (code: ${code}, signal: ${signal}) para post ${post.id}`, { context: 'Scheduler' });
       if (code !== 0) {
         let errorSnippet = `Código de saída: ${code}`;
@@ -262,6 +268,12 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
           logger.error(`[Social Dispatcher] Erro ao registrar falha no DB: ${dbErr?.message}`, { context: 'Scheduler' });
         }
       }
+
+      // Avança a fila automaticamente se houver itens aguardando
+      try {
+        const { processNextQueueItem } = await import('@/lib/dark-clips-queue');
+        setTimeout(() => processNextQueueItem(), 1000);
+      } catch (_) {}
     });
     child.unref();
 
@@ -271,6 +283,7 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
       platforms: platformsArg,
     });
   } catch (uErr: any) {
+    activePostDispatches.delete(post.id);
     logger.error(`Erro ao disparar despachante nativo: ${uErr?.message}`, { context: 'Scheduler' });
     return { success: false, error: uErr?.message };
   }

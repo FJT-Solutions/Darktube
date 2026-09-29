@@ -43,12 +43,16 @@ export async function processNextQueueItem() {
       const activeRender = renderingCheck.rows[0];
       const activeTime = new Date(activeRender.created_at).getTime();
       const now = Date.now();
-      // Se estiver renderizando há menos de 15 minutos, respeita o lock para não sobrecarregar o Remotion
-      if (now - activeTime < 15 * 60 * 1000) {
+      // Se estiver renderizando há menos de 10 minutos, respeita o lock para não sobrecarregar o Remotion
+      if (now - activeTime < 10 * 60 * 1000) {
         logger.debug(`[DarkClips Queue] Post ${activeRender.id} ainda está em renderização. Fila aguardando término...`, { context: 'Queue' });
         return;
       } else {
-        logger.warn(`[DarkClips Queue] Post ${activeRender.id} em 'rendering' há mais de 15 min. Liberando lock...`, { context: 'Queue' });
+        logger.warn(`[DarkClips Queue] Post ${activeRender.id} em 'rendering' há mais de 10 min. Marcando como falha para liberar fila...`, { context: 'Queue' });
+        await pool.query(
+          `UPDATE public.dark_clips_posts SET status = 'failed', error_message = 'Timeout de renderização excedido (10 min)' WHERE id = $1`,
+          [activeRender.id]
+        );
       }
     }
 
@@ -85,6 +89,7 @@ export async function processNextQueueItem() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          postId: nextPost.id,
           clipId: nextPost.clip_id,
           title: nextPost.title || 'Dark Clip Render',
           durationInSeconds: nextPost.clip_duration || 30,
@@ -111,7 +116,15 @@ export async function processNextQueueItem() {
       });
 
       const data = await renderRes.json();
-      logger.info(`[DarkClips Queue] Render do item ${nextPost.id} concluído com sucesso`, { context: 'Queue', data: { success: data.success } });
+      if (!data.success && !data.isAlreadyRendering) {
+        logger.error(`[DarkClips Queue] Falha ao iniciar render para ${nextPost.id}: ${data.error}`, { context: 'Queue' });
+        await pool.query(
+          `UPDATE public.dark_clips_posts SET status = 'failed', error_message = $1 WHERE id = $2`,
+          [`Falha ao iniciar render: ${data.error || 'Erro desconhecido'}`, nextPost.id]
+        );
+      } else {
+        logger.info(`[DarkClips Queue] Render do item ${nextPost.id} processado com sucesso`, { context: 'Queue', data: { success: data.success } });
+      }
     } catch (renderFetchErr: any) {
       logger.warn(`[DarkClips Queue] Chamada HTTP de render para ${nextPost.id} encerrou (${renderFetchErr.message}). O webhook continuará o processo.`, { context: 'Queue' });
     }
