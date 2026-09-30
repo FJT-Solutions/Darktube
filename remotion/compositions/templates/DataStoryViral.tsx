@@ -9,6 +9,7 @@ import {
   Easing,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -534,6 +535,17 @@ export const DataStoryViralComposition: React.FC<RemotionShortProps> = ({
           </div>
         </div>
       </AbsoluteFill>
+
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {currentScene && (
+        <CaptionLayer
+          scene={currentScene}
+          captionStyle="highlight"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      )}
     </AbsoluteFill>
   );
 };
