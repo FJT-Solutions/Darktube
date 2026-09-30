@@ -5,8 +5,11 @@ import {
   useVideoConfig,
   Img,
   interpolate,
+  Sequence,
+  Audio,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -42,22 +45,22 @@ const QuizConfetti: React.FC<{
 
   const particles = React.useMemo(() => {
     const r = createRng(33190);
-    return Array.from({ length: 36 }, (_, i) => ({
+    return Array.from({ length: 40 }, (_, i) => ({
       angle: (r() - 0.5) * Math.PI * 2,
-      speed: 160 + r() * 400,
-      size: 6 + r() * 8,
+      speed: 180 + r() * 450,
+      size: 6 + r() * 10,
       color: r() > 0.3 ? correctColor : '#FACC15',
-      rotSpeed: (r() - 0.5) * 18,
+      rotSpeed: (r() - 0.5) * 22,
     }));
   }, [correctColor]);
 
   return (
-    <AbsoluteFill style={{ pointerEvents: 'none', overflow: 'hidden' }}>
+    <AbsoluteFill style={{ pointerEvents: 'none', overflow: 'hidden', zIndex: 60 }}>
       {particles.map((p, idx) => {
         const t = elapsed / 60;
         const progress = closedFormSpring(t, 110, 18);
         const dist = p.speed * progress;
-        const gravity = progress * progress * 140;
+        const gravity = progress * progress * 160;
         const x = Math.cos(p.angle) * dist;
         const y = Math.sin(p.angle) * dist + gravity;
         const opacity = Math.max(0, 1 - progress * 1.2);
@@ -67,14 +70,14 @@ const QuizConfetti: React.FC<{
             key={idx}
             style={{
               position: 'absolute',
-              top: '60%',
+              top: '58%',
               left: '50%',
               width: `${p.size}px`,
               height: `${p.size}px`,
               backgroundColor: p.color,
-              borderRadius: idx % 2 === 0 ? '50%' : '2px',
+              borderRadius: idx % 2 === 0 ? '50%' : '3px',
               opacity,
-              boxShadow: `0 0 10px ${p.color}`,
+              boxShadow: `0 0 12px ${p.color}`,
               transform: `translate(-50%, -50%) translate(${x}px, ${y}px) rotate(${elapsed * p.rotSpeed}deg)`,
             }}
           />
@@ -93,8 +96,8 @@ const CircularQuizTimer: React.FC<{
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - remainingRatio);
-  const isUrgent = remainingRatio < 0.3;
-  const ringColor = isUrgent ? '#EF4444' : primaryColor;
+  const isUrgent = remainingRatio < 0.35;
+  const ringColor = isUrgent ? '#FF0055' : primaryColor;
 
   return (
     <div style={{ position: 'relative', width: '92px', height: '92px' }}>
@@ -103,7 +106,7 @@ const CircularQuizTimer: React.FC<{
           cx="46"
           cy="46"
           r={radius}
-          stroke="rgba(255,255,255,0.1)"
+          stroke="rgba(255,255,255,0.12)"
           strokeWidth="6"
           fill="none"
         />
@@ -117,7 +120,9 @@ const CircularQuizTimer: React.FC<{
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
-          style={{ transition: 'none' }}
+          style={{
+            filter: isUrgent ? `drop-shadow(0 0 8px ${ringColor})` : 'none',
+          }}
         />
       </svg>
       <div
@@ -127,10 +132,11 @@ const CircularQuizTimer: React.FC<{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '24px',
+          fontSize: '26px',
           fontWeight: 900,
           color: ringColor,
           fontFamily: 'Montserrat, Inter, sans-serif',
+          textShadow: isUrgent ? `0 0 12px ${ringColor}` : 'none',
         }}
       >
         {Math.max(0, secondsLeft)}
@@ -139,57 +145,59 @@ const CircularQuizTimer: React.FC<{
   );
 };
 
-// ─── Main QuizTrivia Composition ────────────────────────────────────────────
-export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
-  primaryColor = '#3B82F6', // Vibrant Blue
-  accentColor = '#10B981',  // Correct Answer Neon Green
+// ─── Single Quiz Scene View ─────────────────────────────────────────────────
+export interface QuizTriviaSingleProps {
+  scene: SceneSegment;
+  sceneIndex: number;
+  totalScenes: number;
+  primaryColor?: string;
+  accentColor?: string;
+  format?: 'vertical' | 'horizontal';
+  showWatermark?: boolean;
+  watermarkText?: string;
+}
+
+export const QuizTriviaSceneSingle: React.FC<QuizTriviaSingleProps> = ({
+  scene,
+  sceneIndex,
+  totalScenes,
+  primaryColor = '#00F0FF',
+  accentColor = '#00FF66',
   format = 'vertical',
   showWatermark = true,
-  watermarkText = 'QUIZ TIME',
+  watermarkText = 'DARK QUIZ',
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const time = frame / fps;
-
-  // Scene timing resolution
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-  let sceneStartFrame = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 6;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      sceneStartFrame = Math.round(accumulatedTime * fps);
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 6;
+  const dur = scene.durationSeconds || 10;
+  const totalFrames = Math.max(30, Math.round(dur * fps));
+  const sceneLocalTime = frame / fps;
   const isLandscape = format === 'horizontal' || width > height;
 
-  // Answer Revelation Phase: happens at 65% of the scene duration
+  // Reveal phase: occurs at 65% of the scene duration
   const revealProgressTime = dur * 0.65;
-  const isRevealed = sceneLocalTime >= revealProgressTime;
+  const revealFrame = Math.round(revealProgressTime * fps);
+  const isRevealed = frame >= revealFrame;
   const remainingCountdown = Math.max(0, Math.ceil(revealProgressTime - sceneLocalTime));
   const countdownRatio = Math.max(0, Math.min(1, 1 - sceneLocalTime / revealProgressTime));
 
-  // Question & Options data
-  const questionText = currentScene.captionText || 'Qual é o maior planeta do sistema solar?';
-  const options = currentScene.letteringLines && currentScene.letteringLines.length >= 4
-    ? currentScene.letteringLines.map((l) => l.text)
-    : ['Terra', 'Júpiter', 'Saturno', 'Marte'];
+  // Question & Options resolution
+  const questionText = scene.headline || (scene as any).title || scene.captionText || 'QUAL É A RESPOSTA CORRETA?';
+  const rawOptions = (scene as any).options || (scene.letteringLines && scene.letteringLines.length >= 2 ? scene.letteringLines.map((l) => l.text) : null);
+  const options: string[] = rawOptions && rawOptions.length >= 2
+    ? rawOptions
+    : ['Opção Alfa', 'Opção Beta', 'Opção Gama', 'Opção Delta'];
 
-  // Default correct option index is 1 (B)
-  const correctIndex = 1;
+  const correctIndex = typeof (scene as any).correctIndex === 'number' ? (scene as any).correctIndex : 1;
 
   // Question Card Entry Spring
   const questionSpring = closedFormSpring(sceneLocalTime, 140, 20);
+
+  // Background subtle zoom
+  const bgScale = interpolate(frame, [0, totalFrames], [1.02, 1.14], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   return (
     <AbsoluteFill
@@ -199,34 +207,54 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
         fontFamily: 'Montserrat, Inter, sans-serif',
       }}
     >
-      {/* ── 1. Dynamic Background & Grid ── */}
+      {/* ── Background Image / Atmosphere ── */}
+      {scene.imageUrl ? (
+        <AbsoluteFill style={{ overflow: 'hidden' }}>
+          <Img
+            src={scene.imageUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: `scale(${bgScale})`,
+              filter: 'brightness(0.32) saturate(1.2) contrast(1.1)',
+            }}
+          />
+        </AbsoluteFill>
+      ) : null}
+
+      {/* ── Ambient Gradient & Tech Grid ── */}
       <AbsoluteFill
         style={{
           background: `
-            radial-gradient(circle at 50% 30%, ${primaryColor}26 0%, transparent 60%),
-            radial-gradient(circle at 50% 85%, #0B1120 0%, #070A12 100%)
+            radial-gradient(circle at 50% 25%, ${primaryColor}22 0%, transparent 65%),
+            radial-gradient(circle at 50% 85%, #050810 0%, #070A12 100%)
           `,
         }}
       />
 
       <AbsoluteFill
         style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
-          opacity: 0.7,
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+          opacity: 0.6,
         }}
       />
+
+      {/* Audio narration */}
+      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* Confetti when answer is revealed */}
       {isRevealed && (
         <QuizConfetti
           frame={frame}
-          triggerFrame={sceneStartFrame + Math.round(revealProgressTime * fps)}
+          triggerFrame={revealFrame}
           correctColor={accentColor}
         />
       )}
 
-      {/* ── 2. Top Quiz Bar (Progress, Streak, Difficulty) ── */}
+      {/* ── Top Header Quiz Bar ── */}
       <div
         style={{
           position: 'absolute',
@@ -244,24 +272,25 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span
             style={{
-              padding: '6px 14px',
+              padding: '6px 16px',
               borderRadius: '999px',
-              backgroundColor: '#1E293B',
-              border: '1px solid #334155',
-              color: '#94A3B8',
+              backgroundColor: '#0F172A',
+              border: `1.5px solid ${primaryColor}66`,
+              color: '#00F0FF',
               fontWeight: 800,
               fontSize: '13px',
+              letterSpacing: '1px',
             }}
           >
-            PERGUNTA {activeSceneIndex + 1}/{scenes.length || 5}
+            PERGUNTA {sceneIndex + 1}/{totalScenes}
           </span>
           <span
             style={{
               padding: '6px 14px',
               borderRadius: '999px',
-              backgroundColor: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #EF4444',
-              color: '#EF4444',
+              backgroundColor: 'rgba(255, 0, 85, 0.15)',
+              border: '1.5px solid rgba(255, 0, 85, 0.6)',
+              color: '#FF0055',
               fontWeight: 800,
               fontSize: '13px',
               display: 'flex',
@@ -269,11 +298,11 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
               gap: '4px',
             }}
           >
-            🔥 STREAK x3
+            🔥 {scene.badgeText || (scene as any).badge || 'QUIZ TÁTICO'}
           </span>
         </div>
 
-        {/* Circular Timer in Top Bar */}
+        {/* Circular Countdown Timer */}
         <CircularQuizTimer
           remainingRatio={countdownRatio}
           primaryColor={primaryColor}
@@ -281,21 +310,21 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
         />
       </div>
 
-      {/* ── 3. Question Banner ── */}
+      {/* ── Question Card Banner ── */}
       <div
         style={{
           position: 'absolute',
-          top: isLandscape ? '130px' : '170px',
+          top: isLandscape ? '130px' : '160px',
           left: '50%',
           transform: `translateX(-50%) translateY(${(1 - questionSpring) * 35}px) scale(${0.96 + questionSpring * 0.04})`,
-          width: '90%',
+          width: '92%',
           maxWidth: '880px',
-          padding: isLandscape ? '24px 32px' : '28px 24px',
+          padding: isLandscape ? '22px 28px' : '26px 22px',
           borderRadius: '24px',
-          backgroundColor: 'rgba(15, 23, 42, 0.88)',
-          border: '2px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.7), 0 0 30px rgba(59, 130, 246, 0.15)',
-          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(10, 15, 30, 0.92)',
+          border: '2px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(0, 240, 255, 0.12)',
+          backdropFilter: 'blur(16px)',
           textAlign: 'center',
           zIndex: 30,
           opacity: questionSpring,
@@ -304,28 +333,29 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
         <h2
           style={{
             margin: 0,
-            fontSize: isLandscape ? '32px' : '30px',
+            fontSize: isLandscape ? '30px' : '28px',
             fontWeight: 900,
             color: '#FFFFFF',
             lineHeight: 1.3,
+            letterSpacing: '-0.5px',
           }}
         >
           {questionText}
         </h2>
       </div>
 
-      {/* ── 4. Options List / Grid ── */}
+      {/* ── 4 Options List ── */}
       <div
         style={{
           position: 'absolute',
-          top: isLandscape ? '310px' : '390px',
+          top: isLandscape ? '290px' : '330px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '90%',
+          width: '92%',
           maxWidth: '880px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '14px',
+          gap: '12px',
           zIndex: 30,
         }}
       >
@@ -336,8 +366,8 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
           const optSpring = closedFormSpring(sceneLocalTime - delayTime, 160, 22);
 
           // State styling
-          let borderStyle = '1.5px solid rgba(255,255,255,0.08)';
-          let bgStyle = 'rgba(15, 23, 42, 0.75)';
+          let borderStyle = '1.5px solid rgba(255,255,255,0.1)';
+          let bgStyle = 'rgba(15, 23, 42, 0.85)';
           let badgeBg = '#1E293B';
           let textColor = '#FFFFFF';
           let glow = 'none';
@@ -345,13 +375,13 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
           if (isRevealed) {
             if (isCorrect) {
               borderStyle = `2.5px solid ${accentColor}`;
-              bgStyle = 'rgba(16, 185, 129, 0.15)';
+              bgStyle = 'rgba(0, 255, 102, 0.2)';
               badgeBg = accentColor;
               textColor = '#FFFFFF';
-              glow = `0 0 25px ${accentColor}66`;
+              glow = `0 0 30px ${accentColor}88`;
             } else {
-              borderStyle = '1.5px solid rgba(239, 68, 68, 0.3)';
-              bgStyle = 'rgba(239, 68, 68, 0.05)';
+              borderStyle = '1.5px solid rgba(239, 68, 68, 0.35)';
+              bgStyle = 'rgba(239, 68, 68, 0.08)';
               badgeBg = '#334155';
               textColor = '#64748B';
             }
@@ -363,15 +393,16 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                padding: '16px 20px',
-                borderRadius: '18px',
+                padding: '14px 18px',
+                borderRadius: '16px',
                 backgroundColor: bgStyle,
                 border: borderStyle,
                 boxShadow: glow,
                 gap: '16px',
                 transform: `translateY(${(1 - optSpring) * 30}px) scale(${0.96 + optSpring * 0.04})`,
                 opacity: optSpring,
-                transition: 'border 0.3s ease, background 0.3s ease',
+                backdropFilter: 'blur(10px)',
+                transition: 'border 0.25s ease, background 0.25s ease, box-shadow 0.25s ease',
               }}
             >
               {/* Option Letter Indicator */}
@@ -387,6 +418,7 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
                   fontSize: '18px',
                   fontWeight: 900,
                   color: isRevealed && isCorrect ? '#000000' : '#FFFFFF',
+                  boxShadow: isRevealed && isCorrect ? `0 0 14px ${accentColor}` : 'none',
                 }}
               >
                 {letter}
@@ -396,9 +428,10 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
               <span
                 style={{
                   fontSize: isLandscape ? '22px' : '20px',
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: textColor,
                   flex: 1,
+                  lineHeight: 1.2,
                 }}
               >
                 {opt}
@@ -415,20 +448,33 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
         })}
       </div>
 
-      {/* ── 5. Watermark Footer ── */}
+      {/* ── Word-Level Synchronized Karaoke Subtitles ── */}
+      <div style={{ position: 'absolute', bottom: isLandscape ? '40px' : '65px', left: 0, right: 0, zIndex: 45 }}>
+        <CaptionLayer
+          scene={scene}
+          captionStyle="box"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      </div>
+
+      {/* ── Watermark Footer ── */}
       {showWatermark && (
         <div
           style={{
             position: 'absolute',
-            bottom: isLandscape ? '20px' : '36px',
+            bottom: isLandscape ? '12px' : '22px',
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             color: '#64748B',
-            fontSize: '14px',
-            fontWeight: 700,
+            fontSize: '13px',
+            fontWeight: 800,
+            letterSpacing: '1px',
+            zIndex: 50,
           }}
         >
           <span style={{ color: primaryColor }}>●</span>
@@ -438,3 +484,66 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = ({
     </AbsoluteFill>
   );
 };
+
+// ─── Multi-Scene / Composition Wrapper ───────────────────────────────────────
+export const QuizTriviaComposition: React.FC<RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    const fallbackScene: SceneSegment = {
+      headline: props.headline || 'QUAL É O MAIOR PLANETA DO SISTEMA SOLAR?',
+      captionText: props.subheadline || 'A gravidade extrema deste gigante gasoso captura asteroides.',
+      durationSeconds: 10,
+      options: ['Terra', 'Júpiter', 'Saturno', 'Marte'],
+      correctIndex: 1,
+    } as any;
+    return (
+      <QuizTriviaSceneSingle
+        scene={fallbackScene}
+        sceneIndex={0}
+        totalScenes={1}
+        primaryColor={props.primaryColor || '#00F0FF'}
+        accentColor={props.accentColor || '#00FF66'}
+        format={props.format || 'vertical'}
+        showWatermark={props.showWatermark}
+        watermarkText={props.watermarkText || 'QUIZ TÁTICO'}
+      />
+    );
+  }
+
+  let accumulatedFrames = 0;
+  const totalCount = scenes.length;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#070A12' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 10;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`quiz_seq_${idx}_${scene.headline || scene.captionText?.slice(0, 10)}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <QuizTriviaSceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              totalScenes={totalCount}
+              primaryColor={props.primaryColor || '#00F0FF'}
+              accentColor={props.accentColor || '#00FF66'}
+              format={props.format || 'vertical'}
+              showWatermark={props.showWatermark}
+              watermarkText={props.watermarkText || 'QUIZ TÁTICO'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const QuizTrivia = QuizTriviaComposition;

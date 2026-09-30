@@ -5,8 +5,11 @@ import {
   useVideoConfig,
   Img,
   interpolate,
+  Sequence,
+  Audio,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -160,7 +163,7 @@ const ProceduralClapperboard: React.FC<{
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#F59E0B', fontFamily: 'monospace' }}>
             <span>TAKE 01</span>
-            <span>FPS: 30</span>
+            <span>FPS: 24</span>
             <span>SYNC: OK</span>
           </div>
         </div>
@@ -169,9 +172,22 @@ const ProceduralClapperboard: React.FC<{
   );
 };
 
-// ─── Main EditorialStory Composition ────────────────────────────────────────
-export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
+export interface EditorialStorySingleProps {
+  scene: SceneSegment;
+  sceneIndex: number;
+  totalScenes: number;
+  primaryColor?: string;
+  accentColor?: string;
+  format?: 'vertical' | 'horizontal';
+  showWatermark?: boolean;
+  watermarkText?: string;
+}
+
+// ─── Single Editorial Story Scene View ───────────────────────────────────────
+export const EditorialStorySceneSingle: React.FC<EditorialStorySingleProps> = ({
+  scene,
+  sceneIndex,
+  totalScenes,
   primaryColor = '#00F0FF',
   accentColor = '#FFFFFF',
   format = 'vertical',
@@ -180,27 +196,9 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const time = frame / fps;
-
-  // Scene timing resolution
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-  let sceneStartFrame = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 5;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      sceneStartFrame = Math.round(accumulatedTime * fps);
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 5;
+  const dur = scene.durationSeconds || 10;
+  const totalFrames = Math.max(30, Math.round(dur * fps));
+  const sceneLocalTime = frame / fps;
   const isLandscape = format === 'horizontal' || width > height;
 
   // Spring & Easing Physics
@@ -218,8 +216,8 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
   // Dynamic Vignette modulation
   const vignetteBreath = 0.75 + Math.sin(frame * 0.05) * 0.1;
 
-  const quote = currentScene.captionText || 'A história que os poderosos tentaram apagar dos livros oficiais.';
-  const chapterNumber = activeSceneIndex + 1;
+  const quote = scene.headline || (scene as any).title || scene.captionText || 'A história que tentaram apagar dos livros oficiais.';
+  const chapterNumber = sceneIndex + 1;
 
   return (
     <AbsoluteFill
@@ -233,10 +231,10 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
       <ProceduralClapperboard sceneLocalTime={sceneLocalTime} chapterNumber={chapterNumber} />
 
       {/* ── 2. Background Layer with Ken Burns Parallax ── */}
-      {currentScene.imageUrl ? (
+      {scene.imageUrl ? (
         <AbsoluteFill style={{ filter: 'contrast(1.22) saturate(1.1) brightness(0.6)' }}>
           <Img
-            src={currentScene.imageUrl}
+            src={scene.imageUrl}
             style={{
               width: '100%',
               height: '100%',
@@ -252,6 +250,9 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
           }}
         />
       )}
+
+      {/* Audio narration */}
+      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── 3. Depth-of-Field Blur Simulation ── */}
       <AbsoluteFill
@@ -310,12 +311,13 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
             color: '#000000',
             fontWeight: 900,
             fontSize: '12px',
-            padding: '3px 8px',
+            padding: '3px 10px',
             borderRadius: '4px',
             letterSpacing: '1px',
+            fontFamily: 'Montserrat, sans-serif',
           }}
         >
-          PARTE {chapterNumber}
+          PARTE {chapterNumber}/{totalScenes}
         </span>
         <span
           style={{
@@ -326,7 +328,7 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
             fontFamily: 'Montserrat, sans-serif',
           }}
         >
-          INVESTIGAÇÃO ESPECIAL
+          {scene.badgeText || (scene as any).badge || 'DOSSIÊ CONFIDENCIAL'}
         </span>
       </div>
 
@@ -361,7 +363,7 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
           <h1
             style={{
               margin: 0,
-              fontSize: isLandscape ? '46px' : '44px',
+              fontSize: isLandscape ? '44px' : '40px',
               fontWeight: 900,
               color: '#FFFFFF',
               lineHeight: 1.25,
@@ -380,7 +382,7 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
             maxWidth: '340px',
             height: '4px',
             backgroundColor: primaryColor,
-            marginTop: '24px',
+            marginTop: '20px',
             boxShadow: `0 0 14px ${primaryColor}`,
             borderRadius: '2px',
           }}
@@ -389,7 +391,7 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
         {/* Author / Source attribution */}
         <div
           style={{
-            marginTop: '18px',
+            marginTop: '16px',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -402,15 +404,26 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
             style={{
               color: '#94A3B8',
               fontFamily: 'Montserrat, sans-serif',
-              fontSize: '14px',
+              fontSize: '13px',
               letterSpacing: '1.5px',
               textTransform: 'uppercase',
             }}
           >
-            DOCUMENTO HISTÓRICO • 1974
+            DOCUMENTO OFICIAL • REGISTRO #{200 + chapterNumber * 37}
           </span>
         </div>
       </AbsoluteFill>
+
+      {/* ── Word-Level Synchronized Karaoke Subtitles (Floating above bottom letterbox) ── */}
+      <div style={{ position: 'absolute', bottom: isLandscape ? '55px' : '85px', left: 0, right: 0, zIndex: 45 }}>
+        <CaptionLayer
+          scene={scene}
+          captionStyle="box"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      </div>
 
       {/* ── 9. Brand Watermark in Bottom Bar ── */}
       {showWatermark && (
@@ -437,3 +450,64 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = ({
     </AbsoluteFill>
   );
 };
+
+// ─── Multi-Scene / Composition Wrapper ───────────────────────────────────────
+export const EditorialStoryComposition: React.FC<RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    const fallbackScene: SceneSegment = {
+      headline: props.headline || 'O MANUSCRITO QUE DESAFIOU O IMPÉRIO',
+      captionText: props.subheadline || 'Guardado sob sigilo absoluto por mais de três séculos.',
+      durationSeconds: 10,
+    } as any;
+    return (
+      <EditorialStorySceneSingle
+        scene={fallbackScene}
+        sceneIndex={0}
+        totalScenes={1}
+        primaryColor={props.primaryColor || '#00F0FF'}
+        accentColor={props.accentColor || '#FFFFFF'}
+        format={props.format || 'vertical'}
+        showWatermark={props.showWatermark}
+        watermarkText={props.watermarkText || 'DARKTUBE EDITORIAL'}
+      />
+    );
+  }
+
+  let accumulatedFrames = 0;
+  const totalCount = scenes.length;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#04060A' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 10;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`editorial_seq_${idx}_${scene.headline || scene.captionText?.slice(0, 10)}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <EditorialStorySceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              totalScenes={totalCount}
+              primaryColor={props.primaryColor || '#00F0FF'}
+              accentColor={props.accentColor || '#FFFFFF'}
+              format={props.format || 'vertical'}
+              showWatermark={props.showWatermark}
+              watermarkText={props.watermarkText || 'DARKTUBE EDITORIAL'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const EditorialStory = EditorialStoryComposition;

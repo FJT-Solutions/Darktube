@@ -13,65 +13,67 @@ USER = "root"
 PASS = "fjt@Solutions1"
 
 OUT_DIR = r"c:\Users\natha\Documents\project\darktube\out\test_renders"
-FRAMES_DIR = os.path.join(OUT_DIR, "investigationboard_frames")
+FRAMES_DIR = os.path.join(OUT_DIR, "quiztrivia_frames")
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(FRAMES_DIR, exist_ok=True)
 
-LOCAL_VIDEO_PATH = os.path.join(OUT_DIR, "InvestigationBoard_60s.mp4")
+LOCAL_VIDEO_PATH = os.path.join(OUT_DIR, "QuizTrivia_60s.mp4")
 
-# 6 CENAS DE INVESTIGAÇÃO CALIBRADAS PARA 60 SEGUNDOS (1440 FRAMES @ 24FPS)
-script_scenes = [
+# 5 PERGUNTAS DE QUIZ CIENTÍFICO OBSCURO (~60s @ 24fps)
+quiz_scenes = [
     {
-        "id": "inv_01",
-        "title": "DOSSIÊ ATLAS-7",
-        "badge": "CONFIDENCIAL",
-        "text": "Um arquivo ultrassecreto contendo transações financeiras ilícitas desapareceu dos servidores centrais em Genebra sem deixar rastros digitais.",
+        "id": "quiz_01",
+        "question": "QUAL O LUGAR MAIS SILENCIOSO DA TERRA?",
+        "options": ["Fossa das Marianas", "Câmara Anecoica", "Cúpula Ártica", "Caverna Son Doong"],
+        "correctIndex": 1,
+        "badge": "ACÚSTICA",
+        "text": "A câmara anecoica nos Estados Unidos absorve tanto som que você consegue ouvir seu próprio sangue circular.",
+        "image": "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1080&q=80",
+        "dur": 11.0,
+    },
+    {
+        "id": "quiz_02",
+        "question": "QUANTO TEMPO A LUZ DO SOL LEVA ATÉ NÓS?",
+        "options": ["Cinco Minutos", "Oito Minutos e Vinte", "Quinze Minutos", "Instantâneo"],
+        "correctIndex": 1,
+        "badge": "ASTRONOMIA",
+        "text": "Os fótons emitidos pela superfície solar viajam a trezentos mil quilômetros por segundo por oito minutos e vinte segundos.",
+        "image": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1080&q=80",
+        "dur": 11.0,
+    },
+    {
+        "id": "quiz_03",
+        "question": "QUAL O ELEMENTO MAIS LETAL POR GRAMA?",
+        "options": ["Cianeto", "Polônio 210", "Chumbo Puro", "Mercúrio"],
+        "correctIndex": 1,
+        "badge": "QUÍMICA",
+        "text": "Um único grama de polônio duzentos e dez é capaz de vaporizar e aniquilar cinquenta milhões de pessoas.",
+        "image": "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1080&q=80",
+        "dur": 11.0,
+    },
+    {
+        "id": "quiz_04",
+        "question": "O QUE OCORRE NO HORIZONTE DE EVENTOS?",
+        "options": ["Fusão Termonuclear", "Espaguetificação", "Reflexão Espelho", "Onda Térmica"],
+        "correctIndex": 1,
+        "badge": "RELATIVIDADE",
+        "text": "A gravidade diferencial puxa os pés com tanta intensidade que o corpo é esticado como um fio fino.",
+        "image": "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=1080&q=80",
+        "dur": 11.0,
+    },
+    {
+        "id": "quiz_05",
+        "question": "QUAL SER VIVO SUPORTA O VÁCUO ESPACIAL?",
+        "options": ["Escorpião", "Tardígrado", "Barata d'água", "Formiga Bala"],
+        "correctIndex": 1,
+        "badge": "BIOLOGIA",
+        "text": "O tardígrado entra em dessecação quase total, suportando radiação cósmica letal e zero absoluto.",
         "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "inv_02",
-        "title": "PRIMEIRO SUSPEITO",
-        "badge": "ALVO PRINCIPAL",
-        "text": "O ex-analista sênior Marcus Vance comprou uma passagem só de ida para Istambul quarenta minutos após a violação do perímetro de segurança.",
-        "image": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "inv_03",
-        "title": "RASTRO FINANCEIRO",
-        "badge": "EVIDÊNCIA #03",
-        "text": "Extratos bancários revelam uma transferência de quatro milhões de dólares convertidos em criptoativos anônimos na mesma madrugada.",
-        "image": "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "inv_04",
-        "title": "ENCONTRO CLANDESTINO",
-        "badge": "PORTO ROTERDÃ",
-        "text": "Câmeras de vigilância registraram um encontro entre Vance e um intermediário desconhecido em um cais isolado no porto de Roterdã.",
-        "image": "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "inv_05",
-        "title": "MICROCHIP OCULTO",
-        "badge": "EVIDÊNCIA #05",
-        "text": "Peritos recuperaram um microchip oculto dentro de um relógio de pulso quebrado encontrado no quarto de hotel abandonado pelo suspeito.",
-        "image": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "inv_06",
-        "title": "ALERTA VERMELHO",
-        "badge": "MANDADO INTERPOL",
-        "text": "A Interpol emitiu um alerta vermelho prioritário. A rede de cumplicidade aponta para figuras do alto escalão corporativo global.",
-        "image": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&q=80",
-        "dur": 10.0,
+        "dur": 11.0,
     }
 ]
 
-print("=== PRODUÇÃO INVESTIGATION BOARD (60s @ 720p 24fps) ===", flush=True)
+print("=== PRODUÇÃO QUIZ TRIVIA (60s @ 720p 24fps) ===", flush=True)
 
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -81,19 +83,9 @@ stdin, stdout, stderr = c.exec_command("docker ps -q -f name=n8n-remotionservice
 cid = stdout.read().decode('utf-8').strip()
 print(f"Container Remotion ativo: {cid}", flush=True)
 
-# 1. VERIFICAR SE O BUNDLE ESTÁ PRONTO
-print("\n1. Verificando bundle Remotion...", flush=True)
-for _ in range(12):
-    stdin, stdout, stderr = c.exec_command(f"docker exec {cid} curl -s http://127.0.0.1:3001/health")
-    res = stdout.read().decode('utf-8').strip()
-    if '"bundled":true' in res:
-        print("✅ Bundle pronto no container!", flush=True)
-        break
-    time.sleep(4)
-
-# 2. SINTETIZAR NARRAÇÃO PIPER TTS (PORTUGUÊS)
-print("\n2. Sintetizando narração Piper TTS (voz: faber)...", flush=True)
-for item in script_scenes:
+# 1. SINTETIZAR NARRAÇÃO PIPER TTS
+print("\n1. Sintetizando narração Piper TTS (voz: faber)...", flush=True)
+for item in quiz_scenes:
     sid = item["id"]
     text = item["text"]
     tts_payload = json.dumps({"model": "tts-1", "voice": "faber", "input": text})
@@ -123,7 +115,7 @@ echo "$DUR"
     item["dur"] = max(item["dur"], round(dur + 1.2, 1))
     print(f"  [{sid}] Áudio: {dur:.2f}s | Duração cena: {item['dur']}s", flush=True)
 
-# 3. GERAR TIMINGS DE KARAOKE FONÉTICO
+# 2. GERAR TIMINGS DE KARAOKE FONÉTICO
 def make_word_timings(text, audio_dur):
     words = text.strip().split()
     if not words:
@@ -146,17 +138,17 @@ def make_word_timings(text, audio_dur):
     return timings
 
 remotion_scenes = []
-for idx, sc in enumerate(script_scenes):
+for idx, sc in enumerate(quiz_scenes):
     remotion_scenes.append({
         "index": idx,
-        "headline": sc["title"],
+        "headline": sc["question"],
         "badgeText": sc["badge"],
         "captionText": sc["text"],
+        "options": sc["options"],
+        "correctIndex": sc["correctIndex"],
         "audioUrl": f"/app/output/{sc['id']}.mp3",
         "imageUrl": sc["image"],
         "durationSeconds": sc["dur"],
-        "transitionIn": "none",
-        "transitionDurationFrames": 0,
         "words": make_word_timings(sc["text"], sc["audio_dur"]),
     })
 
@@ -165,49 +157,48 @@ fps = 24
 total_frames = int(round(total_dur * fps))
 print(f"\nDuração total calculada: {total_dur:.1f}s ({total_frames} frames @ {fps}fps, 720x1280)", flush=True)
 
-# 4. ENVIAR PAYLOAD DE RENDER
-job_id = "investigationboard_60s_v1"
+# 3. ENVIAR PAYLOAD DE RENDER
+job_id = "quiztrivia_60s_v1"
 render_payload = {
     "historyId": job_id,
     "callbackUrl": "http://127.0.0.1:3001/render-callback",
     "composition": {
-        "templateId": "InvestigationBoard",
+        "templateId": "QuizTrivia",
         "format": "vertical",
         "width": 720,
         "height": 1280,
         "fps": 24,
         "jpegQuality": 75,
         "concurrency": 2,
-        "primaryColor": "#EF4444",
-        "stampText": "TOP SECRET",
-        "backgroundMusicUrl": "/app/output/bgm_noir.mp3",
+        "primaryColor": "#00F0FF",
+        "accentColor": "#00FF66",
+        "backgroundMusicUrl": "/app/output/bgm_cyber.mp3",
         "scenes": remotion_scenes,
     }
 }
 
-print("\n4. Submetendo job de renderização ao Remotion Service...", flush=True)
+print("\n3. Submetendo job de renderização ao Remotion Service...", flush=True)
 payload_json = json.dumps(render_payload, ensure_ascii=False)
 
 submit_cmd = f"""
-cat << 'EOF' > /tmp/inv_payload.json
+cat << 'EOF' > /tmp/quiz_payload.json
 {payload_json}
 EOF
-docker cp /tmp/inv_payload.json {cid}:/tmp/inv_payload.json
+docker cp /tmp/quiz_payload.json {cid}:/tmp/quiz_payload.json
 docker exec {cid} curl -s -X POST http://127.0.0.1:3001/render \\
   -H "Content-Type: application/json" \\
-  -d @/tmp/inv_payload.json
+  -d @/tmp/quiz_payload.json
 """
 stdin, stdout, stderr = c.exec_command(submit_cmd, timeout=30)
 submit_res = stdout.read().decode('utf-8', errors='replace').strip()
 print(f"Resposta do /render: {submit_res}", flush=True)
 
-# 5. MONITORAR PROGRESSO
-print("\n5. Monitorando renderização (720p @ 24fps)...", flush=True)
-last_pct = -1
+# 4. MONITORAR PROGRESSO
+print("\n4. Monitorando renderização (720p @ 24fps)...", flush=True)
 start_t = time.time()
 completed = False
 
-while time.time() - start_t < 900:  # máx 15 min
+while time.time() - start_t < 900:
     stdin, stdout, stderr = c.exec_command("docker ps -q -f name=n8n-remotionservice | head -n1")
     cid = stdout.read().decode('utf-8').strip()
     stdin, stdout, stderr = c.exec_command(f"docker logs --tail 12 {cid}")
@@ -215,15 +206,12 @@ while time.time() - start_t < 900:  # máx 15 min
     
     current_line = None
     for line in logs.split('\n'):
-        if 'Render progresso:' in line or 'Renderizando' in line or 'Mixando áudio' in line or 'Áudio mixado' in line:
-            current_line = line.strip()
-        if 'Progresso:' in line:
+        if any(k in line for k in ['Render progresso:', 'Renderizando:', 'Mixando áudio', 'Áudio mixado', 'Progresso:']):
             current_line = line.strip()
     
     if current_line:
         print(f"  [{int(time.time() - start_t)}s] {current_line}", flush=True)
     
-    # Verificar se o arquivo final foi gerado
     stdin, stdout, stderr = c.exec_command(f"docker exec {cid} ls -lh /app/output/render_{job_id}.mp4 2>/dev/null")
     ls_out = stdout.read().decode('utf-8').strip()
     if 'render_' in ls_out and not 'staging' in ls_out:
@@ -238,8 +226,8 @@ if not completed:
     c.close()
     sys.exit(1)
 
-# 6. BAIXAR O VÍDEO LOCALMENTE
-print("\n6. Baixando vídeo para o ambiente local...", flush=True)
+# 5. BAIXAR O VÍDEO LOCALMENTE
+print("\n5. Baixando vídeo para o ambiente local...", flush=True)
 c.exec_command(f"docker cp {cid}:/app/output/render_{job_id}.mp4 /tmp/render_{job_id}.mp4")
 time.sleep(2)
 
@@ -250,21 +238,18 @@ sftp.close()
 file_size_mb = os.path.getsize(LOCAL_VIDEO_PATH) / (1024 * 1024)
 print(f"✅ Vídeo salvo localmente: {LOCAL_VIDEO_PATH} ({file_size_mb:.2f} MB)", flush=True)
 
-# 7. EXTRAIR KEYFRAMES PARA INSPEÇÃO VISUAL
-print("\n7. Extraindo frames representativos...", flush=True)
-timestamps = [3.0, 13.0, 23.0, 33.0, 43.0, 53.0]
+# 6. EXTRAIR KEYFRAMES PARA INSPEÇÃO VISUAL
+print("\n6. Extraindo frames representativos...", flush=True)
+timestamps = [4.0, 15.0, 26.0, 37.0, 48.0]
 sftp = c.open_sftp()
 for idx, ts in enumerate(timestamps):
     frame_path = os.path.join(FRAMES_DIR, f"scene_{idx + 1}_{int(ts)}s.jpg")
-    cmd = f"""
-docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/inv_frame_{idx+1}.jpg
-docker cp {cid}:/app/output/inv_frame_{idx+1}.jpg /tmp/inv_frame_{idx+1}.jpg
-"""
-    c.exec_command(cmd)
-    time.sleep(1)
-    sftp.get(f"/tmp/inv_frame_{idx+1}.jpg", frame_path)
+    cmd = f"docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/quiz_frame_{idx+1}.jpg && docker cp {cid}:/app/output/quiz_frame_{idx+1}.jpg /tmp/quiz_frame_{idx+1}.jpg"
+    stdin, stdout, stderr = c.exec_command(cmd)
+    stdout.channel.recv_exit_status()
+    sftp.get(f"/tmp/quiz_frame_{idx+1}.jpg", frame_path)
     print(f"  📸 Keyframe {idx + 1} extraído ({ts}s): {frame_path}", flush=True)
 
 sftp.close()
 c.close()
-print("\n=== VALIDAÇÃO DO TEMPLATE INVESTIGATION BOARD CONCLUÍDA COM SUCESSO! ===", flush=True)
+print("\n=== VALIDAÇÃO DO TEMPLATE QUIZ TRIVIA CONCLUÍDA COM SUCESSO! ===", flush=True)

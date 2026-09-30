@@ -5,8 +5,11 @@ import {
   useVideoConfig,
   Img,
   interpolate,
+  Sequence,
+  Audio,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -38,10 +41,10 @@ const SparkleTierBurst: React.FC<{ frame: number; primaryColor: string }> = ({
 }) => {
   const sparkles = React.useMemo(() => {
     const r = createRng(77218);
-    return Array.from({ length: 18 }, (_, i) => ({
+    return Array.from({ length: 24 }, (_, i) => ({
       x: 10 + r() * 80,
       y: 10 + r() * 80,
-      delay: r() * 60,
+      delay: r() * 50,
       size: 4 + r() * 8,
     }));
   }, []);
@@ -49,9 +52,9 @@ const SparkleTierBurst: React.FC<{ frame: number; primaryColor: string }> = ({
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {sparkles.map((s, idx) => {
-        const localFrame = (frame + s.delay) % 50;
-        const opacity = Math.sin((localFrame / 50) * Math.PI);
-        const scale = 0.5 + opacity * 0.8;
+        const localFrame = (frame + s.delay) % 45;
+        const opacity = Math.sin((localFrame / 45) * Math.PI);
+        const scale = 0.5 + opacity * 0.9;
 
         return (
           <div
@@ -75,7 +78,7 @@ const SparkleTierBurst: React.FC<{ frame: number; primaryColor: string }> = ({
   );
 };
 
-interface TierDef {
+export interface TierDef {
   grade: string;
   name: string;
   color: string;
@@ -83,53 +86,58 @@ interface TierDef {
   items: string[];
 }
 
-// ─── Main TierList Composition ──────────────────────────────────────────────
-export const TierListComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
-  primaryColor = '#EF4444', // S-tier Red
-  accentColor = '#F59E0B',
+export interface TierListSingleProps {
+  scene: SceneSegment;
+  sceneIndex: number;
+  totalScenes: number;
+  primaryColor?: string;
+  accentColor?: string;
+  format?: 'vertical' | 'horizontal';
+  showWatermark?: boolean;
+  watermarkText?: string;
+}
+
+// ─── Single TierList Scene View ─────────────────────────────────────────────
+export const TierListSceneSingle: React.FC<TierListSingleProps> = ({
+  scene,
+  sceneIndex,
+  totalScenes,
+  primaryColor = '#FF0055',
+  accentColor = '#FACC15',
   format = 'vertical',
   showWatermark = true,
-  watermarkText = 'TIER LIST RANKING',
+  watermarkText = 'DARK TIER LIST',
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const time = frame / fps;
-
-  // Scene timing resolution
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-  let sceneStartFrame = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 5;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      sceneStartFrame = Math.round(accumulatedTime * fps);
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 5;
+  const dur = scene.durationSeconds || 10;
+  const totalFrames = Math.max(30, Math.round(dur * fps));
+  const sceneLocalTime = frame / fps;
   const isLandscape = format === 'horizontal' || width > height;
 
-  // Default tiers
+  // Grade definitions
   const tiers: TierDef[] = [
-    { grade: 'S', name: 'GOD TIER', color: '#EF4444', bgGrad: 'rgba(239, 68, 68, 0.2)', items: ['Elite'] },
-    { grade: 'A', name: 'EXCELENTE', color: '#F97316', bgGrad: 'rgba(249, 115, 22, 0.15)', items: ['Ótimo'] },
-    { grade: 'B', name: 'BOM', color: '#FACC15', bgGrad: 'rgba(250, 204, 21, 0.12)', items: ['Decente'] },
-    { grade: 'C', name: 'MEDÍOCRE', color: '#22C55E', bgGrad: 'rgba(34, 197, 94, 0.1)', items: ['Aceitável'] },
-    { grade: 'D', name: 'LIXO', color: '#3B82F6', bgGrad: 'rgba(59, 130, 246, 0.1)', items: ['Horrível'] },
+    { grade: 'S', name: 'DEUS', color: '#EF4444', bgGrad: 'rgba(239, 68, 68, 0.22)', items: ['Elite Absoluta'] },
+    { grade: 'A', name: 'EXCELENTE', color: '#F97316', bgGrad: 'rgba(249, 115, 22, 0.16)', items: ['Altíssimo Nível'] },
+    { grade: 'B', name: 'BOM', color: '#FACC15', bgGrad: 'rgba(250, 204, 21, 0.14)', items: ['Consistente'] },
+    { grade: 'C', name: 'MÉDIO', color: '#22C55E', bgGrad: 'rgba(34, 197, 94, 0.12)', items: ['Aceitável'] },
+    { grade: 'D', name: 'LIXO', color: '#3B82F6', bgGrad: 'rgba(59, 130, 246, 0.12)', items: ['Descartável'] },
   ];
 
-  // Incoming item placement dynamics
-  const placementItem = currentScene.letteringLines?.[0]?.text || currentScene.captionText || 'NOVO ITEM';
-  const targetTierIndex = 0; // S-tier placement by default
-  const dropSpring = closedFormSpring(sceneLocalTime - 0.4, 150, 19);
+  // Resolve target tier for this scene (default: alternate or read from props)
+  const targetGrade = (scene as any).targetTier || (scene as any).tier || (sceneIndex === 0 ? 'S' : sceneIndex === 1 ? 'A' : sceneIndex === 2 ? 'S' : 'B');
+  const targetTierIndex = Math.max(0, tiers.findIndex((t) => t.grade === targetGrade));
+
+  const itemName = scene.headline || (scene as any).title || (scene.letteringLines?.[0]?.text) || 'ITEM EM ANÁLISE';
+
+  // Item drop spring: starts at 0.5s into the scene
+  const dropSpring = closedFormSpring(sceneLocalTime - 0.5, 150, 20);
+
+  // Background subtle zoom
+  const bgScale = interpolate(frame, [0, totalFrames], [1.02, 1.12], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   return (
     <AbsoluteFill
@@ -139,29 +147,49 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
         fontFamily: 'Montserrat, Inter, sans-serif',
       }}
     >
-      {/* ── 1. Atmosphere Background ── */}
+      {/* ── Background Image / Atmosphere ── */}
+      {scene.imageUrl ? (
+        <AbsoluteFill style={{ overflow: 'hidden' }}>
+          <Img
+            src={scene.imageUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: `scale(${bgScale})`,
+              filter: 'brightness(0.3) saturate(1.2) contrast(1.1)',
+            }}
+          />
+        </AbsoluteFill>
+      ) : null}
+
       <AbsoluteFill
         style={{
-          background: 'radial-gradient(circle at 50% 20%, #172033 0%, #090C15 80%)',
+          background: 'radial-gradient(circle at 50% 20%, #151D30 0%, #080B14 85%)',
+          opacity: scene.imageUrl ? 0.75 : 1,
         }}
       />
 
       <AbsoluteFill
         style={{
-          backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
           backgroundSize: '40px 40px',
           opacity: 0.6,
         }}
       />
 
-      {/* ── 2. Top Header ── */}
+      {/* Audio narration */}
+      {scene.audioUrl && <Audio src={scene.audioUrl} />}
+
+      {/* ── Top Header ── */}
       <div
         style={{
           position: 'absolute',
           top: isLandscape ? '24px' : '52px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '90%',
+          width: '92%',
           maxWidth: '880px',
           textAlign: 'center',
           zIndex: 40,
@@ -170,10 +198,10 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
         <div
           style={{
             display: 'inline-block',
-            padding: '6px 16px',
+            padding: '5px 16px',
             borderRadius: '999px',
             backgroundColor: '#1E293B',
-            border: '1px solid #334155',
+            border: '1.5px solid #334155',
             color: '#FACC15',
             fontWeight: 800,
             fontSize: '13px',
@@ -182,39 +210,40 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
             marginBottom: '8px',
           }}
         >
-          DEFINITIVE RANKING
+          TIER LIST OFICIAL • #{sceneIndex + 1}/{totalScenes}
         </div>
         <h1
           style={{
             margin: 0,
-            fontSize: isLandscape ? '34px' : '38px',
+            fontSize: isLandscape ? '32px' : '30px',
             fontWeight: 900,
             color: '#FFFFFF',
             lineHeight: 1.2,
+            letterSpacing: '-0.5px',
           }}
         >
-          {currentScene.captionText || 'ONDE ESTE ITEM SE ENCAIXA?'}
+          {scene.badgeText || (scene as any).badge || 'CLASSIFICANDO AGORA'}
         </h1>
       </div>
 
-      {/* ── 3. Tier Rows Board ── */}
+      {/* ── Tier Rows Board ── */}
       <div
         style={{
           position: 'absolute',
-          top: isLandscape ? '130px' : '170px',
+          top: isLandscape ? '120px' : '150px',
           left: '50%',
           transform: 'translateX(-50%)',
           width: '92%',
           maxWidth: '880px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '10px',
+          gap: '8px',
           zIndex: 30,
         }}
       >
         {tiers.map((tier, idx) => {
           const isTargetTier = idx === targetTierIndex;
-          const rowDelay = idx * 0.06;
+          const rowDelay = idx * 0.05;
           const rowSpring = closedFormSpring(sceneLocalTime - rowDelay, 160, 24);
 
           return (
@@ -222,21 +251,22 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
               key={tier.grade}
               style={{
                 display: 'flex',
-                height: isLandscape ? '68px' : '62px',
-                borderRadius: '16px',
-                backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                border: `1.5px solid ${isTargetTier ? tier.color : 'rgba(255,255,255,0.08)'}`,
-                boxShadow: isTargetTier ? `0 0 25px ${tier.color}44` : 'none',
+                height: isLandscape ? '64px' : '58px',
+                borderRadius: '14px',
+                backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                border: `1.5px solid ${isTargetTier && dropSpring >= 0.8 ? tier.color : 'rgba(255,255,255,0.08)'}`,
+                boxShadow: isTargetTier && dropSpring >= 0.8 ? `0 0 25px ${tier.color}55` : 'none',
                 overflow: 'hidden',
                 transform: `translateX(${(1 - rowSpring) * -40}px)`,
                 opacity: rowSpring,
                 position: 'relative',
+                backdropFilter: 'blur(10px)',
               }}
             >
               {/* Grade Header Column */}
               <div
                 style={{
-                  width: '74px',
+                  width: '70px',
                   backgroundColor: tier.color,
                   display: 'flex',
                   alignItems: 'center',
@@ -256,25 +286,28 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
                   flex: 1,
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '0 16px',
-                  gap: '12px',
+                  padding: '0 14px',
+                  gap: '10px',
                   backgroundColor: tier.bgGrad,
                   position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                {tier.grade === 'S' && <SparkleTierBurst frame={frame} primaryColor={tier.color} />}
+                {tier.grade === 'S' && isTargetTier && dropSpring >= 0.8 && (
+                  <SparkleTierBurst frame={frame} primaryColor={tier.color} />
+                )}
 
                 {/* Pre-existing items */}
                 {tier.items.map((item, iIdx) => (
                   <div
                     key={iIdx}
                     style={{
-                      padding: '6px 14px',
-                      borderRadius: '10px',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
                       backgroundColor: 'rgba(0,0,0,0.45)',
                       border: '1px solid rgba(255,255,255,0.1)',
                       color: '#E2E8F0',
-                      fontSize: '15px',
+                      fontSize: '13px',
                       fontWeight: 700,
                     }}
                   >
@@ -282,25 +315,24 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
                   </div>
                 ))}
 
-                {/* Placed Target Item with Gravity Recoil */}
-                {isTargetTier && (
+                {/* Placed Target Item with Gravity Drop */}
+                {isTargetTier && dropSpring >= 0.8 && (
                   <div
                     style={{
-                      padding: '6px 18px',
-                      borderRadius: '10px',
+                      padding: '5px 14px',
+                      borderRadius: '8px',
                       backgroundColor: tier.color,
                       color: '#000000',
-                      fontSize: '16px',
+                      fontSize: '14px',
                       fontWeight: 900,
                       boxShadow: `0 0 16px ${tier.color}`,
-                      transform: `scale(${dropSpring}) translateY(${(1 - dropSpring) * -30}px)`,
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
                     }}
                   >
-                    <span>👑</span>
-                    <span>{placementItem}</span>
+                    <span>🔥</span>
+                    <span>{itemName}</span>
                   </div>
                 )}
               </div>
@@ -309,21 +341,21 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
         })}
       </div>
 
-      {/* ── 4. Floating Flying Card Stage (Before Landing) ── */}
+      {/* ── Floating Preview Card Stage (Before Landing) ── */}
       {dropSpring < 0.8 && (
         <div
           style={{
             position: 'absolute',
-            bottom: isLandscape ? '60px' : '140px',
+            bottom: isLandscape ? '60px' : '150px',
             left: '50%',
-            transform: `translateX(-50%) translateY(${dropSpring * -180}px) scale(${1 - dropSpring * 0.3})`,
-            padding: '16px 36px',
+            transform: `translateX(-50%) translateY(${dropSpring * -160}px) scale(${1 - dropSpring * 0.25})`,
+            padding: '16px 32px',
             borderRadius: '20px',
-            backgroundColor: '#1E293B',
-            border: '2px solid #FACC15',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 35px rgba(250, 204, 21, 0.4)',
+            backgroundColor: '#0F172A',
+            border: `2.5px solid ${accentColor}`,
+            boxShadow: '0 20px 50px rgba(0,0,0,0.85), 0 0 35px rgba(250, 204, 21, 0.45)',
             color: '#FFFFFF',
-            fontSize: '24px',
+            fontSize: '22px',
             fontWeight: 900,
             display: 'flex',
             alignItems: 'center',
@@ -332,24 +364,37 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
           }}
         >
           <span>🎯</span>
-          <span>{placementItem}</span>
+          <span>{itemName}</span>
         </div>
       )}
 
-      {/* ── 5. Watermark Footer ── */}
+      {/* ── Word-Level Synchronized Karaoke Subtitles ── */}
+      <div style={{ position: 'absolute', bottom: isLandscape ? '40px' : '65px', left: 0, right: 0, zIndex: 45 }}>
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      </div>
+
+      {/* ── Watermark Footer ── */}
       {showWatermark && (
         <div
           style={{
             position: 'absolute',
-            bottom: isLandscape ? '16px' : '36px',
+            bottom: isLandscape ? '12px' : '22px',
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             color: '#64748B',
-            fontSize: '14px',
-            fontWeight: 700,
+            fontSize: '13px',
+            fontWeight: 800,
+            letterSpacing: '1px',
+            zIndex: 50,
           }}
         >
           <span style={{ color: primaryColor }}>●</span>
@@ -359,3 +404,65 @@ export const TierListComposition: React.FC<RemotionShortProps> = ({
     </AbsoluteFill>
   );
 };
+
+// ─── Multi-Scene / Composition Wrapper ───────────────────────────────────────
+export const TierListComposition: React.FC<RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    const fallbackScene: SceneSegment = {
+      headline: props.headline || 'INTELIGÊNCIA ARTIFICIAL GERAL',
+      captionText: props.subheadline || 'Atingindo o nível cognitivo supremo que transforma toda a civilização humana.',
+      durationSeconds: 10,
+      targetTier: 'S',
+    } as any;
+    return (
+      <TierListSceneSingle
+        scene={fallbackScene}
+        sceneIndex={0}
+        totalScenes={1}
+        primaryColor={props.primaryColor || '#FF0055'}
+        accentColor={props.accentColor || '#FACC15'}
+        format={props.format || 'vertical'}
+        showWatermark={props.showWatermark}
+        watermarkText={props.watermarkText || 'DARK TIER LIST'}
+      />
+    );
+  }
+
+  let accumulatedFrames = 0;
+  const totalCount = scenes.length;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#090C15' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 10;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`tier_seq_${idx}_${scene.headline || scene.captionText?.slice(0, 10)}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <TierListSceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              totalScenes={totalCount}
+              primaryColor={props.primaryColor || '#FF0055'}
+              accentColor={props.accentColor || '#FACC15'}
+              format={props.format || 'vertical'}
+              showWatermark={props.showWatermark}
+              watermarkText={props.watermarkText || 'DARK TIER LIST'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const TierList = TierListComposition;

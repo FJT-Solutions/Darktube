@@ -5,8 +5,11 @@ import {
   useVideoConfig,
   Img,
   interpolate,
+  Sequence,
+  Audio,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -17,18 +20,6 @@ function createRng(seed: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-// ─── Closed-form spring (pure function of time) ─────────────────────────────
-function closedFormSpring(t: number, k = 170, d = 26): number {
-  if (t <= 0) return 0;
-  const w0 = Math.sqrt(k);
-  const z = d / (2 * w0);
-  if (z < 1) {
-    const wd = w0 * Math.sqrt(1 - z * z);
-    return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t));
-  }
-  return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
 }
 
 // ─── 1. Starfield Warp Particles (Traveling towards camera) ─────────────────
@@ -130,7 +121,7 @@ const OrbitingKeywords: React.FC<{
   frame: number;
   primaryColor: string;
 }> = ({ words, frame, primaryColor }) => {
-  const radius = 320;
+  const radius = 300;
 
   return (
     <div
@@ -161,7 +152,7 @@ const OrbitingKeywords: React.FC<{
               color: '#FFFFFF',
               fontFamily: 'Montserrat, sans-serif',
               fontWeight: 900,
-              fontSize: '18px',
+              fontSize: '16px',
               letterSpacing: '3px',
               textTransform: 'uppercase',
               textShadow: `0 0 12px ${primaryColor}`,
@@ -177,9 +168,22 @@ const OrbitingKeywords: React.FC<{
   );
 };
 
-// ─── Main InfiniteZoom Composition ──────────────────────────────────────────
-export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
+export interface InfiniteZoomSingleProps {
+  scene: SceneSegment;
+  sceneIndex: number;
+  totalScenes: number;
+  primaryColor?: string;
+  accentColor?: string;
+  format?: 'vertical' | 'horizontal';
+  showWatermark?: boolean;
+  watermarkText?: string;
+}
+
+// ─── Single Infinite Zoom Scene View ─────────────────────────────────────────
+export const InfiniteZoomSceneSingle: React.FC<InfiniteZoomSingleProps> = ({
+  scene,
+  sceneIndex,
+  totalScenes,
   primaryColor = '#818CF8', // Futuristic Indigo
   accentColor = '#EC4899',  // Vibrant Pink
   format = 'vertical',
@@ -188,27 +192,8 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
+  const dur = scene.durationSeconds || 10;
   const time = frame / fps;
-
-  // Scene timing resolution
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-  let sceneStartFrame = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 5;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      sceneStartFrame = Math.round(accumulatedTime * fps);
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 5;
   const isLandscape = format === 'horizontal' || width > height;
 
   // Seamless Exponential Portal Loop
@@ -218,7 +203,6 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
   // 6 Concentric Rings with logarithmic scale progression
   const rings = [0, 1, 2, 3, 4, 5].map((index) => {
     const prog = (loopProgress + index * (1 / 6)) % 1;
-    // Exponential scale from 0.08 to 12.0
     const scale = Math.pow(10, prog * 2.2 - 1.1);
     const opacity = Math.sin(Math.PI * prog);
     const hueShift = (index * 45 + frame * 0.8) % 360;
@@ -230,8 +214,10 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
   const vortexRot = frame * 1.5;
 
   // Keywords orbiting
-  const keywords = ['DIMENSÃO', 'PORTAL', 'SINGULARIDADE', 'FRACTAL', 'INFINITO'];
-  const caption = currentScene.captionText || 'VIAJANDO ALÉM DOS LIMITES DA REALIDADE CONHECIDA';
+  const rawKeywords = (scene as any).keywords || (scene.letteringLines ? scene.letteringLines.map(l => l.text) : null);
+  const keywords = rawKeywords && rawKeywords.length > 0 ? rawKeywords : ['SINGULARIDADE', 'FRACTAL', 'HORIZONTE', 'DIMENSÃO'];
+
+  const caption = scene.headline || (scene as any).title || scene.captionText || 'VIAJANDO ALÉM DOS LIMITES CONHECIDOS';
 
   return (
     <AbsoluteFill
@@ -256,6 +242,9 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
 
       {/* Starfield Particles traveling toward viewer */}
       <StarfieldWarp frame={frame} primaryColor={primaryColor} />
+
+      {/* Audio narration */}
+      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── 2. Concentric Portal Rings & Fractal Shards ── */}
       <AbsoluteFill
@@ -285,7 +274,7 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
               }}
             >
               {/* Picture-in-Picture artwork layer */}
-              {currentScene.imageUrl && (
+              {scene.imageUrl && (
                 <div
                   style={{
                     position: 'absolute',
@@ -296,7 +285,7 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
                   }}
                 >
                   <Img
-                    src={currentScene.imageUrl}
+                    src={scene.imageUrl}
                     style={{
                       width: '100%',
                       height: '100%',
@@ -354,46 +343,35 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
       <div
         style={{
           position: 'absolute',
-          bottom: isLandscape ? '60px' : '110px',
+          top: isLandscape ? '24px' : '52px',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '88%',
-          maxWidth: '820px',
-          textAlign: 'center',
+          display: 'inline-block',
+          padding: '6px 18px',
+          borderRadius: '999px',
+          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+          border: `1.5px solid ${primaryColor}`,
+          color: '#FFFFFF',
+          fontSize: '12px',
+          fontWeight: 900,
+          letterSpacing: '2.5px',
+          textTransform: 'uppercase',
+          backdropFilter: 'blur(8px)',
           zIndex: 50,
         }}
       >
-        <div
-          style={{
-            display: 'inline-block',
-            padding: '6px 18px',
-            borderRadius: '999px',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            border: `1.5px solid ${primaryColor}`,
-            color: '#FFFFFF',
-            fontSize: '12px',
-            fontWeight: 900,
-            letterSpacing: '2.5px',
-            textTransform: 'uppercase',
-            marginBottom: '12px',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          HYPERLOOP ENGINE // 4D
-        </div>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: isLandscape ? '32px' : '36px',
-            fontWeight: 900,
-            color: '#FFFFFF',
-            lineHeight: 1.25,
-            textShadow: '0 4px 20px rgba(0,0,0,0.9), 0 0 30px rgba(129, 140, 248, 0.5)',
-            letterSpacing: '-0.5px',
-          }}
-        >
-          {caption}
-        </h2>
+        PORTAL VÓRTICE • ETAPA {sceneIndex + 1}/{totalScenes}
+      </div>
+
+      {/* ── Word-Level Synchronized Karaoke Subtitles ── */}
+      <div style={{ position: 'absolute', bottom: isLandscape ? '45px' : '75px', left: 0, right: 0, zIndex: 45 }}>
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
       </div>
 
       {/* ── 5. Brand Watermark ── */}
@@ -401,7 +379,7 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: isLandscape ? '24px' : '48px',
+            bottom: isLandscape ? '14px' : '22px',
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
@@ -421,3 +399,64 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = ({
     </AbsoluteFill>
   );
 };
+
+// ─── Multi-Scene / Composition Wrapper ───────────────────────────────────────
+export const InfiniteZoomComposition: React.FC<RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    const fallbackScene: SceneSegment = {
+      headline: props.headline || 'A SINGULARIDADE DO TEMPO',
+      captionText: props.subheadline || 'Mergulhando pelas camadas cósmicas do hiperespaço.',
+      durationSeconds: 10,
+    } as any;
+    return (
+      <InfiniteZoomSceneSingle
+        scene={fallbackScene}
+        sceneIndex={0}
+        totalScenes={1}
+        primaryColor={props.primaryColor || '#818CF8'}
+        accentColor={props.accentColor || '#EC4899'}
+        format={props.format || 'vertical'}
+        showWatermark={props.showWatermark}
+        watermarkText={props.watermarkText || 'INFINITE PORTAL'}
+      />
+    );
+  }
+
+  let accumulatedFrames = 0;
+  const totalCount = scenes.length;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#020308' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 10;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`zoom_seq_${idx}_${scene.headline || scene.captionText?.slice(0, 10)}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <InfiniteZoomSceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              totalScenes={totalCount}
+              primaryColor={props.primaryColor || '#818CF8'}
+              accentColor={props.accentColor || '#EC4899'}
+              format={props.format || 'vertical'}
+              showWatermark={props.showWatermark}
+              watermarkText={props.watermarkText || 'INFINITE PORTAL'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const InfiniteZoom = InfiniteZoomComposition;

@@ -5,8 +5,11 @@ import {
   useVideoConfig,
   Img,
   interpolate,
+  Sequence,
+  Audio,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -37,12 +40,12 @@ const DangerMeter: React.FC<{ dangerLevel: number; springP: number }> = ({
   springP,
 }) => {
   const bars = 10;
-  const activeBars = Math.round(dangerLevel * springP);
+  const activeBars = Math.round(dangerLevel * Math.min(1, springP));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 800, color: '#94A3B8' }}>
-        <span>NÍVEL DE PERIGO</span>
+        <span style={{ letterSpacing: '1px' }}>NÍVEL DE AMEAÇA</span>
         <span style={{ color: activeBars > 7 ? '#EF4444' : '#F59E0B' }}>{activeBars}/10</span>
       </div>
       <div style={{ display: 'flex', gap: '4px', height: '8px' }}>
@@ -77,8 +80,6 @@ const SpookyFogOverlay: React.FC<{ frame: number; primaryColor: string }> = ({
       x: 10 + r() * 80,
       y: 20 + r() * 60,
       radius: 140 + r() * 180,
-      speedX: (r() - 0.5) * 0.4,
-      speedY: (r() - 0.5) * 0.3,
     }));
   }, []);
 
@@ -108,9 +109,22 @@ const SpookyFogOverlay: React.FC<{ frame: number; primaryColor: string }> = ({
   );
 };
 
-// ─── Main DarkFactCard Composition ──────────────────────────────────────────
-export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
+export interface DarkFactCardSingleProps {
+  scene: SceneSegment;
+  sceneIndex: number;
+  totalScenes: number;
+  primaryColor?: string;
+  accentColor?: string;
+  format?: 'vertical' | 'horizontal';
+  showWatermark?: boolean;
+  watermarkText?: string;
+}
+
+// ─── Single Fact Card Scene View ────────────────────────────────────────────
+export const DarkFactCardSceneSingle: React.FC<DarkFactCardSingleProps> = ({
+  scene,
+  sceneIndex,
+  totalScenes,
   primaryColor = '#DC2626', // Blood Crimson Red
   accentColor = '#FACC15',
   format = 'vertical',
@@ -119,27 +133,9 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const time = frame / fps;
-
-  // Scene timing resolution
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-  let sceneStartFrame = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 5;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      sceneStartFrame = Math.round(accumulatedTime * fps);
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 5;
+  const dur = scene.durationSeconds || 10;
+  const totalFrames = Math.max(30, Math.round(dur * fps));
+  const sceneLocalTime = frame / fps;
   const isLandscape = format === 'horizontal' || width > height;
 
   // Card Animation Dynamics
@@ -148,9 +144,17 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
   const cardTranslateY = (1 - enterSpring) * 60;
 
   // Fact Text & Metadata
-  const factNumber = String(activeSceneIndex + 1).padStart(2, '0');
-  const factText = currentScene.captionText || 'Mais de 80% dos oceanos continuam completamente inexplorados e habitados por espécies desconhecidas.';
-  const words = currentScene.words || [];
+  const factNumber = String(sceneIndex + 1).padStart(2, '0');
+  const factHeadline = scene.headline || (scene as any).title || (scene.letteringLines?.[0]?.text) || 'FATO REVELADO';
+  const factText = scene.captionText || 'Arquivo secreto desclassificado das operações submarinas.';
+  const words = scene.words || [];
+  const dangerLevel = typeof (scene as any).dangerLevel === 'number' ? (scene as any).dangerLevel : 8;
+
+  // Background subtle zoom
+  const bgScale = interpolate(frame, [0, totalFrames], [1.02, 1.14], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   return (
     <AbsoluteFill
@@ -160,13 +164,30 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
         fontFamily: 'Montserrat, Inter, sans-serif',
       }}
     >
-      {/* ── 1. Spooky Fog and Deep Gradient ── */}
+      {/* ── Background Image / Atmosphere ── */}
+      {scene.imageUrl ? (
+        <AbsoluteFill style={{ overflow: 'hidden' }}>
+          <Img
+            src={scene.imageUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: `scale(${bgScale})`,
+              filter: 'brightness(0.28) contrast(1.15) saturate(1.1)',
+            }}
+          />
+        </AbsoluteFill>
+      ) : null}
+
+      {/* ── Spooky Fog and Deep Gradient ── */}
       <AbsoluteFill
         style={{
           background: `
             radial-gradient(circle at 50% 35%, ${primaryColor}26 0%, transparent 65%),
             radial-gradient(circle at 20% 80%, #0B1120 0%, #04060A 100%)
           `,
+          opacity: scene.imageUrl ? 0.8 : 1,
         }}
       />
 
@@ -175,12 +196,15 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
       {/* Screen Vignette Border */}
       <AbsoluteFill
         style={{
-          boxShadow: 'inset 0 0 100px rgba(0,0,0,0.85)',
+          boxShadow: 'inset 0 0 120px rgba(0,0,0,0.9)',
           pointerEvents: 'none',
         }}
       />
 
-      {/* ── 2. Top Header Category Badge ── */}
+      {/* Audio narration */}
+      {scene.audioUrl && <Audio src={scene.audioUrl} />}
+
+      {/* ── Top Header Category Badge ── */}
       <div
         style={{
           position: 'absolute',
@@ -202,7 +226,7 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
             gap: '8px',
             padding: '6px 16px',
             borderRadius: '999px',
-            backgroundColor: 'rgba(220, 38, 38, 0.15)',
+            backgroundColor: 'rgba(220, 38, 38, 0.18)',
             border: `1.5px solid ${primaryColor}`,
             color: '#F87171',
             fontWeight: 900,
@@ -211,15 +235,15 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
           }}
         >
           <span>👁️</span>
-          <span>FATO OBSCURO #{factNumber}</span>
+          <span>FATO OBSCURO #{factNumber}/{totalScenes}</span>
         </div>
 
-        <div style={{ color: '#64748B', fontSize: '13px', fontWeight: 700 }}>
-          CLASSIFICADO // CONFIDENCIAL
+        <div style={{ color: '#94A3B8', fontSize: '13px', fontWeight: 800, letterSpacing: '1px' }}>
+          {scene.badgeText || (scene as any).badge || 'CLASSIFICADO // NÍVEL 5'}
         </div>
       </div>
 
-      {/* ── 3. Central Fact Card Container ── */}
+      {/* ── Central Fact Card Container ── */}
       <AbsoluteFill
         style={{
           display: 'flex',
@@ -235,61 +259,61 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
             width: isLandscape ? '70%' : '90%',
             maxWidth: '840px',
             borderRadius: '32px',
-            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-            border: '2px solid rgba(255,255,255,0.08)',
-            boxShadow: `0 25px 70px rgba(0,0,0,0.9), 0 0 40px ${primaryColor}22`,
-            padding: isLandscape ? '36px 40px' : '36px 28px',
+            backgroundColor: 'rgba(15, 23, 42, 0.88)',
+            border: '2px solid rgba(255,255,255,0.1)',
+            boxShadow: `0 25px 70px rgba(0,0,0,0.92), 0 0 40px ${primaryColor}26`,
+            padding: isLandscape ? '36px 40px' : '32px 26px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px',
+            gap: '20px',
             transform: `translateY(${cardTranslateY}px) scale(${cardScale})`,
             opacity: enterSpring,
             backdropFilter: 'blur(16px)',
             position: 'relative',
           }}
         >
-          {/* Top of Card: Emoji Spotlight */}
+          {/* Top of Card: Threat Spotlight */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div
               style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '20px',
-                backgroundColor: 'rgba(220, 38, 38, 0.2)',
+                width: '60px',
+                height: '60px',
+                borderRadius: '18px',
+                backgroundColor: 'rgba(220, 38, 38, 0.22)',
                 border: `1.5px solid ${primaryColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '32px',
+                fontSize: '30px',
                 boxShadow: `0 0 20px ${primaryColor}44`,
               }}
             >
               ⚠️
             </div>
             <div>
-              <span style={{ fontSize: '14px', color: '#EF4444', fontWeight: 800, letterSpacing: '1px' }}>
-                ALERTA DE SEGURANÇA
+              <span style={{ fontSize: '13px', color: '#EF4444', fontWeight: 900, letterSpacing: '1.5px' }}>
+                ALERTA CONFIDENCIAL
               </span>
               <h3 style={{ margin: 0, fontSize: '22px', color: '#FFFFFF', fontWeight: 800 }}>
-                {currentScene.letteringLines?.[0]?.text || 'VOCÊ SABIA DISSO?'}
+                {factHeadline}
               </h3>
             </div>
           </div>
 
-          {/* Main Fact Text with Word-by-word Highlight or Text */}
-          <div style={{ minHeight: '120px' }}>
+          {/* Main Fact Text with Word-by-word Highlight inside Card */}
+          <div style={{ minHeight: '110px' }}>
             {words.length > 0 ? (
-              <p style={{ margin: 0, fontSize: isLandscape ? '28px' : '26px', lineHeight: 1.45, fontWeight: 700 }}>
+              <p style={{ margin: 0, fontSize: isLandscape ? '28px' : '25px', lineHeight: 1.45, fontWeight: 700 }}>
                 {words.map((w, wIdx) => {
-                  const isWordActive = time >= w.startInSeconds && time <= w.endInSeconds;
-                  const isPassed = time > w.endInSeconds;
+                  const isWordActive = sceneLocalTime >= w.startInSeconds && sceneLocalTime <= w.endInSeconds;
+                  const isPassed = sceneLocalTime > w.endInSeconds;
 
                   return (
                     <span
                       key={wIdx}
                       style={{
                         color: isWordActive ? '#FACC15' : isPassed ? '#FFFFFF' : '#64748B',
-                        backgroundColor: isWordActive ? 'rgba(250, 204, 21, 0.18)' : 'transparent',
+                        backgroundColor: isWordActive ? 'rgba(250, 204, 21, 0.2)' : 'transparent',
                         padding: isWordActive ? '2px 4px' : '0',
                         borderRadius: '4px',
                         fontWeight: isWordActive ? 900 : 700,
@@ -308,7 +332,7 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
               <p
                 style={{
                   margin: 0,
-                  fontSize: isLandscape ? '28px' : '26px',
+                  fontSize: isLandscape ? '28px' : '25px',
                   lineHeight: 1.45,
                   fontWeight: 700,
                   color: '#FFFFFF',
@@ -320,12 +344,12 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
           </div>
 
           {/* Danger Meter Indicator */}
-          <DangerMeter dangerLevel={8} springP={enterSpring} />
+          <DangerMeter dangerLevel={dangerLevel} springP={enterSpring} />
 
           {/* Footer Citation */}
           <div
             style={{
-              paddingTop: '16px',
+              paddingTop: '14px',
               borderTop: '1px solid rgba(255,255,255,0.08)',
               display: 'flex',
               justifyContent: 'space-between',
@@ -334,33 +358,106 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = ({
               color: '#64748B',
             }}
           >
-            <span>Fonte: Arquivos Desclassificados (Doc #492-B)</span>
-            <span style={{ color: '#FACC15' }}>CONFIRMADO ✓</span>
+            <span>Fonte: Registro de Inteligência #{1000 + sceneIndex * 147}</span>
+            <span style={{ color: '#FACC15', fontWeight: 800 }}>VERIFICADO ✓</span>
           </div>
         </div>
       </AbsoluteFill>
 
-      {/* ── 4. Swipe for More CTA ── */}
+      {/* ── Word-Level Synchronized Karaoke Subtitles (Floating bottom) ── */}
+      <div style={{ position: 'absolute', bottom: isLandscape ? '35px' : '55px', left: 0, right: 0, zIndex: 45 }}>
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      </div>
+
+      {/* ── Watermark Footer ── */}
       {showWatermark && (
         <div
           style={{
             position: 'absolute',
-            bottom: isLandscape ? '20px' : '36px',
+            bottom: isLandscape ? '12px' : '20px',
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            color: '#94A3B8',
-            fontSize: '14px',
+            color: '#64748B',
+            fontSize: '13px',
             fontWeight: 800,
             letterSpacing: '1px',
+            zIndex: 50,
           }}
         >
-          <span>ARRASTE PARA O PRÓXIMO FATO</span>
-          <span style={{ animation: 'bounce 1s infinite' }}>▲</span>
+          <span style={{ color: primaryColor }}>●</span>
+          <span>{watermarkText}</span>
         </div>
       )}
     </AbsoluteFill>
   );
 };
+
+// ─── Multi-Scene / Composition Wrapper ───────────────────────────────────────
+export const DarkFactCardComposition: React.FC<RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    const fallbackScene: SceneSegment = {
+      headline: props.headline || 'O VÁCUO DO ESPAÇO PROFUNDO',
+      captionText: props.subheadline || 'A cada segundo, buracos negros supermassivos devoram sistemas inteiros em silêncio.',
+      durationSeconds: 10,
+    } as any;
+    return (
+      <DarkFactCardSceneSingle
+        scene={fallbackScene}
+        sceneIndex={0}
+        totalScenes={1}
+        primaryColor={props.primaryColor || '#DC2626'}
+        accentColor={props.accentColor || '#FACC15'}
+        format={props.format || 'vertical'}
+        showWatermark={props.showWatermark}
+        watermarkText={props.watermarkText || 'ARQUIVO CONFIDENCIAL'}
+      />
+    );
+  }
+
+  let accumulatedFrames = 0;
+  const totalCount = scenes.length;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#04060A' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 10;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`darkfact_seq_${idx}_${scene.headline || scene.captionText?.slice(0, 10)}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <DarkFactCardSceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              totalScenes={totalCount}
+              primaryColor={props.primaryColor || '#DC2626'}
+              accentColor={props.accentColor || '#FACC15'}
+              format={props.format || 'vertical'}
+              showWatermark={props.showWatermark}
+              watermarkText={props.watermarkText || 'ARQUIVO CONFIDENCIAL'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const DarkFactCard = DarkFactCardComposition;

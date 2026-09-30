@@ -1,7 +1,0 @@
-src/
-.github/
-docs/
-.gitignore
-.prettierrc
-tsconfig.json
-CONTRIBUTING.md
