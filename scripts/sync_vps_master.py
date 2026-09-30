@@ -16,7 +16,7 @@ c.connect(HOST, port=22, username=USER, password=PASS, timeout=15)
 
 script = """
 set -e
-echo "=== Updating /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code ==="
+echo "=== 1. Atualizando repositório Git no host VPS ==="
 cd /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code
 git reset --hard
 git clean -fd
@@ -25,32 +25,32 @@ git checkout master
 git pull origin master
 git log -1 --oneline
 
-CID=$(docker ps -q -f name=n8n-remotionservice | head -n1)
-echo "Active Remotion Container ID: $CID"
+echo "=== 2. Copiando código para TODOS os containers Remotion em execução ==="
+RUNNING_CIDS=$(docker ps --filter "name=n8n-remotionservice" --filter "status=running" -q)
 
-echo "=== Syncing remotion files from host repo to running container ==="
-docker cp /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code/remotion/. $CID:/app/remotion/
-docker cp /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code/scripts/remotion-server/server.js $CID:/app/scripts/remotion-server/server.js || true
-docker cp /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code/scripts/remotion-server/server.js $CID:/app/server.js || true
-
-echo "=== Restarting container to apply updated server.js and pre-bundle ==="
-docker restart $CID
+for CID in $RUNNING_CIDS; do
+  echo "Sincronizando container $CID..."
+  docker cp /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code/remotion/. $CID:/app/remotion/
+  docker cp /etc/dokploy/applications/n8n-remotionservice-ry6eh9/code/scripts/remotion-server/server.js $CID:/app/server.js
+  
+  echo "Disparando /rebundle no container $CID..."
+  docker exec $CID curl -s -X POST http://127.0.0.1:3001/rebundle
+  echo ""
+done
 """
 
-stdin, stdout, stderr = c.exec_command(script, timeout=120)
+stdin, stdout, stderr = c.exec_command(script, timeout=180)
 print(stdout.read().decode('utf-8', errors='replace'))
 print("ERR:", stderr.read().decode('utf-8', errors='replace'))
 
-print("Aguardando bundle pré-compilar no container (45s)...", flush=True)
-time.sleep(30)
-
+print("\nAguardando confirmação de saúde do bundle...", flush=True)
 for attempt in range(15):
-    time.sleep(4)
-    stdin, stdout, stderr = c.exec_command("docker exec $(docker ps -q -f name=n8n-remotionservice | head -n1) curl -s http://127.0.0.1:3001/health")
+    time.sleep(3)
+    stdin, stdout, stderr = c.exec_command("docker exec $(docker ps --filter 'name=n8n-remotionservice' --filter 'status=running' -q | head -n1) curl -s http://127.0.0.1:3001/health")
     health = stdout.read().decode('utf-8').strip()
-    print(f"  Attempt {attempt+1}: {health}", flush=True)
+    print(f"  Tentativa {attempt+1}: {health}", flush=True)
     if '"bundled":true' in health:
-        print("\n✅ Remotion Service pronto e bundle compilado!", flush=True)
+        print("\n✅ Bundle Remotion pronto para renderização!", flush=True)
         break
 
 c.close()

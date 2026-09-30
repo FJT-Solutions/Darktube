@@ -5,9 +5,17 @@ import {
   spring,
   useCurrentFrame,
   useVideoConfig,
+  Sequence,
   Img,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
+
+export interface VHSNoirProps extends RemotionShortProps {
+  timestamp?: string;
+  scene?: SceneSegment;
+  sceneIndex?: number;
+}
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -183,27 +191,23 @@ const TapeCounter: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =
   );
 };
 
-// ─── Film Grain Heavy ───────────────────────────────────────────────────────
-const HeavyGrain: React.FC<{ frame: number }> = ({ frame }) => {
-  // Using SVG noise filter for procedural grain
+// ─── Fast Film Grain (Optimized for Software Rasterizer) ──────────────────
+const FastFilmGrain: React.FC<{ frame: number }> = ({ frame }) => {
+  const shiftX = (frame * 19) % 100;
+  const shiftY = (frame * 31) % 100;
   return (
-    <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 48, mixBlendMode: 'overlay' }}>
-      <svg width="100%" height="100%">
-        <defs>
-          <filter id="vhs-grain">
-            <feTurbulence
-              type="fractalNoise"
-              baseFrequency="0.65"
-              numOctaves="3"
-              stitchTiles="stitch"
-              seed={frame % 60}
-            />
-            <feColorMatrix type="saturate" values="0" />
-          </filter>
-        </defs>
-        <rect width="100%" height="100%" filter="url(#vhs-grain)" opacity="0.12" />
-      </svg>
-    </AbsoluteFill>
+    <AbsoluteFill
+      style={{
+        pointerEvents: 'none',
+        zIndex: 48,
+        opacity: 0.12,
+        backgroundImage:
+          'radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), radial-gradient(rgba(0,0,0,0.6) 1px, transparent 1px)',
+        backgroundSize: '4px 4px, 3px 3px',
+        backgroundPosition: `${shiftX}px ${shiftY}px, ${-shiftX}px ${-shiftY}px`,
+        mixBlendMode: 'overlay',
+      }}
+    />
   );
 };
 
@@ -239,42 +243,28 @@ const HorizontalWarp: React.FC<{ frame: number }> = ({ frame }) => {
  *
  * Para: Horror, nostalgia, mistério, darkwave, 80s/90s.
  * Inclui: RGB split (chromatic aberration), tracking lines,
- * film grain pesado, date overlay estilo camcorder, color bleed,
+ * film grain rápido, date overlay estilo camcorder, color bleed,
  * flicker de luminosidade, head switching noise, warping horizontal,
- * Play/Pause/Rewind HUD, tape counter.
+ * Play/Pause/Rewind HUD, tape counter, karaoke captions.
  */
-export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
+export const VHSNoirSceneSingle: React.FC<VHSNoirProps> = ({
+  scene,
+  sceneIndex = 0,
   primaryColor = '#FF0040',
   accentColor = '#FFFFFF',
   format = 'vertical',
+  timestamp,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const time = frame / fps;
-
   const isVertical = format === 'vertical';
 
-  // Find active scene
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 5;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 5;
+  const durSec = scene?.durationSeconds || 5;
+  const durFrames = Math.max(30, Math.round(durSec * fps));
+  const progress = Math.min(1, Math.max(0, frame / durFrames));
 
   // ── Luminosity flicker ──
-  const rng = createRng(frame * 7 + 42);
+  const rng = createRng(frame * 7 + 42 + sceneIndex * 13);
   const flickerBase = 0.85 + rng() * 0.15;
   const heavyFlicker = rng() > 0.95 ? 0.6 + rng() * 0.3 : flickerBase;
 
@@ -282,24 +272,19 @@ export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
   const colorTemp = `sepia(${0.15 + Math.sin(frame * 0.05) * 0.05}) saturate(${1.1 + Math.sin(frame * 0.03) * 0.15}) contrast(${1.05 + Math.sin(frame * 0.07) * 0.05})`;
 
   // ── Ken Burns slow drift ──
-  const scale = 1.05 + (sceneLocalTime / dur) * 0.06;
-  const panX = Math.sin(sceneLocalTime * 0.3) * 8;
-  const panY = (sceneLocalTime / dur) * -15;
+  const scale = 1.05 + progress * 0.07;
+  const panX = Math.sin((frame / fps) * 0.25) * 8;
+  const panY = progress * -15;
 
   // ── Text entrance ──
   const textEnter = spring({
-    frame: Math.max(0, Math.floor(sceneLocalTime * fps) - 8),
+    frame: Math.max(0, frame - 8),
     fps,
     config: { damping: 16, stiffness: 100 },
   });
 
-  const text = currentScene.captionText || '';
-
-  // Generate VHS date
-  const vhsDate = `JAN.15.1997  ${String(Math.floor(time / 3600)).padStart(2, '0')}:${String(Math.floor((time % 3600) / 60)).padStart(2, '0')}`;
-
-  // ── Play icon state ──
-  const isPlaying = true;
+  const headline = scene?.headline || (scene as any)?.title || '';
+  const vhsDate = timestamp || (scene as any)?.timestamp || `JAN.15.1997  03:${String(42 + sceneIndex * 2).padStart(2, '0')}`;
 
   return (
     <AbsoluteFill
@@ -309,25 +294,13 @@ export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
         fontFamily: "'VCR OSD Mono', 'Courier New', monospace",
       }}
     >
-      {/* SVG filters for channel separation */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
-        <defs>
-          <filter id="vhs-red">
-            <feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" />
-          </filter>
-          <filter id="vhs-blue">
-            <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" />
-          </filter>
-        </defs>
-      </svg>
-
       {/* ── MAIN CONTENT with RGB Split ── */}
       <AbsoluteFill style={{ filter: colorTemp, opacity: heavyFlicker }}>
         {/* Background Image with Ken Burns */}
-        {currentScene.imageUrl ? (
-          <AbsoluteFill style={{ filter: 'brightness(0.55) contrast(1.3)' }}>
+        {scene?.imageUrl ? (
+          <AbsoluteFill style={{ filter: 'brightness(0.6) contrast(1.25)' }}>
             <Img
-              src={currentScene.imageUrl}
+              src={scene.imageUrl}
               style={{
                 width: '100%',
                 height: '100%',
@@ -352,49 +325,44 @@ export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
           }}
         />
 
-        {/* ── TEXT CONTENT ── */}
-        <AbsoluteFill
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'flex-end',
-            padding: isVertical ? '120px 40px' : '80px 50px',
-            zIndex: 10,
-          }}
-        >
+        {/* Headline Badge if provided */}
+        {headline && (
           <div
             style={{
-              transform: `translateY(${(1 - textEnter) * 25}px)`,
+              position: 'absolute',
+              top: isVertical ? '130px' : '65px',
+              left: '25px',
+              right: '25px',
+              textAlign: 'center',
+              zIndex: 20,
+              transform: `translateY(${(1 - textEnter) * 20}px)`,
               opacity: textEnter,
             }}
           >
-            {/* Distorted caption with VHS aesthetic */}
-            <h1
+            <span
               style={{
-                fontSize: isVertical ? '44px' : '38px',
-                fontWeight: 900,
-                lineHeight: 1.2,
-                color: accentColor,
-                margin: 0,
-                textShadow: `
-                  3px 0 ${primaryColor},
-                  -2px 0 rgba(0, 100, 255, 0.6),
-                  0 0 20px rgba(255, 255, 255, 0.15)
-                `,
-                fontFamily: "'Inter', sans-serif",
+                display: 'inline-block',
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                border: `1.5px solid ${primaryColor}`,
+                padding: '6px 18px',
+                color: '#FFFFFF',
+                fontSize: isVertical ? '15px' : '13px',
+                letterSpacing: '3px',
+                textTransform: 'uppercase',
+                boxShadow: `0 0 15px ${primaryColor}55`,
               }}
             >
-              {text}
-            </h1>
+              {headline}
+            </span>
           </div>
-        </AbsoluteFill>
+        )}
       </AbsoluteFill>
 
       {/* ── VHS OVERLAYS ── */}
       <TrackingLines frame={frame} />
       <HeadSwitchNoise frame={frame} />
       <HorizontalWarp frame={frame} />
-      <HeavyGrain frame={frame} />
+      <FastFilmGrain frame={frame} />
 
       {/* ── Scan lines (subtle) ── */}
       <AbsoluteFill
@@ -405,6 +373,17 @@ export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
           zIndex: 46,
         }}
       />
+
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {scene && (
+        <CaptionLayer
+          scene={scene}
+          captionStyle="retro"
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          format={format}
+        />
+      )}
 
       {/* ── VHS DATE OVERLAY ── */}
       <VHSDateOverlay
@@ -426,7 +405,6 @@ export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
           zIndex: 50,
         }}
       >
-        {/* Play triangle */}
         <div
           style={{
             width: 0,
@@ -475,3 +453,44 @@ export const VHSNoirComposition: React.FC<RemotionShortProps> = ({
     </AbsoluteFill>
   );
 };
+
+export const VHSNoirComposition: React.FC<VHSNoirProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    return <VHSNoirSceneSingle {...props} />;
+  }
+
+  let accumulatedFrames = 0;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#0A0A0A' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 5;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`vhs_seq_${idx}_${scene.captionText?.slice(0, 10) || ''}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <VHSNoirSceneSingle
+              {...props}
+              scene={scene}
+              sceneIndex={idx}
+              primaryColor={props.primaryColor || '#FF0040'}
+              accentColor={props.accentColor || '#FFFFFF'}
+              format={props.format || 'vertical'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const VHSNoir = VHSNoirComposition;
