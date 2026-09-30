@@ -6,6 +6,7 @@ import {
   Img,
   interpolate,
   Easing,
+  Sequence,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
 import { CaptionLayer } from '../CaptionLayer';
@@ -233,6 +234,7 @@ const SpecularFloor: React.FC<{
     >
       {imageUrl ? (
         <Img
+          key={imageUrl}
           src={imageUrl}
           style={{
             width: '100%',
@@ -307,59 +309,51 @@ const FloatingHeroBadge: React.FC<{
   );
 };
 
-// ─── Main HeroShotReveal Component ──────────────────────────────────────────
-export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
-  scenes = [],
-  primaryColor = '#8B5CF6',
-  accentColor = '#06B6D4',
-  format = 'vertical',
-  showWatermark = true,
-  watermarkText = 'DarkTube HeroShot',
+
+// ─── Single HeroShot Scene (isolated within Sequence) ────────────────────────
+const HeroShotSceneSingle: React.FC<{
+  scene: SceneSegment;
+  sceneIndex: number;
+  primaryColor: string;
+  accentColor: string;
+  format: string;
+  showWatermark: boolean;
+  watermarkText: string;
+}> = ({
+  scene,
+  sceneIndex,
+  primaryColor,
+  accentColor,
+  format,
+  showWatermark,
+  watermarkText,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const time = frame / fps;
-
-  // Scene timing resolution
-  let accumulatedTime = 0;
-  let activeSceneIndex = 0;
-  let sceneLocalTime = 0;
-  let sceneStartFrame = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const dur = scenes[i].durationSeconds || 5;
-    if (time >= accumulatedTime && time < accumulatedTime + dur) {
-      activeSceneIndex = i;
-      sceneLocalTime = time - accumulatedTime;
-      sceneStartFrame = Math.round(accumulatedTime * fps);
-      break;
-    }
-    accumulatedTime += dur;
-  }
-
-  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
-  const dur = currentScene.durationSeconds || 5;
+  const dur = scene.durationSeconds || 5;
+  const durFrames = Math.max(30, Math.round(dur * fps));
   const isLandscape = format === 'horizontal' || width > height;
 
   // Keyframe Physics
-  const enterSpring = closedFormSpring(sceneLocalTime, 145, 22);
+  const enterSpring = closedFormSpring(time, 145, 22);
   const revealProgress = Math.min(1, enterSpring);
 
   // Parallax & 3D Tilt Mechanics
   const mouseMockPanX = Math.sin(frame * 0.04) * 4;
   const mouseMockPanY = Math.cos(frame * 0.035) * 3;
   const rotX = (1 - enterSpring) * 18 + mouseMockPanY;
-  const rotY = (1 - enterSpring) * -14 + (sceneLocalTime / dur) * 5 + mouseMockPanX;
+  const rotY = (1 - enterSpring) * -14 + (time / dur) * 5 + mouseMockPanX;
   const cardScale = isLandscape
-    ? 0.85 + enterSpring * 0.15 + (sceneLocalTime / dur) * 0.02
-    : 0.82 + enterSpring * 0.18 + (sceneLocalTime / dur) * 0.025;
+    ? 0.85 + enterSpring * 0.15 + (time / dur) * 0.02
+    : 0.82 + enterSpring * 0.18 + (time / dur) * 0.025;
   const translateY = (1 - enterSpring) * 90;
 
   // Dynamic Border Glow Loop (Rotating angle)
   const borderAngle = (frame * 3.5) % 360;
 
   // Shimmer Reveal Flash traveling across
-  const shimmerPos = interpolate(sceneLocalTime, [0.15, 0.95], [-40, 140], {
+  const shimmerPos = interpolate(time, [0.15, 0.95], [-40, 140], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -369,8 +363,8 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
   const shadowY = 35 + rotX * 3;
   const shadowBlur = 60 + (1 - enterSpring) * 30;
 
-  const captionText = currentScene.captionText || '';
-  const badgeText = currentScene.badgeText || (currentScene.letteringLines?.[0]?.badge) || 'EXCLUSIVE REVEAL';
+  const captionText = scene.captionText || '';
+  const badgeText = scene.badgeText || (scene.letteringLines?.[0]?.badge) || 'EXCLUSIVE REVEAL';
 
   return (
     <AbsoluteFill
@@ -412,7 +406,7 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
 
       {/* ── 4. Specular Floor Reflection ── */}
       <SpecularFloor
-        imageUrl={currentScene.imageUrl}
+        imageUrl={scene.imageUrl}
         primaryColor={primaryColor}
         springP={enterSpring}
         rotX={rotX}
@@ -421,7 +415,7 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
       {/* ── 5. Particle Burst on Reveal Moment ── */}
       <ParticleBurst
         frame={frame}
-        revealFrame={sceneStartFrame + 3}
+        revealFrame={3}
         primaryColor={primaryColor}
         accentColor={accentColor}
       />
@@ -481,14 +475,15 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
             />
 
             {/* Main Visual or Dynamic Artwork */}
-            {currentScene.imageUrl ? (
+            {scene.imageUrl ? (
               <Img
-                src={currentScene.imageUrl}
+                key={scene.imageUrl}
+                src={scene.imageUrl}
                 style={{
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  transform: `scale(${1.08 - (sceneLocalTime / dur) * 0.06})`,
+                  transform: `scale(${1.08 - (time / dur) * 0.06})`,
                   filter: `contrast(1.08) brightness(${0.9 + enterSpring * 0.15})`,
                 }}
               />
@@ -507,7 +502,7 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
                 {/* Fallback procedural emblem */}
                 <svg width="220" height="220" viewBox="0 0 200 200">
                   <polygon
-                    points="100,20 180,65 180,155 100,195 20,155 20,65"
+                    points="100,20 180,65 180,155 100,195 20,65"
                     fill="none"
                     stroke={primaryColor}
                     strokeWidth="3"
@@ -519,60 +514,61 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
                     fill="none"
                     stroke={accentColor}
                     strokeWidth="2"
-                    transform={`rotate(${-frame * 0.8} 100 100)`}
+                    transform={`rotate(${frame * -0.9} 100 100)`}
                   />
-                  <circle cx="100" cy="100" r="28" fill={primaryColor} opacity="0.35" />
-                  <circle cx="100" cy="100" r="14" fill="#FFFFFF" />
                 </svg>
               </div>
             )}
 
-            {/* Shimmer Light Sweep */}
+            {/* Diagonal Shimmer Flash Light Sweep */}
             <div
               style={{
                 position: 'absolute',
-                top: 0,
-                bottom: 0,
+                top: '-40%',
                 left: `${shimmerPos}%`,
-                width: '180px',
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)',
-                transform: 'skewX(-28deg)',
+                width: '120px',
+                height: '180%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent)',
+                transform: 'rotate(25deg)',
                 pointerEvents: 'none',
-                mixBlendMode: 'overlay',
+                filter: 'blur(8px)',
+                zIndex: 4,
               }}
             />
 
-            {/* Bottom Vignette for Typography Contrast */}
+            {/* Gradient Scrim for Typography Legibility */}
             <div
               style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(to top, rgba(3,5,9,0.92) 0%, rgba(3,5,9,0.4) 40%, transparent 75%)',
-                pointerEvents: 'none',
+                background: 'linear-gradient(to top, rgba(5,8,22,0.95) 0%, rgba(5,8,22,0.45) 50%, transparent 80%)',
+                zIndex: 5,
               }}
             />
 
-            {/* Floating Badge in Card Corner */}
-            <FloatingHeroBadge
-              text={badgeText}
-              badgeColor={accentColor}
-              frame={frame}
-              revealFrame={sceneStartFrame}
-            />
+            {/* Floating Cyber Badge */}
+            {badgeText && (
+              <FloatingHeroBadge
+                text={badgeText}
+                badgeColor={accentColor}
+                frame={frame}
+                revealFrame={3}
+              />
+            )}
 
-            {/* Card Content & Title */}
+            {/* Dynamic Typography Layout */}
             <div
               style={{
                 position: 'absolute',
-                bottom: '36px',
-                left: '36px',
-                right: '36px',
-                zIndex: 30,
+                bottom: isLandscape ? '28px' : '36px',
+                left: isLandscape ? '32px' : '40px',
+                right: isLandscape ? '32px' : '40px',
+                zIndex: 10,
               }}
             >
-              {currentScene.letteringLines && currentScene.letteringLines.length > 0 ? (
-                currentScene.letteringLines.map((line, idx) => {
-                  const lineSpring = closedFormSpring(sceneLocalTime - 0.2 - idx * 0.12, 190, 24);
+              {scene.letteringLines && scene.letteringLines.length > 0 ? (
+                scene.letteringLines.map((line, idx) => {
+                  const lineSpring = closedFormSpring(time - idx * 0.12, 160, 20);
                   return (
                     <div
                       key={idx}
@@ -592,7 +588,7 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
                     </div>
                   );
                 })
-              ) : currentScene.headline ? (
+              ) : scene.headline ? (
                 <div
                   style={{
                     fontSize: isLandscape ? '36px' : '48px',
@@ -606,7 +602,7 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
                     transform: `translateY(${(1 - enterSpring) * 25}px)`,
                   }}
                 >
-                  {currentScene.headline}
+                  {scene.headline}
                 </div>
               ) : (
                 <div
@@ -631,47 +627,49 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
 
       {/* ── Word-synced Karaoke Subtitles (Viral Grade 10 Standard) ── */}
       <CaptionLayer
-        scene={currentScene}
+        scene={scene}
         primaryColor={primaryColor}
         accentColor={accentColor}
         format={format}
-        localFrame={Math.round(sceneLocalTime * fps)}
-        durationFrames={Math.round(dur * fps)}
+        localFrame={frame}
+        durationFrames={durFrames}
       />
 
       {/* ── 7. Top & Bottom Cinematographic Accents ── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '38px',
-          left: '42px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          zIndex: 40,
-        }}
-      >
+      {showWatermark && (
         <div
           style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            backgroundColor: primaryColor,
-            boxShadow: `0 0 10px ${primaryColor}`,
-          }}
-        />
-        <span
-          style={{
-            fontSize: '15px',
-            fontWeight: 800,
-            letterSpacing: '2.5px',
-            color: 'rgba(255,255,255,0.7)',
-            textTransform: 'uppercase',
+            position: 'absolute',
+            top: '38px',
+            left: '42px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            zIndex: 40,
           }}
         >
-          {watermarkText}
-        </span>
-      </div>
+          <div
+            style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              backgroundColor: primaryColor,
+              boxShadow: `0 0 10px ${primaryColor}`,
+            }}
+          />
+          <span
+            style={{
+              fontSize: '15px',
+              fontWeight: 800,
+              letterSpacing: '2.5px',
+              color: 'rgba(255,255,255,0.7)',
+              textTransform: 'uppercase',
+            }}
+          >
+            {watermarkText}
+          </span>
+        </div>
+      )}
 
       {/* Subtle Frame Jitter on Trauma/Impact */}
       <div
@@ -683,10 +681,60 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
           color: 'rgba(255,255,255,0.3)',
           fontFamily: 'monospace',
           letterSpacing: '1px',
+          zIndex: 40,
         }}
       >
         HERO_ENGINE // V2.0.4
       </div>
+    </AbsoluteFill>
+  );
+};
+
+// ─── Main HeroShotReveal Multi-Scene Composition ─────────────────────────────
+export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
+  scenes = [],
+  primaryColor = '#8B5CF6',
+  accentColor = '#06B6D4',
+  format = 'vertical',
+  showWatermark = true,
+  watermarkText = 'DarkTube HeroShot',
+}) => {
+  const { fps } = useVideoConfig();
+
+  const safeScenes = scenes.length > 0 ? scenes : [{
+    index: 0,
+    captionText: 'CINEMATIC HERO SHOT REVEAL',
+    durationSeconds: 5,
+  }];
+
+  let accumulatedFrames = 0;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#030509' }}>
+      {safeScenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 5;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`${idx}_${scene.imageUrl || scene.captionText?.slice(0, 10) || ''}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <HeroShotSceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              primaryColor={primaryColor}
+              accentColor={accentColor}
+              format={format}
+              showWatermark={showWatermark}
+              watermarkText={watermarkText}
+            />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };
