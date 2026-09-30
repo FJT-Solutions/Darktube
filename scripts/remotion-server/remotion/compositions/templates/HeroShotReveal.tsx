@@ -56,8 +56,8 @@ const ParticleBurst: React.FC<{
   const rng = createRng(998244353);
   const particles: BurstParticle[] = React.useMemo(() => {
     const r = createRng(88102);
-    return Array.from({ length: 48 }, (_, i) => ({
-      angle: (i / 48) * Math.PI * 2 + (r() - 0.5) * 0.3,
+    return Array.from({ length: 18 }, (_, i) => ({
+      angle: (i / 18) * Math.PI * 2 + (r() - 0.5) * 0.3,
       speed: 120 + r() * 420,
       size: 4 + r() * 8,
       color: r() > 0.4 ? primaryColor : r() > 0.2 ? accentColor : '#FACC15',
@@ -192,9 +192,8 @@ const FragmentAssembly: React.FC<{
               width: '50%',
               height: '40%',
               border: `1.5px solid ${primaryColor}88`,
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              backdropFilter: 'blur(8px)',
-              boxShadow: `0 0 25px ${primaryColor}40`,
+              backgroundColor: 'rgba(15,23,42,0.65)',
+              boxShadow: `0 0 15px ${primaryColor}30`,
               transform: `translate(${currentX}px, ${currentY}px) rotate(${currentRot}deg) scale(${currentScale})`,
               opacity,
               borderRadius: '24px',
@@ -212,53 +211,23 @@ const SpecularFloor: React.FC<{
   primaryColor: string;
   springP: number;
   rotX: number;
-}> = ({ imageUrl, primaryColor, springP, rotX }) => {
+}> = ({ primaryColor, springP, rotX }) => {
   return (
     <div
       style={{
         position: 'absolute',
-        top: '64%',
+        top: '62%',
         left: '50%',
-        width: '84%',
-        maxWidth: '820px',
-        height: '450px',
-        transform: `translateX(-50%) perspective(1200px) rotateX(${Math.max(40, 72 - rotX * 0.5)}deg) scaleY(-1)`,
+        width: '90%',
+        maxWidth: '860px',
+        height: '380px',
+        transform: `translateX(-50%) perspective(1200px) rotateX(${Math.max(45, 75 - rotX * 0.5)}deg)`,
         transformOrigin: 'top center',
-        opacity: springP * 0.35,
-        filter: 'blur(7px)',
+        opacity: springP * 0.45,
         pointerEvents: 'none',
-        overflow: 'hidden',
-        maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)',
-        WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)',
+        background: `radial-gradient(ellipse at 50% 0%, ${primaryColor}55 0%, ${primaryColor}18 50%, transparent 80%)`,
       }}
-    >
-      {imageUrl ? (
-        <Img
-          key={imageUrl}
-          src={imageUrl}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            background: `linear-gradient(135deg, ${primaryColor}66 0%, #111827 100%)`,
-          }}
-        />
-      )}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(to top, #04060A 20%, transparent 80%)',
-        }}
-      />
-    </div>
+    />
   );
 };
 
@@ -299,7 +268,6 @@ const FloatingHeroBadge: React.FC<{
         gap: '8px',
         transform: `translateY(${floatWobble}px) rotate(${rotWobble}deg) scale(${enterSpring})`,
         transformOrigin: 'top right',
-        backdropFilter: 'blur(16px)',
         zIndex: 50,
       }}
     >
@@ -531,7 +499,6 @@ const HeroShotSceneSingle: React.FC<{
                 background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent)',
                 transform: 'rotate(25deg)',
                 pointerEvents: 'none',
-                filter: 'blur(8px)',
                 zIndex: 4,
               }}
             />

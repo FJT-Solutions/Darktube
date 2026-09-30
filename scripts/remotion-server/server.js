@@ -401,7 +401,6 @@ async function handleDarkClipsRender(req, res) {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-software-rasterizer',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
@@ -809,7 +808,6 @@ async function renderAsync(historyId, composition, callbackUrl) {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-software-rasterizer',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
@@ -841,7 +839,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
     });
 
     // Concorrência dinâmica: respeita RENDER_CONCURRENCY (.env) ou payload (padrão: 4, máx: 6)
-    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '4', 10);
+    const rawConcurrency = parseInt(composition.concurrency || process.env.RENDER_CONCURRENCY || '2', 10);
     const concurrency = Math.max(1, Math.min(rawConcurrency, 6));
     console.log(`[Remotion Render] Concorrência ativa: ${concurrency} workers (V8 heap: 8192MB, SHM: 2GB)`);
 
