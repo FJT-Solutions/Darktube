@@ -8,6 +8,7 @@ import {
   Easing,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -591,6 +592,22 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
                     </div>
                   );
                 })
+              ) : currentScene.headline ? (
+                <div
+                  style={{
+                    fontSize: isLandscape ? '36px' : '48px',
+                    fontWeight: 900,
+                    color: '#FFFFFF',
+                    lineHeight: 1.15,
+                    textTransform: 'uppercase',
+                    letterSpacing: '-0.5px',
+                    textShadow: '0 4px 20px rgba(0,0,0,0.95)',
+                    opacity: enterSpring,
+                    transform: `translateY(${(1 - enterSpring) * 25}px)`,
+                  }}
+                >
+                  {currentScene.headline}
+                </div>
               ) : (
                 <div
                   style={{
@@ -611,6 +628,16 @@ export const HeroShotRevealComposition: React.FC<RemotionShortProps> = ({
           </div>
         </div>
       </AbsoluteFill>
+
+      {/* ── Word-synced Karaoke Subtitles (Viral Grade 10 Standard) ── */}
+      <CaptionLayer
+        scene={currentScene}
+        primaryColor={primaryColor}
+        accentColor={accentColor}
+        format={format}
+        localFrame={Math.round(sceneLocalTime * fps)}
+        durationFrames={Math.round(dur * fps)}
+      />
 
       {/* ── 7. Top & Bottom Cinematographic Accents ── */}
       <div
