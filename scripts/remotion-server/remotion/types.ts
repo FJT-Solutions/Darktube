@@ -172,6 +172,9 @@ export interface SceneSegment {
   badgeText?: string;
   badgeColor?: string;
 
+  /** Título principal de destaque da cena */
+  headline?: string;
+
   /** URL do áudio de narração DESTA cena (gerado pelo Edge-TTS) */
   audioUrl?: string;
 
