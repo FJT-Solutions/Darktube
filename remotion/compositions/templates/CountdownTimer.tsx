@@ -6,7 +6,11 @@ import {
   useCurrentFrame,
   useVideoConfig,
   Easing,
+  Sequence,
+  Img,
 } from 'remotion';
+import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -19,7 +23,7 @@ function createRng(seed: number) {
   };
 }
 
-export interface CountdownTimerProps {
+export interface CountdownTimerProps extends RemotionShortProps {
   totalCount?: number;       // e.g. 5 for "Top 5"
   currentNumber?: number;    // which number is currently showing
   label?: string;            // e.g. "5º LUGAR"
@@ -28,6 +32,8 @@ export interface CountdownTimerProps {
   primaryColor?: string;
   urgencyColor?: string;
   format?: 'vertical' | 'horizontal';
+  scene?: SceneSegment;
+  sceneIndex?: number;
 }
 
 // ─── Flip Clock Digit ───────────────────────────────────────────────────────
@@ -288,7 +294,7 @@ const SoundWaveBars: React.FC<{
  * labels de posição, barra lateral de progresso,
  * color shift frio→quente, sound wave bars, urgency pulse.
  */
-export const CountdownTimerScene: React.FC<CountdownTimerProps> = ({
+export const CountdownTimerSceneSingle: React.FC<CountdownTimerProps> = ({
   totalCount = 5,
   currentNumber = 5,
   label = '',
@@ -297,6 +303,8 @@ export const CountdownTimerScene: React.FC<CountdownTimerProps> = ({
   primaryColor = '#00F0FF',
   urgencyColor = '#FF0040',
   format = 'vertical',
+  scene,
+  sceneIndex = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -363,6 +371,28 @@ export const CountdownTimerScene: React.FC<CountdownTimerProps> = ({
         transform: `translateX(${shakeIntensity}px)`,
       }}
     >
+      {/* ── Background image with subtle slow zoom if provided ── */}
+      {scene?.imageUrl && (
+        <AbsoluteFill style={{ opacity: 0.28, overflow: 'hidden' }}>
+          <Img
+            src={scene.imageUrl}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: `scale(${1 + frame * 0.0008})`,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'radial-gradient(circle at center, transparent 20%, rgba(5,8,16,0.92) 90%)',
+            }}
+          />
+        </AbsoluteFill>
+      )}
+
       {/* ── Background gradient (shifts warm) ── */}
       <AbsoluteFill
         style={{
@@ -579,6 +609,66 @@ export const CountdownTimerScene: React.FC<CountdownTimerProps> = ({
 
       {/* ── EXPLOSION PARTICLES (on #1) ── */}
       {isFinale && <ExplosionParticles frame={frame} startFrame={10} color={activeColor} />}
+
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {scene && (
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={activeColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      )}
     </AbsoluteFill>
   );
 };
+
+export const CountdownTimerScene: React.FC<CountdownTimerProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    return <CountdownTimerSceneSingle {...props} />;
+  }
+
+  let accumulatedFrames = 0;
+  const totalCount = scenes.length;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#050810' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 5;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        const currentNum = totalCount - idx;
+
+        return (
+          <Sequence
+            key={`countdown_seq_${idx}_${scene.captionText?.slice(0, 10) || ''}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <CountdownTimerSceneSingle
+              {...props}
+              scene={scene}
+              sceneIndex={idx}
+              totalCount={totalCount}
+              currentNumber={currentNum}
+              label={scene.badgeText || (scene as any).badge || `${currentNum}º LUGAR`}
+              headline={scene.headline || (scene as any).title || props.headline || `TOP ${currentNum}`}
+              subheadline={scene.captionText || props.subheadline}
+              primaryColor={props.primaryColor || '#00F0FF'}
+              urgencyColor={props.urgencyColor || '#FF0040'}
+              format={props.format || 'vertical'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const CountdownTimer = CountdownTimerScene;

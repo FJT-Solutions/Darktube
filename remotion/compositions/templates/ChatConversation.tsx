@@ -5,27 +5,24 @@ import {
   spring,
   useCurrentFrame,
   useVideoConfig,
+  Img,
 } from 'remotion';
+import { SceneSegment, RemotionShortProps } from '../../types';
 
-// ─── Deterministic RNG ──────────────────────────────────────────────────────
-function createRng(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+// ─── Types ──────────────────────────────────────────────────────────────────
 export interface ChatMessage {
   text: string;
   sender: 'left' | 'right';
+  senderName?: string;
+  avatarUrl?: string;
+  imageUrl?: string;
   emoji?: string;
   isVoice?: boolean;
+  durationSeconds?: number;
+  words?: Array<{ word: string; startInSeconds: number; endInSeconds: number }>;
 }
 
-export interface ChatConversationProps {
+export interface ChatConversationProps extends RemotionShortProps {
   messages?: ChatMessage[];
   leftName?: string;
   rightName?: string;
@@ -49,22 +46,25 @@ const TypingIndicator: React.FC<{
     <div
       style={{
         display: 'inline-flex',
+        alignItems: 'center',
         gap: '4px',
-        padding: '12px 18px',
+        padding: '10px 16px',
         backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: '20px 20px 20px 4px',
+        borderRadius: '18px 18px 18px 4px',
+        width: 'fit-content',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
       }}
     >
       {[0, 1, 2].map((i) => (
         <div
           key={i}
           style={{
-            width: '8px',
-            height: '8px',
+            width: '7px',
+            height: '7px',
             borderRadius: '50%',
             backgroundColor: color,
-            opacity: 0.3 + Math.sin(frame * 0.25 + i * 1.2) * 0.4,
-            transform: `translateY(${Math.sin(frame * 0.25 + i * 1.2) * 3}px)`,
+            opacity: 0.35 + Math.sin(frame * 0.3 + i * 1.1) * 0.45,
+            transform: `translateY(${Math.sin(frame * 0.3 + i * 1.1) * 3}px)`,
           }}
         />
       ))}
@@ -74,299 +74,388 @@ const TypingIndicator: React.FC<{
 
 // ─── Voice Message Waveform ─────────────────────────────────────────────────
 const VoiceWaveform: React.FC<{
-  frame: number;
   progress: number;
   color: string;
-}> = ({ frame, progress, color }) => {
-  const rng = createRng(5555);
-  const bars = Array.from({ length: 24 }, (_, i) => ({
-    height: 4 + rng() * 20,
-    active: i / 24 < progress,
-  }));
+}> = ({ progress, color }) => {
+  const bars = [8, 14, 22, 12, 18, 24, 16, 10, 20, 15, 25, 12, 18, 8, 14, 22, 10, 16];
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '8px 0' }}>
-      {/* Play button */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '6px 0' }}>
       <div
         style={{
           width: 0,
           height: 0,
-          borderLeft: '10px solid #FFFFFF',
-          borderTop: '6px solid transparent',
-          borderBottom: '6px solid transparent',
-          marginRight: '10px',
-          opacity: 0.8,
+          borderLeft: '12px solid #FFFFFF',
+          borderTop: '7px solid transparent',
+          borderBottom: '7px solid transparent',
+          marginRight: '12px',
+          opacity: 0.9,
         }}
       />
-      {bars.map((bar, i) => (
+      {bars.map((height, i) => (
         <div
           key={i}
           style={{
             width: '3px',
-            height: `${bar.height}px`,
+            height: `${height}px`,
             borderRadius: '2px',
-            backgroundColor: bar.active ? color : 'rgba(255,255,255,0.2)',
+            backgroundColor: i / bars.length < progress ? color : 'rgba(255,255,255,0.25)',
             transition: 'background-color 0.1s',
           }}
         />
       ))}
-      <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginLeft: '8px' }}>
+      <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px', marginLeft: '10px', fontFamily: 'monospace' }}>
         0:{String(Math.floor(progress * 15)).padStart(2, '0')}
       </span>
     </div>
   );
 };
 
-// ─── Read Receipt ───────────────────────────────────────────────────────────
-const ReadReceipt: React.FC<{
-  status: 'sent' | 'delivered' | 'read';
-  color: string;
-}> = ({ status, color }) => {
-  const checkColor = status === 'read' ? color : 'rgba(255,255,255,0.35)';
+// ─── Read Receipt Checks ────────────────────────────────────────────────────
+const ReadReceipt: React.FC<{ color: string }> = ({ color }) => (
+  <div style={{ display: 'inline-flex', gap: '1px', marginLeft: '6px', verticalAlign: 'middle' }}>
+    <svg width="15" height="10" viewBox="0 0 16 10">
+      <path d="M1 5 L4 8 L10 2" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 5 L8 8 L14 2" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  </div>
+);
 
-  return (
-    <div style={{ display: 'flex', gap: '1px', marginTop: '3px', justifyContent: 'flex-end' }}>
-      <svg width="16" height="10" viewBox="0 0 16 10">
-        <path d="M1 5 L4 8 L10 2" fill="none" stroke={checkColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        {status !== 'sent' && (
-          <path d="M5 5 L8 8 L14 2" fill="none" stroke={checkColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        )}
-      </svg>
-    </div>
-  );
-};
-
-// ─── Emoji Reaction Float ───────────────────────────────────────────────────
-const EmojiReaction: React.FC<{
-  emoji: string;
-  frame: number;
-  startFrame: number;
-}> = ({ emoji, frame, startFrame }) => {
-  const elapsed = frame - startFrame;
-  if (elapsed < 0 || elapsed > 40) return null;
-
-  const progress = elapsed / 40;
-  const y = -progress * 60;
-  const scale = Math.sin(progress * Math.PI);
-  const opacity = 1 - progress;
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: '100%',
-        right: '10px',
-        transform: `translateY(${y}px) scale(${0.5 + scale * 0.8})`,
-        opacity,
-        fontSize: '28px',
-        pointerEvents: 'none',
-      }}
-    >
-      {emoji}
-    </div>
-  );
-};
-
-// ─── Chat Bubble ────────────────────────────────────────────────────────────
+// ─── Chat Bubble Component With Word Karaoke Sync ───────────────────────────
 const ChatBubble: React.FC<{
   message: ChatMessage;
   enterProgress: number;
   frame: number;
-  messageFrame: number;
-  isLast: boolean;
+  messageStartFrame: number;
+  fps: number;
   primaryColor: string;
   appStyle: string;
-}> = ({ message, enterProgress, frame, messageFrame, isLast, primaryColor, appStyle }) => {
+  isLast: boolean;
+}> = ({
+  message,
+  enterProgress,
+  frame,
+  messageStartFrame,
+  fps,
+  primaryColor,
+  appStyle,
+}) => {
   const isRight = message.sender === 'right';
+  const elapsedSeconds = Math.max(0, (frame - messageStartFrame) / fps);
 
-  // Bubble colors based on app style
+  // Bubble colors
   const bubbleColors = {
-    imessage: isRight ? '#007AFF' : '#333333',
+    imessage: isRight ? '#0A84FF' : '#2C2C2E',
     whatsapp: isRight ? '#005C4B' : '#202C33',
-    dark: isRight ? primaryColor + 'CC' : 'rgba(255,255,255,0.1)',
+    dark: isRight ? `${primaryColor}CC` : 'rgba(255,255,255,0.12)',
   };
   const bubbleColor = bubbleColors[appStyle as keyof typeof bubbleColors] || bubbleColors.dark;
 
-  // Voice message progress
-  const voiceProgress = message.isVoice
-    ? interpolate(frame - messageFrame, [0, 60], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
-    : 0;
-
-  // Typewriter for text content
-  const typeChars = Math.min(
-    message.text.length,
-    Math.floor((frame - messageFrame) * 1.2)
-  );
-  const visibleText = message.text.substring(0, typeChars);
+  // Active word index from phonetics/words if present
+  let activeWordIdx = -1;
+  if (message.words && message.words.length > 0) {
+    activeWordIdx = message.words.findIndex(
+      (w) => elapsedSeconds >= w.startInSeconds && elapsedSeconds <= w.endInSeconds
+    );
+  }
 
   return (
     <div
       style={{
         display: 'flex',
-        justifyContent: isRight ? 'flex-end' : 'flex-start',
-        padding: '3px 16px',
-        transform: `translateY(${(1 - enterProgress) * 20}px) scale(${0.9 + enterProgress * 0.1})`,
+        flexDirection: 'column',
+        alignItems: isRight ? 'flex-end' : 'flex-start',
+        padding: '4px 16px',
+        transform: `translateY(${(1 - enterProgress) * 24}px) scale(${0.92 + enterProgress * 0.08})`,
         opacity: enterProgress,
         position: 'relative',
       }}
     >
+      {/* Sender label */}
+      {message.senderName && (
+        <span
+          style={{
+            fontSize: '11px',
+            color: isRight ? primaryColor : 'rgba(255,255,255,0.5)',
+            marginBottom: '3px',
+            marginLeft: isRight ? '0' : '8px',
+            marginRight: isRight ? '8px' : '0',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+          }}
+        >
+          {message.senderName}
+        </span>
+      )}
+
+      {/* Bubble container */}
       <div
         style={{
-          maxWidth: '75%',
+          maxWidth: '82%',
           backgroundColor: bubbleColor,
-          borderRadius: isRight
-            ? '18px 18px 4px 18px'
-            : '18px 18px 18px 4px',
-          padding: message.isVoice ? '10px 16px' : '10px 16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          borderRadius: isRight ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+          padding: '12px 16px',
+          boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(10px)',
           position: 'relative',
         }}
       >
+        {/* Attached image if present */}
+        {message.imageUrl && (
+          <div
+            style={{
+              marginBottom: '8px',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              maxHeight: '180px',
+            }}
+          >
+            <Img
+              src={message.imageUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+              }}
+            />
+          </div>
+        )}
+
+        {/* Voice message waveform or text */}
         {message.isVoice ? (
-          <VoiceWaveform frame={frame} progress={voiceProgress} color={primaryColor} />
+          <VoiceWaveform
+            progress={interpolate(elapsedSeconds, [0, message.durationSeconds || 7], [0, 1], {
+              extrapolateLeft: 'clamp',
+              extrapolateRight: 'clamp',
+            })}
+            color={primaryColor}
+          />
+        ) : message.words && message.words.length > 0 ? (
+          /* Synchronized Karaoke Word Highlighting */
+          <p
+            style={{
+              margin: 0,
+              fontSize: '17px',
+              lineHeight: 1.45,
+              color: '#FFFFFF',
+              fontWeight: 500,
+            }}
+          >
+            {message.words.map((w, wIdx) => {
+              const isPast = elapsedSeconds > w.endInSeconds;
+              const isCurrent = wIdx === activeWordIdx;
+
+              return (
+                <span
+                  key={wIdx}
+                  style={{
+                    color: isCurrent ? '#FFE600' : isPast ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                    fontWeight: isCurrent ? 800 : 500,
+                    textShadow: isCurrent ? '0 0 12px rgba(255,230,0,0.6)' : 'none',
+                    backgroundColor: isCurrent ? 'rgba(255,230,0,0.18)' : 'transparent',
+                    padding: isCurrent ? '1px 3px' : '0',
+                    borderRadius: '3px',
+                    transition: 'color 0.1s, text-shadow 0.1s',
+                  }}
+                >
+                  {w.word}{' '}
+                </span>
+              );
+            })}
+          </p>
         ) : (
-          <p style={{
-            margin: 0,
-            fontSize: '16px',
-            lineHeight: 1.45,
-            color: '#FFFFFF',
-            wordBreak: 'break-word',
-          }}>
-            {visibleText}
-            {typeChars < message.text.length && frame % 12 < 7 && (
-              <span style={{ opacity: 0.5 }}>▌</span>
-            )}
+          /* Standard text */
+          <p
+            style={{
+              margin: 0,
+              fontSize: '17px',
+              lineHeight: 1.45,
+              color: '#FFFFFF',
+              fontWeight: 500,
+            }}
+          >
+            {message.text}
           </p>
         )}
 
-        {/* Time stamp */}
-        <div style={{
-          fontSize: '10px',
-          color: 'rgba(255,255,255,0.45)',
-          textAlign: 'right',
-          marginTop: '4px',
-        }}>
-          {Math.floor(messageFrame / 30) % 12 + 1}:{String(messageFrame % 60).padStart(2, '0')} PM
+        {/* Timestamp & read receipts */}
+        <div
+          style={{
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.45)',
+            textAlign: 'right',
+            marginTop: '5px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <span>{Math.floor(messageStartFrame / 30) % 12 + 1}:{String(messageStartFrame % 60).padStart(2, '0')}</span>
+          {isRight && <ReadReceipt color={appStyle === 'whatsapp' ? '#53BDEB' : primaryColor} />}
         </div>
-
-        {/* Read receipt for right-side messages */}
-        {isRight && typeChars >= message.text.length && (
-          <ReadReceipt status="read" color="#53BDEB" />
-        )}
-
-        {/* Emoji reaction */}
-        {message.emoji && typeChars >= message.text.length && (
-          <EmojiReaction emoji={message.emoji} frame={frame} startFrame={messageFrame + message.text.length} />
-        )}
       </div>
     </div>
   );
 };
 
-/**
- * ChatConversation — Motor de Conversa de Chat
- *
- * Para: Storytime, drama, conversa de WhatsApp/iMessage.
- * Inclui: chat bubbles com typing indicator, delivered/read receipts,
- * emoji reactions flutuantes, voice message waveform,
- * typewriter text reveal, online status dot, timestamps,
- * dark/imessage/whatsapp styles.
- */
+// ─── Main Chat Conversation Component ───────────────────────────────────────
 export const ChatConversationScene: React.FC<ChatConversationProps> = ({
-  messages = [
-    { text: 'Você não vai acreditar no que eu descobri...', sender: 'left' },
-    { text: 'O quê? Me conta agora', sender: 'right' },
-    { text: 'Achei os documentos que provam tudo. Está tudo aqui.', sender: 'left', emoji: '😱' },
-    { text: 'Isso muda TUDO. Precisamos agir rápido.', sender: 'right' },
-    { text: '', sender: 'left', isVoice: true },
-  ],
-  leftName = 'Informante',
-  rightName = 'Você',
-  headline = 'Conversa Interceptada',
+  messages: initialMessages,
+  scenes,
+  leftName = 'Agente Alpha',
+  rightName = 'Comando Central',
+  leftAvatar = '🕵️',
+  rightAvatar = '🛰️',
+  headline = 'COMUNICAÇÃO CRIPTOGRAFADA',
   appStyle = 'dark',
   primaryColor = '#00F0FF',
   format = 'vertical',
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-
   const isVertical = format === 'vertical';
 
-  // ── Header entrance ──
+  // Build messages list: if `scenes` provided, map each scene to a chat dialogue turn
+  let activeMessages: ChatMessage[] = [];
+  if (scenes && scenes.length > 0) {
+    activeMessages = scenes.map((s, idx) => {
+      const isRight = idx % 2 !== 0;
+      return {
+        text: s.captionText || s.headline || '',
+        sender: isRight ? 'right' : 'left',
+        senderName: isRight ? rightName : (s.headline || leftName),
+        imageUrl: s.imageUrl,
+        durationSeconds: s.durationSeconds || 5,
+        words: (s as any).words,
+      };
+    });
+  } else if (initialMessages && initialMessages.length > 0) {
+    activeMessages = initialMessages;
+  } else {
+    activeMessages = [
+      { text: 'Localizamos os dados no servidor primário.', sender: 'left', senderName: leftName },
+      { text: 'Copiem todos os registros imediatamente.', sender: 'right', senderName: rightName },
+      { text: 'A extração foi interceptada. Precisamos de extração agora.', sender: 'left', senderName: leftName },
+    ];
+  }
+
+  // Calculate start frames for each message based on durationSeconds
+  const messageTimings: Array<{ startFrame: number; durationFrames: number; msg: ChatMessage }> = [];
+  let currentAccum = 0;
+  activeMessages.forEach((msg) => {
+    const durSec = msg.durationSeconds || 5;
+    const durFrames = Math.max(30, Math.round(durSec * fps));
+    messageTimings.push({
+      startFrame: currentAccum,
+      durationFrames: durFrames,
+      msg,
+    });
+    currentAccum += durFrames;
+  });
+
+  // Determine which messages are revealed by the current frame
+  const visibleMessages = messageTimings.filter((t) => frame >= t.startFrame);
+  const currentTurn = messageTimings.find((t) => frame >= t.startFrame && frame < t.startFrame + t.durationFrames)
+    || messageTimings[messageTimings.length - 1];
+
+  // Header entrance spring
   const headerEnter = spring({
     frame,
     fps,
     config: { damping: 20, stiffness: 100 },
   });
 
-  // ── Message timing ──
-  const framesPerMessage = 35;
-
-  // ── Find which messages are visible and which is "typing" ──
-  const visibleCount = Math.floor(frame / framesPerMessage) + 1;
-  const isTyping = visibleCount <= messages.length && frame % framesPerMessage < framesPerMessage * 0.3;
-  const nextSender = messages[visibleCount - 1]?.sender || 'left';
-
-  // ── Online status pulse ──
-  const onlinePulse = 0.7 + Math.sin(frame * 0.15) * 0.3;
+  // Typing indicator logic: show for the first 20 frames of each message
+  const isTyping = currentTurn && (frame - currentTurn.startFrame) < Math.min(22, currentTurn.durationFrames * 0.15);
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: appStyle === 'whatsapp' ? '#0B141A' : '#0A0A0F',
+        backgroundColor: appStyle === 'whatsapp' ? '#0B141A' : '#0B0D13',
         overflow: 'hidden',
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* ── Background pattern ── */}
-      {appStyle === 'whatsapp' && (
-        <AbsoluteFill
-          style={{
-            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M30 0L60 30L30 60L0 30Z\' fill=\'none\' stroke=\'%23ffffff06\' stroke-width=\'1\'/%3E%3C/svg%3E")',
-            opacity: 0.5,
-          }}
-        />
-      )}
+      {/* ── Background subtle gradient & grid ── */}
+      <AbsoluteFill
+        style={{
+          background: 'radial-gradient(ellipse at 50% 20%, rgba(0, 240, 255, 0.04) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }}
+      />
 
-      {/* ── CHAT HEADER ── */}
+      {/* ── PHONE TOP STATUS BAR (Clock, Signal, Battery) ── */}
       <div
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          padding: isVertical ? '55px 20px 16px' : '15px 20px 12px',
-          backgroundColor: 'rgba(15, 15, 20, 0.95)',
+          height: isVertical ? '48px' : '30px',
+          padding: '0 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          color: '#FFFFFF',
+          fontSize: '13px',
+          fontWeight: 600,
+          zIndex: 30,
+          opacity: 0.85,
+        }}
+      >
+        <span>09:41</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', letterSpacing: '1px' }}>5G</span>
+          <div style={{ width: '18px', height: '10px', border: '1px solid #FFFFFF', borderRadius: '3px', padding: '1px' }}>
+            <div style={{ width: '80%', height: '100%', backgroundColor: '#FFFFFF', borderRadius: '1px' }} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── APP CHAT HEADER ── */}
+      <div
+        style={{
+          position: 'absolute',
+          top: isVertical ? '44px' : '25px',
+          left: 0,
+          right: 0,
+          padding: '12px 20px',
+          backgroundColor: 'rgba(15, 18, 26, 0.94)',
           borderBottom: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           alignItems: 'center',
           gap: '14px',
-          zIndex: 20,
+          zIndex: 25,
           transform: `translateY(${(1 - headerEnter) * -60}px)`,
           opacity: headerEnter,
           backdropFilter: 'blur(20px)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
         }}
       >
-        {/* Back arrow */}
-        <div style={{ color: primaryColor, fontSize: '22px', opacity: 0.7 }}>‹</div>
+        {/* Back icon */}
+        <div style={{ color: primaryColor, fontSize: '24px', cursor: 'pointer', lineHeight: 1 }}>‹</div>
 
-        {/* Avatar */}
+        {/* Contact Avatar */}
         <div style={{ position: 'relative' }}>
           <div
             style={{
               width: '44px',
               height: '44px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(255,255,255,0.1)',
+              backgroundColor: `${primaryColor}22`,
+              border: `1.5px solid ${primaryColor}55`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '20px',
+              fontSize: '22px',
             }}
           >
-            👤
+            {leftAvatar}
           </div>
-          {/* Online dot */}
+          {/* Online status indicator */}
           <div
             style={{
               position: 'absolute',
@@ -376,148 +465,138 @@ export const ChatConversationScene: React.FC<ChatConversationProps> = ({
               height: '12px',
               borderRadius: '50%',
               backgroundColor: '#10B981',
-              border: '2px solid #0A0A0F',
-              boxShadow: `0 0 ${6 + onlinePulse * 4}px #10B981`,
-              opacity: onlinePulse,
+              border: '2px solid #0B0D13',
+              boxShadow: '0 0 8px #10B981',
             }}
           />
         </div>
 
-        <div>
-          <div style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 700 }}>
+        {/* Contact info & encrypted status */}
+        <div style={{ flex: 1 }}>
+          <div style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 700, letterSpacing: '0.3px' }}>
             {leftName}
           </div>
-          <div style={{ color: '#10B981', fontSize: '12px', opacity: 0.8 }}>
-            online agora
+          <div style={{ color: '#10B981', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>●</span>
+            <span style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>Canal Criptografado E2E</span>
           </div>
         </div>
-      </div>
 
-      {/* ── CHAT HEADLINE BADGE ── */}
-      <div
-        style={{
-          position: 'absolute',
-          top: isVertical ? '130px' : '80px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 15,
-          opacity: headerEnter,
-        }}
-      >
+        {/* Top badge */}
         <div
           style={{
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            borderRadius: '12px',
-            padding: '6px 16px',
-            fontSize: '12px',
-            color: 'rgba(255,255,255,0.45)',
+            backgroundColor: `${primaryColor}1A`,
+            border: `1px solid ${primaryColor}44`,
+            borderRadius: '6px',
+            padding: '4px 8px',
+            fontSize: '10px',
+            color: primaryColor,
+            fontWeight: 700,
             letterSpacing: '1px',
           }}
         >
-          {headline.toUpperCase()}
+          {headline.slice(0, 16).toUpperCase()}
         </div>
       </div>
 
-      {/* ── MESSAGES AREA ── */}
+      {/* ── MESSAGES FEED (Scrolls dynamically) ── */}
       <div
         style={{
           position: 'absolute',
-          top: isVertical ? '165px' : '100px',
-          bottom: isVertical ? '100px' : '60px',
+          top: isVertical ? '135px' : '90px',
+          bottom: isVertical ? '90px' : '65px',
           left: 0,
           right: 0,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-end',
           overflow: 'hidden',
-          padding: '10px 0',
+          paddingBottom: '16px',
         }}
       >
-        {messages.slice(0, visibleCount).map((msg, i) => {
-          const msgStartFrame = i * framesPerMessage;
-          const enterP = spring({
-            frame: Math.max(0, frame - msgStartFrame),
+        {visibleMessages.map(({ startFrame, durationFrames, msg }, i) => {
+          const enterProgress = spring({
+            frame: Math.max(0, frame - startFrame),
             fps,
-            config: { damping: 14, stiffness: 140 },
+            config: { damping: 15, stiffness: 150 },
           });
 
           return (
             <ChatBubble
               key={i}
               message={msg}
-              enterProgress={enterP}
+              enterProgress={enterProgress}
               frame={frame}
-              messageFrame={msgStartFrame}
-              isLast={i === visibleCount - 1}
+              messageStartFrame={startFrame}
+              fps={fps}
               primaryColor={primaryColor}
               appStyle={appStyle}
+              isLast={i === visibleMessages.length - 1}
             />
           );
         })}
 
-        {/* Typing indicator */}
-        <div
-          style={{
-            padding: '3px 16px',
-            display: 'flex',
-            justifyContent: nextSender === 'right' ? 'flex-end' : 'flex-start',
-          }}
-        >
-          <TypingIndicator
-            frame={frame}
-            color="rgba(255,255,255,0.5)"
-            visible={isTyping && visibleCount <= messages.length}
-          />
-        </div>
+        {/* Real-time typing indicator */}
+        {isTyping && currentTurn && (
+          <div
+            style={{
+              padding: '4px 20px',
+              display: 'flex',
+              justifyContent: currentTurn.msg.sender === 'right' ? 'flex-end' : 'flex-start',
+            }}
+          >
+            <TypingIndicator frame={frame} color={primaryColor} visible={true} />
+          </div>
+        )}
       </div>
 
-      {/* ── INPUT BAR ── */}
+      {/* ── BOTTOM PHONE INPUT BAR ── */}
       <div
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          padding: isVertical ? '12px 16px 40px' : '10px 16px 14px',
-          backgroundColor: 'rgba(15, 15, 20, 0.95)',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: isVertical ? '12px 16px 36px' : '10px 16px 14px',
+          backgroundColor: 'rgba(15, 18, 26, 0.96)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          zIndex: 20,
+          zIndex: 25,
           opacity: headerEnter,
         }}
       >
-        <div style={{ fontSize: '22px', opacity: 0.5 }}>＋</div>
+        <div style={{ fontSize: '20px', opacity: 0.6, color: '#FFFFFF' }}>＋</div>
         <div
           style={{
             flex: 1,
-            backgroundColor: 'rgba(255,255,255,0.06)',
+            backgroundColor: 'rgba(255,255,255,0.07)',
             borderRadius: '20px',
             padding: '10px 16px',
             fontSize: '14px',
             color: 'rgba(255,255,255,0.3)',
           }}
         >
-          Mensagem...
+          Mensagem criptografada...
         </div>
         <div
           style={{
-            width: '36px',
-            height: '36px',
+            width: '38px',
+            height: '38px',
             borderRadius: '50%',
             backgroundColor: primaryColor,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: 0.7,
+            boxShadow: `0 0 12px ${primaryColor}66`,
           }}
         >
           <div
             style={{
               width: 0,
               height: 0,
-              borderLeft: '8px solid #FFFFFF',
+              borderLeft: '8px solid #000000',
               borderTop: '5px solid transparent',
               borderBottom: '5px solid transparent',
               marginLeft: '2px',
@@ -528,3 +607,5 @@ export const ChatConversationScene: React.FC<ChatConversationProps> = ({
     </AbsoluteFill>
   );
 };
+
+export const ChatConversation = ChatConversationScene;
