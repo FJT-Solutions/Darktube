@@ -788,8 +788,9 @@ async function renderAsync(historyId, composition, callbackUrl) {
     const durationInFrames = Math.max(30, calcFrames);
     console.log(`[Remotion Render] Duração exata calculada: ${durationInFrames} frames (${(durationInFrames / fps).toFixed(2)}s @ ${fps}fps, ${width}x${height}) para ${scenesList.length} cenas`);
 
-    // inputProps = o que o ShortVideoComposition recebe via useVideoConfig + props
+    // inputProps = o que o ShortVideoComposition / Templates recebem via useVideoConfig + props
     const inputProps = {
+      ...composition,
       scenes:              composition.scenes,
       captionStyle:        composition.captionStyle        || 'pop',
       primaryColor:        composition.primaryColor        || '#EAB308',

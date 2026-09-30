@@ -5,7 +5,11 @@ import {
   spring,
   useCurrentFrame,
   useVideoConfig,
+  Sequence,
+  Img,
 } from 'remotion';
+import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -29,6 +33,17 @@ export interface SurveillanceCamProps {
   nightVision?: boolean;
   primaryColor?: string;
   format?: 'vertical' | 'horizontal';
+  imageUrl?: string;
+  scene?: SceneSegment;
+  sceneIndex?: number;
+  scenes?: Array<SceneSegment & {
+    cameraId?: string;
+    location?: string;
+    coordinates?: string;
+    alertLevel?: 'NORMAL' | 'WARNING' | 'CRITICAL';
+    nightVision?: boolean;
+    subheadline?: string;
+  }>;
 }
 
 // ─── Timecode Display ───────────────────────────────────────────────────────
@@ -197,9 +212,9 @@ const HUDReadout: React.FC<{
  * scan-lines com interferência, crosshair/mira, night-vision,
  * REC piscante, static bursts, target lock, video corruption.
  */
-export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
-  headline = 'SUBJECT IDENTIFIED',
-  subheadline = 'Movimento detectado no perímetro norte',
+export const SurveillanceCamSceneSingle: React.FC<SurveillanceCamProps> = ({
+  headline: initialHeadline = 'SUBJECT IDENTIFIED',
+  subheadline: initialSubheadline = 'Movimento detectado no perímetro norte',
   cameraId = 'CAM-07-BRAVO',
   location = 'SETOR 7G // PERÍMETRO NORTE',
   coordinates = '23°32\'S 46°38\'W',
@@ -208,11 +223,17 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
   nightVision = false,
   primaryColor = '#00FF41',
   format = 'vertical',
+  imageUrl,
+  scene,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const isVertical = format === 'vertical';
+
+  const headline = scene?.headline || (scene as any)?.title || initialHeadline;
+  const subheadline = (scene as any)?.subheadline || (scene ? '' : initialSubheadline);
+  const rawImage = scene?.imageUrl || (scene as any)?.mediaUrl || imageUrl;
 
   // Alert colors
   const alertColors = {
@@ -252,7 +273,7 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
 
   // ── Headline entrance ──
   const headlineEnter = spring({
-    frame: Math.max(0, frame - 30),
+    frame: Math.max(0, frame - 20),
     fps,
     config: { damping: 14, stiffness: 120 },
   });
@@ -274,11 +295,31 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
         filter: nightVision ? 'sepia(0.3) hue-rotate(70deg) saturate(1.5)' : 'none',
       }}
     >
+      {/* ── Background Surveillance Footage / Still ── */}
+      {rawImage && (
+        <AbsoluteFill style={{ overflow: 'hidden', zIndex: 1 }}>
+          <Img
+            src={rawImage}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: nightVision
+                ? 'grayscale(100%) brightness(1.1) contrast(1.3)'
+                : 'grayscale(60%) contrast(1.2) brightness(0.75)',
+              opacity: 0.65,
+              transform: `scale(${ptzZoom * 1.05}) translate(${ptzX * 0.5}px, ${ptzY * 0.5}px)`,
+            }}
+          />
+        </AbsoluteFill>
+      )}
+
       {/* ── PTZ Camera Layer ── */}
       <AbsoluteFill
         style={{
           transform: `translate(${ptzX}px, ${ptzY}px) scale(${ptzZoom})`,
           opacity: bootProgress,
+          zIndex: 4,
         }}
       >
         {/* Dark vignette */}
@@ -289,14 +330,16 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
           }}
         />
 
-        {/* Content area - headline centered */}
+        {/* Content area - headline centered in top third */}
         <AbsoluteFill
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '140px 40px',
+            justifyContent: 'flex-start',
+            paddingTop: isVertical ? '140px' : '60px',
+            paddingLeft: '30px',
+            paddingRight: '30px',
             zIndex: 8,
           }}
         >
@@ -316,8 +359,9 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
                 padding: '6px 16px',
                 border: `1.5px solid ${alertColor}`,
                 borderRadius: '4px',
-                marginBottom: '20px',
+                marginBottom: '16px',
                 opacity: alertPulse,
+                backgroundColor: 'rgba(0,0,0,0.6)',
               }}
             >
               <div
@@ -336,27 +380,31 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
 
             <h2
               style={{
-                fontSize: isVertical ? '38px' : '32px',
+                fontSize: isVertical ? '34px' : '28px',
                 fontWeight: 900,
                 color: '#FFFFFF',
-                margin: '0 0 12px 0',
+                margin: '0 0 10px 0',
                 letterSpacing: '2px',
-                textShadow: `0 0 20px ${alertColor}44`,
+                textShadow: `0 0 20px ${alertColor}66, 0 2px 4px rgba(0,0,0,0.9)`,
+                textTransform: 'uppercase',
               }}
             >
               {headline}
             </h2>
 
-            <p
-              style={{
-                fontSize: isVertical ? '18px' : '16px',
-                color: 'rgba(255,255,255,0.65)',
-                margin: 0,
-                maxWidth: '600px',
-              }}
-            >
-              {subheadline}
-            </p>
+            {subheadline ? (
+              <p
+                style={{
+                  fontSize: isVertical ? '18px' : '16px',
+                  color: 'rgba(255,255,255,0.75)',
+                  margin: 0,
+                  maxWidth: '600px',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+                }}
+              >
+                {subheadline}
+              </p>
+            ) : null}
           </div>
         </AbsoluteFill>
 
@@ -433,7 +481,7 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
       <div
         style={{
           position: 'absolute',
-          bottom: isVertical ? '60px' : '25px',
+          bottom: isVertical ? '50px' : '25px',
           left: '24px',
           right: '24px',
           display: 'flex',
@@ -516,6 +564,17 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
         />
       </div>
 
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {scene && (
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={alertColor}
+          accentColor="#FFFFFF"
+          format={format}
+        />
+      )}
+
       {/* ── BORDER FRAME ── */}
       <div
         style={{
@@ -556,3 +615,71 @@ export const SurveillanceCamScene: React.FC<SurveillanceCamProps> = ({
     </AbsoluteFill>
   );
 };
+
+// ─── Main Multi-Scene SurveillanceCam Composition ───────────────────────────
+export const SurveillanceCamScene: React.FC<SurveillanceCamProps & RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    return <SurveillanceCamSceneSingle {...props} />;
+  }
+
+  let accumulatedFrames = 0;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#0A0A0A' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 5;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        const camNum = String(idx + 1).padStart(2, '0');
+        const sectors = [
+          'SETOR 01 // PERÍMETRO EXTERNO',
+          'SETOR 02 // SALA DE SERVIDORES',
+          'SETOR 03 // DOCAS DE CARGA',
+          'SETOR 04 // SUBTERRÂNEO NÍVEL 4',
+          'SETOR 05 // TERMINAL DE CONTROLE',
+          'SETOR 06 // CABINE PRINCIPAL'
+        ];
+        const alertSequence: Array<'NORMAL' | 'WARNING' | 'CRITICAL'> = [
+          'WARNING', 'CRITICAL', 'WARNING', 'CRITICAL', 'NORMAL', 'CRITICAL'
+        ];
+
+        const sceneAlert = (scene as any).alertLevel || alertSequence[idx % alertSequence.length];
+        const sceneNightVision = (scene as any).nightVision ?? (idx % 2 === 1);
+        const sceneCamId = (scene as any).cameraId || `CAM-${camNum}-SEC`;
+        const sceneLocation = (scene as any).location || sectors[idx % sectors.length];
+        const sceneCoords = (scene as any).coordinates || `23°${31 + idx}'S 46°${37 + idx}'W`;
+
+        return (
+          <Sequence
+            key={`surveillance_seq_${idx}_${scene.captionText?.slice(0, 10) || ''}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <SurveillanceCamSceneSingle
+              {...props}
+              scene={scene}
+              sceneIndex={idx}
+              headline={scene.headline || (scene as any).title || props.headline || `INCIDENTE DETECTADO #${idx + 1}`}
+              subheadline={(scene as any).subheadline || ''}
+              cameraId={sceneCamId}
+              location={sceneLocation}
+              coordinates={sceneCoords}
+              alertLevel={sceneAlert}
+              nightVision={sceneNightVision}
+              imageUrl={scene.imageUrl || (scene as any).mediaUrl || props.imageUrl}
+              primaryColor={props.primaryColor || '#00FF41'}
+              format={props.format || 'vertical'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const SurveillanceCam = SurveillanceCamScene;
