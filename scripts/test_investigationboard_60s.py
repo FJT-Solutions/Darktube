@@ -4,7 +4,6 @@ import time
 import os
 import sys
 import io
-import subprocess
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
@@ -14,95 +13,65 @@ USER = "root"
 PASS = "fjt@Solutions1"
 
 OUT_DIR = r"c:\Users\natha\Documents\project\darktube\out\test_renders"
-FRAMES_DIR = os.path.join(OUT_DIR, "surveillancecam_frames")
+FRAMES_DIR = os.path.join(OUT_DIR, "investigationboard_frames")
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(FRAMES_DIR, exist_ok=True)
 
-LOCAL_VIDEO_PATH = os.path.join(OUT_DIR, "SurveillanceCam_60s.mp4")
+LOCAL_VIDEO_PATH = os.path.join(OUT_DIR, "InvestigationBoard_60s.mp4")
 
-# 6 CENAS DE VIGILÂNCIA / CCTV CALIBRADAS PARA 60 SEGUNDOS (1440 FRAMES @ 24FPS)
+# 6 CENAS DE INVESTIGAÇÃO CALIBRADAS PARA 60 SEGUNDOS (1440 FRAMES @ 24FPS)
 script_scenes = [
     {
-        "id": "cctv_01",
-        "title": "VIOLAÇÃO DE PERÍMETRO",
-        "badge": "SETOR 01 // CERCA EXTERNA",
-        "cam": "CAM-01-EXT",
-        "loc": "SETOR 01 // PERÍMETRO EXTERNO",
-        "coords": "23°31'S 46°37'W",
-        "alert": "WARNING",
-        "nightVision": False,
-        "text": "Às três horas e quarenta e duas da madrugada, sensores sísmicos registraram uma intrusão desconhecida na cerca externa de alta voltagem.",
-        "image": "https://images.unsplash.com/photo-1508873696983-2df5293cb32f?w=1080&q=80",
+        "id": "inv_01",
+        "title": "DOSSIÊ ATLAS-7",
+        "badge": "CONFIDENCIAL",
+        "text": "Um arquivo ultrassecreto contendo transações financeiras ilícitas desapareceu dos servidores centrais em Genebra sem deixar rastros digitais.",
+        "image": "https://images.unsplash.com/photo-1544717305-2782549b5136?w=1080&q=80",
         "dur": 10.0,
     },
     {
-        "id": "cctv_02",
-        "title": "SALA DE SERVIDORES",
-        "badge": "SETOR 02 // DATACENTER",
-        "cam": "CAM-02-INT",
-        "loc": "SETOR 02 // DATACENTER PROFUNDO",
-        "coords": "23°32'S 46°38'W",
-        "alert": "CRITICAL",
-        "nightVision": True,
-        "text": "As câmeras de visão noturna do datacenter captaram uma queda repentina de energia e transmissão massiva de dados confidenciais.",
-        "image": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "cctv_03",
-        "title": "DOCA DE CARGA",
-        "badge": "SETOR 03 // ACESSO SUL",
-        "cam": "CAM-03-DOCK",
-        "loc": "SETOR 03 // DOCAS DE EMBARQUE",
-        "coords": "23°33'S 46°39'W",
-        "alert": "WARNING",
-        "nightVision": False,
-        "text": "Dois veículos sem identificação entraram pelo portão sul desativando os protocolos de checagem biométrica dos operadores.",
-        "image": "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1080&q=80",
-        "dur": 10.0,
-    },
-    {
-        "id": "cctv_04",
-        "title": "SUBTERRÂNEO NÍVEL QUATRO",
-        "badge": "SETOR 04 // ELEVADOR",
-        "cam": "CAM-04-SUB",
-        "loc": "SETOR 04 // SUBTERRÂNEO NÍVEL 4",
-        "coords": "23°34'S 46°40'W",
-        "alert": "CRITICAL",
-        "nightVision": True,
-        "text": "O elevador de acesso aos túneis subterrâneos profundos foi acionado manualmente com credenciais expiradas há dez anos.",
+        "id": "inv_02",
+        "title": "PRIMEIRO SUSPEITO",
+        "badge": "ALVO PRINCIPAL",
+        "text": "O ex-analista sênior Marcus Vance comprou uma passagem só de ida para Istambul quarenta minutos após a violação do perímetro de segurança.",
         "image": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1080&q=80",
         "dur": 10.0,
     },
     {
-        "id": "cctv_05",
-        "title": "TERMINAL DE COMANDO",
-        "badge": "SETOR 05 // PAINEL MESTRE",
-        "cam": "CAM-05-CMD",
-        "loc": "SETOR 05 // TERMINAL DE CONTROLE",
-        "coords": "23°35'S 46°41'W",
-        "alert": "CRITICAL",
-        "nightVision": False,
-        "text": "Na sala de controle deserta, o console central executou rotinas automáticas de expurgo eliminando registros em quarenta segundos.",
-        "image": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1080&q=80",
+        "id": "inv_03",
+        "title": "RASTRO FINANCEIRO",
+        "badge": "EVIDÊNCIA #03",
+        "text": "Extratos bancários revelam uma transferência de quatro milhões de dólares convertidos em criptoativos anônimos na mesma madrugada.",
+        "image": "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1080&q=80",
         "dur": 10.0,
     },
     {
-        "id": "cctv_06",
-        "title": "EVAPORAÇÃO TOTAL",
-        "badge": "SETOR 06 // PONTO ZERO",
-        "cam": "CAM-06-VOID",
-        "loc": "SETOR 06 // CABINE PRINCIPAL",
-        "coords": "23°36'S 46°42'W",
-        "alert": "CRITICAL",
-        "nightVision": True,
-        "text": "Quando a equipe tática adentrou a instalação, nenhum invasor ou arquivo foi localizado. Apenas o sinal do alarme persistia.",
-        "image": "https://images.unsplash.com/photo-1517420704952-d9f39e95b43e?w=1080&q=80",
+        "id": "inv_04",
+        "title": "ENCONTRO CLANDESTINO",
+        "badge": "PORTO ROTERDÃ",
+        "text": "Câmeras de vigilância registraram um encontro entre Vance e um intermediário desconhecido em um cais isolado no porto de Roterdã.",
+        "image": "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1080&q=80",
+        "dur": 10.0,
+    },
+    {
+        "id": "inv_05",
+        "title": "MICROCHIP OCULTO",
+        "badge": "EVIDÊNCIA #05",
+        "text": "Peritos recuperaram um microchip oculto dentro de um relógio de pulso quebrado encontrado no quarto de hotel abandonado pelo suspeito.",
+        "image": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1080&q=80",
+        "dur": 10.0,
+    },
+    {
+        "id": "inv_06",
+        "title": "ALERTA VERMELHO",
+        "badge": "MANDADO INTERPOL",
+        "text": "A Interpol emitiu um alerta vermelho prioritário. A rede de cumplicidade aponta para figuras do alto escalão corporativo global.",
+        "image": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080&q=80",
         "dur": 10.0,
     }
 ]
 
-print("=== PRODUÇÃO SURVEILLANCE CAM (60s @ 720p 24fps) ===", flush=True)
+print("=== PRODUÇÃO INVESTIGATION BOARD (60s @ 720p 24fps) ===", flush=True)
 
 c = paramiko.SSHClient()
 c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -181,18 +150,13 @@ for idx, sc in enumerate(script_scenes):
     remotion_scenes.append({
         "index": idx,
         "headline": sc["title"],
+        "badgeText": sc["badge"],
         "captionText": sc["text"],
         "audioUrl": f"/app/output/{sc['id']}.mp3",
         "imageUrl": sc["image"],
         "durationSeconds": sc["dur"],
         "transitionIn": "none",
         "transitionDurationFrames": 0,
-        "cameraId": sc["cam"],
-        "location": sc["loc"],
-        "coordinates": sc["coords"],
-        "alertLevel": sc["alert"],
-        "nightVision": sc["nightVision"],
-        "badgeText": sc["badge"],
         "words": make_word_timings(sc["text"], sc["audio_dur"]),
     })
 
@@ -202,23 +166,21 @@ total_frames = int(round(total_dur * fps))
 print(f"\nDuração total calculada: {total_dur:.1f}s ({total_frames} frames @ {fps}fps, 720x1280)", flush=True)
 
 # 4. ENVIAR PAYLOAD DE RENDER
-job_id = "surveillancecam_60s_v2"
+job_id = "investigationboard_60s_v1"
 render_payload = {
     "historyId": job_id,
     "callbackUrl": "http://127.0.0.1:3001/render-callback",
     "composition": {
-        "templateId": "SurveillanceCam",
+        "templateId": "InvestigationBoard",
         "format": "vertical",
         "width": 720,
         "height": 1280,
         "fps": 24,
         "jpegQuality": 75,
         "concurrency": 2,
-        "primaryColor": "#00FF41",
-        "accentColor": "#FFFFFF",
-        "showWatermark": True,
-        "watermarkText": "DARKTUBE // CCTV",
-        "backgroundMusicUrl": "/app/output/bgm_cyber.mp3",
+        "primaryColor": "#EF4444",
+        "stampText": "TOP SECRET",
+        "backgroundMusicUrl": "/app/output/bgm_noir.mp3",
         "scenes": remotion_scenes,
     }
 }
@@ -227,13 +189,13 @@ print("\n4. Submetendo job de renderização ao Remotion Service...", flush=True
 payload_json = json.dumps(render_payload, ensure_ascii=False)
 
 submit_cmd = f"""
-cat << 'EOF' > /tmp/surveillance_payload.json
+cat << 'EOF' > /tmp/inv_payload.json
 {payload_json}
 EOF
-docker cp /tmp/surveillance_payload.json {cid}:/tmp/surveillance_payload.json
+docker cp /tmp/inv_payload.json {cid}:/tmp/inv_payload.json
 docker exec {cid} curl -s -X POST http://127.0.0.1:3001/render \\
   -H "Content-Type: application/json" \\
-  -d @/tmp/surveillance_payload.json
+  -d @/tmp/inv_payload.json
 """
 stdin, stdout, stderr = c.exec_command(submit_cmd, timeout=30)
 submit_res = stdout.read().decode('utf-8', errors='replace').strip()
@@ -293,14 +255,14 @@ sftp = c.open_sftp()
 for idx, ts in enumerate(timestamps):
     frame_path = os.path.join(FRAMES_DIR, f"scene_{idx + 1}_{int(ts)}s.jpg")
     cmd = f"""
-docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/frame_{idx+1}.jpg
-docker cp {cid}:/app/output/frame_{idx+1}.jpg /tmp/frame_{idx+1}.jpg
+docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/inv_frame_{idx+1}.jpg
+docker cp {cid}:/app/output/inv_frame_{idx+1}.jpg /tmp/inv_frame_{idx+1}.jpg
 """
     c.exec_command(cmd)
     time.sleep(1)
-    sftp.get(f"/tmp/frame_{idx+1}.jpg", frame_path)
+    sftp.get(f"/tmp/inv_frame_{idx+1}.jpg", frame_path)
     print(f"  📸 Keyframe {idx + 1} extraído ({ts}s): {frame_path}", flush=True)
 
 sftp.close()
 c.close()
-print("\n=== VALIDAÇÃO DO TEMPLATE SURVEILLANCE CAM CONCLUÍDA COM SUCESSO! ===", flush=True)
+print("\n=== VALIDAÇÃO DO TEMPLATE INVESTIGATION BOARD CONCLUÍDA COM SUCESSO! ===", flush=True)

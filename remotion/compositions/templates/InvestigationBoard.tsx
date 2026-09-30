@@ -6,7 +6,11 @@ import {
   useCurrentFrame,
   useVideoConfig,
   Easing,
+  Sequence,
+  Img,
 } from 'remotion';
+import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -19,32 +23,36 @@ function createRng(seed: number) {
   };
 }
 
-export interface InvestigationBoardProps {
+export interface InvestigationBoardProps extends RemotionShortProps {
   headline?: string;
   evidenceItems?: Array<{
     label: string;
     type?: 'photo' | 'document' | 'note';
     status?: 'suspect' | 'confirmed' | 'unknown';
+    imageUrl?: string;
   }>;
   connections?: Array<[number, number]>; // pairs of evidence item indices
   stampText?: string;
   primaryColor?: string;
   format?: 'vertical' | 'horizontal';
+  scene?: SceneSegment;
+  sceneIndex?: number;
 }
 
-// ─── Cork Board Texture ─────────────────────────────────────────────────────
+// ─── Cork Board Texture (Fast Procedural Gradient - Zero CPU Filter Overhead) ─
 const CorkTexture: React.FC = () => (
-  <AbsoluteFill>
-    <svg width="100%" height="100%" style={{ position: 'absolute' }}>
-      <defs>
-        <filter id="cork-noise">
-          <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="5" seed="42" />
-          <feColorMatrix type="matrix" values="0.3 0 0 0 0.35  0 0.2 0 0 0.22  0 0 0.1 0 0.12  0 0 0 0.25 0" />
-        </filter>
-      </defs>
-      <rect width="100%" height="100%" filter="url(#cork-noise)" />
-    </svg>
-  </AbsoluteFill>
+  <AbsoluteFill
+    style={{
+      backgroundColor: '#8B6F47',
+      backgroundImage: `
+        radial-gradient(ellipse at 20% 30%, rgba(160, 120, 80, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(120, 85, 55, 0.5) 0%, transparent 60%),
+        radial-gradient(circle at 50% 50%, rgba(100, 70, 45, 0.3) 0%, transparent 70%),
+        repeating-linear-gradient(45deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 2px, transparent 2px, transparent 4px),
+        repeating-linear-gradient(-45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 4px)
+      `,
+    }}
+  />
 );
 
 // ─── Push Pin ───────────────────────────────────────────────────────────────
@@ -99,7 +107,8 @@ const PolaroidCard: React.FC<{
   frame: number;
   index: number;
   primaryColor: string;
-}> = ({ label, type, status, rotation, enterProgress, frame, index, primaryColor }) => {
+  imageUrl?: string;
+}> = ({ label, type, status, rotation, enterProgress, frame, index, primaryColor, imageUrl }) => {
   const wobble = Math.sin(frame * 0.06 + index * 2) * 1.5;
   const swing = Math.sin(frame * 0.04 + index * 1.3) * 0.8;
 
@@ -148,7 +157,19 @@ const PolaroidCard: React.FC<{
             position: 'relative',
           }}
         >
-          <span style={{ fontSize: '40px', opacity: 0.6 }}>{icon}</span>
+          {imageUrl ? (
+            <Img
+              src={imageUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: 'contrast(1.15) brightness(0.9)',
+              }}
+            />
+          ) : (
+            <span style={{ fontSize: '40px', opacity: 0.6 }}>{icon}</span>
+          )}
 
           {/* Status overlay */}
           {status === 'suspect' && (
@@ -331,8 +352,8 @@ const MagnifyingGlass: React.FC<{
  * evidence reveal sequencial, magnifying glass spotlight,
  * SUSPECT/CONFIRMED stamps.
  */
-export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
-  headline = 'OPERAÇÃO ATLAS-7',
+export const InvestigationBoardSceneSingle: React.FC<InvestigationBoardProps> = ({
+  headline: initialHeadline = 'OPERAÇÃO ATLAS-7',
   evidenceItems = [
     { label: 'Agente Duplo\nIdentidade Alpha', type: 'photo', status: 'suspect' },
     { label: 'Transferência\nBancária Offshore', type: 'document', status: 'confirmed' },
@@ -344,12 +365,29 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
   stampText = 'CASO ABERTO',
   primaryColor = '#EF4444',
   format = 'vertical',
+  scene,
+  sceneIndex = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const isVertical = format === 'vertical';
-  const rng = createRng(9999);
+  const rng = createRng(9999 + sceneIndex * 17);
+
+  const headline = scene?.headline || (scene as any)?.title || initialHeadline;
+
+  // Clone evidence items and apply scene's image/label to the active item
+  const items = evidenceItems.map((item, i) => {
+    if (scene && i === sceneIndex % evidenceItems.length) {
+      return {
+        ...item,
+        imageUrl: scene.imageUrl || (scene as any).mediaUrl || item.imageUrl,
+        label: (scene as any).badgeText || scene.headline || item.label,
+        status: (i % 2 === 0 ? 'suspect' : 'confirmed') as 'suspect' | 'confirmed',
+      };
+    }
+    return item;
+  });
 
   // ── Board entrance ──
   const boardEnter = spring({
@@ -372,23 +410,23 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
       ];
 
   // ── Evidence reveal cascade ──
-  const evidenceEntries = evidenceItems.map((_, i) =>
+  const evidenceEntries = items.map((_, i) =>
     spring({
-      frame: Math.max(0, frame - 15 - i * 12),
+      frame: Math.max(0, frame - 10 - i * 8),
       fps,
       config: { damping: 12, stiffness: 120 },
     })
   );
 
   // ── String connections progress ──
-  const stringProgress = interpolate(frame, [40, 80], [0, 1], {
+  const stringProgress = interpolate(frame, [25, 60], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.bezier(0.25, 0.1, 0.25, 1),
   });
 
   // ── Stamp entrance ──
-  const stampFrame = Math.max(0, frame - 70);
+  const stampFrame = Math.max(0, frame - 55);
   const stampSpring = spring({
     frame: stampFrame,
     fps,
@@ -396,7 +434,7 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
   });
 
   // ── Magnifying glass ──
-  const showMagnifier = frame > 90;
+  const showMagnifier = frame > 70;
 
   // ── Headline ──
   const headlineEnter = spring({
@@ -441,7 +479,7 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
       <div
         style={{
           position: 'absolute',
-          top: isVertical ? '70px' : '30px',
+          top: isVertical ? '60px' : '25px',
           left: '50%',
           transform: `translateX(-50%) translateY(${(1 - headlineEnter) * 20}px)`,
           opacity: headlineEnter,
@@ -451,15 +489,15 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
       >
         <div
           style={{
-            backgroundColor: 'rgba(15, 15, 10, 0.85)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            padding: '12px 28px',
+            backgroundColor: 'rgba(15, 15, 10, 0.88)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            padding: '10px 24px',
             borderRadius: '4px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
           }}
         >
           <h2 style={{
-            fontSize: isVertical ? '24px' : '20px',
+            fontSize: isVertical ? '22px' : '18px',
             fontWeight: 900,
             color: '#FFFFFF',
             letterSpacing: '3px',
@@ -478,9 +516,8 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
         const to = positions[toIdx];
         if (!from || !to) return null;
 
-        // Convert % to approximate px (assuming 1080x1920 or 1920x1080)
-        const w = isVertical ? 1080 : 1920;
-        const h = isVertical ? 1920 : 1080;
+        const w = isVertical ? 720 : 1280;
+        const h = isVertical ? 1280 : 720;
         const perConnectionProgress = interpolate(
           stringProgress,
           [ci / connections.length, (ci + 1) / connections.length],
@@ -502,9 +539,9 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
       })}
 
       {/* ── EVIDENCE ITEMS ── */}
-      {evidenceItems.map((item, i) => {
+      {items.map((item, i) => {
         const pos = positions[i] || { x: 50, y: 50 };
-        const rotation = (rng() - 0.5) * 16;
+        const rotation = (rng() - 0.5) * 14;
 
         return (
           <div
@@ -533,6 +570,7 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
               frame={frame}
               index={i}
               primaryColor={primaryColor}
+              imageUrl={item.imageUrl}
             />
           </div>
         );
@@ -543,7 +581,7 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
         text="Verificar alibi do informante"
         color="#FDE68A"
         rotation={-5}
-        opacity={interpolate(frame, [50, 60], [0, 0.9], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })}
+        opacity={interpolate(frame, [40, 50], [0, 0.9], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })}
         x={isVertical ? '5%' : '3%'}
         y={isVertical ? '68%' : '60%'}
       />
@@ -551,7 +589,7 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
         text="Câmera #7 offline desde 03:47"
         color="#FCA5A5"
         rotation={3}
-        opacity={interpolate(frame, [55, 65], [0, 0.85], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })}
+        opacity={interpolate(frame, [45, 55], [0, 0.85], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })}
         x={isVertical ? '70%' : '78%'}
         y={isVertical ? '85%' : '72%'}
       />
@@ -559,19 +597,30 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
       {/* ── MAGNIFYING GLASS ── */}
       <MagnifyingGlass frame={frame} active={showMagnifier} />
 
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {scene && (
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={primaryColor}
+          accentColor="#FFE600"
+          format={format}
+        />
+      )}
+
       {/* ── CASE STAMP ── */}
       {stampFrame > 0 && (
         <div
           style={{
             position: 'absolute',
-            bottom: isVertical ? '120px' : '60px',
-            right: isVertical ? '40px' : '60px',
+            bottom: isVertical ? '90px' : '50px',
+            right: isVertical ? '30px' : '50px',
             transform: `scale(${interpolate(stampSpring, [0, 1], [2.5, 1])}) rotate(-15deg)`,
             border: `4px solid ${primaryColor}`,
             borderRadius: '8px',
             padding: '8px 24px',
             color: primaryColor,
-            fontSize: isVertical ? '32px' : '28px',
+            fontSize: isVertical ? '28px' : '24px',
             fontWeight: 900,
             letterSpacing: '4px',
             textTransform: 'uppercase',
@@ -587,3 +636,44 @@ export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = ({
     </AbsoluteFill>
   );
 };
+
+export const InvestigationBoardScene: React.FC<InvestigationBoardProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    return <InvestigationBoardSceneSingle {...props} />;
+  }
+
+  let accumulatedFrames = 0;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#1A1510' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 5;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`investigation_seq_${idx}_${scene.captionText?.slice(0, 10) || ''}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <InvestigationBoardSceneSingle
+              {...props}
+              scene={scene}
+              sceneIndex={idx}
+              headline={scene.headline || (scene as any).title || props.headline || `EVIDÊNCIA #${idx + 1}`}
+              primaryColor={props.primaryColor || '#EF4444'}
+              format={props.format || 'vertical'}
+            />
+          </Sequence>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+export const InvestigationBoard = InvestigationBoardScene;

@@ -254,17 +254,19 @@ print(f"✅ Vídeo salvo localmente: {LOCAL_VIDEO_PATH} ({file_size_mb:.2f} MB)"
 # 7. EXTRAIR KEYFRAMES PARA INSPEÇÃO VISUAL
 print("\n7. Extraindo frames representativos...", flush=True)
 timestamps = [2.0, 12.0, 22.0, 32.0, 42.0, 52.0]
+sftp = c.open_sftp()
 for idx, ts in enumerate(timestamps):
     frame_path = os.path.join(FRAMES_DIR, f"frame_scene_{idx + 1}_{int(ts)}s.jpg")
-    cmd = [
-        "ffmpeg", "-y", "-ss", str(ts), "-i", LOCAL_VIDEO_PATH,
-        "-vframes", "1", "-q:v", "2", frame_path
-    ]
-    try:
-        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-        print(f"  📸 Keyframe {idx + 1} extraído ({ts}s): {frame_path}", flush=True)
-    except Exception as e:
-        print(f"  ⚠️ Falha ao extrair frame {idx + 1}: {e}", flush=True)
+    cmd = f"""
+docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/vhs_frame_{idx+1}.jpg
+docker cp {cid}:/app/output/vhs_frame_{idx+1}.jpg /tmp/vhs_frame_{idx+1}.jpg
+"""
+    c.exec_command(cmd)
+    time.sleep(1)
+    sftp.get(f"/tmp/vhs_frame_{idx+1}.jpg", frame_path)
+    print(f"  📸 Keyframe {idx + 1} extraído ({ts}s): {frame_path}", flush=True)
+
+sftp.close()
 
 c.close()
 print("\n=== VALIDAÇÃO DO TEMPLATE VHS NOIR CONCLUÍDA COM SUCESSO! ===", flush=True)
