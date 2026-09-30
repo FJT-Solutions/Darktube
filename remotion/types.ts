@@ -34,7 +34,12 @@ export type AnimationStyle =
   | 'counter-confetti' // contador com confete
   | 'odometer-digit-roll' // odômetro numérico
   | 'typing-code-block'// terminal de código digitando
-  | 'terminal-3d';     // terminal 3D
+  | 'terminal-3d'     // terminal 3D
+  | 'map-route'       // mapa de rotas animado
+  | 'cable-map'       // mapa de cabos submarinos
+  | 'pacific-map'     // mapa do pacífico
+  | 'dunant-map'      // mapa do atlântico norte
+  | 'twoafrica-map';  // mapa da circunavegação africana
 
 /**
  * Transição de entrada da cena (usada pelo TransitionSeries do @remotion/transitions).
@@ -93,7 +98,10 @@ export type SceneType =
   | 'UI_SHOWCASE'
   | 'MAP_JOURNEY'
   | 'INFINITE_ZOOM'
-  | 'THREE_D';
+  | 'THREE_D'
+  | 'DOSSIER'
+  | 'DIAGRAM'
+  | 'STICK';
 
 /**
  * Efeitos sonoros procedurais gerados pelo sintetizador de áudio Darktube (sfx.mjs).
@@ -138,7 +146,10 @@ export type LivingBgType =
   | 'gradient-mesh'
   | 'grid-mesh'
   | 'mesh-gradient'
-  | 'clean';
+  | 'clean'
+  | 'pacific-chokepoint'
+  | 'global-atlantic'
+  | 'atlantic-cable';
 
 /**
  * Uma cena individual do vídeo.
@@ -257,6 +268,9 @@ export interface RemotionShortProps {
 
   /** Ativar sintetizador procedural de SFX (padrão: true) */
   enableSfx?: boolean;
+
+  /** Ativar textura de granulação analógica de cinema 35mm (padrão: true) */
+  enableFilmGrain?: boolean;
 
   /** Ativar corte automático de silêncio (FFmpeg silencedetect) */
   autoTrimSilence?: boolean;

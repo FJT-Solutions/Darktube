@@ -51,6 +51,8 @@ verify_supabase.ts
 
 # Temp video/frame downloads
 /tmp/
+/output/
+/out/
 *.mp4
 public/*.mp4
 

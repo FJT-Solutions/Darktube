@@ -135,7 +135,7 @@ export const TypewriterText: React.FC<{
   );
 };
 
-// ─── Glitch text: texto com aberração cromática ────────────────────────────────
+// ─── Glitch text: texto com aberração cromática nativa (sem duplicação de DOM) ─────
 export const GlitchText: React.FC<{
   text: string;
   fontSize: number;
@@ -144,64 +144,34 @@ export const GlitchText: React.FC<{
   intensity?: number;
 }> = ({ text, fontSize, color = '#ffffff', fontWeight = 900, intensity = 0.7 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
-  // Glitch presente só nos primeiros 18 frames, depois some
+  // Glitch nos primeiros 18 frames
   const glitchProgress = interpolate(frame, [0, 18], [1, 0], { extrapolateRight: 'clamp' });
   const glitchAmt = glitchProgress * intensity;
 
-  const redX   = Math.sin(frame * 2.1) * 8  * glitchAmt;
-  const blueX  = Math.sin(frame * 3.7) * -6 * glitchAmt;
-  const skewX  = Math.sin(frame * 1.3) * 4  * glitchAmt;
-
+  const redX = Math.sin(frame * 2.1) * 5 * glitchAmt;
+  const blueX = Math.sin(frame * 3.7) * -5 * glitchAmt;
   const opacity = interpolate(frame, [0, 4], [0, 1], { extrapolateRight: 'clamp' });
 
-  const baseStyle: React.CSSProperties = {
-    position: 'absolute',
-    fontSize,
-    fontWeight,
-    fontFamily: 'Montserrat, Inter, sans-serif',
-    textTransform: 'uppercase',
-    lineHeight: 1.1,
-    userSelect: 'none',
-  };
-
   return (
-    <div style={{ position: 'relative', display: 'inline-block', opacity }}>
-      {/* Camada vermelha (aberração) */}
-      <span
-        style={{
-          ...baseStyle,
-          color: 'rgba(255, 0, 60, 0.75)',
-          transform: `translateX(${redX}px) skewX(${skewX}deg)`,
-          mixBlendMode: 'screen',
-        }}
-      >
-        {text}
-      </span>
-      {/* Texto principal */}
-      <span
-        style={{
-          ...baseStyle,
-          color,
-          textShadow: `0 0 20px ${color}66, 0 2px 8px rgba(0,0,0,0.9)`,
-          position: 'relative',
-        }}
-      >
-        {text}
-      </span>
-      {/* Camada azul (aberração) */}
-      <span
-        style={{
-          ...baseStyle,
-          color: 'rgba(0, 180, 255, 0.75)',
-          transform: `translateX(${blueX}px)`,
-          mixBlendMode: 'screen',
-        }}
-      >
-        {text}
-      </span>
-    </div>
+    <span
+      style={{
+        display: 'inline-block',
+        fontSize,
+        fontWeight,
+        fontFamily: 'Montserrat, Inter, Impact, sans-serif',
+        textTransform: 'uppercase',
+        color,
+        WebkitTextStroke: '4px #000000',
+        paintOrder: 'stroke fill',
+        textShadow: `${redX}px 0 rgba(255, 30, 80, 0.9), ${blueX}px 0 rgba(0, 230, 255, 0.9), 0 8px 24px rgba(0,0,0,0.95)`,
+        opacity,
+        letterSpacing: '1px',
+        lineHeight: 1.1,
+      }}
+    >
+      {text}
+    </span>
   );
 };
 

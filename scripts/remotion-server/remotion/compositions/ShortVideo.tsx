@@ -25,7 +25,11 @@ import { AnimatedLineChart, AnimatedBarChart, AnimatedMapRoute, DocumentaryLower
 
 import { LivingBackground } from './LivingBackground';
 import { LetteringScene } from './LetteringScene';
-import { IllustrativeScene } from './IllustrativeScene';
+import { CinematicWorldMapScene, SUBSEA_CABLES, CameraPreset } from './CinematicWorldMapScene';
+import { TactileDocumentaryDossier } from './TactileDocumentaryDossier';
+import { CableCrossSectionDiagram } from './CableCrossSectionDiagram';
+import { ProceduralFilmGrain } from './ProceduralFilmGrain';
+import { StickFigureScene, StickEra } from './StickFigureScene';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Spring presets — configurações de física por estilo emocional
@@ -66,6 +70,7 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
   showWatermark = true,
   watermarkText = 'DarkTube AI',
   format = 'vertical',
+  enableFilmGrain = true,
 }) => {
   const { fps } = useVideoConfig();
 
@@ -115,6 +120,9 @@ export const ShortVideoComposition: React.FC<RemotionShortProps> = ({
           );
         })}
       </TransitionSeries>
+
+      {/* ── TEXTURA ANALÓGICA DE GRÃO DE CINEMA 35MM (ANTI-SLOP STANDARD) ── */}
+      {enableFilmGrain && <ProceduralFilmGrain opacity={0.04} cadenceFps={12} />}
 
       {/* ── BARRA DE PROGRESSO ── */}
       <ProgressBar totalScenes={scenes.length} primaryColor={primaryColor} accentColor={accentColor} />
@@ -250,7 +258,163 @@ const SceneLayer: React.FC<{
     );
   }
 
-  // 4. CENA PADRÃO / CINEMÁTICA (2.5D Parallax ou Ken Burns + Overlays + Legendas Sincronizadas)
+  // 4. CENA MAP_JOURNEY / MAP (Johnny Harris / Vox Geopolitical Submarine Map)
+  if (
+    scene.sceneType === 'MAP_JOURNEY' ||
+    (scene.sceneType as string) === 'MAP' ||
+    (scene.animationStyle && ['map-route', 'flight-map', 'cable-map', 'pacific-map', 'dunant-map'].includes(scene.animationStyle))
+  ) {
+    const cableKey = (
+      scene.animationStyle === 'pacific-map'
+        ? 'pacific_faster'
+        : scene.animationStyle === 'dunant-map'
+        ? 'dunant'
+        : scene.animationStyle === 'twoafrica-map'
+        ? 'twoafrica'
+        : 'ellalink'
+    ) as keyof typeof SUBSEA_CABLES;
+
+    const cable = SUBSEA_CABLES[cableKey] || SUBSEA_CABLES.ellalink;
+    const preset = (
+      scene.livingBgType === 'pacific-chokepoint'
+        ? 'pacific-chokepoint'
+        : scene.livingBgType === 'global-atlantic'
+        ? 'global-atlantic'
+        : 'atlantic-cable'
+    ) as CameraPreset;
+
+    return (
+      <AbsoluteFill>
+        <CinematicWorldMapScene
+          cameraPreset={preset}
+          activeCable={cable}
+          headline={scene.badgeText || cable.name}
+          subheadline={scene.captionText || '99% da internet mundial atravessa o leito dos oceanos.'}
+          metricBadge={`${cable.lengthKm.toLocaleString()} KM // ${cable.capacityTbps} TBPS`}
+          primaryColor={primaryColor}
+          format={format as any}
+          durationFrames={durationFrames}
+        />
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 5. CENA DE DOSSIÊ INVESTIGATIVO TÁTIL (Vox / Johnny Harris)
+  if (
+    scene.sceneType === 'DOSSIER' ||
+    (scene.sceneType as string) === 'DOSSIER' ||
+    scene.animationStyle === ('dossier-tactile' as any)
+  ) {
+    return (
+      <AbsoluteFill>
+        <TactileDocumentaryDossier
+          classification={scene.badgeText || 'CONFIDENCIAL // CLASSIFICADO'}
+          documentTitle={scene.badgeText || 'RELATÓRIO DE INTELIGÊNCIA GLOBAL'}
+          highlightWords={scene.captionText?.slice(0, 50) || '99% DO TRÁFEGO MUNDIAL'}
+          bodyText={scene.captionText || ''}
+          stampText="CONFIRMADO"
+          highlighterColor="#FFE600"
+          format={format as any}
+        />
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 6. CENA DE DIAGRAMA TÉCNICO / RAIO X DO CABO
+  if (
+    scene.sceneType === 'DIAGRAM' ||
+    (scene.sceneType as string) === 'DIAGRAM' ||
+    scene.animationStyle === ('cable-diagram' as any)
+  ) {
+    return (
+      <AbsoluteFill>
+        <CableCrossSectionDiagram primaryColor={primaryColor} format={format as any} />
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 7. CENA STICK FIGURE ANIMATION (MinutePhysics / OverSimplified)
+  if (
+    scene.sceneType === 'STICK' ||
+    (scene.sceneType as string) === 'STICK' ||
+    scene.animationStyle === ('stick-figure' as any) ||
+    scene.animationStyle === ('stickman' as any)
+  ) {
+    const eraMapping: Record<string, StickEra> = {
+      caveman: 'caveman',
+      fogo: 'caveman',
+      agriculture: 'agriculture',
+      agricultura: 'agriculture',
+      empires: 'empires',
+      imperios: 'empires',
+      guerra: 'empires',
+      industrial: 'industrial',
+      space: 'space',
+      espaco: 'space',
+      lua: 'space',
+      ai_future: 'ai_future',
+      ia: 'ai_future',
+      futuro: 'ai_future',
+    };
+
+    const detectedEra = (
+      (scene.livingBgType && eraMapping[scene.livingBgType]) ||
+      (scene.animationStyle && eraMapping[scene.animationStyle as string]) ||
+      (['caveman', 'agriculture', 'empires', 'industrial', 'space', 'ai_future'][sceneIndex % 6] as StickEra)
+    );
+
+    return (
+      <AbsoluteFill>
+        <StickFigureScene
+          era={detectedEra}
+          headline={scene.badgeText || 'A HISTÓRIA DA HUMANIDADE'}
+          subheadline={scene.captionText || 'Como evoluímos da fogueira até a inteligência artificial.'}
+          badgeText={scene.badgeText || 'ERA DA EVOLUÇÃO'}
+          primaryColor={primaryColor}
+          format={format as any}
+          durationFrames={durationFrames}
+        />
+        {/* Legendas sincronizadas por palavra */}
+        <CaptionLayer
+          scene={scene}
+          captionStyle={captionStyle}
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          durationFrames={durationFrames}
+          format={format}
+        />
+      </AbsoluteFill>
+    );
+  }
+
+  // 8. CENA PADRÃO / CINEMÁTICA (2.5D Parallax ou Ken Burns + Overlays + Legendas Sincronizadas)
   const fgImage = scene.subjectImageUrl || scene.foregroundUrl;
   const bgImage = scene.imageUrl;
   const intensity = scene.intensity ?? 0.8;
@@ -613,6 +777,57 @@ const KenBurnsImage: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 // LEGENDAS — 3 estilos com efeitos avançados
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SMART PHRASE-CHUNKED CAPTION LAYER (Nível 10 Viral Standard)
+// 2 a 3 palavras por chunk, destaque em tempo real na palavra falada,
+// container frosted glass com contraste absoluto e zero glitch/duplicação.
+// ─────────────────────────────────────────────────────────────────────────────
+interface WordTiming {
+  word: string;
+  startInSeconds: number;
+  endInSeconds: number;
+}
+
+interface CaptionChunk {
+  words: WordTiming[];
+  startInSeconds: number;
+  endInSeconds: number;
+}
+
+function chunkWords(words: WordTiming[], maxWordsPerChunk = 3, maxChars = 22): CaptionChunk[] {
+  if (!words || words.length === 0) return [];
+  const chunks: CaptionChunk[] = [];
+  let currentWords: WordTiming[] = [];
+  let currentChars = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const isPunctuationEnd = /[.,!?:;]$/.test(w.word.trim());
+    const nextW = words[i + 1];
+    const bigPause = nextW ? (nextW.startInSeconds - w.endInSeconds > 0.35) : false;
+
+    currentWords.push(w);
+    currentChars += w.word.length + 1;
+
+    if (
+      currentWords.length >= maxWordsPerChunk ||
+      currentChars >= maxChars ||
+      isPunctuationEnd ||
+      bigPause ||
+      i === words.length - 1
+    ) {
+      chunks.push({
+        words: currentWords,
+        startInSeconds: currentWords[0].startInSeconds,
+        endInSeconds: nextW ? nextW.startInSeconds : currentWords[currentWords.length - 1].endInSeconds + 0.3,
+      });
+      currentWords = [];
+      currentChars = 0;
+    }
+  }
+  return chunks;
+}
+
 const CaptionLayer: React.FC<{
   scene: SceneSegment;
   captionStyle: string;
@@ -626,199 +841,177 @@ const CaptionLayer: React.FC<{
   const currentTimeInScene = frame / fps;
 
   const isVertical = format === 'vertical';
-  const words = scene.words || [];
+  const words = (scene.words || []) as WordTiming[];
   const captionText = scene.captionText || '';
-  const textEffect = scene.textEffect || (captionStyle === 'pop' ? 'pop' : 'none');
-  const springPreset = scene.springPreset || 'bouncy';
-  const springConfig = SPRING_PRESETS[springPreset];
-  const fontSize = isVertical ? 72 : 56;
+  const highlightColor = primaryColor || '#FFE600';
 
-  // ── POP: cada palavra aparece e desaparece individualmente ──────────────────
-  // Usa pop quando: captionStyle='pop' OU quando há words disponíveis (priority: sync words)
-  const usePopMode = (captionStyle === 'pop' || words.length > 0) && words.length > 0;
-  if (usePopMode) {
-    const activeIndex = words.findIndex((w, i) => {
-      const nextWord = words[i + 1];
-      const end = nextWord ? nextWord.startInSeconds : (w.endInSeconds + 0.5);
-      return currentTimeInScene >= w.startInSeconds && currentTimeInScene < end;
+  // 1. MODO SINCRONIZADO POR PHRASE-CHUNKS (Viral Grade 10 Standard)
+  if (words.length > 0) {
+    const chunks = chunkWords(words, 3, 20);
+    if (chunks.length === 0) return null;
+
+    // Encontra o chunk ativo
+    let activeChunk = chunks.find(
+      (c) => currentTimeInScene >= c.startInSeconds && currentTimeInScene < c.endInSeconds
+    );
+
+    // Se estiver antes do primeiro chunk, mostra o primeiro chunk (evita tela vazia)
+    if (!activeChunk && currentTimeInScene < chunks[0].startInSeconds) {
+      activeChunk = chunks[0];
+    }
+    // Se passou do último chunk, mantém o último até o final da cena
+    if (!activeChunk && currentTimeInScene >= chunks[chunks.length - 1].endInSeconds) {
+      activeChunk = chunks[chunks.length - 1];
+    }
+
+    if (!activeChunk) return null;
+
+    // Fade sutil nos últimos 5 frames da cena
+    const fadeOut = interpolate(frame, [durationFrames - 5, durationFrames], [1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
     });
 
-    if (activeIndex === -1) return null;
-    const currentWord = words[activeIndex];
-    const wordFrame = frame - Math.round(currentWord.startInSeconds * fps);
-
     return (
-      <AbsoluteFill
+      <div
         style={{
-          justifyContent: 'flex-end',
+          position: 'absolute',
+          bottom: isVertical ? '22%' : '14%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '90%',
+          display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
-          paddingBottom: isVertical ? '18%' : '12%',
+          zIndex: 50,
           pointerEvents: 'none',
-        }}
-      >
-        {/* Efeito de texto pelo textEffect da cena */}
-        {textEffect === 'split-bounce' ? (
-          <SplitBounceText
-            text={currentWord.word}
-            primaryColor={primaryColor}
-            fontSize={fontSize + 20}
-            springPreset={springPreset}
-            staggerFrames={1}
-          />
-        ) : textEffect === 'glitch' ? (
-          <GlitchText
-            text={currentWord.word}
-            fontSize={fontSize + 20}
-            intensity={scene.intensity ?? 0.8}
-          />
-        ) : textEffect === 'typewriter' ? (
-          <TypewriterText
-            text={currentWord.word}
-            fontSize={fontSize + 20}
-            color={accentColor}
-            charsPerSecond={18}
-          />
-        ) : textEffect === 'editorial' ? (
-          <EditorialText
-            text={currentWord.word}
-            primaryColor={primaryColor}
-            fontSize={fontSize + 20}
-            frame={wordFrame}
-          />
-        ) : (textEffect === 'kinetic-pop' || (textEffect as string) === 'kinetic') ? (
-          <KineticPopText
-            text={currentWord.word}
-            primaryColor={primaryColor}
-            fps={fps}
-            isVertical={isVertical}
-            springConfig={{ damping: 4, stiffness: 600, mass: 0.25 }}
-            frame={wordFrame}
-          />
-        ) : (
-          /* Pop padrão com spring physics */
-          <PopWord
-            word={currentWord.word}
-            primaryColor={primaryColor}
-            fps={fps}
-            isVertical={isVertical}
-            springConfig={springConfig}
-            frame={wordFrame}
-          />
-        )}
-      </AbsoluteFill>
-    );
-  }
-
-  // ── KARAOKE: todas as palavras visíveis, a ativa é destacada ────────────────
-  if (captionStyle === 'karaoke') {
-    if (words.length === 0) return null;
-
-    return (
-      <AbsoluteFill
-        style={{
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          paddingBottom: isVertical ? '16%' : '10%',
-          paddingLeft: '5%',
-          paddingRight: '5%',
-          pointerEvents: 'none',
+          opacity: fadeOut,
         }}
       >
         <div
           style={{
-            display: 'flex',
+            display: 'inline-flex',
             flexWrap: 'wrap',
             justifyContent: 'center',
-            gap: '10px',
-            maxWidth: '90%',
+            alignItems: 'center',
+            gap: isVertical ? '12px 18px' : '10px 14px',
+            padding: isVertical ? '16px 32px' : '12px 24px',
+            borderRadius: '24px',
+            backgroundColor: 'rgba(5, 8, 20, 0.82)',
+            border: '1.5px solid rgba(255, 255, 255, 0.16)',
+            boxShadow: '0 14px 40px rgba(0,0,0,0.8), 0 0 25px rgba(0,0,0,0.6)',
+            maxWidth: '100%',
           }}
         >
-          {words.map((w, i) => {
-            const isActive = currentTimeInScene >= w.startInSeconds && currentTimeInScene < w.endInSeconds;
-            const isPast   = currentTimeInScene >= w.endInSeconds;
+          {activeChunk.words.map((w, idx) => {
+            const nextWord = activeChunk!.words[idx + 1];
+            const wordEnd = nextWord ? nextWord.startInSeconds : (w.endInSeconds + 0.25);
+            const isActive = currentTimeInScene >= w.startInSeconds && currentTimeInScene < wordEnd;
+            const isPast = currentTimeInScene >= wordEnd;
+
+            // Micro-punch na palavra ativa
+            const wordFrame = Math.max(0, frame - Math.round(w.startInSeconds * fps));
+            const punchScale = isActive
+              ? interpolate(wordFrame, [0, 4, 8], [1.18, 1.10, 1.08], { extrapolateRight: 'clamp' })
+              : 1.0;
+
             return (
-              <KaraokeWord
-                key={i}
-                word={w.word}
-                isActive={isActive}
-                isPast={isPast}
-                primaryColor={scene.emotionColor || primaryColor}
-                accentColor={accentColor}
-                fps={fps}
-                isVertical={isVertical}
-                springConfig={springConfig}
-              />
+              <span
+                key={idx}
+                style={{
+                  display: 'inline-block',
+                  position: 'relative',
+                  fontFamily: "'Montserrat', 'Inter', Impact, sans-serif",
+                  fontSize: isVertical ? 68 : 48,
+                  fontWeight: 900,
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  lineHeight: 1.1,
+                  WebkitTextStroke: isVertical ? '4.5px #000000' : '3.5px #000000',
+                  paintOrder: 'stroke fill',
+                  color: isActive ? highlightColor : isPast ? 'rgba(255,255,255,0.75)' : '#FFFFFF',
+                  transform: `scale(${punchScale})`,
+                  transformOrigin: 'center center',
+                  textShadow: isActive
+                    ? `0 0 25px ${highlightColor}, 0 4px 14px #000000`
+                    : '0 4px 14px rgba(0,0,0,0.95)',
+                  willChange: 'transform, color',
+                }}
+              >
+                {/* Marcador luminoso sob a palavra ativa */}
+                {isActive && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: '2px',
+                      left: '-4px',
+                      right: '-4px',
+                      height: '32%',
+                      backgroundColor: `${highlightColor}38`,
+                      zIndex: -1,
+                      borderRadius: '6px',
+                    }}
+                  />
+                )}
+                {w.word}
+              </span>
             );
           })}
         </div>
-      </AbsoluteFill>
+      </div>
     );
   }
 
-  // ── SUBTITLE: texto completo da cena ──────────────────────────────────────
+  // 2. MODO FALLBACK ESTÁTICO (Caso não venha array de words)
+  if (!captionText) return null;
+
   const subtitleOpacity = interpolate(
     frame,
     [0, 8, durationFrames - 8, durationFrames],
     [0, 1, 1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
-  const subtitleY = interpolate(frame, [0, 12], [20, 0], { extrapolateRight: 'clamp' });
-
-  // textEffect: split-bounce para subtitle também
-  if (textEffect === 'split-bounce' && captionText) {
-    return (
-      <AbsoluteFill
-        style={{
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          paddingBottom: isVertical ? '20%' : '12%',
-          pointerEvents: 'none',
-          opacity: subtitleOpacity,
-        }}
-      >
-        <SplitBounceText
-          text={captionText}
-          primaryColor={primaryColor}
-          fontSize={isVertical ? 56 : 44}
-          springPreset={springPreset}
-          staggerFrames={2}
-        />
-      </AbsoluteFill>
-    );
-  }
 
   return (
-    <AbsoluteFill
+    <div
       style={{
-        justifyContent: 'flex-end',
+        position: 'absolute',
+        bottom: isVertical ? '22%' : '14%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: '90%',
+        display: 'flex',
+        justifyContent: 'center',
         alignItems: 'center',
-        paddingBottom: isVertical ? '20%' : '12%',
-        paddingLeft: '5%',
-        paddingRight: '5%',
+        zIndex: 50,
         pointerEvents: 'none',
+        opacity: subtitleOpacity,
       }}
     >
       <div
         style={{
-          opacity: subtitleOpacity,
-          transform: `translateY(${subtitleY}px)`,
-          backgroundColor: 'rgba(0, 0, 0, 0.85)',
-          borderRadius: '16px',
-          padding: '20px 32px',
-          border: '1px solid rgba(255,255,255,0.08)',
+          display: 'inline-block',
+          padding: isVertical ? '18px 36px' : '14px 28px',
+          borderRadius: '24px',
+          backgroundColor: 'rgba(5, 8, 20, 0.85)',
+          border: '1.5px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 14px 40px rgba(0,0,0,0.8)',
           textAlign: 'center',
-          color: accentColor,
-          fontFamily: 'Montserrat, sans-serif',
-          fontSize: isVertical ? 64 : 50,
-          fontWeight: 800,
-          lineHeight: 1.3,
-          textShadow: '0 2px 8px rgba(0,0,0,0.9)',
-          maxWidth: '100%',
+          color: '#FFFFFF',
+          fontFamily: "'Montserrat', 'Inter', Impact, sans-serif",
+          fontSize: isVertical ? 60 : 44,
+          fontWeight: 900,
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          lineHeight: 1.15,
+          WebkitTextStroke: isVertical ? '4.5px #000000' : '3.5px #000000',
+          paintOrder: 'stroke fill',
+          textShadow: '0 4px 16px rgba(0,0,0,0.95)',
         }}
       >
         {captionText}
       </div>
-    </AbsoluteFill>
+    </div>
   );
 };
 

@@ -70,6 +70,20 @@ app.get('/health', (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// REBUNDLE ON-DEMAND (Hot-reload de código Remotion)
+// ──────────────────────────────────────────────
+app.post('/rebundle', async (req, res) => {
+  try {
+    console.log('[Remotion Service] 🔄 Recompilando bundle sob demanda...');
+    await initBundle();
+    res.json({ success: true, bundledLocation });
+  } catch (err) {
+    console.error('[Remotion Service] ❌ Erro no rebundle:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // SERVIR arquivos renderizados e bundle do Remotion
 // Cache-Control agressivo para que os workers do Chromium
 // não façam re-fetch da mesma imagem em cada frame.

@@ -66,18 +66,54 @@ export const LetteringScene: React.FC<LetteringSceneProps> = ({
         padding: '0 40px',
         zIndex: 5,
         transform: `translate(${exitX}px, ${exitY + idleFloatY}px) scale(${exitScale})`,
-        filter: `blur(${exitBlur}px)`,
+        filter: exitBlur > 0.5 ? `blur(${exitBlur}px)` : 'none',
         opacity: exitOpacity,
       }}
     >
+      {/* Decorative Documentary HUD Kicker */}
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          backgroundColor: 'rgba(255, 230, 0, 0.12)',
+          border: `1.5px solid ${primaryColor}`,
+          borderRadius: '100px',
+          padding: '8px 22px',
+          color: primaryColor,
+          fontFamily: "'Montserrat', 'Inter', sans-serif",
+          fontSize: '22px',
+          fontWeight: 900,
+          letterSpacing: '3px',
+          textTransform: 'uppercase',
+          marginBottom: '24px',
+          boxShadow: `0 0 25px ${primaryColor}44`,
+          opacity: interpolate(frame, [0, 4], [0.8, 1], { extrapolateRight: 'clamp' }),
+          transform: `scale(${interpolate(frame, [0, 8], [1.15, 1.0], { extrapolateRight: 'clamp' })})`,
+        }}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            backgroundColor: primaryColor,
+            boxShadow: `0 0 10px ${primaryColor}`,
+          }}
+        />
+        DOSSIÊ REVELADO
+      </div>
+
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '16px',
+          gap: '18px',
           maxWidth: '920px',
           textAlign: 'center',
+          position: 'relative',
         }}
       >
         {resolvedLines.map((line, lineIdx) => {
@@ -98,27 +134,27 @@ export const LetteringScene: React.FC<LetteringSceneProps> = ({
               }}
             >
               {words.map((word, wordIdx) => {
-                const globalWordIndex = lineIdx * 3 + wordIdx;
-                const delay = globalWordIndex * 3.5; // Stagger é Lei (3-4f)
+                // Linha 0 visível imediatamente desde o frame 0 (zero tela preta)
+                const isLineZero = lineIdx === 0;
+                const delay = isLineZero ? wordIdx * 2.0 : 4 + (lineIdx * 3) + (wordIdx * 2.5);
 
-                // Closed-form spring determinístico analítico
                 const tSec = Math.max(0, (frame - delay) / fps);
-                const enterProgress = closedFormSpring(tSec, 170, 24);
+                const springVal = closedFormSpring(tSec, 180, 22);
 
-                const enterY = interpolate(enterProgress, [0, 1], [60, 0], {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                });
-                const enterBlur = interpolate(enterProgress, [0, 1], [14, 0], {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                });
-                const enterScale = isHero
-                  ? interpolate(enterProgress, [0, 0.7, 1], [0.4, 1.14, 1], {
-                      extrapolateLeft: 'clamp',
-                      extrapolateRight: 'clamp',
-                    })
-                  : enterProgress;
+                // No frame 0, line 0 começa já visível com punch slam
+                const enterProgress = isLineZero ? Math.max(0.7, springVal) : springVal;
+
+                const enterY = isLineZero
+                  ? interpolate(frame, [0, 8], [15, 0], { extrapolateRight: 'clamp' })
+                  : interpolate(enterProgress, [0, 1], [40, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
+                const enterScale = isLineZero
+                  ? interpolate(frame, [0, 8], [1.18, 1.0], { extrapolateRight: 'clamp' })
+                  : isHero
+                  ? interpolate(enterProgress, [0, 0.7, 1], [0.6, 1.12, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+                  : Math.max(0.8, enterProgress);
+
+                const opacity = isLineZero ? 1 : (enterProgress > 0.05 ? 1 : 0);
 
                 // Micro-animação para pontuação (?, !, %)
                 const isPunctuation = word.includes('?') || word.includes('!') || word.includes('%');
@@ -129,36 +165,34 @@ export const LetteringScene: React.FC<LetteringSceneProps> = ({
                     key={wordIdx}
                     style={{
                       display: 'inline-block',
-                      fontFamily: "'Nunito', 'Fredoka', 'Montserrat', 'Inter', sans-serif",
+                      fontFamily: "'Montserrat', 'Inter', Impact, sans-serif",
                       fontSize: `${lineFontSize}px`,
                       fontWeight: line.weight || 900,
-                      letterSpacing: isHero ? '-3px' : '-1px',
+                      letterSpacing: isHero ? '-1px' : '0px',
                       textTransform: 'uppercase',
                       color: lineColor,
                       lineHeight: 1.05,
+                      WebkitTextStroke: '4px #000000',
+                      paintOrder: 'stroke fill',
                       transform: `translateY(${enterY}px) scale(${enterScale}) rotate(${punctRotate}deg)`,
-                      filter: `blur(${enterBlur}px)`,
-                      opacity: enterProgress > 0.05 ? 1 : 0,
-                      // Sombra Cartoon Sólida SEM blur (Padrão VERBO Motion)
-                      textShadow: isHero
-                        ? `0 8px 0 rgba(0, 0, 0, 0.35)`
-                        : `0 6px 0 rgba(0, 0, 0, 0.25)`,
+                      opacity,
+                      textShadow: `0 8px 25px rgba(0, 0, 0, 0.95), 0 0 35px ${lineColor}66`,
                       position: 'relative',
                     }}
                   >
-                    {/* Marca-texto / Caixa de Destaque Cartoon para palavras Hero */}
+                    {/* Marca-texto / Glow de Destaque para palavras Hero */}
                     {isHero && (
                       <span
                         style={{
                           position: 'absolute',
-                          bottom: '6px',
-                          left: '-8px',
-                          right: '-8px',
-                          height: '38%',
-                          backgroundColor: `${primaryColor}40`,
+                          bottom: '4px',
+                          left: '-6px',
+                          right: '-6px',
+                          height: '35%',
+                          backgroundColor: `${lineColor}33`,
                           zIndex: -1,
-                          borderRadius: '8px',
-                          transform: `scaleX(${interpolate(enterProgress, [0, 1], [0, 1], {
+                          borderRadius: '6px',
+                          transform: `scaleX(${interpolate(enterProgress, [0, 1], [0.5, 1], {
                             extrapolateLeft: 'clamp',
                             extrapolateRight: 'clamp',
                           })})`,
