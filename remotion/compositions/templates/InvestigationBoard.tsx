@@ -399,9 +399,9 @@ export const InvestigationBoardSceneSingle: React.FC<InvestigationBoardProps> = 
   // ── Layout positions for evidence items ──
   const positions = isVertical
     ? [
-        { x: 25, y: 28 }, { x: 72, y: 25 },
-        { x: 20, y: 52 }, { x: 75, y: 55 },
-        { x: 50, y: 78 },
+        { x: 26, y: 24 }, { x: 74, y: 23 },
+        { x: 22, y: 46 }, { x: 76, y: 48 },
+        { x: 50, y: 68 },
       ]
     : [
         { x: 15, y: 30 }, { x: 40, y: 25 },
