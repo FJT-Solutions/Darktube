@@ -65,8 +65,8 @@ const sampleShortProps: RemotionShortProps = {
 const calculateShortMetadata = async ({ props }: { props: unknown }) => {
   const shortProps = (props as RemotionShortProps) || {};
   const scenesList = shortProps.scenes || sampleShortProps.scenes || [];
-  const fps = 30;
-  const DEFAULT_TRANSITION_FRAMES = 18;
+  const fps = parseInt((shortProps as any).fps || '24', 10);
+  const DEFAULT_TRANSITION_FRAMES = Math.round(18 * (fps / 30));
 
   let calcFrames = 0;
   for (let i = 0; i < scenesList.length; i++) {
@@ -79,9 +79,16 @@ const calculateShortMetadata = async ({ props }: { props: unknown }) => {
       calcFrames -= tFrames;
     }
   }
-  const durationInFrames = Math.max(120, calcFrames);
+  const durationInFrames = Math.max(Math.round(4 * fps), calcFrames);
+
+  const isVertical = (shortProps.format || 'vertical') === 'vertical';
+  const width = parseInt((shortProps as any).width || (isVertical ? 720 : 1280), 10);
+  const height = parseInt((shortProps as any).height || (isVertical ? 1280 : 720), 10);
 
   return {
+    fps,
+    width,
+    height,
     durationInFrames,
     defaultProps: sampleShortProps,
   };

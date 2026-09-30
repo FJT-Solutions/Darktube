@@ -6,7 +6,11 @@ import {
   useCurrentFrame,
   useVideoConfig,
   Easing,
+  Sequence,
+  Img,
 } from 'remotion';
+import { SceneSegment, RemotionShortProps } from '../types';
+import { CaptionLayer } from './CaptionLayer';
 
 // ─── Deterministic RNG (Mulberry32) ─────────────────────────────────────────
 function createRng(seed: number) {
@@ -32,6 +36,11 @@ export interface TactileDossierProps {
   marginNote?: string;        // Handwritten margin annotation
   format?: 'vertical' | 'horizontal';
   primaryColor?: string;
+  accentColor?: string;
+  showWatermark?: boolean;
+  watermarkText?: string;
+  scene?: SceneSegment;
+  sceneIndex?: number;
 }
 
 // ─── SVG Wavy Highlighter Path ──────────────────────────────────────────────
@@ -172,7 +181,7 @@ const ScanLinesOverlay: React.FC<{ frame: number; opacity: number }> = ({ frame,
           right: 0,
           height: '3px',
           background: 'linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.25), transparent)',
-          filter: 'blur(1px)',
+          boxShadow: '0 0 6px rgba(0, 240, 255, 0.4)',
         }}
       />
     </div>
@@ -265,7 +274,7 @@ const PaperAgingStains: React.FC<{ opacity: number }> = ({ opacity }) => {
  * fita adesiva de evidência, anotações manuscritas na margem,
  * paperclip metálico, redaction bars, paper aging procedural.
  */
-export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
+const TactileDossierSceneSingle: React.FC<TactileDossierProps> = ({
   classification = 'TOP SECRET // CLASSIFICADO',
   documentTitle = 'RELATÓRIO ESTRATÉGICO DE INFRAESTRUTURA',
   dossierNumber = 'DOSSIÊ-BR-9941',
@@ -278,11 +287,28 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
   marginNote = 'verificar fonte primária →',
   format = 'vertical',
   primaryColor = '#00F0FF',
+  accentColor = '#FFE600',
+  showWatermark = true,
+  watermarkText = 'DarkTube Dossier',
+  scene,
+  sceneIndex = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const isVertical = format === 'vertical';
+
+  const effClassification = scene?.badgeText
+    ? `CLASSIFICADO // ${scene.badgeText}`
+    : (sceneIndex > 0 ? `ARQUIVO CONFIDENCIAL #${sceneIndex + 1}` : classification);
+  const effTitle = scene?.letteringLines?.[0]?.text || documentTitle;
+  const effHighlight = scene?.letteringLines?.find(l => l.isHighlight)?.text || scene?.letteringLines?.[1]?.text || highlightWords;
+  const effBody = scene?.captionText || bodyText;
+  const effStamp = scene?.badgeText || (sceneIndex % 2 === 1 ? 'CONFIDENCIAL' : stampText);
+  const effRedacted = scene?.letteringLines?.[1]?.text ? `OPERAÇÃO ${scene.letteringLines[1].text.toUpperCase()}` : redactedText;
+  const effMargin = scene?.badgeText ? `// REF: ${scene.badgeText}` : marginNote;
+  const effDossierNo = dossierNumber || `DOSSIÊ-BR-${sceneIndex + 9941}`;
+  const effImage = scene?.imageUrl;
 
   // ── 1. Document entry with inertial spring ──
   const docEnter = spring({
@@ -297,13 +323,13 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
 
   // ── 2. Typewriter effect for body text ──
   const typewriterChars = Math.floor(
-    interpolate(frame, [15, 15 + bodyText.length * 0.8], [0, bodyText.length], {
+    interpolate(frame, [15, 15 + effBody.length * 0.8], [0, effBody.length], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
     })
   );
-  const visibleBody = bodyText.substring(0, typewriterChars);
-  const cursorVisible = frame % 16 < 10 && typewriterChars < bodyText.length;
+  const visibleBody = effBody.substring(0, typewriterChars);
+  const cursorVisible = frame % 16 < 10 && typewriterChars < effBody.length;
 
   // ── 3. Wavy highlighter with hand tremor ──
   const highlightProgress = interpolate(frame, [22, 55], [0, 100], {
@@ -487,7 +513,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
                 letterSpacing: '2px',
               }}
             >
-              {classification}
+              {effClassification}
             </span>
           </div>
           <span
@@ -497,7 +523,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
               letterSpacing: '1px',
             }}
           >
-            {dossierNumber}
+            {effDossierNo}
           </span>
         </div>
 
@@ -505,24 +531,66 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
         <h3
           style={{
             fontFamily: "'Inter', sans-serif",
-            fontSize: isVertical ? '28px' : '24px',
+            fontSize: isVertical ? '26px' : '22px',
             fontWeight: 900,
             color: '#FFFFFF',
             textTransform: 'uppercase',
-            margin: '0 0 20px 0',
+            margin: '0 0 16px 0',
             lineHeight: 1.25,
             letterSpacing: '-0.5px',
           }}
         >
-          {documentTitle}
+          {effTitle}
         </h3>
+
+        {/* ── EVIDÊNCIA FOTOGRÁFICA (SE DISPONÍVEL) ── */}
+        {effImage && (
+          <div
+            style={{
+              position: 'relative',
+              margin: '8px auto 14px auto',
+              width: '95%',
+              maxHeight: isVertical ? '220px' : '180px',
+              overflow: 'hidden',
+              borderRadius: '8px',
+              border: '2px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+            }}
+          >
+            <Img
+              src={effImage}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: 'contrast(1.1) brightness(0.9)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '6px',
+                right: '8px',
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                color: '#FFE600',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontFamily: 'monospace',
+                letterSpacing: '1px',
+              }}
+            >
+              FIG. {sceneIndex + 1} // EVIDÊNCIA
+            </div>
+          </div>
+        )}
 
         {/* ── TEXTO DESTACADO COM MARCA-TEXTO SVG ONDULANTE ── */}
         <div
           style={{
             position: 'relative',
             display: 'inline-block',
-            margin: '12px 0 24px 0',
+            margin: '10px 0 18px 0',
             lineHeight: 1.4,
           }}
         >
@@ -530,8 +598,8 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
           <WavyHighlighter
             progress={highlightProgress}
             color={highlighterColor}
-            width={isVertical ? 680 : 580}
-            height={isVertical ? 80 : 65}
+            width={isVertical ? 580 : 540}
+            height={isVertical ? 75 : 60}
             frame={frame}
           />
           <span
@@ -539,7 +607,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
               position: 'relative',
               zIndex: 2,
               fontFamily: "'Inter', sans-serif",
-              fontSize: isVertical ? '26px' : '22px',
+              fontSize: isVertical ? '23px' : '20px',
               fontWeight: 900,
               color: highlightProgress > 30 ? '#0F172A' : '#FFFFFF',
               backgroundColor: 'transparent',
@@ -548,7 +616,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
               transition: 'color 0.2s',
             }}
           >
-            {highlightWords}
+            {effHighlight}
           </span>
         </div>
 
@@ -595,7 +663,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
               transition: 'color 0.3s',
             }}
           >
-            {redactedText}
+            {effRedacted}
           </span>
           {/* Black redaction bar that slides away */}
           <div
@@ -646,7 +714,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
             pointerEvents: 'none',
           }}
         >
-          {marginNote}
+          {effMargin}
         </div>
 
         {/* ── RODAPÉ COM CÓDIGO DE BARRAS ANIMADO ── */}
@@ -716,7 +784,7 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
                 pointerEvents: 'none',
               }}
             >
-              {stampText}
+              {effStamp}
             </div>
 
             {/* Impact particles */}
@@ -730,6 +798,94 @@ export const TactileDocumentaryDossier: React.FC<TactileDossierProps> = ({
           </>
         )}
       </div>
+
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {scene && (
+        <CaptionLayer
+          scene={scene}
+          captionStyle="pop"
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          format={format}
+        />
+      )}
+
+      {/* ── WATERMARK ── */}
+      {showWatermark && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '25px',
+            left: '25px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 40,
+          }}
+        >
+          <div
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: primaryColor,
+              boxShadow: `0 0 8px ${primaryColor}`,
+            }}
+          />
+          <span
+            style={{
+              fontSize: '13px',
+              fontWeight: 800,
+              letterSpacing: '2px',
+              color: 'rgba(255,255,255,0.7)',
+              textTransform: 'uppercase',
+            }}
+          >
+            {watermarkText}
+          </span>
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};
+
+// ─── Main Multi-Scene Tactile Documentary Dossier Composition ───────────────
+export const TactileDocumentaryDossier: React.FC<TactileDossierProps & RemotionShortProps> = (props) => {
+  const { fps } = useVideoConfig();
+  const scenes = props.scenes;
+
+  if (!scenes || scenes.length === 0) {
+    return <TactileDossierSceneSingle {...props} />;
+  }
+
+  let accumulatedFrames = 0;
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#050811' }}>
+      {scenes.map((scene, idx) => {
+        const durSeconds = scene.durationSeconds || 5;
+        const durFrames = Math.max(30, Math.round(durSeconds * fps));
+        const fromFrame = accumulatedFrames;
+        accumulatedFrames += durFrames;
+
+        return (
+          <Sequence
+            key={`dossier_seq_${idx}_${scene.captionText?.slice(0, 10) || ''}`}
+            from={fromFrame}
+            durationInFrames={durFrames}
+          >
+            <TactileDossierSceneSingle
+              scene={scene}
+              sceneIndex={idx}
+              format={props.format || 'vertical'}
+              primaryColor={props.primaryColor || '#00F0FF'}
+              accentColor={props.accentColor || '#FFE600'}
+              showWatermark={props.showWatermark ?? true}
+              watermarkText={props.watermarkText || 'DarkTube Dossier'}
+            />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };

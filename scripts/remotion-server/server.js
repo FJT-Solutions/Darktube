@@ -720,8 +720,8 @@ async function renderAsync(historyId, composition, callbackUrl) {
   // Regra: máximo de 3 segundos de render por frame, mínimo 10 min, máximo 60 min
   const scenesList = composition.scenes || [];
   let estimatedFrames = 0;
-  const fps = 30;
-  const DEFAULT_TRANSITION_FRAMES = 18;
+  const fps = parseInt(composition.fps || '24', 10);
+  const DEFAULT_TRANSITION_FRAMES = Math.round(18 * (fps / 30));
   for (let i = 0; i < scenesList.length; i++) {
     const scene = scenesList[i];
     estimatedFrames += Math.round((scene.durationSeconds || 5) * fps);
@@ -732,7 +732,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
     }
   }
   const MAX_RENDER_SECONDS = Math.max(600, Math.min(3600, estimatedFrames * 3));
-  console.log(`[Remotion Watchdog] Timeout global: ${MAX_RENDER_SECONDS}s (${(MAX_RENDER_SECONDS / 60).toFixed(1)} min) para ~${estimatedFrames} frames`);
+  console.log(`[Remotion Watchdog] Timeout global: ${MAX_RENDER_SECONDS}s (${(MAX_RENDER_SECONDS / 60).toFixed(1)} min) para ~${estimatedFrames} frames (@${fps}fps)`);
 
   // ── WATCHDOG 2: Stall detector — aborta se sem progresso por 3 minutos ──
   const STALL_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos sem progresso = abort
@@ -768,12 +768,12 @@ async function renderAsync(historyId, composition, callbackUrl) {
     // Pré-carrega e baixa todos os assets localmente + gera recortes 2.5D
     await preloadAndProcessAllAssets(composition.scenes);
 
-    // Determinar dimensões pelo format
+    // Determinar dimensões pelo format (Padrão rápido: 720x1280 @ 24fps para máxima performance de CPU)
     const isVertical = (composition.format || 'vertical') === 'vertical';
-    const width  = isVertical ? 1080 : 1920;
-    const height = isVertical ? 1920 : 1080;
+    const width  = parseInt(composition.width  || (isVertical ? 720 : 1280), 10);
+    const height = parseInt(composition.height || (isVertical ? 1280 : 720), 10);
 
-    // ── Calcular duração total EXATA em frames (30fps) ──
+    // ── Calcular duração total EXATA em frames ──
     let calcFrames = 0;
     for (let i = 0; i < scenesList.length; i++) {
       const scene = scenesList[i];
@@ -786,7 +786,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       }
     }
     const durationInFrames = Math.max(30, calcFrames);
-    console.log(`[Remotion Render] Duração exata calculada: ${durationInFrames} frames (${(durationInFrames / fps).toFixed(2)}s) para ${scenesList.length} cenas`);
+    console.log(`[Remotion Render] Duração exata calculada: ${durationInFrames} frames (${(durationInFrames / fps).toFixed(2)}s @ ${fps}fps, ${width}x${height}) para ${scenesList.length} cenas`);
 
     // inputProps = o que o ShortVideoComposition recebe via useVideoConfig + props
     const inputProps = {
@@ -852,7 +852,7 @@ async function renderAsync(historyId, composition, callbackUrl) {
       concurrency,
       maxRetries: 3,
       imageFormat: 'jpeg',
-      jpegQuality: 85,
+      jpegQuality: parseInt(composition.jpegQuality || '75', 10),
       inputProps,
       gl: null,
       browserExecutable: CHROME_PATH,
