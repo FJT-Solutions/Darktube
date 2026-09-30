@@ -7,6 +7,7 @@ import {
   interpolate,
 } from 'remotion';
 import { SceneSegment, RemotionShortProps } from '../../types';
+import { CaptionLayer } from '../CaptionLayer';
 
 // ─── Deterministic RNG ──────────────────────────────────────────────────────
 function createRng(seed: number) {
@@ -479,6 +480,17 @@ export const PollDebateComposition: React.FC<RemotionShortProps> = ({
           <span>•</span>
           <span style={{ color: '#F59E0B' }}>COMENTE SEU VOTO</span>
         </div>
+      )}
+
+      {/* ── WORD-LEVEL SYNCHRONIZED KARAOKE CAPTIONS ── */}
+      {currentScene && (
+        <CaptionLayer
+          scene={currentScene}
+          captionStyle="highlight"
+          primaryColor={primaryColor}
+          accentColor={accentColor}
+          format={format}
+        />
       )}
     </AbsoluteFill>
   );

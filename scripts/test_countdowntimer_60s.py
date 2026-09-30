@@ -240,12 +240,9 @@ timestamps = [3.0, 13.0, 23.0, 33.0, 43.0, 53.0]
 sftp = c.open_sftp()
 for idx, ts in enumerate(timestamps):
     frame_path = os.path.join(FRAMES_DIR, f"scene_{idx + 1}_{int(ts)}s.jpg")
-    cmd = f"""
-docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/countdown_frame_{idx+1}.jpg
-docker cp {cid}:/app/output/countdown_frame_{idx+1}.jpg /tmp/countdown_frame_{idx+1}.jpg
-"""
-    c.exec_command(cmd)
-    time.sleep(1)
+    cmd = f"docker exec {cid} ffmpeg -y -ss {ts} -i /app/output/render_{job_id}.mp4 -vframes 1 -q:v 2 /app/output/countdown_frame_{idx+1}.jpg && docker cp {cid}:/app/output/countdown_frame_{idx+1}.jpg /tmp/countdown_frame_{idx+1}.jpg"
+    stdin, stdout, stderr = c.exec_command(cmd)
+    stdout.channel.recv_exit_status()
     sftp.get(f"/tmp/countdown_frame_{idx+1}.jpg", frame_path)
     print(f"  📸 Keyframe {idx + 1} extraído ({ts}s): {frame_path}", flush=True)
 
