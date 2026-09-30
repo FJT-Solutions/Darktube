@@ -1,0 +1,29 @@
+{
+  "id": "blur-slide",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "Title words enter one by one \u2014 y 40\u21920 + blur 10\u21920 + opacity 0\u21921, all three channels converging on the same outCubic easing with word gaps of ~3.5f; the subtitle follows with a stagger before the title finishes settling",
+  "duration": "~3.8s (114f@30fps)",
+  "energy": "Low (one-shot settle, no peaks, no loops)",
+  "styles": [
+    {
+      "key": "blur-slide",
+      "label": "blur-slide",
+      "media": "./media/blur-slide.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/blur-slide.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/blur-slide/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/blur-slide/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/blur-slide/BlurSlide.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/blur-slide/prompt.md",
+  "unlock": null
+}

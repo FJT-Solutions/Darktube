@@ -9,7 +9,8 @@ c.connect('31.220.92.254', username='root', password='fjt@Solutions1')
 
 stdin, stdout, stderr = c.exec_command('docker ps --format "{{.ID}} | {{.Names}} | {{.CreatedAt}} | {{.Status}}"\n')
 print("Containers:\n", stdout.read().decode('utf-8', errors='replace'))
-stdin, stdout, stderr = c.exec_command('for cid in $(docker ps -q -f name=remotion); do echo "=== Container $cid ==="; docker logs --tail 15 $cid; done')
-print("Logs:\n", stdout.read().decode('utf-8', errors='replace'))
+stdin, stdout, stderr = c.exec_command('CID=`docker ps -q -f name=n8n-remotionservice | head -n1`\ndocker exec $CID node -e "const { bundle } = require(\'@remotion/bundler\'); bundle({ entryPoint: \'/app/remotion/index.tsx\' }).then(b => console.log(\'BUNDLE SUCCESS:\', b)).catch(e => console.error(\'BUNDLE ERROR:\', e.message || e))"')
+print("Direct Bundle Output:\n", stdout.read().decode('utf-8', errors='replace'))
+print("Direct Bundle Err:\n", stderr.read().decode('utf-8', errors='replace'))
 
 c.close()

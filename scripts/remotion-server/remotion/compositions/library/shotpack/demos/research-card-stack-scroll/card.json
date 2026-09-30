@@ -1,0 +1,29 @@
+{
+  "id": "research-card-stack-scroll",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Dark paper cards fly in along a bottom-right axis into the center, one every 12 frames, stacking with a 1-frame squash on landing; only the top card renders fully clear (title + authors + abstract), cards below increasingly blur and darken with stack depth, showing only their title bar; the horizontal grid background scrolls down in sync as a speed reference",
+  "duration": "~4.8s (144f@30fps)",
+  "energy": "Medium-high (uniform high frequency \u2014 no explosion but constant pressure)",
+  "styles": [
+    {
+      "key": "research-card-stack-scroll",
+      "label": "research-card-stack-scroll",
+      "media": "./media/research-card-stack-scroll.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/research-card-stack-scroll.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/research-card-stack-scroll/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/research-card-stack-scroll/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/research-card-stack-scroll/ResearchCardStackScroll.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/research-card-stack-scroll/prompt.md",
+  "unlock": null
+}

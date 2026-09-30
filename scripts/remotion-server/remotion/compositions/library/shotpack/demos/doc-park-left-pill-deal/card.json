@@ -1,0 +1,29 @@
+{
+  "id": "doc-park-left-pill-deal",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "The document doesn't fade out but slides out to the left leaving only ~35% width, slightly shrinking to 0.92; on the right, three white outlined pills deal in slowly to the narration rhythm (outBack pop-in); after each lands, its subtitle darkens word by word, then the whole sentence fades out before the next arrives; the document auto-scrolls very slowly the whole time, keeping \"being read\" alive",
+  "duration": "~5.8s (174f@30fps)",
+  "energy": "Low (slow dealing rhythm, no peaks; kept alive by the auto-scroll)",
+  "styles": [
+    {
+      "key": "doc-park-left-pill-deal",
+      "label": "doc-park-left-pill-deal",
+      "media": "./media/doc-park-left-pill-deal.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/doc-park-left-pill-deal.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/doc-park-left-pill-deal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/doc-park-left-pill-deal/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/doc-park-left-pill-deal/DocParkLeftPillDeal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/doc-park-left-pill-deal/prompt.md",
+  "unlock": null
+}

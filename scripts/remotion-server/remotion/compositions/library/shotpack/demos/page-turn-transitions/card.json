@@ -1,0 +1,35 @@
+{
+  "id": "page-turn-transitions",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Full-page solid-block transitions, two variants \u2014 cube-rotate (two pages glued to adjacent cube faces, rotating 90\u00b0) and barn-door-split (the old page splits in two and slides apart, the new page meeting it head-on)",
+  "duration": "Per variant, previous-state setup 30f + transition 20\u201338f + ending \u226540f, ~4.4\u20134.7s",
+  "energy": "Medium-High",
+  "styles": [
+    {
+      "key": "cube-rotate",
+      "label": "cube-rotate",
+      "media": "./media/cube-rotate.mp4?v=1784437314669"
+    },
+    {
+      "key": "barn-door-split",
+      "label": "barn-door-split",
+      "media": "./media/barn-door-split.mp4?v=1784437314671"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/cube-rotate.mp4?v=1784437314669",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/page-turn-transitions/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/page-turn-transitions/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/page-turn-transitions/BarnDoorSplit.tsx",
+    "./demos/transition/page-turn-transitions/CubeRotate.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/page-turn-transitions/prompt.md",
+  "unlock": null
+}

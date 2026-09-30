@@ -1,0 +1,36 @@
+{
+  "id": "fui-hud-moves",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "ui-entrance"
+  ],
+  "summary": "FUI/HUD two variants \u2014 line-unfold-panel, a line unfolds into a panel (line\u2192plane CRT grammar), and reticle-lock-on, a reticle locks on (viewfinder flies in and locks the target)",
+  "duration": "A 3\u20134s (incl. exit) / B 2\u20133s",
+  "energy": "A medium / B medium-high (the lock frame is the hit point)",
+  "styles": [
+    {
+      "key": "line-unfold-panel",
+      "label": "line-unfold-panel",
+      "media": "./media/line-unfold-panel.mp4?v=1784437314568"
+    },
+    {
+      "key": "reticle-lock-on",
+      "label": "reticle-lock-on",
+      "media": "./media/reticle-lock-on.mp4?v=1784437314570"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/line-unfold-panel.mp4?v=1784437314568",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/fui-hud-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/fui-hud-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/fui-hud-moves/LineUnfoldPanel.tsx",
+    "./demos/effects/fui-hud-moves/ReticleLockOn.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/fui-hud-moves/prompt.md",
+  "unlock": null
+}

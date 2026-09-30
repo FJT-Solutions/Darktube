@@ -1,0 +1,35 @@
+{
+  "id": "wipe-transitions",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Geometric wipe transitions, two variants \u2014 clock-wipe (a radar pointer sweeps 360\u00b0 to change pages) and blinds-slice (12 vertical strips staggered-flip into a wave)",
+  "duration": "Per variant, prior state \u226520f + wipe 32\u201360f + ending \u226540f, ~5s (150f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "clock-wipe",
+      "label": "clock-wipe",
+      "media": "./media/clock-wipe.mp4?v=1784437314879"
+    },
+    {
+      "key": "blinds-slice",
+      "label": "blinds-slice",
+      "media": "./media/blinds-slice.mp4?v=1784437314880"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/clock-wipe.mp4?v=1784437314879",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/wipe-transitions/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/wipe-transitions/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/wipe-transitions/BlindsSlice.tsx",
+    "./demos/transition/wipe-transitions/ClockWipe.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/wipe-transitions/prompt.md",
+  "unlock": null
+}

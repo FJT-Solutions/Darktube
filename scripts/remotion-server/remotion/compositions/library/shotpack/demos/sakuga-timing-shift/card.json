@@ -1,0 +1,30 @@
+{
+  "id": "sakuga-timing-shift",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "ui-entrance"
+  ],
+  "summary": "Shooting on 3s becomes shooting on 1s \u2014 the element first moves with hand-flip-book staccato in 3-frame steps, at the climax moment it cuts to frame-by-frame silky sprint; the frame-rate quantization shift itself is the spectacle",
+  "duration": "~5s",
+  "energy": "Medium-high",
+  "styles": [
+    {
+      "key": "sakuga-timing-shift",
+      "label": "sakuga-timing-shift",
+      "media": "./media/sakuga-timing-shift.mp4?v=1784437314722"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/sakuga-timing-shift.mp4?v=1784437314722",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/sakuga-timing-shift/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/sakuga-timing-shift/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/sakuga-timing-shift/SakugaTimingShift.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/sakuga-timing-shift/prompt.md",
+  "unlock": null
+}

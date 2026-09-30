@@ -1,0 +1,41 @@
+{
+  "id": "montage-rhythm-moves",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm"
+  ],
+  "summary": "Three montage rhythm variants \u2014 drop-blackout-slam blackout buildup to burst, wright-triple-cut triple click close-ups, domino-cascade domino chain entrance",
+  "duration": "A 4.3s / B 4.3s / C 5s",
+  "energy": "High",
+  "styles": [
+    {
+      "key": "drop-blackout-slam",
+      "label": "drop-blackout-slam \u9ed1\u573a\u84c4\u7206",
+      "media": "./media/drop-blackout-slam.mp4?v=1784437314637"
+    },
+    {
+      "key": "wright-triple-cut",
+      "label": "wright-triple-cut \u4e09\u8fde\u7279\u5199",
+      "media": "./media/wright-triple-cut.mp4?v=1784437314638"
+    },
+    {
+      "key": "domino-cascade",
+      "label": "domino-cascade \u8fde\u9501\u5165\u573a",
+      "media": "./media/domino-cascade.mp4?v=1784437314640"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/drop-blackout-slam.mp4?v=1784437314637",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/montage-rhythm-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/montage-rhythm-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/montage-rhythm-moves/DominoCascade.tsx",
+    "./demos/rhythm/montage-rhythm-moves/DropBlackoutSlam.tsx",
+    "./demos/rhythm/montage-rhythm-moves/WrightTripleCut.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/montage-rhythm-moves/prompt.md",
+  "unlock": null
+}

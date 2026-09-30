@@ -1,0 +1,27 @@
+{
+  "id": "deck-deal-flyin",
+  "tier": "paid",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "In a dark metallic background, a close-up of a physical deck of cards opens with an orbit, then pulls back to the page as a pile of cards slams into the grid like dealing \u2014 hard accelerating \u2014 with the camera chasing the scroll and resting half a second on the full board",
+  "duration": "dealing segment ~2.6s (36\u2013113f), preceded by an optional ~2s (62f) deck close-up",
+  "energy": "High (workhorse of the rhythm-climbing segment; don't use as the opening first shot)",
+  "styles": [
+    {
+      "key": "deck-deal-flyin",
+      "label": "deck-deal-flyin",
+      "media": "./media/deck-deal-flyin.mp4?v=1784437314552"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/deck-deal-flyin.mp4?v=1784437314552",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/deck-deal-flyin/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/deck-deal-flyin/prompt.md",
+  "unlock": "https://getshotpack.com/pricing"
+}

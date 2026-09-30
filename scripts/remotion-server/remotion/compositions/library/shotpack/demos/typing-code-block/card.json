@@ -1,0 +1,29 @@
+{
+  "id": "typing-code-block",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "The same syntax-highlighted code shows two reveals side by side \u2014 left side line-level stagger with 4f gaps, fading in and rising 8px; right side per-character typing keeping each character's original token color, with a #3a4468 block cursor behind the current character",
+  "duration": "~4.6s (138f@30fps)",
+  "energy": "Medium (right side continuous typing advance, left side one-shot convergence)",
+  "styles": [
+    {
+      "key": "typing-code-block",
+      "label": "typing-code-block",
+      "media": "./media/typing-code-block.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/typing-code-block.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/typing-code-block/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/typing-code-block/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/typing-code-block/TypingCodeBlock.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/typing-code-block/prompt.md",
+  "unlock": null
+}

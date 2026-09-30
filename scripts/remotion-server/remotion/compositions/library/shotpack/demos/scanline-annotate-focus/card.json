@@ -1,0 +1,29 @@
+{
+  "id": "scanline-annotate-focus",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "A bright scanline sweeps top-to-bottom across the page; wherever it passes, a camera viewfinder pops in sequence (1.75\u00d7 converging + slight overshoot), then a monospace small annotation fires beside it, and the top status line counts in sync 00/06\u219206/06",
+  "duration": "~4.6s (138f@30fps)",
+  "energy": "medium (mechanical and calm; rhythm driven by the constant-velocity scanline, annotations as beat points)",
+  "styles": [
+    {
+      "key": "scanline-annotate-focus",
+      "label": "scanline-annotate-focus",
+      "media": "./media/scanline-annotate-focus.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/scanline-annotate-focus.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/scanline-annotate-focus/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/scanline-annotate-focus/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/scanline-annotate-focus/ScanlineAnnotateFocus.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/scanline-annotate-focus/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,41 @@
+{
+  "id": "transition-hidden-cut",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Hidden-cut transitions, three variants \u2014 foreground-occlusion invisible cut, versus-slam opening, and warm light-leak burn; the hard cut is hidden inside 1\u20133 frames of occlusion/impact/light peak, and the viewer never sees the scissors",
+  "duration": "n/a (technique card; frames per variant are in the parameter table, drawn from the adjacent shots' budgets)",
+  "energy": "n/a (technique card, doesn't occupy an energy slot)",
+  "styles": [
+    {
+      "key": "invisible-cut",
+      "label": "invisible-cut \u524d\u666f\u906e\u6321\u9690\u5f62\u5207",
+      "media": "./media/invisible-cut.mp4?v=1784437314833"
+    },
+    {
+      "key": "versus-slam",
+      "label": "versus-slam \u5bf9\u649e\u5f00\u5c4f",
+      "media": "./media/versus-slam.mp4?v=1784437314835"
+    },
+    {
+      "key": "light-leak-burn",
+      "label": "light-leak-burn \u7425\u73c0\u6f0f\u5149",
+      "media": "./media/light-leak-burn.mp4?v=1784437314836"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/invisible-cut.mp4?v=1784437314833",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/transition-hidden-cut/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/transition-hidden-cut/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/transition-hidden-cut/InvisibleCut.tsx",
+    "./demos/transition/transition-hidden-cut/LightLeakBurn.tsx",
+    "./demos/transition/transition-hidden-cut/VersusSlam.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/transition-hidden-cut/prompt.md",
+  "unlock": null
+}

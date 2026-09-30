@@ -1,0 +1,29 @@
+{
+  "id": "cursor-flyover",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera"
+  ],
+  "summary": "After the full-page overhead view fades in, the camera flies to each of the four corners for zoom-in close-ups, while an SVG cursor syncs in to point and leaves click ripples",
+  "duration": "~6.0s (180f @ 30fps; overhead 0\u20131.2s \u00b7 four steps of 0.7s transition + 0.5s hold each)",
+  "energy": "Medium (steady cruise; rhythm comes from the click ripples)",
+  "styles": [
+    {
+      "key": "cursor-flyover",
+      "label": "cursor-flyover",
+      "media": "./media/cursor-flyover.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/cursor-flyover.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/cursor-flyover/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/cursor-flyover/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/cursor-flyover/CursorFlyover.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/cursor-flyover/prompt.md",
+  "unlock": null
+}

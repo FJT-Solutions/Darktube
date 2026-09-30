@@ -1,0 +1,31 @@
+{
+  "id": "dataviz-landscape-open",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "data",
+    "camera"
+  ],
+  "summary": "Dark-field river-of-lines landscape opening \u2014 multiple streams merge into a main trunk, fictional ID labels float on the lines, the camera flies over at low speed with deep depth of field",
+  "duration": "5\u20138s (opening atmosphere segment, \u22641 time per film)",
+  "energy": "Low start, slow climb (opening slot, leaves room for the later ramp)",
+  "styles": [
+    {
+      "key": "dataviz-landscape-open",
+      "label": "dataviz-landscape-open",
+      "media": "./media/dataviz-landscape-open.mp4?v=1784437314547"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/dataviz-landscape-open.mp4?v=1784437314547",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/dataviz-landscape-open/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/dataviz-landscape-open/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/dataviz-landscape-open/DatavizLandscapeOpen.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/dataviz-landscape-open/prompt.md",
+  "unlock": null
+}

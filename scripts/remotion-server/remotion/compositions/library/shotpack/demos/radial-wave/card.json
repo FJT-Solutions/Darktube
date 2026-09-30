@@ -1,0 +1,29 @@
+{
+  "id": "radial-wave",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "A 17\u00d79 dot grid lights up staggered by Euclidean distance from the wave source; each dot overshoots scale to 1.5 then settles to a constant on state; after the first wave sweeps, a second bright-blue pulse gathers back inward from the outer ring to the center",
+  "duration": "~3.8s (114f@30fps)",
+  "energy": "Medium-high (one burst at the start; after the wavefront passes it settles into a constant low-energy base)",
+  "styles": [
+    {
+      "key": "radial-wave",
+      "label": "radial-wave",
+      "media": "./media/radial-wave.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/radial-wave.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/radial-wave/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/radial-wave/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/radial-wave/RadialWave.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/radial-wave/prompt.md",
+  "unlock": null
+}

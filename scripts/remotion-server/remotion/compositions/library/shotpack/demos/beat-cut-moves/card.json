@@ -1,0 +1,36 @@
+{
+  "id": "beat-cut-moves",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "transition"
+  ],
+  "summary": "Two variants of hard cuts as a rhythmic instrument \u2014 an accelerating hard-cut chain (halving intervals closing in on the beat) and a flash-freeze sequence (three white flashes, each cutting to a different crop)",
+  "duration": "A total ~4.3s (setup 49f + five-cut chain + freeze hold 35f); B total ~4.3s (live footage 30f + three flashes + hold 60f)",
+  "energy": "High",
+  "styles": [
+    {
+      "key": "beat-cut-accelerando",
+      "label": "beat-cut-accelerando \u9012\u8fdb\u786c\u5207\u4e32",
+      "media": "./media/beat-cut-accelerando.mp4?v=1784437314486"
+    },
+    {
+      "key": "paparazzi-flash",
+      "label": "paparazzi-flash \u8fde\u95ea\u5b9a\u683c",
+      "media": "./media/paparazzi-flash.mp4?v=1784437314488"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/beat-cut-accelerando.mp4?v=1784437314486",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/beat-cut-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/beat-cut-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/beat-cut-moves/BeatCutAccelerando.tsx",
+    "./demos/rhythm/beat-cut-moves/PaparazziFlash.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/beat-cut-moves/prompt.md",
+  "unlock": null
+}

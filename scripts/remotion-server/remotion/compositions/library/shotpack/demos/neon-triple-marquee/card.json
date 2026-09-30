@@ -1,0 +1,30 @@
+{
+  "id": "neon-triple-marquee",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro",
+    "typography"
+  ],
+  "summary": "Three rows of opposite-direction neon marquees recap \u2014 BETTER/FASTER/STRONGER in giant hollow-stroke letters stacked top/middle/bottom filling the screen; odd/even rows roll horizontally at constant speed in opposite directions; the three rows light up in turn on a 1/3 phase; the whole group fades out at the end",
+  "duration": "4\u20135s (demo 150f: 10f fade-in + loop body + 20f fade-out)",
+  "energy": "Medium-high (continuous flow + per-row pulses, no instantaneous impact)",
+  "styles": [
+    {
+      "key": "neon-triple-marquee",
+      "label": "neon-triple-marquee",
+      "media": "./media/neon-triple-marquee.mp4?v=1784437314656"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/neon-triple-marquee.mp4?v=1784437314656",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/neon-triple-marquee/prompt.md",
+  "tsx": "https://getshotpack.com/demos/outro/neon-triple-marquee/demo.tsx",
+  "tsxFiles": [
+    "./demos/outro/neon-triple-marquee/NeonTripleMarquee.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/outro/neon-triple-marquee/prompt.md",
+  "unlock": null
+}

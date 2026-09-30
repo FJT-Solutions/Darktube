@@ -1,0 +1,30 @@
+{
+  "id": "stroke-segment-build",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "typography"
+  ],
+  "summary": "Broken strokes make the word \u2014 the title splits into a dozen disconnected stroke segments lit up in random order; the first 70% is unreadable, then the moment the last segments land the meaning \"snaps\" into place",
+  "duration": "4\u20135s",
+  "energy": "Low start, mid peak (suspense type; the landing frame is the energy point)",
+  "styles": [
+    {
+      "key": "stroke-segment-build",
+      "label": "stroke-segment-build",
+      "media": "./media/stroke-segment-build.mp4?v=1784437314790"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/stroke-segment-build.mp4?v=1784437314790",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/stroke-segment-build/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/stroke-segment-build/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/stroke-segment-build/StrokeSegmentBuild.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/stroke-segment-build/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "scanline-assemble-flyin",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects"
+  ],
+  "summary": "A page opens on an empty dark grid; a bright scanline sweeps top-to-bottom; wherever it reaches a block's landing point, that component flies in from off-screen and locks in, with motion blur and a landing edge flash \u2014 the page is exactly assembled the moment the scan completes",
+  "duration": "~4.6s (138f@30fps)",
+  "energy": "medium-high (the scanline is steady, but each component fly-in is a burst point, density escalating)",
+  "styles": [
+    {
+      "key": "scanline-assemble-flyin",
+      "label": "scanline-assemble-flyin",
+      "media": "./media/scanline-assemble-flyin.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/scanline-assemble-flyin.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/scanline-assemble-flyin/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/scanline-assemble-flyin/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/scanline-assemble-flyin/ScanlineAssembleFlyin.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/scanline-assemble-flyin/prompt.md",
+  "unlock": null
+}

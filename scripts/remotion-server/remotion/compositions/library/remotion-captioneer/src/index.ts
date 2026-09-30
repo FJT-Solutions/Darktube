@@ -1,0 +1,212 @@
+/**
+ * remotion-captioneer
+ *
+ * Drop-in animated captions for Remotion.
+ * Audio → word-level synced subtitle components.
+ * Supports: Local Whisper, OpenAI, Groq, Deepgram, AssemblyAI, ElevenLabs
+ *
+ * Also includes: Audio-video sync, templates, and layout primitives.
+ */
+
+// Types (compatible with @remotion/captions)
+export {
+  CAPTION_STYLES,
+  STYLE_LABELS,
+  styleToCompositionId,
+} from "./caption-styles.js";
+
+export type {
+  Caption,
+  TikTokPage,
+  Word,
+  CaptionSegment,
+  CaptionData,
+  CaptionStyle,
+  CaptionComponentProps,
+  WhisperOptions,
+  ProcessAudioOptions,
+} from "./types.js";
+
+export { toCaptionArray, fromCaptionArray } from "./types.js";
+
+// Components
+export {
+  AnimatedCaptions,
+  WordHighlight,
+  Karaoke,
+  Typewriter,
+  Bounce,
+  Wave,
+  Glow,
+  TypewriterErase,
+  Pill,
+  Flicker,
+  Highlighter,
+  Blur,
+  Rainbow,
+  Scale,
+  Spotlight,
+} from "./components/index.js";
+
+// Whisper integration (local)
+export {
+  processAudio,
+  loadCaptions,
+  installWhisper,
+  downloadModel,
+} from "./whisper.js";
+
+// STT Providers
+export type {
+  STTProvider,
+  STTProviderOptions,
+  ProviderName,
+  ProviderConfig,
+} from "./providers/index.js";
+
+export {
+  OpenAIProvider,
+  GroqProvider,
+  DeepgramProvider,
+  AssemblyAIProvider,
+  ElevenLabsProvider,
+  createProvider,
+  detectProvider,
+  listProviders,
+} from "./providers/index.js";
+
+// ─── Audio-Video Sync ─────────────────────────────────────────────
+
+export {
+  analyzeAudio,
+  type AudioAnalysis,
+  type BeatInfo,
+  type VolumeFrame,
+  type AnalyzeOptions,
+  AudioSyncProvider,
+  useAudioAnalysis,
+  useVolume,
+  useBeat,
+  useEnergy,
+  useBeatPulse,
+  useIsOnBeat,
+  useTimeToNextBeat,
+  volumeScale,
+  energyOpacity,
+  useTimelineValue,
+  useTimelineTrigger,
+  useTimelineProgress,
+  fadeInOut,
+  type Keyframe,
+  type TimelineAnimation,
+} from "./sync/index.js";
+
+// ─── Templates ────────────────────────────────────────────────────
+
+export type {
+  VideoTemplate,
+  Scene,
+  Block,
+  BlockType,
+  DesignTokens,
+  ColorTokens,
+  TypographyTokens,
+  AnimationConfig,
+  TextBlock,
+  ImageBlock,
+  VideoBlock,
+  AudioBlock,
+  CaptionsBlock,
+  DividerBlock,
+  SpacerBlock,
+  ColumnsBlock,
+  GridBlock,
+  LogoBlock,
+} from "./templates/index.js";
+
+export {
+  createIntroScene,
+  createCaptionScene,
+  createOutroScene,
+  createDividerScene,
+  buildTemplate,
+  TemplateComposition,
+} from "./templates/index.js";
+
+// ─── Layout Primitives ────────────────────────────────────────────
+
+export {
+  Container,
+  Stack,
+  Row,
+  Columns,
+  Grid,
+  Center,
+  Positioned,
+  Overlay,
+  GradientBg,
+  FadeIn,
+  SlideUp,
+} from "./layouts/index.js";
+
+// Utilities
+export {
+  getActiveSegment,
+  getActiveWord,
+  getActiveWordIndex,
+  getWordProgress,
+  groupWordsIntoLines,
+  getSegmentDisplayLines,
+  smartWrap,
+  paginateCaptions,
+  estimateReadingTimeMs,
+  msToFrame,
+  frameToMs,
+} from "./utils.js";
+
+// Presets
+export {
+  presets,
+  getPreset,
+  getPresetCategories,
+  applyPreset,
+  type CaptionPreset,
+} from "./presets/index.js";
+
+// Exporters
+export {
+  toSRT,
+  toVTT,
+  toASS,
+  toPlainText,
+  toJSON,
+  toWordLevelSRT,
+  toWordLevelVTT,
+} from "./exporters.js";
+
+// Emoji Reactions
+export {
+  EmojiReactions,
+  autoGenerateReactions,
+  type EmojiReaction,
+} from "./emoji.js";
+
+// Config
+export { loadConfig } from "./config.js";
+export type { CaptioneerConfig } from "./config.js";
+
+// Translation (OpenAI)
+export {
+  translateCaptionData,
+  assertValidTargetLanguageTag,
+  assertCaptionDataShape,
+  type TranslateCaptionsOptions,
+} from "./translate.js";
+
+// Node / CLI helpers (also available from remotion-captioneer/node)
+export {
+  transcribeMediaFile,
+  transcribeWithWhisper,
+  defaultCaptionOutputPath,
+  type TranscribeMediaOptions,
+} from "./transcribe-media.js";

@@ -1,0 +1,31 @@
+{
+  "id": "magician-card-flourish",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "ui-entrance",
+    "effects"
+  ],
+  "summary": "On a pure black field a blue star-burst flashes for 0.3s (an X-shaped needle beam rotating 90\u00b0 + a central glow radiating short spikes), then the card shoots out of the flash point \u2014 spinning extremely fast along an arc toward the camera, spin decaying with proximity, a hard freeze near full-frame, then a sheen sweep after the freeze",
+  "duration": "Flash 0.3s + flight ~1.7s + freeze showcase + sheen ~2s; 4.2s total",
+  "energy": "High (a one-shot burst; still after the freeze)",
+  "styles": [
+    {
+      "key": "magician-card-flourish",
+      "label": "magician-card-flourish",
+      "media": "./media/magician-card-flourish.mp4?v=1784437314633"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/magician-card-flourish.mp4?v=1784437314633",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/magician-card-flourish/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/magician-card-flourish/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/magician-card-flourish/MagicianCardFlourish.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/magician-card-flourish/prompt.md",
+  "unlock": null
+}

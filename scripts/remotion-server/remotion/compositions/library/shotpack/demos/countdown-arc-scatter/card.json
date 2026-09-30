@@ -1,0 +1,29 @@
+{
+  "id": "countdown-arc-scatter",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "A white-background dial with 9 equal-size numbers arranged tangentially along a large arc; the whole dial sweeps 96\u00b0 then decelerates to a hard stop, \"5\" halts at the arc's apex and pans into place as the title's first character, the other numbers blur-scatter in place, and the title words blur-fade in one by one with the last word tinted accent",
+  "duration": "~1.1s (33f@30fps, an extremely short single beat)",
+  "energy": "High (96\u00b0 sweep compressed into 17 frames, pure impact)",
+  "styles": [
+    {
+      "key": "countdown-arc-scatter",
+      "label": "countdown-arc-scatter",
+      "media": "./media/countdown-arc-scatter.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/countdown-arc-scatter.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/countdown-arc-scatter/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/countdown-arc-scatter/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/countdown-arc-scatter/CountdownArcScatter.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/countdown-arc-scatter/prompt.md",
+  "unlock": null
+}

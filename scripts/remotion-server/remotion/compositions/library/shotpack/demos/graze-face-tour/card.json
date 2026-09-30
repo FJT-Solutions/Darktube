@@ -1,0 +1,30 @@
+{
+  "id": "graze-face-tour",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera",
+    "ui-entrance"
+  ],
+  "summary": "High-angle face-grazing close-up tour \u2014 the camera skims low across the UI surface (sidebar tree/header/list as terrain), while page text initially floats above the interface with matching soft shadows, then accelerates down to stick back onto the interface one after another as the camera advances",
+  "duration": "4\u20135s per segment; can chain multiple segments to extend",
+  "energy": "Medium-high (continuous camera drive + elements landing in sequence, high information density)",
+  "styles": [
+    {
+      "key": "graze-face-tour",
+      "label": "graze-face-tour",
+      "media": "./media/graze-face-tour.mp4?v=1785050508191"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/graze-face-tour.mp4?v=1785050508191",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/graze-face-tour/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/graze-face-tour/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/graze-face-tour/GrazeFaceTour.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/graze-face-tour/prompt.md",
+  "unlock": null
+}

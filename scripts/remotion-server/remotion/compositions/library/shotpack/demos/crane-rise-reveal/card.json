@@ -1,0 +1,31 @@
+{
+  "id": "crane-rise-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "camera",
+    "data"
+  ],
+  "summary": "Crane-rise reveal \u2014 opens tight on a single row of data, the camera decelerates as it rises and pulls back, rows flood in until the full dashboard fills the frame",
+  "duration": "5s (close-up hold 20f + rise 100f + full-frame stillness 30f)",
+  "energy": "Medium-high (sustained one-directional motion, no impact beat)",
+  "styles": [
+    {
+      "key": "crane-rise-reveal",
+      "label": "crane-rise-reveal",
+      "media": "./media/crane-rise-reveal.mp4?v=1784437314541"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/crane-rise-reveal.mp4?v=1784437314541",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/crane-rise-reveal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/crane-rise-reveal/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/crane-rise-reveal/CraneRiseReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/crane-rise-reveal/prompt.md",
+  "unlock": null
+}

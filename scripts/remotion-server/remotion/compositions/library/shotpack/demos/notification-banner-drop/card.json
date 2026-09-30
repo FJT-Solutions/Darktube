@@ -1,0 +1,30 @@
+{
+  "id": "notification-banner-drop",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "A white notification banner springs in from the top of the phone (with overshoot), content rows then reveal, a finger taps the banner, the banner scales up and fades out, a conversation page slides in from the top, and message bubbles float up in a stagger",
+  "duration": "~7s (210f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium-low (the banner drop is one small peak; the rest is sliding in and staggered reveals)",
+  "styles": [
+    {
+      "key": "notification-banner-drop",
+      "label": "notification-banner-drop",
+      "media": "./media/notification-banner-drop.mp4?v=1786372186393"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/notification-banner-drop.mp4?v=1786372186393",
+  "poster": "https://r2.getshotpack.com/media/notification-banner-drop-1786372186393.png",
+  "card": "https://getshotpack.com/demos/mobile/notification-banner-drop/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/notification-banner-drop/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/notification-banner-drop/NotificationBannerDrop.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/notification-banner-drop/prompt.md",
+  "unlock": null
+}

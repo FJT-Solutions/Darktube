@@ -1,0 +1,30 @@
+{
+  "id": "onboarding-stepper",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "screen",
+  "tags": [
+    "mobile",
+    "screen"
+  ],
+  "summary": "A step-by-step phone onboarding flow: the top stepper dots/connectors light up and advance with each step, each step's content enters with blur-in + slide-up, the bottom Next/Finish button presses through transitions, and a checkmark pops out when done",
+  "duration": "~7s (210f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (step-by-step progression, one small peak per step)",
+  "styles": [
+    {
+      "key": "onboarding-stepper",
+      "label": "onboarding-stepper",
+      "media": "./media/onboarding-stepper-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/onboarding-stepper-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/onboarding-stepper-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/onboarding-stepper/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/onboarding-stepper/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/onboarding-stepper/OnboardingStepper.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/onboarding-stepper/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,33 @@
+{
+  "id": "whip-pan-transition",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Whip-pan transition \u2014 two pages sweep across the same frame with a large translate left/right/up/down, with speed-stretch and motion blur; the previous page whips out from its entry side, the next page whips in from the same side",
+  "duration": "Per variant, prior state \u226520f + whip 24\u201340f + ending \u226540f, ~4s (120f)",
+  "energy": "High (the whip segment is the film's speed peak; buffer with low energy before and after)",
+  "styles": [
+    {
+      "key": "whip-h",
+      "label": "whip-h",
+      "media": "./media/whip-pan-transition.mp4?v=1786343981647"
+    },
+    {
+      "key": "whip-v",
+      "label": "whip-v"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/whip-pan-transition.mp4?v=1786343981647",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/whip-pan-transition/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/whip-pan-transition/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/whip-pan-transition/WhipPanTransition.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/whip-pan-transition/prompt.md",
+  "unlock": null
+}

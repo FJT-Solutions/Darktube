@@ -1,0 +1,30 @@
+{
+  "id": "title-demote-to-label",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "transition"
+  ],
+  "summary": "Big title demotes into a section label, two variants \u2014 A: the centered big title develops, holds one beat, then continuously shrinks 0.3x and pans to the top-left corner as a small section label while the content area grows beneath it; B: same routine but its entrance carries a text-selection highlight block that sweeps in then withdraws",
+  "duration": "A ~3s (92f) / B ~3.5s (104f); demo plays both variants back-to-back in 196f",
+  "energy": "Low-mid (layout-transformation type, atmospheric shot)",
+  "styles": [
+    {
+      "key": "title-demote-to-label",
+      "label": "title-demote-to-label",
+      "media": "./media/title-demote-to-label.mp4?v=1784437314825"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/title-demote-to-label.mp4?v=1784437314825",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/title-demote-to-label/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/title-demote-to-label/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/title-demote-to-label/TitleDemoteToLabel.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/title-demote-to-label/prompt.md",
+  "unlock": null
+}

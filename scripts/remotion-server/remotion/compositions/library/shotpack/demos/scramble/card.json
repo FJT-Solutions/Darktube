@@ -1,0 +1,29 @@
+{
+  "id": "scramble",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "A monospace whole line of characters first scrambles rapidly every 2 frames, then locks into the real characters one by one left-to-right; each lock frame flashes a blue-white highlight \u2014 a seed-driven reproducible decryption feel",
+  "duration": "~3.2s (96f@30fps)",
+  "energy": "Medium-high (continuous high-frequency character noise, no single impact point)",
+  "styles": [
+    {
+      "key": "scramble",
+      "label": "scramble",
+      "media": "./media/scramble.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/scramble.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/scramble/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/scramble/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/scramble/Scramble.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/scramble/prompt.md",
+  "unlock": null
+}

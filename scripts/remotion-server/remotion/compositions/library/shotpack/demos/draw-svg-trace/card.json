@@ -1,0 +1,30 @@
+{
+  "id": "draw-svg-trace",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance",
+    "typography"
+  ],
+  "summary": "Stroke-grow circle annotation \u2014 an inked stroke with a pen tip traces around the element's outline, \"drawing\" it; at the moment it closes, a black flash hands off and content fades in; the same trick can draw an underline under titles",
+  "duration": "stroke 40f + black flash hand-off 16f + hold \u226535f, about 3\u20134s",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "draw-svg-trace",
+      "label": "draw-svg-trace",
+      "media": "./media/draw-svg-trace.mp4?v=1784437314561"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/draw-svg-trace.mp4?v=1784437314561",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/draw-svg-trace/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/draw-svg-trace/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/draw-svg-trace/DrawSvgTrace.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/draw-svg-trace/prompt.md",
+  "unlock": null
+}

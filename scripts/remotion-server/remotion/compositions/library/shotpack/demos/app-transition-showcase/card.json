@@ -1,0 +1,30 @@
+{
+  "id": "app-transition-showcase",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "transition",
+  "tags": [
+    "mobile",
+    "transition"
+  ],
+  "summary": "Three in-app transitions chained together in a phone app: push slides in (list\u2192detail), zoom pulls closer (detail\u2192form), morph transforms shape (form\u2192done card); each transition starts and stops on its own, then the whole device breathes to settle",
+  "duration": "~7.4s (222f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (each of the three transitions has its own start and stop)",
+  "styles": [
+    {
+      "key": "app-transition-showcase",
+      "label": "app-transition-showcase",
+      "media": "./media/app-transition-showcase-1786364790339.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/app-transition-showcase-1786364790339.mp4",
+  "poster": "https://r2.getshotpack.com/media/app-transition-showcase-1786364790339.png",
+  "card": "https://getshotpack.com/demos/mobile/app-transition-showcase/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/app-transition-showcase/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/app-transition-showcase/AppTransitionShowcase.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/app-transition-showcase/prompt.md",
+  "unlock": null
+}

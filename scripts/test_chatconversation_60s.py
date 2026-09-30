@@ -155,7 +155,7 @@ total_frames = int(round(total_dur * fps))
 print(f"\nDuração total calculada: {total_dur:.1f}s ({total_frames} frames @ {fps}fps, 720x1280)", flush=True)
 
 # 4. ENVIAR PAYLOAD DE RENDER
-job_id = "chatconversation_60s_v1"
+job_id = f"chatconversation_60s_{int(time.time())}"
 render_payload = {
     "historyId": job_id,
     "callbackUrl": "http://127.0.0.1:3001/render-callback",
@@ -239,7 +239,7 @@ print(f"✅ Vídeo salvo localmente: {LOCAL_VIDEO_PATH} ({file_size_mb:.2f} MB)"
 
 # 7. EXTRAIR KEYFRAMES PARA INSPEÇÃO VISUAL
 print("\n7. Extraindo frames representativos...", flush=True)
-timestamps = [3.0, 13.0, 23.0, 33.0, 43.0, 53.0]
+timestamps = [3.0, 12.0, 21.0, 30.0, 40.0, 48.0]
 sftp = c.open_sftp()
 for idx, ts in enumerate(timestamps):
     frame_path = os.path.join(FRAMES_DIR, f"scene_{idx + 1}_{int(ts)}s.jpg")

@@ -1,0 +1,29 @@
+{
+  "id": "spotlight-hero-card",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "effects",
+    "camera"
+  ],
+  "summary": "A spotlight sweeps the page and locks onto one card; after a 45\u00b0 oblique push-in the card springs up to float, a beam traces its outline twice, then it seats back into place",
+  "duration": "~4.6s (82\u2013220f)",
+  "energy": "Medium (the highest-texture shot; slow and steady rhythm)",
+  "styles": [
+    {
+      "key": "spotlight-hero-card",
+      "label": "spotlight-hero-card",
+      "media": "./media/spotlight-hero-card.mp4?v=1785050510059"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/spotlight-hero-card.mp4?v=1785050510059",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/spotlight-hero-card/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/opening/spotlight-hero-card/prompt.md",
+  "unlock": null
+}

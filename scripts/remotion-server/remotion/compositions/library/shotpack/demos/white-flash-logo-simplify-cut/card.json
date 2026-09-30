@@ -1,0 +1,29 @@
+{
+  "id": "white-flash-logo-simplify-cut",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "A colorful liquid-gradient wordmark sits in flowing shimmer, the frame slams to white overexposure in one beat, and a flat version of the wordmark fades in and freezes on the white ground \u2014 one white flash completes a dimensionality reduction of texture",
+  "duration": "~3.6s (108f@30fps; seated shimmer 0\u20131.2s \u00b7 slam to white 1.2\u20131.5s \u00b7 flat freeze 1.7\u20132.7s)",
+  "energy": "Medium-High (one pulse-like accent, stillness both before and after)",
+  "styles": [
+    {
+      "key": "white-flash-logo-simplify-cut",
+      "label": "white-flash-logo-simplify-cut",
+      "media": "./media/white-flash-logo-simplify-cut.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/white-flash-logo-simplify-cut.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/white-flash-logo-simplify-cut/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/white-flash-logo-simplify-cut/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/white-flash-logo-simplify-cut/WhiteFlashLogoSimplifyCut.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/white-flash-logo-simplify-cut/prompt.md",
+  "unlock": null
+}

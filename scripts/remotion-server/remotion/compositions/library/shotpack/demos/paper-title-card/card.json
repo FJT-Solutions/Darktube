@@ -1,0 +1,29 @@
+{
+  "id": "paper-title-card",
+  "tier": "paid",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "transition",
+    "rhythm"
+  ],
+  "summary": "A one-sentence line presses word by word onto the paper, one word marked with accent italic, a short dash closes in",
+  "duration": "1.7\u20131.8s (50\u201355f)",
+  "energy": "Low (breathing spot, separates two high-energy shots)",
+  "styles": [
+    {
+      "key": "paper-title-card",
+      "label": "paper-title-card",
+      "media": "./media/paper-title-card.mp4?v=1784437314694"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/paper-title-card.mp4?v=1784437314694",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/paper-title-card/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/typography/paper-title-card/prompt.md",
+  "unlock": "https://getshotpack.com/pricing"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "neon-frame-forerun",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance",
+    "effects"
+  ],
+  "summary": "A strongly-perspective neon rectangular frame races in from the left edge from both ends to take shape first; the page inside the frame brightens from dark, while components/text inside the frame settle down from 3D space in staggered order with soft same-shape shadows, completing the fit in sync with the page lighting; background neon tube clusters dim at the end to yield the spotlight",
+  "duration": "frame race-in ~0.6s + lighting & settling ~2s + background dimming ~0.8s; whole piece 4\u20134.5s",
+  "energy": "Medium-high (three layers of action stacked, but all serving one same entrance)",
+  "styles": [
+    {
+      "key": "neon-frame-forerun",
+      "label": "neon-frame-forerun",
+      "media": "./media/neon-frame-forerun.mp4?v=1784437314646"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/neon-frame-forerun.mp4?v=1784437314646",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/neon-frame-forerun/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/neon-frame-forerun/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/neon-frame-forerun/NeonFrameForerun.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/neon-frame-forerun/prompt.md",
+  "unlock": null
+}

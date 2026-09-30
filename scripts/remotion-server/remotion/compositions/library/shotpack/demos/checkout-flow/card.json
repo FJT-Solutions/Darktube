@@ -1,0 +1,30 @@
+{
+  "id": "checkout-flow",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "A phone checkout flow: the amount card + form fields stagger in, the confirmation card springs up after tapping Pay (overlay + order summary), and after confirming, a full-screen success state with a checkmark + receipt copy",
+  "duration": "~7s (210f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (form progression \u2192 confirmation popup \u2192 success)",
+  "styles": [
+    {
+      "key": "checkout-flow",
+      "label": "checkout-flow",
+      "media": "./media/checkout-flow-1786363141622.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/checkout-flow-1786363141622.mp4",
+  "poster": "https://r2.getshotpack.com/media/checkout-flow-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/checkout-flow/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/checkout-flow/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/checkout-flow/CheckoutFlow.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/checkout-flow/prompt.md",
+  "unlock": null
+}

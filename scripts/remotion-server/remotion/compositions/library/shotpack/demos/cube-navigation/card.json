@@ -1,0 +1,29 @@
+{
+  "id": "cube-navigation",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Content pasted onto all six faces of a 3D cube, the camera alternating between front close-up \u2192 pulled back to an isometric view of the edges \u2192 rotating to a face and pushing in, stepping through each; every face computes lighting in real time from its normal direction",
+  "duration": "~6.0s (180f@30fps; five camera steps, ~0.7s each + hold)",
+  "energy": "Medium (steady spatial cruising, with beats coming from the perspective shift at each face rotation)",
+  "styles": [
+    {
+      "key": "cube-navigation",
+      "label": "cube-navigation",
+      "media": "./media/cube-navigation.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/cube-navigation.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/cube-navigation/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/cube-navigation/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/cube-navigation/CubeNavigation.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/cube-navigation/prompt.md",
+  "unlock": null
+}

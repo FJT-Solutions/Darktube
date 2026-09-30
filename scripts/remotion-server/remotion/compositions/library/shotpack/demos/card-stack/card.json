@@ -1,0 +1,29 @@
+{
+  "id": "card-stack",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "8 cards spring in one by one from below the screen, stacking into a pile; once all settle, the whole pile fans out into a 3D spread in one move \u2014 each card rotates 8\u00b0 by index, shifts 34px laterally, and steps one z-layer back",
+  "duration": "~4.2s (126f@30fps)",
+  "energy": "Medium-high (the entrance is a chain of small bursts; the spread closes as one smooth whole-body move)",
+  "styles": [
+    {
+      "key": "card-stack",
+      "label": "card-stack",
+      "media": "./media/card-stack.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/card-stack.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/card-stack/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/card-stack/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/card-stack/CardStack.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/card-stack/prompt.md",
+  "unlock": null
+}

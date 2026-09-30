@@ -1,0 +1,30 @@
+{
+  "id": "line-boil",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "typography"
+  ],
+  "summary": "Line boil \u2014 during a hold, text/outline contours jitter slightly every 3 frames, like hand-drawn frame-by-frame redrawing, keeping still frames \"alive\" with breathing",
+  "duration": "parasitic \u2014 boil segment follows the host's hold length, no duration of its own",
+  "energy": "low (noise-level)",
+  "styles": [
+    {
+      "key": "line-boil",
+      "label": "line-boil",
+      "media": "./media/line-boil.mp4?v=1784437314626"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/line-boil.mp4?v=1784437314626",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/line-boil/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/line-boil/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/line-boil/LineBoil.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/line-boil/prompt.md",
+  "unlock": null
+}

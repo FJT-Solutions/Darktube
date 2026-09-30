@@ -1,0 +1,29 @@
+{
+  "id": "pill-slot-cycle",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "In-sentence slot cycling \u2014 the fixed sentence stem stays pinned rock-still, the trailing pill badge rolls one slot-machine tick every ~0.7s (the old one flies up with accelerating fade-out, the new one slides in from below with blur), and after cycling through N feature words the complete sentence settles as the closer",
+  "duration": "entrance 12f + 21f per tick \u00d7 word count + closer 14f + hold; 6 words \u2248 5.8s (demo 175f)",
+  "energy": "Medium (steady metronome, no peaks)",
+  "styles": [
+    {
+      "key": "pill-slot-cycle",
+      "label": "pill-slot-cycle",
+      "media": "./media/pill-slot-cycle.mp4?v=1784437314703"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/pill-slot-cycle.mp4?v=1784437314703",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/pill-slot-cycle/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/pill-slot-cycle/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/pill-slot-cycle/PillSlotCycle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/pill-slot-cycle/prompt.md",
+  "unlock": null
+}

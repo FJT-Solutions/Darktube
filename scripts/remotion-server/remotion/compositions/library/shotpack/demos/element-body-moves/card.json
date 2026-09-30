@@ -1,0 +1,35 @@
+{
+  "id": "element-body-moves",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Two variants of element body-feel \u2014 axial-stretch stretches along the motion axis like taffy, contact-shadow-lift lifts off the plane with a contact shadow",
+  "duration": "A ~4.7s / B ~5.3s",
+  "energy": "A medium-high / B low-medium",
+  "styles": [
+    {
+      "key": "axial-stretch",
+      "label": "axial-stretch",
+      "media": "./media/axial-stretch.mp4?v=1784437314564"
+    },
+    {
+      "key": "contact-shadow-lift",
+      "label": "contact-shadow-lift",
+      "media": "./media/contact-shadow-lift.mp4?v=1784437314566"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/axial-stretch.mp4?v=1784437314564",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/element-body-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/element-body-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/element-body-moves/AxialStretch.tsx",
+    "./demos/ui-entrance/element-body-moves/ContactShadowLift.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/element-body-moves/prompt.md",
+  "unlock": null
+}

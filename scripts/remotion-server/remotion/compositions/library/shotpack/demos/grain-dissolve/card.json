@@ -1,0 +1,29 @@
+{
+  "id": "grain-dissolve",
+  "tier": "free",
+  "core": true,
+  "category": "outro",
+  "subcategory": null,
+  "tags": [
+    "outro"
+  ],
+  "summary": "A full line of text bursts into boiling grain noise with a diagonal selection box appearing; the noise cloud rapidly condenses into a larger glowing short wordmark, then translation decays to zero and freezes",
+  "duration": "~2.0s (60f@30fps; sand-ification 0.26\u20130.56s \u00b7 condensing 1.2\u20131.42s \u00b7 solidify-settle ending)",
+  "energy": "Medium-high (a short, one-shot energy pulse; a natural outro beat-sync)",
+  "styles": [
+    {
+      "key": "grain-dissolve",
+      "label": "grain-dissolve",
+      "media": "./media/grain-dissolve.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/grain-dissolve.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/outro/grain-dissolve/prompt.md",
+  "tsx": "https://getshotpack.com/demos/outro/grain-dissolve/demo.tsx",
+  "tsxFiles": [
+    "./demos/outro/grain-dissolve/GrainDissolve.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/outro/grain-dissolve/prompt.md",
+  "unlock": null
+}

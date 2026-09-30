@@ -1,0 +1,30 @@
+{
+  "id": "settings-toggle-flow",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "screen",
+  "tags": [
+    "mobile",
+    "screen"
+  ],
+  "summary": "A phone settings page toggle flow: multiple switches flip on in a stagger (thumb springs with overshoot + track color transition), a slider drags its progress, and a \"Settings saved\" toast slides up, lingers, and fades out",
+  "duration": "~7.4s (222f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (each switch flips in a stagger)",
+  "styles": [
+    {
+      "key": "settings-toggle-flow",
+      "label": "settings-toggle-flow",
+      "media": "./media/settings-toggle-flow-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/settings-toggle-flow-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/settings-toggle-flow-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/settings-toggle-flow/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/settings-toggle-flow/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/settings-toggle-flow/SettingsToggleFlow.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/settings-toggle-flow/prompt.md",
+  "unlock": null
+}

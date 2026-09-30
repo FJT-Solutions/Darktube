@@ -1,0 +1,30 @@
+{
+  "id": "chat-to-preview-morph",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "transition",
+  "tags": [
+    "mobile",
+    "transition"
+  ],
+  "summary": "Split screen inside a phone: the chat panel compresses from 55% to 25% height (content fades out in sync), the result preview grows from 45% to 75% (content fades in + moves up), an Apple-grade ease completes the shape transformation, and finally the whole device breathes to settle",
+  "duration": "~6s (180f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (a single shape transformation, slow settling with Apple ease)",
+  "styles": [
+    {
+      "key": "chat-to-preview-morph",
+      "label": "chat-to-preview-morph",
+      "media": "./media/chat-to-preview-morph-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/chat-to-preview-morph-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/chat-to-preview-morph-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/chat-to-preview-morph/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/chat-to-preview-morph/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/chat-to-preview-morph/ChatToPreviewMorph.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/chat-to-preview-morph/prompt.md",
+  "unlock": null
+}

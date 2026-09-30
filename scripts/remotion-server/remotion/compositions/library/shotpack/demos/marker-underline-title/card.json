@@ -1,0 +1,29 @@
+{
+  "id": "marker-underline-title",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "After the big title settles, a marker underline quickly draws left-to-right beneath the keyword \u2014 tapered stroke, rough edges, slight upward tilt following the italic letterform, hugging the text baseline",
+  "duration": "title settles + stroke starts 4~8f later, draw 8\u201312f, total 1\u20131.5s",
+  "energy": "Low (one stroke of punctuation, doesn't steal the title's show)",
+  "styles": [
+    {
+      "key": "marker-underline-title",
+      "label": "marker-underline-title",
+      "media": "./media/marker-underline-title.mp4?v=1784437314635"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/marker-underline-title.mp4?v=1784437314635",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/marker-underline-title/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/marker-underline-title/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/marker-underline-title/MarkerUnderlineTitle.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/marker-underline-title/prompt.md",
+  "unlock": null
+}

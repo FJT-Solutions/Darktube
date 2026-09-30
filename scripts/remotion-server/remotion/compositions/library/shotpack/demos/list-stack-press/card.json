@@ -1,0 +1,27 @@
+{
+  "id": "list-stack-press",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "List cards fly up one by one from the bottom of the frame stacking into a pile; each landing presses the whole pile down and bounces it back, while the counter ticks up one in sync",
+  "duration": "~3s (18\u201388f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "list-stack-press",
+      "label": "list-stack-press",
+      "media": "./media/list-stack-press.mp4?v=1784437314631"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/list-stack-press.mp4?v=1784437314631",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/list-stack-press/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/list-stack-press/prompt.md",
+  "unlock": null
+}

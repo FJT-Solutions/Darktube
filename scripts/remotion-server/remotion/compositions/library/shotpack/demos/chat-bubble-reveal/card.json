@@ -1,0 +1,30 @@
+{
+  "id": "chat-bubble-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "Messages in an iMessage-style chat UI reveal one by one: the user side types character by character then sends (blue bubble pops in), the other side reveals a gray bubble character by character after a typing indicator, a reaction pops in with a delay, and finally the whole device breathes to settle",
+  "duration": "~7s (210f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (messages advance one by one; the typing indicator drives the rhythm)",
+  "styles": [
+    {
+      "key": "chat-bubble-reveal",
+      "label": "chat-bubble-reveal",
+      "media": "./media/chat-bubble-reveal-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/chat-bubble-reveal-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/chat-bubble-reveal-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/chat-bubble-reveal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/chat-bubble-reveal/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/chat-bubble-reveal/ChatBubbleReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/chat-bubble-reveal/prompt.md",
+  "unlock": null
+}

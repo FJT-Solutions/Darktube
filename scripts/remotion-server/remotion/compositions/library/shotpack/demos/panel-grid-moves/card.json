@@ -1,0 +1,42 @@
+{
+  "id": "panel-grid-moves",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "ui-entrance"
+  ],
+  "summary": "Three panel-grid rhythm variants \u2014 grid-flash-mosaic 3\u00d73 grid flash-cut filling the wall and swallowing the screen, flip-grid-reflow collective grid rearrangement, comic-panel-split comic-style diagonal panels with three camera positions in parallel",
+  "duration": "A ~4.7s / B ~4.8s / C ~5s",
+  "energy": "A High / B Medium / C Medium-high",
+  "styles": [
+    {
+      "key": "grid-flash-mosaic",
+      "label": "grid-flash-mosaic",
+      "media": "./media/grid-flash-mosaic.mp4?v=1784437314682"
+    },
+    {
+      "key": "flip-grid-reflow",
+      "label": "flip-grid-reflow",
+      "media": "./media/flip-grid-reflow.mp4?v=1784437314684"
+    },
+    {
+      "key": "comic-panel-split",
+      "label": "comic-panel-split",
+      "media": "./media/comic-panel-split.mp4?v=1784437314685"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/grid-flash-mosaic.mp4?v=1784437314682",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/panel-grid-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/panel-grid-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/panel-grid-moves/ComicPanelSplit.tsx",
+    "./demos/rhythm/panel-grid-moves/FlipGridReflow.tsx",
+    "./demos/rhythm/panel-grid-moves/GridFlashMosaic.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/panel-grid-moves/prompt.md",
+  "unlock": null
+}

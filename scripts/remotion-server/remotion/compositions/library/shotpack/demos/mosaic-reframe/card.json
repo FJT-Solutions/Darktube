@@ -1,0 +1,29 @@
+{
+  "id": "mosaic-reframe",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Twelve tiles continuously morph among a regular grid, a feature mosaic, and a diagonal waterfall \u2014 position, width, and height each interpolate independently, with a slight per-tile stagger and holds between segments",
+  "duration": "~6.0s (180f@30fps; emergence 0\u20130.6s \u00b7 A\u2192B 1.6\u20132.5s \u00b7 hold \u00b7 B\u2192C 3.7\u20134.8s)",
+  "energy": "Medium (continuous flowing re-arrangement, no burst point, composed temperament)",
+  "styles": [
+    {
+      "key": "mosaic-reframe",
+      "label": "mosaic-reframe",
+      "media": "./media/mosaic-reframe.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/mosaic-reframe.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/mosaic-reframe/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/mosaic-reframe/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/mosaic-reframe/MosaicReframe.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/mosaic-reframe/prompt.md",
+  "unlock": null
+}

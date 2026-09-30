@@ -1,0 +1,30 @@
+{
+  "id": "runway-ground-skim",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance",
+    "camera"
+  ],
+  "summary": "Under a low-angle ground-skimming camera, a group of UI cards sticks down from the air in a quick rain-like burst (starts offset slightly, descents overlap heavily in parallel, stop the instant they land with zero bounce); once landed, the page stands up and the viewpoint turns head-on to close",
+  "duration": "hover display ~0.4s + sticking ~1.2s + stand-up turn ~1.8s; whole piece 4s",
+  "energy": "High (the falling feel is the centerpiece, the stand-up turn is the closure)",
+  "styles": [
+    {
+      "key": "runway-ground-skim",
+      "label": "runway-ground-skim",
+      "media": "./media/runway-ground-skim.mp4?v=1784437314719"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/runway-ground-skim.mp4?v=1784437314719",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/runway-ground-skim/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/runway-ground-skim/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/runway-ground-skim/RunwayGroundSkim.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/runway-ground-skim/prompt.md",
+  "unlock": null
+}

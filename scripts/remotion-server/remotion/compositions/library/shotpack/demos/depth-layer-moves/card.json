@@ -1,0 +1,35 @@
+{
+  "id": "depth-layer-moves",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera"
+  ],
+  "summary": "Two layered-depth camera moves \u2014 a multi-layer parallax glide (three speed tiers translating sideways to create depth) and a fake dolly-zoom (subject pinned, background swelling in)",
+  "duration": "parallax glide 4\u20135s continuous; dolly-zoom 3\u20134s one-way travel",
+  "energy": "parallax = Medium (texture-forward); dolly-zoom = Medium-high (pressure builds)",
+  "styles": [
+    {
+      "key": "multiplane",
+      "label": "multiplane",
+      "media": "./media/multiplane.mp4?v=1784437314556"
+    },
+    {
+      "key": "dolly-zoom",
+      "label": "dolly-zoom",
+      "media": "./media/dolly-zoom.mp4?v=1784437314559"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/multiplane.mp4?v=1784437314556",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/depth-layer-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/depth-layer-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/depth-layer-moves/DollyZoomReal.tsx",
+    "./demos/camera/depth-layer-moves/MultiplaneReal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/depth-layer-moves/prompt.md",
+  "unlock": null
+}

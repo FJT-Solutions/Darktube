@@ -1,0 +1,30 @@
+{
+  "id": "chat-typing-reply",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "In a phone chat UI, the user types character by character in the input field (caret blinking), a bubble pops in after sending, the AI thinks with three looping dots, the reply reveals character by character (with its own cursor), and finally the whole device breathes to settle",
+  "duration": "~7s (210f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (segmented progression: typing \u2192 sending \u2192 thinking \u2192 reply, no single impact peak)",
+  "styles": [
+    {
+      "key": "chat-typing-reply",
+      "label": "chat-typing-reply",
+      "media": "./media/chat-typing-reply-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/chat-typing-reply-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/chat-typing-reply-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/chat-typing-reply/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/chat-typing-reply/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/chat-typing-reply/ChatTypingReply.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/chat-typing-reply/prompt.md",
+  "unlock": null
+}

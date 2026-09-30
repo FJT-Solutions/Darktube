@@ -1,0 +1,43 @@
+{
+  "id": "trailer-grammar-moves",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "opening",
+    "transition"
+  ],
+  "summary": "Three trailer-grammar variants \u2014 trailer-bumper pre-roll quick-cut hook, card-footage-cadence title cards interleaved in dialogue with footage, smash-cut hard cut into stillness",
+  "duration": "A ~4.7s / B ~5s / C ~4.5s",
+  "energy": "A High / B Medium / C High",
+  "styles": [
+    {
+      "key": "trailer-bumper",
+      "label": "trailer-bumper",
+      "media": "./media/trailer-bumper.mp4?v=1784437314827"
+    },
+    {
+      "key": "card-footage-cadence",
+      "label": "card-footage-cadence",
+      "media": "./media/card-footage-cadence.mp4?v=1784437314829"
+    },
+    {
+      "key": "smash-cut",
+      "label": "smash-cut",
+      "media": "./media/smash-cut.mp4?v=1784437314831"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/trailer-bumper.mp4?v=1784437314827",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/trailer-grammar-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/trailer-grammar-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/trailer-grammar-moves/CardFootageCadence.tsx",
+    "./demos/rhythm/trailer-grammar-moves/SmashCut.tsx",
+    "./demos/rhythm/trailer-grammar-moves/TrailerBumper.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/trailer-grammar-moves/prompt.md",
+  "unlock": null
+}

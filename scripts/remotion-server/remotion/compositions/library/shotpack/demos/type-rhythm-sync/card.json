@@ -1,0 +1,36 @@
+{
+  "id": "type-rhythm-sync",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "rhythm"
+  ],
+  "summary": "Text synced to sound, two variants \u2014 font-weight-pump (strokes thicken and snap back with the drum) and karaoke-fill-sync (words light up one by one with the voiceover)",
+  "duration": "single variant 4\u20135s; A 10f decay window per hit, B 15\u201335f per word by speech rate",
+  "energy": "A high (party-vibe) / B medium (follow-along guidance)",
+  "styles": [
+    {
+      "key": "font-weight-pump",
+      "label": "font-weight-pump \u5b57\u91cd\u8109\u51b2",
+      "media": "./media/font-weight-pump.mp4?v=1784437314859"
+    },
+    {
+      "key": "karaoke-fill-sync",
+      "label": "karaoke-fill-sync \u586b\u8272\u968f\u8bfb",
+      "media": "./media/karaoke-fill-sync.mp4?v=1784437314860"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/font-weight-pump.mp4?v=1784437314859",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/type-rhythm-sync/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/type-rhythm-sync/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/type-rhythm-sync/FontWeightPump.tsx",
+    "./demos/typography/type-rhythm-sync/KaraokeFillSync.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/type-rhythm-sync/prompt.md",
+  "unlock": null
+}

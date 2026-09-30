@@ -1,0 +1,27 @@
+{
+  "id": "type-and-filter",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "On a real UI you type to search, the grid converges into a single card by itself, and a click dives through into the detail page",
+  "duration": "~2.5s (118\u2013190f)",
+  "energy": "Medium (the unhurried beat after the high-energy dealing segment)",
+  "styles": [
+    {
+      "key": "type-and-filter",
+      "label": "type-and-filter",
+      "media": "./media/type-and-filter.mp4?v=1784437314842"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/type-and-filter.mp4?v=1784437314842",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/type-and-filter/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/interaction/type-and-filter/prompt.md",
+  "unlock": null
+}

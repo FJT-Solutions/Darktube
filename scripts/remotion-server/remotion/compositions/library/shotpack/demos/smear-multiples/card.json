@@ -1,0 +1,30 @@
+{
+  "id": "smear-multiples",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm",
+    "effects"
+  ],
+  "summary": "Afterimage doppelgangers \u2014 while a card moves fast horizontally it drags 4 clearly countable semi-transparent duplicate copies, which collapse and merge at the landing moment; an animation-style alternative to motion blur",
+  "duration": "Element-level technique (move 12f + merge bounce-back 8f, parasitic on the displacement move)",
+  "energy": "Medium-high",
+  "styles": [
+    {
+      "key": "smear-multiples",
+      "label": "smear-multiples",
+      "media": "./media/smear-multiples.mp4?v=1784437314756"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/smear-multiples.mp4?v=1784437314756",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/smear-multiples/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/smear-multiples/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/smear-multiples/SmearMultiples.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/smear-multiples/prompt.md",
+  "unlock": null
+}

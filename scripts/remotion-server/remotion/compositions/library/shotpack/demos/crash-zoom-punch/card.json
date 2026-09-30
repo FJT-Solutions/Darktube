@@ -1,0 +1,31 @@
+{
+  "id": "crash-zoom-punch",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera",
+    "effects"
+  ],
+  "summary": "One-beat crash zoom from a wide shot to a target close-up (6f), with two landing options \u2014 overshoot bounce-back (springy) or hard-stop screen shake (weighty)",
+  "duration": "~0.5s of motion + holds before/after (motion 6\u201311f, pre-hold \u226530f to establish the wide shot, post-hold \u226545f to read the close-up)",
+  "energy": "High (instant impact, not sustained high energy)",
+  "styles": [
+    {
+      "key": "crash-zoom-punch",
+      "label": "crash-zoom-punch",
+      "media": "./media/crash-zoom-punch.mp4?v=1784437314543"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/crash-zoom-punch.mp4?v=1784437314543",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/crash-zoom-punch/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/crash-zoom-punch/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/crash-zoom-punch/CrashImpactReal.tsx",
+    "./demos/camera/crash-zoom-punch/CrashZoomReal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/crash-zoom-punch/prompt.md",
+  "unlock": null
+}

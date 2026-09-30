@@ -1,0 +1,30 @@
+{
+  "id": "progress-ring-counter",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "data",
+  "tags": [
+    "mobile",
+    "data"
+  ],
+  "summary": "A circular progress ring grows from 0 to full (arc + ring-head dot advancing), the center percentage counter rolls in sync 0\u2192100%, and when done a checkmark springs out with a subtle ring pulse, while stat cards at the bottom stagger in",
+  "duration": "~5.6s (168f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium-low (the arc's steady growth is a low-energy peak; the completion checkmark gives one small pulse)",
+  "styles": [
+    {
+      "key": "progress-ring-counter",
+      "label": "progress-ring-counter",
+      "media": "./media/progress-ring-counter.mp4?v=1786372190643"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/progress-ring-counter.mp4?v=1786372190643",
+  "poster": "https://r2.getshotpack.com/media/progress-ring-counter-1786372190643.png",
+  "card": "https://getshotpack.com/demos/mobile/progress-ring-counter/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/progress-ring-counter/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/progress-ring-counter/ProgressRingCounter.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/progress-ring-counter/prompt.md",
+  "unlock": null
+}

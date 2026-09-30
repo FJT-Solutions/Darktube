@@ -1,0 +1,25 @@
+# Shotpack
+
+> Remote Remotion shot library for agents — no skill install required.
+
+## How agents should use this site
+
+1. Read [https://getshotpack.com/skill.md](https://getshotpack.com/skill.md) for production rules.
+2. Load [https://getshotpack.com/api/catalog.json](https://getshotpack.com/api/catalog.json) and find the animation by its `id` (e.g. `letterspace-materialize`). Each entry lists the URLs to fetch next.
+3. Fetch the animation's description card and tuned source:
+   - Description card (`card` in the entry): `https://getshotpack.com/demos/<category>/<id>/prompt.md` — intent, parameters, known pitfalls.
+   - Tuned source (`tsx` in the entry): `https://getshotpack.com/demos/<category>/<id>/demo.tsx` — the source of truth.
+   - Extra files (`tsxFiles` in the entry): served from the same demo dir.
+4. Read the card first, then implement from demo.tsx. Never implement from the animation name alone.
+5. Paid-core shots expose preview only until purchase ($9.9 buyout); their source stays locked.
+
+Site: https://getshotpack.com/
+Library: https://getshotpack.com/library
+Stats: 173 cards · 232 styles · 164 free remote shots
+
+## One-liner for users to paste into an agent
+
+```
+Read https://getshotpack.com/llms.txt.
+Implement the animation: <SHOT_ID>
+```

@@ -1,0 +1,29 @@
+{
+  "id": "outline-word-fill",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "An outlined word (1px gray stroke, 500 weight) slams in from 3.2x scale with rapid deceleration; a dashed large circle then shrinks from 2.8x around the word and slowly self-rotates; horizontal dashed lines extend inward from the frame edges; the stroke brightens slightly first, then the solid white ignites within 0.6 frames, a one-frame flash and freezes",
+  "duration": "~2.5s (75f@30fps, a short single beat)",
+  "energy": "High (3.2x contraction + instant ignition, short high impact)",
+  "styles": [
+    {
+      "key": "outline-word-fill",
+      "label": "outline-word-fill",
+      "media": "./media/outline-word-fill.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/outline-word-fill.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/outline-word-fill/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/outline-word-fill/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/outline-word-fill/OutlineWordFill.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/outline-word-fill/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "integration-hub-map",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance",
+    "effects"
+  ],
+  "summary": "The old page flips 180\u00b0 in one fast turn (its side edge flashes briefly) landing on a new hub page; five integration app icons pop in on the same frame, then five rainbow light-pipes connect all at once on the same frame, with delivery pulses flowing through the pipes continuously \u2014 \"turn a new page, the whole ecosystem hooks in at once\"",
+  "duration": "windup ~0.5s + fast flip ~1.2s + icons all at once \u2192 pipes connect, two beats ~0.7s + delivery breathing \u22651.5s; whole piece 4.5\u20135s",
+  "energy": "Medium-high (the flip is the explosion, the delivery segment is the afterglow)",
+  "styles": [
+    {
+      "key": "integration-hub-map",
+      "label": "integration-hub-map",
+      "media": "./media/integration-hub-map.mp4?v=1784437314616"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/integration-hub-map.mp4?v=1784437314616",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/integration-hub-map/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/integration-hub-map/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/integration-hub-map/IntegrationHubMap.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/integration-hub-map/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "pill-chip-slot-cycle-handled",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "In the white-background sentence \"Your `chip` Handled\", the word inside the dark capsule cycles on a vertical wheel; capsule width smoothly stretches by interpolating pre-measured text widths, the words on either side are naturally pushed apart and pulled back together, and 13%-opacity gray ghost items peek above and below the capsule",
+  "duration": "~5.0s (150f@30fps: stillness \u2192 3 switches (0.25/0.47/0.69) \u2192 tail stillness)",
+  "energy": "Medium (three steady beats; the width stretch is the only continuous motion)",
+  "styles": [
+    {
+      "key": "pill-chip-slot-cycle-handled",
+      "label": "pill-chip-slot-cycle-handled",
+      "media": "./media/pill-chip-slot-cycle-handled.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/pill-chip-slot-cycle-handled.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/pill-chip-slot-cycle-handled/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/pill-chip-slot-cycle-handled/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/pill-chip-slot-cycle-handled/PillChipSlotCycleHandled.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/pill-chip-slot-cycle-handled/prompt.md",
+  "unlock": null
+}

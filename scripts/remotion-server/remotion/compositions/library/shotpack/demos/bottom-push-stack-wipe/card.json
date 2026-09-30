@@ -1,0 +1,29 @@
+{
+  "id": "bottom-push-stack-wipe",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Bottom-edge push chapter switch \u2014 the new scene, background color included, is pushed in as a full-screen block from the bottom edge, physically shoving the old scene off-screen. Consecutive chapters each carry a saturated background color, with content pinned to each chapter's own color coordinate system and moving with it",
+  "duration": "Single push 30f + in-chapter hold ~1s; demo triple push 140f (~4.7s)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "bottom-push-stack-wipe",
+      "label": "bottom-push-stack-wipe",
+      "media": "./media/bottom-push-stack-wipe.mp4?v=1784437314497"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/bottom-push-stack-wipe.mp4?v=1784437314497",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/bottom-push-stack-wipe/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/bottom-push-stack-wipe/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/bottom-push-stack-wipe/BottomPushStackWipe.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/bottom-push-stack-wipe/prompt.md",
+  "unlock": null
+}

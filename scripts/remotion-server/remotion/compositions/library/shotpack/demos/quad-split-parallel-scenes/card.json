@@ -1,0 +1,29 @@
+{
+  "id": "quad-split-parallel-scenes",
+  "tier": "free",
+  "core": true,
+  "category": "rhythm",
+  "subcategory": null,
+  "tags": [
+    "rhythm"
+  ],
+  "summary": "The picture hard-cuts into a 2\u00d72 quad split; four quadrants each run their own micro-scene in parallel (typing, whip push-in, word-by-word, interaction chain), key beats staggered 3\u20136 frames apart to create an information barrage",
+  "duration": "~2.1s (63f@30fps, no transitions the whole way)",
+  "energy": "High (four parallel tracks + staggered-beat impact, the standard BGM chorus slot)",
+  "styles": [
+    {
+      "key": "quad-split-parallel-scenes",
+      "label": "quad-split-parallel-scenes",
+      "media": "./media/quad-split-parallel-scenes.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/quad-split-parallel-scenes.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/rhythm/quad-split-parallel-scenes/prompt.md",
+  "tsx": "https://getshotpack.com/demos/rhythm/quad-split-parallel-scenes/demo.tsx",
+  "tsxFiles": [
+    "./demos/rhythm/quad-split-parallel-scenes/QuadSplitParallelScenes.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/rhythm/quad-split-parallel-scenes/prompt.md",
+  "unlock": null
+}

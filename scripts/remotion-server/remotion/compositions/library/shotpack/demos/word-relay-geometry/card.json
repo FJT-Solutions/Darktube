@@ -1,0 +1,29 @@
+{
+  "id": "word-relay-geometry",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography"
+  ],
+  "summary": "Three benefit words each carry a dedicated geometry relay \u2014 dashed large circle self-rotating and shrinking \u2192 three solid circles growing in sequence via trim (phase offset 0.06) \u2192 a metal sheen sweeps and the last beat settles into pure white; old words shrink to 0.86 and fade out, new words reveal outline\u2192fill",
+  "duration": "~6.0s (180f@30fps: three segments at 0.36 time windows each, 0.04 overlap between segments)",
+  "energy": "Medium-high (three beats advancing + continuous geometry motion + background particles, no still frames)",
+  "styles": [
+    {
+      "key": "word-relay-geometry",
+      "label": "word-relay-geometry",
+      "media": "./media/word-relay-geometry.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/word-relay-geometry.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/word-relay-geometry/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/word-relay-geometry/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/word-relay-geometry/WordRelayGeometry.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/word-relay-geometry/prompt.md",
+  "unlock": null
+}

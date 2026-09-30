@@ -1,0 +1,30 @@
+{
+  "id": "page-waterfall-wall",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Page waterfall wall \u2014 real page screenshots cut into 3\u20134 columns scrolling infinitely on a 3D reclined wall at differential speeds in opposite directions, with parallax + a slow lens push-in making a \"so much content it never runs out\" overview",
+  "duration": "4\u20136s (infinite loop; length cut to the paragraph's needs)",
+  "energy": "Medium (flowing display type)",
+  "styles": [
+    {
+      "key": "page-waterfall-wall",
+      "label": "page-waterfall-wall",
+      "media": "./media/page-waterfall-wall.mp4?v=1784437314678"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/page-waterfall-wall.mp4?v=1784437314678",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/page-waterfall-wall/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/page-waterfall-wall/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/page-waterfall-wall/PageWaterfallWall.tsx",
+    "./demos/ui-entrance/page-waterfall-wall/VerticalTicker.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/page-waterfall-wall/prompt.md",
+  "unlock": null
+}

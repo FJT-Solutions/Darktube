@@ -1,0 +1,30 @@
+{
+  "id": "faceid-unlock-scan",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "screen",
+  "tags": [
+    "mobile",
+    "screen"
+  ],
+  "summary": "A scan beam sweeps up and down across the face wireframe in the center of the lock screen (3 times) while the scanning ring arc fills in sync; when done, a checkmark springs out, the lock screen scales and fades out, and desktop icons reveal in a stagger",
+  "duration": "~6.7s (200f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (the scan segment has an even rhythm, the checkmark is a small peak, settling after unlock)",
+  "styles": [
+    {
+      "key": "faceid-unlock-scan",
+      "label": "faceid-unlock-scan",
+      "media": "./media/faceid-unlock-scan.mp4?v=1786372658734"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/faceid-unlock-scan.mp4?v=1786372658734",
+  "poster": "https://r2.getshotpack.com/media/faceid-unlock-scan-1786372658734.png",
+  "card": "https://getshotpack.com/demos/mobile/faceid-unlock-scan/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/faceid-unlock-scan/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/faceid-unlock-scan/FaceIdUnlockScan.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/faceid-unlock-scan/prompt.md",
+  "unlock": null
+}

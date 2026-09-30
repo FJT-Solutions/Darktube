@@ -1,0 +1,41 @@
+{
+  "id": "wall-reveal-moves",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Three variants of whole-wall batch entrance \u2014 bento cell-by-cell lighting, grid wave flipping, blueprint line-tracing formation; all reveal in place without displacement, complementing deck-deal-flyin's fly-in displacement type into a category matrix",
+  "duration": "each variant ~4.3\u20135s (A 150f / B 130f / C 150f @30fps, including establishment holds and still endings)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "bento-light-up",
+      "label": "bento-light-up \u9010\u683c\u70b9\u4eae",
+      "media": "./media/bento-light-up.mp4?v=1784437314872"
+    },
+    {
+      "key": "grid-wave-flip",
+      "label": "grid-wave-flip \u6ce2\u6d6a\u7ffb\u9762",
+      "media": "./media/grid-wave-flip.mp4?v=1784437314873"
+    },
+    {
+      "key": "wireframe-draw-on",
+      "label": "wireframe-draw-on \u84dd\u56fe\u63cf\u7ebf\u6210\u5f62",
+      "media": "./media/wireframe-draw-on.mp4?v=1784437314874"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/bento-light-up.mp4?v=1784437314872",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/wall-reveal-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/wall-reveal-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/wall-reveal-moves/BentoLightUp.tsx",
+    "./demos/ui-entrance/wall-reveal-moves/GridWaveFlip.tsx",
+    "./demos/ui-entrance/wall-reveal-moves/WireframeDrawOn.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/wall-reveal-moves/prompt.md",
+  "unlock": null
+}

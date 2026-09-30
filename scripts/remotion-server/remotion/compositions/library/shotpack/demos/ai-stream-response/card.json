@@ -1,0 +1,29 @@
+{
+  "id": "ai-stream-response",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "An AI response panel lands a readable summary line first, then evidence rows with status icons stream in one by one, and finally everything settles into a completed state",
+  "duration": "~4\u20135s (120\u2013150f, including \u226515f of completed-state stillness)",
+  "energy": "Medium-high (information keeps accruing, but readability outranks speed showboating)",
+  "styles": [
+    {
+      "key": "ai-stream-response",
+      "label": "ai-stream-response",
+      "media": "./media/ai-stream-response.mp4?v=1784437314480"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/ai-stream-response.mp4?v=1784437314480",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/ai-stream-response/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/ai-stream-response/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/ai-stream-response/StreamResponse.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/ai-stream-response/prompt.md",
+  "unlock": null
+}

@@ -147,7 +147,7 @@ total_frames = int(round(total_dur * fps))
 print(f"\nDuração total calculada: {total_dur:.1f}s ({total_frames} frames @ {fps}fps, 720x1280)", flush=True)
 
 # 3. ENVIAR PAYLOAD DE RENDER
-job_id = "datastoryviral_60s_v1"
+job_id = f"datastoryviral_60s_{int(time.time())}"
 render_payload = {
     "historyId": job_id,
     "callbackUrl": "http://127.0.0.1:3001/render-callback",

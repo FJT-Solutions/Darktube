@@ -1,0 +1,28 @@
+{
+  "id": "brand-ink-open",
+  "tier": "paid",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "typography"
+  ],
+  "summary": "Ink crosshair draws in \u2192 wordmark stamps in letter by letter \u2192 typewriter kicker \u2192 a full second of stillness, then float up and dissolve",
+  "duration": "~2.8s (83f)",
+  "energy": "Low (opening slot, leaves climbing room for later shots)",
+  "styles": [
+    {
+      "key": "brand-ink-open",
+      "label": "brand-ink-open",
+      "media": "./media/brand-ink-open.mp4?v=1784437314501"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/brand-ink-open.mp4?v=1784437314501",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/brand-ink-open/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/opening/brand-ink-open/prompt.md",
+  "unlock": "https://getshotpack.com/pricing"
+}

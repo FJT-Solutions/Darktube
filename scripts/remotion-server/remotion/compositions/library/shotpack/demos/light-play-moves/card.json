@@ -1,0 +1,42 @@
+{
+  "id": "light-play-moves",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "typography"
+  ],
+  "summary": "Light effects, three variants \u2014 spotlight-sweep sweeping light over text, sheen single-pass sheen sweep, halation-bloom impact-stop halation bloom",
+  "duration": "A ~5.3s / B ~4.7s / D ~4.8s",
+  "energy": "A medium / B low / D high",
+  "styles": [
+    {
+      "key": "spotlight-sweep",
+      "label": "spotlight-sweep",
+      "media": "./media/spotlight-sweep.mp4?v=1784437314621"
+    },
+    {
+      "key": "sheen-sweep",
+      "label": "sheen-sweep",
+      "media": "./media/sheen-sweep.mp4?v=1784437314622"
+    },
+    {
+      "key": "halation-bloom",
+      "label": "halation-bloom",
+      "media": "./media/halation-bloom.mp4?v=1784437314624"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/spotlight-sweep.mp4?v=1784437314621",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/light-play-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/light-play-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/light-play-moves/HalationBloom.tsx",
+    "./demos/effects/light-play-moves/SheenSweepRetry.tsx",
+    "./demos/effects/light-play-moves/SpotlightSweepReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/light-play-moves/prompt.md",
+  "unlock": null
+}

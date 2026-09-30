@@ -1,0 +1,30 @@
+{
+  "id": "cel-flash-stomp",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "rhythm"
+  ],
+  "summary": "Background-flash word stomp \u2014 large words slam full-screen slightly tilted like stamps, and at each word's landing frame the background layer strobes between two solid colors for a few frames while the text stays rock-still; a UI translation of anime finisher-attack title cards",
+  "duration": "~30f per word \u00d7 word count + \u226545f ending; three words \u2248 4.8s",
+  "energy": "High",
+  "styles": [
+    {
+      "key": "cel-flash-stomp",
+      "label": "cel-flash-stomp",
+      "media": "./media/cel-flash-stomp.mp4?v=1784437314517"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/cel-flash-stomp.mp4?v=1784437314517",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/cel-flash-stomp/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/cel-flash-stomp/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/cel-flash-stomp/CelFlashStomp.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/cel-flash-stomp/prompt.md",
+  "unlock": null
+}

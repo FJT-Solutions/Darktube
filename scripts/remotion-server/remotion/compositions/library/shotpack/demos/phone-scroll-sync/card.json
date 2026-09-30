@@ -1,0 +1,30 @@
+{
+  "id": "phone-scroll-sync",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "interaction",
+  "tags": [
+    "mobile",
+    "interaction"
+  ],
+  "summary": "Feed content inside the phone screen scrolls in sync with a finger swiping up (two swipes with a pause in between); the finger is a vector shape and floats slightly during the pause; finally the finger fades out and the whole device breathes to settle",
+  "duration": "~6s (180f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (segmented progression: the two scrolls each have their own start/stop, no impact peak)",
+  "styles": [
+    {
+      "key": "phone-scroll-sync",
+      "label": "phone-scroll-sync",
+      "media": "./media/phone-scroll-sync-1786356754258.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/phone-scroll-sync-1786356754258.mp4",
+  "poster": "https://r2.getshotpack.com/media/phone-scroll-sync-1786363295560.png",
+  "card": "https://getshotpack.com/demos/mobile/phone-scroll-sync/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/phone-scroll-sync/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/phone-scroll-sync/PhoneScrollSync.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/phone-scroll-sync/prompt.md",
+  "unlock": null
+}

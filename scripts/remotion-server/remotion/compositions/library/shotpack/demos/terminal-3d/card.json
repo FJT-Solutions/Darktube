@@ -1,0 +1,29 @@
+{
+  "id": "terminal-3d",
+  "tier": "free",
+  "core": true,
+  "category": "camera",
+  "subcategory": null,
+  "tags": [
+    "camera"
+  ],
+  "summary": "Three terminal windows scattered through 3D space; the camera flies between windows with a sinusoidal pull-back mid-flight, and at each window a typewriter taps out a command while results slide out line by line \u2014 a spatial narrative flow of command execution",
+  "duration": "~6.0s (180f @ 30fps; three stops of ~1.6s hold + 0.85s flight each)",
+  "energy": "Medium (flight provides dynamism, typing provides rhythm; overall a steady technical narrative)",
+  "styles": [
+    {
+      "key": "terminal-3d",
+      "label": "terminal-3d",
+      "media": "./media/terminal-3d.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/terminal-3d.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/camera/terminal-3d/prompt.md",
+  "tsx": "https://getshotpack.com/demos/camera/terminal-3d/demo.tsx",
+  "tsxFiles": [
+    "./demos/camera/terminal-3d/Terminal3D.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/camera/terminal-3d/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,57 @@
+{
+  "id": "shot-transitions",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Camera handoff, six variants \u2014 push-to-whiteout flash-cut, straight cruise through dark, focus relay, black-frame text card, whip-pan, and mask-wipe through a window (incl. a depth variant), selected by energy drop",
+  "duration": "n/a (technique card; frames per variant are in the parameter table, drawn from the adjacent shots' budgets)",
+  "energy": "n/a (technique card, doesn't occupy an energy slot)",
+  "styles": [
+    {
+      "key": "flash-cut",
+      "label": "\u63a8\u8fdb\u6d41\u767d flash-cut",
+      "media": "./media/flash-cut.mp4?v=1784437314733"
+    },
+    {
+      "key": "shot-transitions-4",
+      "label": "\u7a7f\u6697\u573a\u76f4\u822a",
+      "media": "./media/shot-transitions-4.mp4?v=1784437314735"
+    },
+    {
+      "key": "shot-transitions-5",
+      "label": "\u865a\u7126\u63a5\u529b",
+      "media": "./media/shot-transitions-5.mp4?v=1784437314737"
+    },
+    {
+      "key": "shot-transitions-6",
+      "label": "\u9ed1\u573a\u5b57\u5361",
+      "media": "./media/shot-transitions-6.mp4?v=1784437314739"
+    },
+    {
+      "key": "whip-pan",
+      "label": "whip-pan \u7529\u955c",
+      "media": "./media/whip-pan.mp4?v=1784437314741"
+    },
+    {
+      "key": "mask-wipe",
+      "label": "mask-wipe \u7a7f\u7a97",
+      "media": "./media/mask-wipe.mp4?v=1784437314742"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/flash-cut.mp4?v=1784437314733",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/shot-transitions/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/shot-transitions/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/shot-transitions/MaskWipeReal.tsx",
+    "./demos/transition/shot-transitions/PortalWipeV2.tsx",
+    "./demos/transition/shot-transitions/WhipBrakeReal.tsx",
+    "./demos/transition/shot-transitions/WhipPanReal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/shot-transitions/prompt.md",
+  "unlock": null
+}

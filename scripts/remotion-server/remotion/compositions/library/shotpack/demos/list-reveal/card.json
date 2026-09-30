@@ -1,0 +1,29 @@
+{
+  "id": "list-reveal",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Six items of a vertical menu find their place one by one at 0.09 intervals via scale, settling with a slight outBack overshoot, while the whole list container drifts linearly upward 32px the entire time \u2014 per-item entrance and whole-list drift are two unrelated layers of motion",
+  "duration": "~3.6s (108f@30fps)",
+  "energy": "Low (steady beat, no peaks; drift keeps the frame alive)",
+  "styles": [
+    {
+      "key": "list-reveal",
+      "label": "list-reveal",
+      "media": "./media/list-reveal.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/list-reveal.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/list-reveal/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/list-reveal/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/list-reveal/ListReveal.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/list-reveal/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "avatar-bracket-carousel",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "\"Your ___ teammates\" placeholder layout \u2014 the four-corner focus brackets stay pinned mid-sentence while the avatar queue inside them spring-cycles three times vertically; avatars magnify and sharpen on the way in and shrink, fade and blur by distance on the way out, with the role label swapping in sync; the brackets breathe 7% at each switch",
+  "duration": "~5.2s (156f@30fps)",
+  "energy": "Medium (three evenly spaced switches form a steady metronome; the bracket pulse is the only decorative move)",
+  "styles": [
+    {
+      "key": "avatar-bracket-carousel",
+      "label": "avatar-bracket-carousel",
+      "media": "./media/avatar-bracket-carousel.mp4?v=1785600000000"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/avatar-bracket-carousel.mp4?v=1785600000000",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/avatar-bracket-carousel/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/avatar-bracket-carousel/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/avatar-bracket-carousel/AvatarBracketCarousel.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/avatar-bracket-carousel/prompt.md",
+  "unlock": null
+}

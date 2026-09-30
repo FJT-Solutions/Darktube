@@ -1,0 +1,31 @@
+{
+  "id": "neon-frame-orbit-drop",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance",
+    "effects",
+    "camera"
+  ],
+  "summary": "After the neon frame sketches its outline first, the camera arcs from the page's left to right, and all page components/text settle down from the air **on the same frame** (same-shape soft shadows converging in sync) \u2014 a whole-body-entrance in-frame installation",
+  "duration": "frame sketch ~0.5s + rotation & simultaneous settling ~2.5s + settled ~1s; whole piece 4\u20134.5s",
+  "energy": "Medium-high (one big one-shot move; still once settled)",
+  "styles": [
+    {
+      "key": "neon-frame-orbit-drop",
+      "label": "neon-frame-orbit-drop",
+      "media": "./media/neon-frame-orbit-drop.mp4?v=1785050511487"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/neon-frame-orbit-drop.mp4?v=1785050511487",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/neon-frame-orbit-drop/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/neon-frame-orbit-drop/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/neon-frame-orbit-drop/NeonFrameForerunOrbit.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/neon-frame-orbit-drop/prompt.md",
+  "unlock": null
+}

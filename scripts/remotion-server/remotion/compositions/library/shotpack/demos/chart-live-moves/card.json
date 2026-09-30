@@ -1,0 +1,41 @@
+{
+  "id": "chart-live-moves",
+  "tier": "free",
+  "core": true,
+  "category": "data",
+  "subcategory": null,
+  "tags": [
+    "data"
+  ],
+  "summary": "Three live-chart variants \u2014 oscilloscope-stream (the waveform writes in live at the right edge + a sudden spike), unit-dot-swarm-regroup (dots migrate in three acts to form digits), axis-rescale-shock (a new value bursts out of the frame, forcing the y-axis to rescale)",
+  "duration": "4\u20136s each",
+  "energy": "Medium-high (data is the story)",
+  "styles": [
+    {
+      "key": "oscilloscope-stream",
+      "label": "oscilloscope-stream",
+      "media": "./media/oscilloscope-stream.mp4?v=1784437314519"
+    },
+    {
+      "key": "unit-dot-swarm-regroup",
+      "label": "unit-dot-swarm-regroup",
+      "media": "./media/unit-dot-swarm-regroup.mp4?v=1785050513841"
+    },
+    {
+      "key": "axis-rescale-shock",
+      "label": "axis-rescale-shock",
+      "media": "./media/axis-rescale-shock.mp4?v=1784437314524"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/oscilloscope-stream.mp4?v=1784437314519",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/data/chart-live-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/data/chart-live-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/data/chart-live-moves/AxisRescaleShockV2.tsx",
+    "./demos/data/chart-live-moves/OscilloscopeStreamV2.tsx",
+    "./demos/data/chart-live-moves/UnitDotSwarmRegroupV2.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/data/chart-live-moves/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,37 @@
+{
+  "id": "riso-print-hits",
+  "tier": "free",
+  "core": true,
+  "category": "effects",
+  "subcategory": null,
+  "tags": [
+    "effects",
+    "typography",
+    "rhythm"
+  ],
+  "summary": "Misregistration hits, two variants \u2014 riso-misregistration-hit single impact frame (impact-stop splits a two-color print, jitters twice, registers) and riso-beat-pump beat pump (jumps big per beat + escalating misregistration per beat)",
+  "duration": "A 4s (single); B 4.7s (four beats)",
+  "energy": "high",
+  "styles": [
+    {
+      "key": "misregistration-hit",
+      "label": "misregistration-hit \u5355\u53d1",
+      "media": "./media/misregistration-hit.mp4?v=1784437314711"
+    },
+    {
+      "key": "beat-pump",
+      "label": "beat-pump \u8282\u62cd\u6cf5",
+      "media": "./media/beat-pump.mp4?v=1784437314712"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/misregistration-hit.mp4?v=1784437314711",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/effects/riso-print-hits/prompt.md",
+  "tsx": "https://getshotpack.com/demos/effects/riso-print-hits/demo.tsx",
+  "tsxFiles": [
+    "./demos/effects/riso-print-hits/RisoBeatPump.tsx",
+    "./demos/effects/riso-print-hits/RisoMisregistrationHit.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/effects/riso-print-hits/prompt.md",
+  "unlock": null
+}

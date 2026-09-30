@@ -1,0 +1,27 @@
+{
+  "id": "row-embed",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Content rows descend from the air like cards, level out via rotateX, and the instant they embed, a thin accent-colored seam lights along their bottom edge",
+  "duration": "~2s (12\u201368f)",
+  "energy": "Medium",
+  "styles": [
+    {
+      "key": "row-embed",
+      "label": "row-embed",
+      "media": "./media/row-embed.mp4?v=1784437314715"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/row-embed.mp4?v=1784437314715",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/row-embed/prompt.md",
+  "tsx": null,
+  "tsxFiles": [],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/row-embed/prompt.md",
+  "unlock": null
+}

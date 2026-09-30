@@ -1,0 +1,29 @@
+{
+  "id": "cloner-depth-echo",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Clone column \u2014 the main card instantly \"copies\" out 7 semi-transparent doppelgangers arranged into a column receding diagonally in depth; after a beat pause, all of them accelerate back, merging into the original with a bounce",
+  "duration": "4\u20135s",
+  "energy": "Medium (display-then-gather type)",
+  "styles": [
+    {
+      "key": "cloner-depth-echo",
+      "label": "cloner-depth-echo",
+      "media": "./media/cloner-depth-echo.mp4?v=1784437314528"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/cloner-depth-echo.mp4?v=1784437314528",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/cloner-depth-echo/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/cloner-depth-echo/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/cloner-depth-echo/ClonerDepthEcho.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/cloner-depth-echo/prompt.md",
+  "unlock": null
+}

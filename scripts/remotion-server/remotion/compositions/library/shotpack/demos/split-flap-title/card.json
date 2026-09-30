@@ -1,0 +1,30 @@
+{
+  "id": "split-flap-title",
+  "tier": "free",
+  "core": true,
+  "category": "typography",
+  "subcategory": null,
+  "tags": [
+    "typography",
+    "opening"
+  ],
+  "summary": "Airport split-flap display title \u2014 each character is a mechanical flip cell split into top/bottom halves, flipping through 2 scrambled characters with a click to land on the target, cascading left-to-right as a wave",
+  "duration": "~4.7s (140f: \u226520f scrambled stillness to establish + cascading flips + \u226515f settled stillness)",
+  "energy": "Medium (sustained mechanical motion, not an instantaneous impact)",
+  "styles": [
+    {
+      "key": "split-flap-title",
+      "label": "split-flap-title",
+      "media": "./media/split-flap-title.mp4?v=1784437314774"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/split-flap-title.mp4?v=1784437314774",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/typography/split-flap-title/prompt.md",
+  "tsx": "https://getshotpack.com/demos/typography/split-flap-title/demo.tsx",
+  "tsxFiles": [
+    "./demos/typography/split-flap-title/SplitFlapFlip.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/typography/split-flap-title/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "text-as-mask",
+  "tier": "free",
+  "core": true,
+  "category": "opening",
+  "subcategory": null,
+  "tags": [
+    "opening",
+    "typography"
+  ],
+  "summary": "Text-as-mask video \u2014 a slow-moving product shot shows through the inside of an ultra-bold giant title; at the end the glyphs scale up 26\u00d7 overflowing, and the inside footage takes over full-screen",
+  "duration": "5s (hold 20f + in-glyph drift 80f + scale takeover 30f + stillness 20f)",
+  "energy": "Medium-high (steady drift segment, one burst at the takeover)",
+  "styles": [
+    {
+      "key": "text-as-mask",
+      "label": "text-as-mask",
+      "media": "./media/text-as-mask.mp4?v=1784437314808"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/text-as-mask.mp4?v=1784437314808",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/opening/text-as-mask/prompt.md",
+  "tsx": "https://getshotpack.com/demos/opening/text-as-mask/demo.tsx",
+  "tsxFiles": [
+    "./demos/opening/text-as-mask/TextAsMask.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/opening/text-as-mask/prompt.md",
+  "unlock": null
+}

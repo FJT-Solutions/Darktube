@@ -1,0 +1,35 @@
+{
+  "id": "paper-craft-moves",
+  "tier": "free",
+  "core": true,
+  "category": "ui-entrance",
+  "subcategory": null,
+  "tags": [
+    "ui-entrance"
+  ],
+  "summary": "Two paper-craft variants \u2014 masking-tape-slap presses a card down with masking tape (a floating micro-wobble gets \"slap-slap\" pressed dead) and popup-book-rise stands cards up like a pop-up book (cards rising along their bottom edges into a wall, staggered)",
+  "duration": "A 3\u20134s / B 4\u20135.5s",
+  "energy": "A medium (two hitting beats) / B medium-high (the rising wall has depth impact)",
+  "styles": [
+    {
+      "key": "masking-tape-slap",
+      "label": "masking-tape-slap",
+      "media": "./media/masking-tape-slap.mp4?v=1784437314688"
+    },
+    {
+      "key": "popup-book-rise",
+      "label": "popup-book-rise",
+      "media": "./media/popup-book-rise.mp4?v=1784437314689"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/masking-tape-slap.mp4?v=1784437314688",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/ui-entrance/paper-craft-moves/prompt.md",
+  "tsx": "https://getshotpack.com/demos/ui-entrance/paper-craft-moves/demo.tsx",
+  "tsxFiles": [
+    "./demos/ui-entrance/paper-craft-moves/MaskingTapeSlap.tsx",
+    "./demos/ui-entrance/paper-craft-moves/PopupBookRise.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/ui-entrance/paper-craft-moves/prompt.md",
+  "unlock": null
+}

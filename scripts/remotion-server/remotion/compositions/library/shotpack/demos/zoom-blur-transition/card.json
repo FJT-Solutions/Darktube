@@ -1,0 +1,33 @@
+{
+  "id": "zoom-blur-transition",
+  "tier": "free",
+  "core": true,
+  "category": "transition",
+  "subcategory": null,
+  "tags": [
+    "transition"
+  ],
+  "summary": "Zoom-punch transition \u2014 the previous page zooms in and fades out through blur, the next page punches in from magnified blur and resets; both pages moving along the same depth direction hides the cut point",
+  "duration": "Per variant, prior state \u226520f + punch 24\u201340f + ending \u226540f, ~4s (120f)",
+  "energy": "High (the punch segment is the advancing peak, low-energy buffer before and after)",
+  "styles": [
+    {
+      "key": "zoom-in",
+      "label": "zoom-in",
+      "media": "./media/zoom-blur-transition.mp4?v=1786343981647"
+    },
+    {
+      "key": "rise-punch",
+      "label": "rise-punch"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/zoom-blur-transition.mp4?v=1786343981647",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/transition/zoom-blur-transition/prompt.md",
+  "tsx": "https://getshotpack.com/demos/transition/zoom-blur-transition/demo.tsx",
+  "tsxFiles": [
+    "./demos/transition/zoom-blur-transition/ZoomBlurTransition.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/transition/zoom-blur-transition/prompt.md",
+  "unlock": null
+}

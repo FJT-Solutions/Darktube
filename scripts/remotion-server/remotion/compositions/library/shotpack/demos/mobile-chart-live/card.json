@@ -1,0 +1,30 @@
+{
+  "id": "mobile-chart-live",
+  "tier": "free",
+  "core": true,
+  "category": "mobile",
+  "subcategory": "data",
+  "tags": [
+    "mobile",
+    "data"
+  ],
+  "summary": "A real-time line chart on a phone data page (\"Active sessions\") grows point by point from the left edge to the right, the current-value counter rolls with the progress, two stat cards on top stagger in, on a light grid backdrop, and finally the whole device breathes to settle",
+  "duration": "~6s (180f @ 30fps, including \u226530f of stillness after settling)",
+  "energy": "Medium (line growth + counter)",
+  "styles": [
+    {
+      "key": "mobile-chart-live",
+      "label": "mobile-chart-live",
+      "media": "./media/mobile-chart-live-1786363881104.mp4"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/mobile-chart-live-1786363881104.mp4",
+  "poster": "https://r2.getshotpack.com/media/mobile-chart-live-1786363881104.png",
+  "card": "https://getshotpack.com/demos/mobile/mobile-chart-live/prompt.md",
+  "tsx": "https://getshotpack.com/demos/mobile/mobile-chart-live/demo.tsx",
+  "tsxFiles": [
+    "./demos/mobile/mobile-chart-live/MobileChartLive.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/mobile/mobile-chart-live/prompt.md",
+  "unlock": null
+}

@@ -1,0 +1,29 @@
+{
+  "id": "segmented-thumb-hero",
+  "tier": "free",
+  "core": true,
+  "category": "interaction",
+  "subcategory": null,
+  "tags": [
+    "interaction"
+  ],
+  "summary": "A segmented control's thumb displacement takes the hero close-up \u2014 an oversized capsule segmented control springs in, an outlined-arrow cursor slides in from off-frame and presses, the white thumb slides to the other segment in 8f ease-out, and at the moment it lands a new icon springs out while the old icon retracts",
+  "duration": "~3.5s (demo 110f: float-in 18f + cursor 24f + click + 8f slide + icon pop + hold)",
+  "energy": "Medium (micro-interaction close-up, refined rather than explosive)",
+  "styles": [
+    {
+      "key": "segmented-thumb-hero",
+      "label": "segmented-thumb-hero",
+      "media": "./media/segmented-thumb-hero.mp4?v=1784437314731"
+    }
+  ],
+  "preview": "https://r2.getshotpack.com/media/segmented-thumb-hero.mp4?v=1784437314731",
+  "poster": null,
+  "card": "https://getshotpack.com/demos/interaction/segmented-thumb-hero/prompt.md",
+  "tsx": "https://getshotpack.com/demos/interaction/segmented-thumb-hero/demo.tsx",
+  "tsxFiles": [
+    "./demos/interaction/segmented-thumb-hero/SegmentedThumbHero.tsx"
+  ],
+  "prompt": "https://getshotpack.com/demos/interaction/segmented-thumb-hero/prompt.md",
+  "unlock": null
+}
