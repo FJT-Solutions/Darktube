@@ -1307,15 +1307,18 @@ export default function DarkClipsPage() {
 
   const [detectingCrop, setDetectingCrop] = useState(false);
 
-  async function handleAutoDetectCrop(targetClip?: DarkClip) {
+  async function handleAutoDetectCrop(targetClip?: DarkClip, silent: boolean = true) {
     const clip = targetClip || selectedClip;
     if (!clip) {
-      toast.error("Selecione um clipe para analisar.");
+      if (!silent) toast.error("Selecione um clipe para analisar.");
       return;
     }
 
     setDetectingCrop(true);
-    const toastId = toast.loading("⚡ Analisando enquadramento com FFmpeg local (Custo R$ 0,00)...");
+    let toastId: string | number | undefined;
+    if (!silent) {
+      toastId = toast.loading("⚡ Analisando enquadramento com FFmpeg local (Custo R$ 0,00)...");
+    }
 
     try {
       const res = await fetch("/api/dark-clips/detect-crop", {
@@ -1330,7 +1333,6 @@ export default function DarkClipsPage() {
       const data = await res.json();
       if (data.success && data.detection) {
         const d = data.detection;
-        // Aplica o enquadramento detectado pelo FFmpeg
         const calculatedCropTop = typeof d.crop_top === "number" ? d.crop_top : 22;
         const calculatedCropBottom = typeof d.crop_bottom === "number" ? d.crop_bottom : 0;
         
@@ -1340,18 +1342,63 @@ export default function DarkClipsPage() {
           cropBottom: calculatedCropBottom,
           aspectRatio: d.aspect_ratio || "16:9",
           fitMode: "cover",
+          autoCrop: true,
         }));
 
-        toast.success(`⚡ Vídeo isolado com sucesso pelo FFmpeg! Corte superior de ${calculatedCropTop}% aplicado (100% Grátis).`, { id: toastId });
+        setClips((prevClips) =>
+          prevClips.map((c) =>
+            c.id === clip.id
+              ? {
+                  ...c,
+                  remodel_data: {
+                    ...(typeof c.remodel_data === "object" ? c.remodel_data : {}),
+                    detected_crop: d,
+                  },
+                }
+              : c
+          )
+        );
+
+        if (!silent && toastId) {
+          toast.success(`⚡ Vídeo isolado com sucesso pelo FFmpeg! Corte superior de ${calculatedCropTop}% aplicado (100% Grátis).`, { id: toastId });
+        }
       } else {
-        toast.error("Não foi possível detectar a área do vídeo automaticamente.", { id: toastId });
+        if (!silent && toastId) {
+          toast.error("Não foi possível detectar a área do vídeo automaticamente.", { id: toastId });
+        }
       }
     } catch {
-      toast.error("Erro ao comunicar com o analisador de vídeo.", { id: toastId });
+      if (!silent && toastId) {
+        toast.error("Erro ao comunicar com o analisador de vídeo.", { id: toastId });
+      }
     } finally {
       setDetectingCrop(false);
     }
   }
+
+  // ── Auto-Crop Automático (Zero Clique) ──
+  // Detecta e enquadra o vídeo automaticamente assim que o clipe é selecionado
+  useEffect(() => {
+    if (!selectedClip) return;
+
+    const remodel = typeof selectedClip.remodel_data === "string"
+      ? JSON.parse(selectedClip.remodel_data || "{}")
+      : (selectedClip.remodel_data || {});
+
+    if (remodel.detected_crop) {
+      const dc = remodel.detected_crop;
+      setVideoPlacement((v) => ({
+        ...v,
+        cropTop: typeof dc.crop_top === "number" ? dc.crop_top : 22,
+        cropBottom: typeof dc.crop_bottom === "number" ? dc.crop_bottom : 0,
+        aspectRatio: dc.aspect_ratio || "16:9",
+        fitMode: "cover",
+        autoCrop: true,
+      }));
+    } else if (selectedClip.video_url || selectedClip.thumbnail_url) {
+      handleAutoDetectCrop(selectedClip, true);
+    }
+  }, [selectedClip?.id]);
 
   async function handleRemodelWithAi(targetClip?: DarkClip) {
     const clip = targetClip || selectedClip;
@@ -2847,14 +2894,23 @@ export default function DarkClipsPage() {
                       </p>
                     </div>
 
-                    {/* Isolamento & Corte Inteligente de Vídeo (Auto-Crop / Manual Crop) */}
+                    {/* Isolamento & Corte Inteligente de Vídeo (Auto-Crop Automático) */}
                     <div className="space-y-2 pt-2 border-t border-border/40">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-semibold flex items-center gap-1.5">
                           <span>✂️ Isolamento & Corte de Bordas</span>
-                          {(videoPlacement.cropTop > 0 || videoPlacement.cropBottom > 0) && (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/40 text-amber-400 bg-amber-500/10 font-mono">
-                              Corte Ativo ({videoPlacement.cropTop}% topo, {videoPlacement.cropBottom}% base)
+                          {detectingCrop ? (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-mono flex items-center gap-1">
+                              <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                              Auto-Crop Detectando...
+                            </Badge>
+                          ) : (videoPlacement.cropTop > 0 || videoPlacement.cropBottom > 0) ? (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-mono">
+                              ⚡ Auto-Crop Ativo ({videoPlacement.cropTop}% topo{videoPlacement.cropBottom > 0 ? `, ${videoPlacement.cropBottom}% base` : ''})
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-muted text-muted-foreground font-mono">
+                              Auto-Crop Ativo
                             </Badge>
                           )}
                         </Label>
@@ -2870,29 +2926,8 @@ export default function DarkClipsPage() {
                           </Button>
                         )}
                       </div>
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={detectingCrop || !selectedClip}
-                        onClick={() => handleAutoDetectCrop()}
-                        className="w-full text-xs h-8 font-bold border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-center gap-1.5"
-                      >
-                        {detectingCrop ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            <span>Detectando área útil com FFmpeg...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-3.5 w-3.5" />
-                            <span>⚡ Isolar Vídeo Automaticamente (FFmpeg Auto-Crop)</span>
-                          </>
-                        )}
-                      </Button>
                       <p className="text-[10px] text-muted-foreground leading-tight">
-                        Remove automaticamente textos fixos, avatares do autor e barras pretas do vídeo original.
+                        Textos fixos, avatares do autor e barras pretas são isolados automaticamente pelo sistema via FFmpeg. Use os controles abaixo se desejar calibrar manualmente:
                       </p>
 
                       {/* Corte Superior (Crop Top) */}
@@ -4924,7 +4959,7 @@ export default function DarkClipsPage() {
                                         fitMode: "cover",
                                       }));
                                     } else {
-                                      handleAutoDetectCrop(clip);
+                                      handleAutoDetectCrop(clip, true);
                                     }
                                   }}
                                   className="flex-1 text-[11px] h-7 font-bold truncate min-w-0"
@@ -5087,23 +5122,6 @@ export default function DarkClipsPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAutoDetectCrop()}
-                            disabled={detectingCrop || !selectedClip}
-                            className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-bold text-xs gap-1.5 h-8 shadow-sm"
-                            title="Detectar automaticamente e remover cabeçalhos/barras antigas usando FFmpeg"
-                          >
-                            {detectingCrop ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Sparkles className="h-3.5 w-3.5" />
-                            )}
-                            {detectingCrop ? "Isolando..." : "⚡ Auto-Crop FFmpeg"}
-                          </Button>
-
                           <Button
                             size="sm"
                             onClick={() => handleRender()}

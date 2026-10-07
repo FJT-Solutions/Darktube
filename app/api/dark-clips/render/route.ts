@@ -247,6 +247,22 @@ export async function POST(req: Request) {
       }
       effectiveVideoPlacement.autoCrop = effectiveVideoPlacement.autoCrop ?? true;
 
+      // Se não houver corte manual informado, recupera o corte detectado do clipe se disponível
+      if ((effectiveVideoPlacement.cropTop === undefined || effectiveVideoPlacement.cropTop === 0) && clipRecord) {
+        try {
+          const parsedRemodel = typeof clipRecord.remodel_data === 'string'
+            ? JSON.parse(clipRecord.remodel_data)
+            : (clipRecord.remodel_data || {});
+          if (parsedRemodel?.detected_crop) {
+            effectiveVideoPlacement.cropTop = parsedRemodel.detected_crop.crop_top;
+            effectiveVideoPlacement.cropBottom = parsedRemodel.detected_crop.crop_bottom;
+            if (parsedRemodel.detected_crop.aspect_ratio) {
+              effectiveVideoPlacement.aspectRatio = parsedRemodel.detected_crop.aspect_ratio;
+            }
+          }
+        } catch (_) {}
+      }
+
       let serverConnected = false;
 
       for (const baseUrl of CANDIDATE_URLS) {
