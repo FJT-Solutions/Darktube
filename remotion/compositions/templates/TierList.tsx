@@ -179,8 +179,6 @@ export const TierListSceneSingle: React.FC<TierListSingleProps> = ({
         }}
       />
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── Top Header ── */}
       <div
@@ -412,8 +410,8 @@ export const TierListComposition: React.FC<RemotionShortProps> = (props) => {
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'INTELIGÊNCIA ARTIFICIAL GERAL',
-      captionText: props.subheadline || 'Atingindo o nível cognitivo supremo que transforma toda a civilização humana.',
+      headline: (props as any).headline || 'INTELIGÊNCIA ARTIFICIAL GERAL',
+      captionText: (props as any).subheadline || 'Atingindo o nível cognitivo supremo que transforma toda a civilização humana.',
       durationSeconds: 10,
       targetTier: 'S',
     } as any;

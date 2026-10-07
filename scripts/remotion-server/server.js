@@ -359,10 +359,92 @@ async function handleDarkClipsRender(req, res) {
           detectedVideoMeta = meta;
           console.log(`[Remotion DarkClips] ⏱️ Duração real detectada: ${meta.dur.toFixed(1)}s (${meta.w}x${meta.h})`);
 
-          // Video original preservado 100% — sem corte automatico.
-          // O enquadramento e controlado pelo Remotion via fitMode/aspectRatio na composicao.
           resolvedVideoUrl = `http://localhost:${PORT}/storage/${inputFileName}`;
-          console.log(`[Remotion DarkClips] Video original preservado: ${resolvedVideoUrl}`);
+
+          // ─────────────────────────────────────────────────────────────────────────
+          // 2. DETECÇÃO E RECORTE INTELIGENTE DE CABEÇALHOS/BORDAS (FFmpeg Crop)
+          // ─────────────────────────────────────────────────────────────────────────
+          const manualCropTop = Number(inputProps.videoPlacement?.cropTop ?? inputProps.videoPlacement?.crop_top ?? 0);
+          const manualCropBottom = Number(inputProps.videoPlacement?.cropBottom ?? inputProps.videoPlacement?.crop_bottom ?? 0);
+          const autoCropRequested = inputProps.videoPlacement?.autoCrop !== false && (req.body.autoCrop !== false);
+
+          if (manualCropTop > 0 || manualCropBottom > 0) {
+            // A) Corte manual explícito solicitado pelo usuário
+            const cutTop = Math.round((manualCropTop / 100) * meta.h);
+            const cutBottom = Math.round((manualCropBottom / 100) * meta.h);
+            const newH = meta.h - cutTop - cutBottom;
+            if (newH > 100) {
+              const cw = meta.w % 2 === 0 ? meta.w : meta.w - 1;
+              const ch = newH % 2 === 0 ? newH : newH - 1;
+              const cy = cutTop % 2 === 0 ? cutTop : cutTop + 1;
+              const croppedFileName = `input_${jobId}_manualcrop.mp4`;
+              const croppedFilePath = path.join(OUTPUT_DIR, croppedFileName);
+              try {
+                console.log(`[Remotion DarkClips] ✂️ Aplicando corte manual FFmpeg: ${cw}x${ch} (topo: ${cutTop}px, base: ${cutBottom}px)...`);
+                execSync(`ffmpeg -y -i "${inputFilePath}" -vf "crop=${cw}:${ch}:0:${cy}" -c:v libx264 -preset veryfast -crf 18 -c:a copy "${croppedFilePath}"`, { timeout: 120000, stdio: 'pipe' });
+                if (fs.existsSync(croppedFilePath) && fs.statSync(croppedFilePath).size > 1000) {
+                  resolvedVideoUrl = `http://localhost:${PORT}/storage/${croppedFileName}`;
+                  detectedVideoMeta.w = cw;
+                  detectedVideoMeta.h = ch;
+                  console.log(`[Remotion DarkClips] ✅ Vídeo recortado manualmente pronto: ${resolvedVideoUrl}`);
+                }
+              } catch (manualErr) {
+                console.warn('[Remotion DarkClips] Aviso no corte manual:', manualErr.message);
+              }
+            }
+          } else if (meta.h > meta.w && autoCropRequested) {
+            // B) Vídeo vertical: detecção automática de cabeçalho estático (ex: memes com avatar/@ no topo e barras pretas)
+            try {
+              console.log(`[Remotion DarkClips] 🔍 Analisando presença de cabeçalhos estáticos via FFmpeg (tblend + cropdetect)...`);
+              const detectOut = execSync(
+                `ffmpeg -ss ${Math.max(0.5, meta.dur * 0.15).toFixed(1)} -i "${inputFilePath}" -t 3 -vf "tblend=all_mode=difference,cropdetect=limit=12:round=2:reset_count=0" -f null - 2>&1`,
+                { timeout: 25000, encoding: 'utf-8' }
+              );
+              let matches = [...detectOut.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
+
+              // Fallback para cropdetect simples se tblend não convergiu
+              if (matches.length === 0) {
+                const detectOut2 = execSync(
+                  `ffmpeg -ss ${Math.max(0.5, meta.dur * 0.15).toFixed(1)} -i "${inputFilePath}" -t 3 -vf "cropdetect=limit=24:round=2:reset_count=0" -f null - 2>&1`,
+                  { timeout: 25000, encoding: 'utf-8' }
+                );
+                matches = [...detectOut2.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
+              }
+
+              if (matches.length > 0) {
+                const last = matches[matches.length - 1];
+                const w = parseInt(last[1], 10);
+                const h = parseInt(last[2], 10);
+                const x = parseInt(last[3], 10);
+                const y = parseInt(last[4], 10);
+
+                const topPct = (y / meta.h);
+                const bottomPct = (meta.h - (y + h)) / meta.h;
+
+                // Se houver mais de 4% de cabeçalho estático no topo OU base cortável OU a área útil é menor que 90%
+                if (topPct > 0.04 || bottomPct > 0.04 || h < meta.h * 0.90) {
+                  const cw = w % 2 === 0 ? w : w - 1;
+                  const ch = h % 2 === 0 ? h : h - 1;
+                  const cx = x % 2 === 0 ? x : x + 1;
+                  const cy = y % 2 === 0 ? y : y + 1;
+                  const croppedFileName = `input_${jobId}_autocrop.mp4`;
+                  const croppedFilePath = path.join(OUTPUT_DIR, croppedFileName);
+                  console.log(`[Remotion DarkClips] 🎯 Cabeçalho/barras estáticas detectadas pelo FFmpeg! Cortando: ${meta.w}x${meta.h} → ${cw}x${ch} (y:${cy}, topo:${Math.round(topPct*100)}%)...`);
+                  execSync(`ffmpeg -y -i "${inputFilePath}" -vf "crop=${cw}:${ch}:${cx}:${cy}" -c:v libx264 -preset veryfast -crf 18 -c:a copy "${croppedFilePath}"`, { timeout: 120000, stdio: 'pipe' });
+                  if (fs.existsSync(croppedFilePath) && fs.statSync(croppedFilePath).size > 1000) {
+                    resolvedVideoUrl = `http://localhost:${PORT}/storage/${croppedFileName}`;
+                    detectedVideoMeta.w = cw;
+                    detectedVideoMeta.h = ch;
+                    console.log(`[Remotion DarkClips] ✅ Vídeo limpo e isolado com sucesso (sem textos antigos): ${resolvedVideoUrl}`);
+                  }
+                } else {
+                  console.log(`[Remotion DarkClips] ✅ Vídeo integralmente dinâmico. Preservando enquadramento original.`);
+                }
+              }
+            } catch (autoErr) {
+              console.warn('[Remotion DarkClips] Aviso na análise de auto-crop:', autoErr.message);
+            }
+          }
         }
       } catch (cacheErr) {
         console.warn(`[Remotion DarkClips] Pre-cache warning (usando URL remota diretamente):`, cacheErr.message);
@@ -380,6 +462,12 @@ async function handleDarkClipsRender(req, res) {
       ? (detectedVideoMeta.w / detectedVideoMeta.h)
       : (9 / 16);
 
+    // Se o vídeo útil for widescreen ou quadrado (após remoção de cabeçalho/barras), adapta o container
+    const isWidescreenOrSquare = videoAspect >= 0.85;
+    const computedAspectRatio = inputProps.videoPlacement?.aspectRatio && inputProps.videoPlacement.aspectRatio !== 'auto'
+      ? inputProps.videoPlacement.aspectRatio
+      : (videoAspect >= 1.5 ? '16:9' : (videoAspect >= 1.2 ? '4:3' : (videoAspect >= 0.9 ? '1:1' : 'auto')));
+
     const finalInputProps = {
       ...inputProps,
       videoUrl: resolvedVideoUrl,
@@ -389,7 +477,8 @@ async function handleDarkClipsRender(req, res) {
       videoAspectRatio: videoAspect,
       videoPlacement: {
         ...(inputProps.videoPlacement || {}),
-        fitMode: inputProps.videoPlacement?.fitMode || inputProps.videoPlacement?.fit_mode || 'contain',
+        aspectRatio: computedAspectRatio,
+        fitMode: isWidescreenOrSquare ? 'cover' : (inputProps.videoPlacement?.fitMode || inputProps.videoPlacement?.fit_mode || 'cover'),
         videoWidth: detectedVideoMeta.w || 1080,
         videoHeight: detectedVideoMeta.h || 1920,
         videoAspectRatio: videoAspect,

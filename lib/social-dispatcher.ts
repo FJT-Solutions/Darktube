@@ -8,6 +8,10 @@ import { restoreAccountCookiesToDisk, getSocialAccounts } from './social-account
 
 const activePostDispatches = new Set<string>();
 
+export function isDispatcherBusy(): boolean {
+  return activePostDispatches.size > 0;
+}
+
 export function isValidVideoUrl(url?: string | null): boolean {
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
@@ -242,7 +246,21 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
     child.on('exit', async (code, signal) => {
       activePostDispatches.delete(post.id);
       logger.info(`[Social Dispatcher] Processo Python finalizado (code: ${code}, signal: ${signal}) para post ${post.id}`, { context: 'Scheduler' });
-      if (code !== 0) {
+      if (code === 0) {
+        try {
+          await pool.query(
+            `UPDATE public.dark_clips_posts SET
+               status = 'published',
+               published_at = NOW(),
+               error_message = NULL
+             WHERE id = $1 AND status = 'publishing'`,
+            [post.id]
+          );
+          logger.info(`[Social Dispatcher] ✅ Post ${post.id} confirmado como 'published' com sucesso!`, { context: 'Scheduler' });
+        } catch (dbErr: any) {
+          logger.error(`[Social Dispatcher] Erro ao registrar status publicado no DB: ${dbErr?.message}`, { context: 'Scheduler' });
+        }
+      } else {
         let errorSnippet = `Código de saída: ${code}`;
         try {
           if (fs.existsSync(logFile)) {

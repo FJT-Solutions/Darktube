@@ -89,17 +89,18 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Inspeciona o registro do post antes de atualizar para identificar se ele deve ser despachado imediatamente
-        let finalPostStatus = status === 'completed' ? 'rendered' : 'failed';
-        let shouldDispatch = false;
-
         const existingDc = await pool.query(
           'SELECT id, user_id, clip_id, title, status, target_accounts, remodel_data, scheduled_at FROM public.dark_clips_posts WHERE id = $1',
           [historyId]
         );
 
-        if (status === 'completed' && existingDc.rows.length > 0) {
-          const currentPost = existingDc.rows[0];
+        const currentPost = existingDc.rows[0];
+        let finalPostStatus = status === 'completed'
+          ? (currentPost?.status === 'scheduled' ? 'scheduled' : 'rendered')
+          : 'failed';
+        let shouldDispatch = false;
+
+        if (status === 'completed' && currentPost) {
           const targets = typeof currentPost.target_accounts === 'string'
             ? JSON.parse(currentPost.target_accounts)
             : (currentPost.target_accounts || []);
@@ -114,6 +115,8 @@ export async function POST(req: NextRequest) {
           if (hasTargets && (isImmediate || isDueScheduled)) {
             finalPostStatus = 'publishing';
             shouldDispatch = true;
+          } else if (currentPost.status === 'scheduled') {
+            finalPostStatus = 'scheduled';
           }
         }
 
@@ -137,6 +140,12 @@ export async function POST(req: NextRequest) {
             videoUrl: finalVideoUrl,
           });
         }
+
+        // Aciona o daemon de agendamento para verificar se há outros itens prontos para disparo
+        try {
+          const { checkDueScheduledPosts } = await import('@/lib/dark-clips-scheduler');
+          checkDueScheduledPosts().catch(() => {});
+        } catch (_) {}
 
         // Notifica a fila do Dark Clips para processar o próximo item
         try {

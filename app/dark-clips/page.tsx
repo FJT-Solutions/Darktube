@@ -386,7 +386,7 @@ export default function DarkClipsPage() {
     borderRadius: 24,
     hasShadow: true,
     aspectRatio: "auto",
-    fitMode: "contain" as "contain" | "cover",
+    fitMode: "cover" as "contain" | "cover",
     zoom: 100,
     cropTop: 0,
     cropBottom: 0,
@@ -1476,7 +1476,10 @@ export default function DarkClipsPage() {
             durationInSeconds: clipDuration,
             profileHeader,
             headline: currentHeadline,
-            videoPlacement,
+            videoPlacement: {
+              ...videoPlacement,
+              autoCrop: true,
+            },
             background,
             watermark,
             footer: currentFooter,
@@ -2842,6 +2845,139 @@ export default function DarkClipsPage() {
                           ? "Mostra 100% do vídeo original dentro da moldura, sem nenhum corte."
                           : "Preenche toda a moldura da janela central. Use o Deslocamento Y abaixo se precisar ajustar o enquadramento."}
                       </p>
+                    </div>
+
+                    {/* Isolamento & Corte Inteligente de Vídeo (Auto-Crop / Manual Crop) */}
+                    <div className="space-y-2 pt-2 border-t border-border/40">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold flex items-center gap-1.5">
+                          <span>✂️ Isolamento & Corte de Bordas</span>
+                          {(videoPlacement.cropTop > 0 || videoPlacement.cropBottom > 0) && (
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/40 text-amber-400 bg-amber-500/10 font-mono">
+                              Corte Ativo ({videoPlacement.cropTop}% topo, {videoPlacement.cropBottom}% base)
+                            </Badge>
+                          )}
+                        </Label>
+                        {(videoPlacement.cropTop > 0 || videoPlacement.cropBottom > 0) && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setVideoPlacement((v) => ({ ...v, cropTop: 0, cropBottom: 0 }))}
+                            className="h-6 text-[10px] px-2 text-muted-foreground hover:text-red-400"
+                          >
+                            Redefinir
+                          </Button>
+                        )}
+                      </div>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={detectingCrop || !selectedClip}
+                        onClick={() => handleAutoDetectCrop()}
+                        className="w-full text-xs h-8 font-bold border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-center gap-1.5"
+                      >
+                        {detectingCrop ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Detectando área útil com FFmpeg...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5" />
+                            <span>⚡ Isolar Vídeo Automaticamente (FFmpeg Auto-Crop)</span>
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-[10px] text-muted-foreground leading-tight">
+                        Remove automaticamente textos fixos, avatares do autor e barras pretas do vídeo original.
+                      </p>
+
+                      {/* Corte Superior (Crop Top) */}
+                      <div className="space-y-1 pt-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-muted-foreground">Corte Superior (Crop Top)</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={videoPlacement.cropTop || 0}
+                              onChange={(e) =>
+                                setVideoPlacement((v) => ({
+                                  ...v,
+                                  cropTop: e.target.value === "" ? 0 : Math.min(60, Math.max(0, Number(e.target.value))),
+                                }))
+                              }
+                              className="w-14 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[10px] font-mono text-primary font-bold">%</span>
+                          </div>
+                        </div>
+                        <Slider
+                          value={[Math.min(60, Math.max(0, videoPlacement.cropTop || 0))]}
+                          min={0}
+                          max={60}
+                          step={1}
+                          onValueChange={([cropTop]) => setVideoPlacement((v) => ({ ...v, cropTop }))}
+                        />
+                      </div>
+
+                      {/* Corte Inferior (Crop Bottom) */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-muted-foreground">Corte Inferior (Crop Bottom)</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={videoPlacement.cropBottom || 0}
+                              onChange={(e) =>
+                                setVideoPlacement((v) => ({
+                                  ...v,
+                                  cropBottom: e.target.value === "" ? 0 : Math.min(60, Math.max(0, Number(e.target.value))),
+                                }))
+                              }
+                              className="w-14 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[10px] font-mono text-primary font-bold">%</span>
+                          </div>
+                        </div>
+                        <Slider
+                          value={[Math.min(60, Math.max(0, videoPlacement.cropBottom || 0))]}
+                          min={0}
+                          max={60}
+                          step={1}
+                          onValueChange={([cropBottom]) => setVideoPlacement((v) => ({ ...v, cropBottom }))}
+                        />
+                      </div>
+
+                      {/* Zoom do Vídeo */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-muted-foreground">Zoom Interno do Vídeo</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={videoPlacement.zoom || 100}
+                              onChange={(e) =>
+                                setVideoPlacement((v) => ({
+                                  ...v,
+                                  zoom: e.target.value === "" ? 100 : Math.min(250, Math.max(50, Number(e.target.value))),
+                                }))
+                              }
+                              className="w-14 h-6 text-xs font-mono text-right px-1.5 py-0 bg-background/80"
+                            />
+                            <span className="text-[10px] font-mono text-primary font-bold">%</span>
+                          </div>
+                        </div>
+                        <Slider
+                          value={[Math.min(250, Math.max(50, videoPlacement.zoom || 100))]}
+                          min={50}
+                          max={250}
+                          step={2}
+                          onValueChange={([zoom]) => setVideoPlacement((v) => ({ ...v, zoom }))}
+                        />
+                      </div>
                     </div>
 
                     {/* Proporção da Moldura (Aspect Ratio) */}
@@ -4778,6 +4914,18 @@ export default function DarkClipsPage() {
                                       if (clip.remodel_data.post_caption) setPostCaption(clip.remodel_data.post_caption);
                                       if (clip.remodel_data.hashtags) setPostHashtags(clip.remodel_data.hashtags);
                                     }
+                                    if ((clip.remodel_data as any)?.detected_crop) {
+                                      const dc = (clip.remodel_data as any).detected_crop;
+                                      setVideoPlacement((v) => ({
+                                        ...v,
+                                        cropTop: typeof dc.crop_top === 'number' ? dc.crop_top : v.cropTop,
+                                        cropBottom: typeof dc.crop_bottom === 'number' ? dc.crop_bottom : v.cropBottom,
+                                        aspectRatio: dc.aspect_ratio || v.aspectRatio,
+                                        fitMode: "cover",
+                                      }));
+                                    } else {
+                                      handleAutoDetectCrop(clip);
+                                    }
                                   }}
                                   className="flex-1 text-[11px] h-7 font-bold truncate min-w-0"
                                   title="Abrir este clipe no Estúdio de Produção abaixo para personalizar layout e agendar individualmente"
@@ -4938,15 +5086,34 @@ export default function DarkClipsPage() {
                           </CardDescription>
                         </div>
 
-                        <Button
-                          size="sm"
-                          onClick={() => handleRender()}
-                          disabled={isRendering}
-                          className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-8 shadow-sm"
-                        >
-                          {isRendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
-                          {isRendering ? "Renderizando..." : "Renderizar Clipe 9:16"}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAutoDetectCrop()}
+                            disabled={detectingCrop || !selectedClip}
+                            className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-bold text-xs gap-1.5 h-8 shadow-sm"
+                            title="Detectar automaticamente e remover cabeçalhos/barras antigas usando FFmpeg"
+                          >
+                            {detectingCrop ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3.5 w-3.5" />
+                            )}
+                            {detectingCrop ? "Isolando..." : "⚡ Auto-Crop FFmpeg"}
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            onClick={() => handleRender()}
+                            disabled={isRendering}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-8 shadow-sm"
+                          >
+                            {isRendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
+                            {isRendering ? "Renderizando..." : "Renderizar Clipe 9:16"}
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
 

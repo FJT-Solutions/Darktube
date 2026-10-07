@@ -66,7 +66,7 @@ const FloatingReactionEmojis: React.FC<{
         const yOffset = (elapsed * item.speed) % 1100;
         const currentY = 1000 - yOffset;
         const currentX = item.x + Math.sin(frame * item.wobbleFreq + idx) * 4;
-        const opacity = interpolate(currentY, [1000, 700, 200, 0], [0, 0.9, 0.9, 0], {
+        const opacity = interpolate(currentY, [0, 200, 700, 1000], [0, 0.9, 0.9, 0], {
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
         });

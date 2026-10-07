@@ -220,30 +220,31 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   const activePanY = pan_y ?? panY ?? 0;
   const activePanX = pan_x ?? panX ?? 0;
 
-  const isContain = activeFitMode === 'contain';
+  const hasCrop = (activeCropTop > 0 || activeCropBottom > 0);
+  const isContain = activeFitMode === 'contain' && !hasCrop;
 
-  // Em modo contain, o vídeo original é sempre 100% preservado sem cortes.
-  // Em modo cover manual, respeita cortes específicos se definidos pelo usuário.
-  const visibleHeightRatio = Math.max(0.2, (100 - activeCropTop - activeCropBottom) / 100);
-  const autoExpandZoom = (!isContain && (activeCropTop > 0 || activeCropBottom > 0)) ? (1 / visibleHeightRatio) : 1;
-  const autoShiftY = (!isContain && (activeCropTop > 0 || activeCropBottom > 0))
-    ? -((activeCropTop - activeCropBottom) / 2)
-    : 0;
+  // Quando há crop definido (top ou bottom), isola o conteúdo ativo e ajusta o zoom/shift
+  const visibleHeightRatio = Math.max(0.15, (100 - activeCropTop - activeCropBottom) / 100);
+  const autoExpandZoom = hasCrop ? (1 / visibleHeightRatio) : 1;
+  const autoShiftY = hasCrop ? -((activeCropTop - activeCropBottom) / 2) : 0;
 
   const totalZoom = ((zoom || 100) / 100) * autoExpandZoom;
   const totalPanY = activePanY + autoShiftY;
 
   // ── Sizing Responsivo Inteligente da Moldura do Vídeo (Canvas 1080x1920) ──
-  const resolvedVideoAspect = propVidAspect || (propVidWidth && propVidHeight ? propVidWidth / propVidHeight : 9 / 16);
+  const rawVideoAspect = propVidAspect || (propVidWidth && propVidHeight ? propVidWidth / propVidHeight : 9 / 16);
+  // Se houver crop top/bottom em vídeo vertical, o conteúdo útil passa a ter proporção widescreen
+  const effectiveContentAspect = hasCrop ? (rawVideoAspect / visibleHeightRatio) : rawVideoAspect;
+
   const resolvedFrameAspect =
     aspectRatio === '16:9' ? 16 / 9 :
     aspectRatio === '4:3' ? 4 / 3 :
     aspectRatio === '1:1' ? 1 :
     aspectRatio === '4:5' ? 4 / 5 :
     aspectRatio === '9:16' ? 9 / 16 :
-    resolvedVideoAspect;
+    effectiveContentAspect;
 
-  const maxAllowedWidth = Math.round(1080 * ((scale || 92) / 100));
+  const maxAllowedWidth = Math.round(1080 * ((scale || 94) / 100));
   // Limite vertical seguro no canvas 1080x1920 para não sobrepor o cabeçalho nem o rodapé
   const maxAllowedHeight = resolvedFrameAspect <= 9 / 16
     ? 1120
@@ -251,7 +252,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
     ? 1080
     : resolvedFrameAspect <= 1
     ? 980
-    : 620;
+    : 660;
 
   let containerWidth = maxAllowedWidth;
   let containerHeight = Math.round(containerWidth / resolvedFrameAspect);
@@ -625,10 +626,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                clipPath:
-                  !isContain && (activeCropTop > 0 || activeCropBottom > 0)
-                    ? `inset(${activeCropTop}% 0% ${activeCropBottom}% 0%)`
-                    : undefined,
+                clipPath: hasCrop
+                  ? `inset(${activeCropTop}% 0% ${activeCropBottom}% 0%)`
+                  : undefined,
               }}
             >
               <OffthreadVideo
@@ -641,7 +641,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: isContain ? 'contain' : (activeFitMode === 'cover' ? 'cover' : 'contain'),
+                  objectFit: hasCrop ? 'cover' : (isContain ? 'contain' : (activeFitMode === 'cover' ? 'cover' : 'contain')),
                   borderRadius: `${borderRadius}px`,
                   transform: `scale(${totalZoom}) translate(${activePanX}%, ${totalPanY}%)`,
                   transformOrigin: 'center center',

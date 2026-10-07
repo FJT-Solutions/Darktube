@@ -18,6 +18,14 @@ import argparse
 from pathlib import Path
 from typing import List, Dict, Any
 
+try:
+    from dotenv import load_dotenv
+    root_dir = Path(__file__).resolve().parent.parent.parent
+    load_dotenv(root_dir / ".env.local")
+    load_dotenv(root_dir / ".env")
+except Exception:
+    pass
+
 current_dir = Path(__file__).resolve().parent
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
@@ -208,13 +216,13 @@ def update_post_status(post_id: str, status: str, error_message: str = None) -> 
             cur = conn.cursor()
             if status == "published":
                 cur.execute(
-                    "UPDATE public.dark_clips_posts SET status = %s, published_at = NOW(), error_message = NULL WHERE id = %s",
-                    ("published", post_id)
+                    "UPDATE public.dark_clips_posts SET status = %s, published_at = NOW(), error_message = NULL WHERE id::text = %s",
+                    ("published", str(post_id))
                 )
             else:
                 cur.execute(
-                    "UPDATE public.dark_clips_posts SET status = %s, error_message = %s WHERE id = %s",
-                    (status, (error_message or "")[:500], post_id)
+                    "UPDATE public.dark_clips_posts SET status = %s, error_message = %s WHERE id::text = %s",
+                    (status, (error_message or "")[:500], str(post_id))
                 )
             conn.commit()
             cur.close()

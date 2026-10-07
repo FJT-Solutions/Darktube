@@ -242,8 +242,6 @@ export const QuizTriviaSceneSingle: React.FC<QuizTriviaSingleProps> = ({
         }}
       />
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* Confetti when answer is revealed */}
       {isRevealed && (
@@ -492,8 +490,8 @@ export const QuizTriviaComposition: React.FC<RemotionShortProps> = (props) => {
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'QUAL É O MAIOR PLANETA DO SISTEMA SOLAR?',
-      captionText: props.subheadline || 'A gravidade extrema deste gigante gasoso captura asteroides.',
+      headline: (props as any).headline || 'QUAL É O MAIOR PLANETA DO SISTEMA SOLAR?',
+      captionText: (props as any).subheadline || 'A gravidade extrema deste gigante gasoso captura asteroides.',
       durationSeconds: 10,
       options: ['Terra', 'Júpiter', 'Saturno', 'Marte'],
       correctIndex: 1,

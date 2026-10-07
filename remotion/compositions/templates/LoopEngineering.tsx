@@ -33,6 +33,23 @@ export const LoopEngineeringComposition: React.FC<RemotionShortProps> = ({
   const { fps, width, height } = useVideoConfig();
   const time = frame / fps;
 
+  // Scene timing resolution
+  let accumulatedTime = 0;
+  let activeSceneIndex = 0;
+
+  for (let i = 0; i < scenes.length; i++) {
+    const dur = scenes[i].durationSeconds || 5;
+    if (time >= accumulatedTime && time < accumulatedTime + dur) {
+      activeSceneIndex = i;
+      break;
+    }
+    accumulatedTime += dur;
+  }
+
+  const currentScene = scenes[activeSceneIndex] || scenes[0] || ({} as SceneSegment);
+  const caption = currentScene.captionText || 'GEOMETRIA HIPNÓTICA EM LOOP PERFEITO';
+  const badge = currentScene.badgeText || (currentScene as any).badge || 'SEAMLESS ASMR';
+
   // Perfect 4.0-second seamless loop math
   const LOOP_DURATION = 4.0;
   const loopT = (time % LOOP_DURATION) / LOOP_DURATION; // 0.0 -> 1.0
@@ -44,9 +61,6 @@ export const LoopEngineeringComposition: React.FC<RemotionShortProps> = ({
 
   // Scale Breathing
   const breathe = Math.sin(loopT * Math.PI * 2) * 0.12;
-
-  const currentScene = scenes[0] || ({} as SceneSegment);
-  const caption = currentScene.captionText || 'GEOMETRIA HIPNÓTICA EM LOOP PERFEITO';
 
   return (
     <AbsoluteFill
@@ -143,7 +157,7 @@ export const LoopEngineeringComposition: React.FC<RemotionShortProps> = ({
             marginBottom: '10px',
           }}
         >
-          SEAMLESS ASMR
+          {badge}
         </div>
         <h2
           style={{

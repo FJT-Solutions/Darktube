@@ -6,6 +6,14 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     logger.info('🚀 DarkTube backend inicializado com sucesso', { context: 'System' })
 
+    // Iniciar daemon contínuo de postagens agendadas (Dark Clips)
+    try {
+      const { startDarkClipsScheduler } = await import('@/lib/dark-clips-scheduler')
+      startDarkClipsScheduler(30000)
+    } catch (schedErr) {
+      logger.warn('Aviso ao iniciar agendador DarkClips:', schedErr)
+    }
+
     // Suppress unhandled noisy socket aborts from browser video scrubbing/cancels
     process.on('uncaughtException', (err: any) => {
       if (err?.code === 'ECONNRESET' || err?.message === 'aborted' || err?.code === 'ERR_STREAM_PREMATURE_CLOSE') {

@@ -201,8 +201,6 @@ export const DarkFactCardSceneSingle: React.FC<DarkFactCardSingleProps> = ({
         }}
       />
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── Top Header Category Badge ── */}
       <div
@@ -408,8 +406,8 @@ export const DarkFactCardComposition: React.FC<RemotionShortProps> = (props) => 
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'O VÁCUO DO ESPAÇO PROFUNDO',
-      captionText: props.subheadline || 'A cada segundo, buracos negros supermassivos devoram sistemas inteiros em silêncio.',
+      headline: (props as any).headline || 'O VÁCUO DO ESPAÇO PROFUNDO',
+      captionText: (props as any).subheadline || 'A cada segundo, buracos negros supermassivos devoram sistemas inteiros em silêncio.',
       durationSeconds: 10,
     } as any;
     return (

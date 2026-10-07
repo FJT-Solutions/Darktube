@@ -163,7 +163,7 @@ export const PollDebateComposition: React.FC<RemotionShortProps> = ({
   const isLandscape = format === 'horizontal' || width > height;
 
   // Question & Option Data
-  const title = currentScene.captionText || 'QUAL É O MELHOR? ESCOLHA SEU LADO';
+  const title = currentScene.headline || (currentScene as any).title || currentScene.captionText || 'QUAL É O MELHOR? ESCOLHA SEU LADO';
   const leftOption = currentScene.letteringLines?.[0]?.text || 'OPÇÃO A';
   const rightOption = currentScene.letteringLines?.[1]?.text || 'OPÇÃO B';
 
@@ -246,10 +246,10 @@ export const PollDebateComposition: React.FC<RemotionShortProps> = ({
         <h1
           style={{
             margin: 0,
-            fontSize: isLandscape ? '34px' : '40px',
+            fontSize: isLandscape ? '30px' : '28px',
             fontWeight: 900,
             color: '#FFFFFF',
-            lineHeight: 1.2,
+            lineHeight: 1.25,
             textShadow: '0 4px 20px rgba(0,0,0,0.8)',
           }}
         >
@@ -266,8 +266,8 @@ export const PollDebateComposition: React.FC<RemotionShortProps> = ({
           flexDirection: isLandscape ? 'row' : 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: isLandscape ? '140px 60px 80px' : '220px 24px 120px',
-          gap: '24px',
+          padding: isLandscape ? '130px 60px 70px' : '175px 24px 160px',
+          gap: '20px',
           zIndex: 20,
         }}
       >
@@ -458,20 +458,20 @@ export const PollDebateComposition: React.FC<RemotionShortProps> = ({
         <div
           style={{
             position: 'absolute',
-            bottom: isLandscape ? '20px' : '36px',
+            bottom: isLandscape ? '14px' : '18px',
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            padding: '10px 24px',
+            padding: '8px 20px',
             borderRadius: '999px',
             backgroundColor: 'rgba(15, 23, 42, 0.9)',
             border: '1px solid rgba(255,255,255,0.1)',
             backdropFilter: 'blur(10px)',
             color: '#94A3B8',
             fontWeight: 700,
-            fontSize: '14px',
+            fontSize: '13px',
             zIndex: 40,
           }}
         >
@@ -490,6 +490,7 @@ export const PollDebateComposition: React.FC<RemotionShortProps> = ({
           primaryColor={primaryColor}
           accentColor={accentColor}
           format={format}
+          customBottom="64px"
         />
       )}
     </AbsoluteFill>

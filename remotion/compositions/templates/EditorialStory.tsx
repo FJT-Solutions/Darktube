@@ -251,8 +251,6 @@ export const EditorialStorySceneSingle: React.FC<EditorialStorySingleProps> = ({
         />
       )}
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── 3. Depth-of-Field Blur Simulation ── */}
       <AbsoluteFill
@@ -458,8 +456,8 @@ export const EditorialStoryComposition: React.FC<RemotionShortProps> = (props) =
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'O MANUSCRITO QUE DESAFIOU O IMPÉRIO',
-      captionText: props.subheadline || 'Guardado sob sigilo absoluto por mais de três séculos.',
+      headline: (props as any).headline || 'O MANUSCRITO QUE DESAFIOU O IMPÉRIO',
+      captionText: (props as any).subheadline || 'Guardado sob sigilo absoluto por mais de três séculos.',
       durationSeconds: 10,
     } as any;
     return (

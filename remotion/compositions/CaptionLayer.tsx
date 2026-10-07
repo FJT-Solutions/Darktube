@@ -56,6 +56,7 @@ export const CaptionLayer: React.FC<{
   durationFrames?: number;
   format?: string;
   localFrame?: number;
+  customBottom?: string;
 }> = ({
   scene,
   captionStyle = 'pop',
@@ -64,6 +65,7 @@ export const CaptionLayer: React.FC<{
   durationFrames,
   format = 'vertical',
   localFrame,
+  customBottom,
 }) => {
   const currentFrame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -102,7 +104,7 @@ export const CaptionLayer: React.FC<{
       <div
         style={{
           position: 'absolute',
-          bottom: isVertical ? '18%' : '12%',
+          bottom: customBottom || (isVertical ? '18%' : '12%'),
           left: '50%',
           transform: 'translateX(-50%)',
           width: '90%',
@@ -193,7 +195,7 @@ export const CaptionLayer: React.FC<{
     <div
       style={{
         position: 'absolute',
-        bottom: isVertical ? '18%' : '12%',
+        bottom: customBottom || (isVertical ? '18%' : '12%'),
         left: '50%',
         transform: 'translateX(-50%)',
         width: '88%',

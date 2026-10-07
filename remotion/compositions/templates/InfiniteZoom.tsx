@@ -243,8 +243,6 @@ export const InfiniteZoomSceneSingle: React.FC<InfiniteZoomSingleProps> = ({
       {/* Starfield Particles traveling toward viewer */}
       <StarfieldWarp frame={frame} primaryColor={primaryColor} />
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── 2. Concentric Portal Rings & Fractal Shards ── */}
       <AbsoluteFill
@@ -407,8 +405,8 @@ export const InfiniteZoomComposition: React.FC<RemotionShortProps> = (props) => 
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'A SINGULARIDADE DO TEMPO',
-      captionText: props.subheadline || 'Mergulhando pelas camadas cósmicas do hiperespaço.',
+      headline: (props as any).headline || 'A SINGULARIDADE DO TEMPO',
+      captionText: (props as any).subheadline || 'Mergulhando pelas camadas cósmicas do hiperespaço.',
       durationSeconds: 10,
     } as any;
     return (

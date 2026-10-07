@@ -222,8 +222,6 @@ export const MatrixCodeRainSceneSingle: React.FC<MatrixCodeRainSingleProps> = ({
         }}
       />
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── 2. Top Terminal Bar ── */}
       <div
@@ -406,8 +404,8 @@ export const MatrixCodeRainComposition: React.FC<RemotionShortProps> = (props) =
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'INVASÃO DE NÚCLEO AUTORIZADA',
-      captionText: props.subheadline || 'Acesso total aos terminais governamentais obtido com sucesso.',
+      headline: (props as any).headline || 'INVASÃO DE NÚCLEO AUTORIZADA',
+      captionText: (props as any).subheadline || 'Acesso total aos terminais governamentais obtido com sucesso.',
       durationSeconds: 10,
     } as any;
     return (

@@ -81,24 +81,12 @@ export async function GET() {
       }
     }
 
-    // 3. Verificação de posts agendados cujo horário já chegou
-    for (const post of posts) {
-      const targets = Array.isArray(post.target_accounts) ? post.target_accounts : [];
-      if (
-        post.status === 'scheduled' &&
-        post.scheduled_at &&
-        new Date(post.scheduled_at) <= new Date() &&
-        isValidVideoUrl(post.rendered_video_url) &&
-        targets.length > 0
-      ) {
-        logger.info(`[Scheduler] Horário atingido para post agendado ${post.id}. Despachando...`, { context: 'Scheduler' });
-        const remodel = (post.remodel_data || {}) as any;
-        await triggerSocialDispatcher({
-          post,
-          accountMap: remodel.selected_accounts_by_platform || remodel.selectedAccountsByPlatform,
-        });
-        post.status = 'publishing' as any;
-      }
+    // 3. Verificação e disparo atômico de posts agendados cujo horário já chegou
+    try {
+      const { checkDueScheduledPosts } = await import('@/lib/dark-clips-scheduler');
+      await checkDueScheduledPosts();
+    } catch (schedErr: any) {
+      logger.warn(`[Scheduler API] Aviso ao executar checkDueScheduledPosts: ${schedErr?.message}`);
     }
 
     // 4. Se houver posts em 'queued' e nenhum em 'rendering', impulsiona o worker da fila
@@ -201,6 +189,12 @@ export async function POST(req: Request) {
           context: 'Scheduler',
         });
       }
+    } else {
+      // Se post agendado foi salvo e já está no horário (ou no passado), verifica imediatamente
+      try {
+        const { checkDueScheduledPosts } = await import('@/lib/dark-clips-scheduler');
+        checkDueScheduledPosts().catch(() => {});
+      } catch (_) {}
     }
 
     return NextResponse.json({ success: true, post });

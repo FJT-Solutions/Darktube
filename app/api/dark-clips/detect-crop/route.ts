@@ -9,8 +9,9 @@ import { promisify } from 'util';
 const execFilePromise = promisify(execFile);
 
 /**
- * Detecção de Área de Vídeo 100% LOCAL e GRATUITA usando o filtro cropdetect nativo do FFmpeg.
- * Não utiliza LLM, não gasta tokens e executa em milissegundos no servidor.
+ * Detecção de Área de Vídeo 100% LOCAL e GRATUITA usando FFmpeg.
+ * Combina tblend (diferença temporal para remover cabeçalhos/textos estáticos)
+ * e cropdetect (remoção de barras pretas e letterboxing).
  */
 export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
   has_header_text: boolean;
@@ -23,17 +24,18 @@ export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
   originalHeight: number;
 } | null> {
   try {
-    console.log(`[DetectCrop Local FFmpeg] 🔍 Analisando vídeo sem LLM: ${videoSource.slice(0, 80)}...`);
+    console.log(`[DetectCrop Local FFmpeg] 🔍 Analisando vídeo: ${videoSource.slice(0, 80)}...`);
 
     let output = '';
+    // 1. Tenta detecção por movimento (diferença entre frames consecutivos elimina textos e avatares estáticos congelados)
     try {
       const res = await execFilePromise(
         'ffmpeg',
         [
-          '-ss', '00:00:00.5',
+          '-ss', '00:00:01',
           '-i', videoSource,
-          '-t', '2',
-          '-vf', 'cropdetect=limit=24:round=2:reset_count=0',
+          '-t', '3',
+          '-vf', 'tblend=all_mode=difference,cropdetect=limit=12:round=2:reset_count=0',
           '-f', 'null',
           '-',
         ],
@@ -41,11 +43,42 @@ export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
       );
       output = (res.stderr || res.stdout || '') as string;
     } catch (execErr: any) {
-      // FFmpeg com "-f null -" envia os relatórios para stderr e às vezes retorna código de saída não-zero
       output = (execErr?.stderr || execErr?.stdout || '') as string;
     }
 
-    // 1. Identificar resolução original do vídeo
+    // 2. Extrair coordenadas detectadas
+    let cropMatches = [...output.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
+
+    // Se tblend não gerou matches ou teve poucos, tenta cropdetect simples (detecta barras pretas puras)
+    if (cropMatches.length === 0) {
+      try {
+        const res2 = await execFilePromise(
+          'ffmpeg',
+          [
+            '-ss', '00:00:01',
+            '-i', videoSource,
+            '-t', '3',
+            '-vf', 'cropdetect=limit=24:round=2:reset_count=0',
+            '-f', 'null',
+            '-',
+          ],
+          { timeout: 20000 }
+        );
+        const out2 = (res2.stderr || res2.stdout || '') as string;
+        cropMatches = [...out2.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
+        if (cropMatches.length > 0) {
+          output = out2;
+        }
+      } catch (execErr2: any) {
+        const out2 = (execErr2?.stderr || execErr2?.stdout || '') as string;
+        cropMatches = [...out2.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
+        if (cropMatches.length > 0) {
+          output = out2;
+        }
+      }
+    }
+
+    // 3. Identificar resolução original do vídeo
     let originalWidth = 1080;
     let originalHeight = 1920;
     const dimMatch = output.match(/Stream #0:\d.*Video:.* (\d{3,4})x(\d{3,4})/);
@@ -54,8 +87,6 @@ export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
       originalHeight = parseInt(dimMatch[2], 10);
     }
 
-    // 2. Extrair coordenadas detectadas pelo filtro cropdetect
-    const cropMatches = [...output.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)];
     if (cropMatches.length > 0) {
       // Pega os últimos valores convergidos
       const lastMatch = cropMatches[cropMatches.length - 1];
@@ -79,7 +110,7 @@ export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
       else if (ratioVal < 0.75) ratioStr = '9:16';
 
       console.log(
-        `[DetectCrop Local FFmpeg] ✅ Detecção Local 100% Sucesso: Original ${originalWidth}x${originalHeight} | Área Útil ${w}x${h} (y:${y}) | Top: ${cropTopPct}% | Bottom: ${cropBottomPct}% | AspectRatio: ${ratioStr}`
+        `[DetectCrop Local FFmpeg] ✅ Detecção FFmpeg: Original ${originalWidth}x${originalHeight} | Área Útil ${w}x${h} (y:${y}) | Top: ${cropTopPct}% | Bottom: ${cropBottomPct}% | AspectRatio: ${ratioStr}`
       );
 
       return {
@@ -100,6 +131,7 @@ export async function detectCropWithLocalFFmpeg(videoSource: string): Promise<{
 }
 
 export async function POST(req: Request) {
+  let tempVideoPath = '';
   try {
     const user = await getCurrentUser();
     const body = await req.json();
@@ -126,24 +158,39 @@ export async function POST(req: Request) {
     const candidateMedia = targetVideo || targetThumbnail || '';
     let resolvedLocalPath = '';
 
+    // Se o vídeo for do storage PostgreSQL, extrai para arquivo temporário no disco
     if (candidateMedia.includes('/api/storage/')) {
       const filename = candidateMedia.split('/api/storage/')[1]?.split('?')[0];
-      const storageDir = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');
-      const testPath = path.join(storageDir, filename);
-      if (fs.existsSync(testPath)) {
-        resolvedLocalPath = testPath;
+      try {
+        const storageDir = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');
+        const testPath = path.join(storageDir, filename);
+        if (fs.existsSync(testPath)) {
+          resolvedLocalPath = testPath;
+        } else {
+          // Extrai buffer do PostgreSQL
+          const sf = await pool.query('SELECT content FROM public.storage_files WHERE filename = $1', [filename]);
+          if (sf.rows.length > 0 && sf.rows[0].content) {
+            const tmpDir = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
+            if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+            tempVideoPath = path.join(tmpDir, `detect_${Date.now()}_${filename}`);
+            fs.writeFileSync(tempVideoPath, sf.rows[0].content);
+            resolvedLocalPath = tempVideoPath;
+          }
+        }
+      } catch (extractErr: any) {
+        console.warn('[DetectCrop] Aviso ao obter buffer do PostgreSQL:', extractErr?.message);
       }
     }
 
     const sourceForDetection = resolvedLocalPath || candidateMedia;
 
-    // ── Executar Detecção 100% Local via FFmpeg (Custo Zero / Sem LLM) ──
+    // ── Executar Detecção 100% Local via FFmpeg ──
     let localResult = null;
     if (sourceForDetection) {
       localResult = await detectCropWithLocalFFmpeg(sourceForDetection);
     }
 
-    // Fallback seguro se FFmpeg não puder ler stream remoto diretamente: preserva o vídeo intacto
+    // Fallback seguro se FFmpeg não puder ler
     if (!localResult) {
       localResult = {
         has_header_text: false,
@@ -162,7 +209,7 @@ export async function POST(req: Request) {
       crop_top: localResult.crop_top,
       crop_bottom: localResult.crop_bottom,
       aspect_ratio: localResult.aspect_ratio,
-      method: 'local_ffmpeg_cropdetect',
+      method: 'local_ffmpeg_motion_cropdetect',
       cost: 'R$ 0,00 (100% Gratuito)',
     };
 
@@ -189,5 +236,9 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('[DetectCrop] Erro geral na rota:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } finally {
+    if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+      try { fs.unlinkSync(tempVideoPath); } catch (_) {}
+    }
   }
 }

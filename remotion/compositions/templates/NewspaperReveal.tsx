@@ -134,8 +134,6 @@ export const NewspaperRevealSceneSingle: React.FC<NewspaperRevealSingleProps> = 
         }}
       />
 
-      {/* Audio narration */}
-      {scene.audioUrl && <Audio src={scene.audioUrl} />}
 
       {/* ── 2. The Broadsheet Newspaper Card ── */}
       <AbsoluteFill
@@ -343,8 +341,8 @@ export const NewspaperRevealComposition: React.FC<RemotionShortProps> = (props) 
 
   if (!scenes || scenes.length === 0) {
     const fallbackScene: SceneSegment = {
-      headline: props.headline || 'O ESCÂNDALO QUE DERRUBOU O GOVERNO',
-      captionText: props.subheadline || 'Documentos vazados revelam a verdade oculta por décadas pelas autoridades.',
+      headline: (props as any).headline || 'O ESCÂNDALO QUE DERRUBOU O GOVERNO',
+      captionText: (props as any).subheadline || 'Documentos vazados revelam a verdade oculta por décadas pelas autoridades.',
       durationSeconds: 10,
     } as any;
     return (

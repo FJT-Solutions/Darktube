@@ -240,11 +240,12 @@ export async function POST(req: Request) {
       };
 
       // ── Enquadramento de Vídeo ──
-      // Respeita os parâmetros manuais do usuário. A detecção temporal de cabeçalhos estáticos
+      // Respeita os parâmetros manuais do usuário e garante auto-crop ativo
       let effectiveVideoPlacement = { ...(inputProps.videoPlacement || {}) };
       if (!effectiveVideoPlacement.fitMode && !effectiveVideoPlacement.fit_mode) {
-        effectiveVideoPlacement.fitMode = 'contain';
+        effectiveVideoPlacement.fitMode = 'cover';
       }
+      effectiveVideoPlacement.autoCrop = effectiveVideoPlacement.autoCrop ?? true;
 
       let serverConnected = false;
 
