@@ -313,13 +313,16 @@
     }
     const panel = await openSettings();
     for (const kind of ['image', 'video']) {
+      caps.diag = caps.diag || {};
       try {
         await setMode(panel, kind);
       } catch (e) {
+        caps.diag[kind] = { modeError: String((e && e.message) || e).slice(0, 120) };
         continue;
       }
       await human(400, 800);
       const labels = radios(panel).map(rlabel);
+      caps.diag[kind] = { radios: labels.slice(0, 16), modelBtns: $$(S.modelBtn, panel).map((b) => txt(b).slice(0, 40)).slice(0, 6) };
       const uniq = (a) => Array.from(new Set(a));
       caps.formats = uniq(caps.formats.concat(labels.filter((l) => /^\d+:\d+$/.test(l))));
       caps.quantities = uniq(caps.quantities.concat(labels.filter((l) => /^x\d$/.test(l))));
@@ -333,8 +336,27 @@
       caps.costs = caps.costs.concat(m.costs).slice(0, 16);
     }
     await closeSettings();
-    const cm = /([\d.,]{1,9})\s*(AI\s*)?(credits|créditos)\b/i.exec(document.body.innerText || document.body.textContent || '');
-    if (cm) caps.credits = Number(cm[1].replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')) || null;
+    const creditRx = /(\d[\d.,]{0,8})\s*(?:[A-Za-zÀ-ú]+\s+){0,3}?(credits|créditos)\b/i;
+    const readCredits = () => {
+      const cm = creditRx.exec(document.body.innerText || document.body.textContent || '');
+      return cm ? Number(cm[1].replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.')) || null : null;
+    };
+    caps.credits = readCredits();
+    if (caps.credits == null) {
+      // Os creditos ficam no menu da conta: abre, le e fecha (so leitura).
+      const acc = $$('button, a, [role=button]').find((b) => /google account|conta google/i.test(b.getAttribute('aria-label') || ''));
+      if (acc) {
+        acc.click();
+        await human(600, 1200);
+        caps.credits = readCredits();
+        const t = document.body.innerText || '';
+        if (/upgrade|fazer upgrade/i.test(t) && caps.credits != null) caps.plan = caps.plan || 'gratuito/básico (aparece "Upgrade")';
+        pressEscape();
+        await sleep(300);
+      } else {
+        caps.diag = Object.assign(caps.diag || {}, { account: 'botão da conta não encontrado' });
+      }
+    }
     return caps;
   }
 

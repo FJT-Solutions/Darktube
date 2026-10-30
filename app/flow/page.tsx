@@ -533,6 +533,7 @@ function SafetyPanel() {
               {Array.isArray(caps.videoModels) && caps.videoModels.length ? caps.videoModels.join(", ") : "não detectado"} · Modelos de imagem:{" "}
               {Array.isArray(caps.imageModels) && caps.imageModels.length ? caps.imageModels.join(", ") : "não detectado"}
             </p>
+            {caps.diag && <p>Detalhe: {JSON.stringify(caps.diag).slice(0, 600)}</p>}
             {caps.selectors && (
               <p>
                 Diagnóstico da página: {Object.entries(caps.selectors as Record<string, unknown>).map(([k, v]) => `${k}=${typeof v === "boolean" ? (v ? "ok" : "NÃO achou") : String(v)}`).join(" · ")}
