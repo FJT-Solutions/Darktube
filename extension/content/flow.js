@@ -101,10 +101,21 @@
   }
 
   async function setMode(panel, kind) {
-    const group = $(S.radioGroup, panel);
-    const r = kind === 'video' ? radios(panel).find((x) => hasIcon(x, 'videocam')) : group && $$(S.radio, group)[0];
+    const rx = kind === 'video' ? /^\s*video\b/i : /^\s*image\b/i;
+    // 1. Procura botao, tab ou toggle com o texto ou aria-label "Video" ou "Image" no topo do painel
+    const candidates = $$('button, [role=tab], [role=radio], mat-button-toggle, .mat-mdc-button-toggle', panel);
+    const r = candidates.find((el) => rx.test(txt(el)) || (el.getAttribute('aria-label') && rx.test(el.getAttribute('aria-label'))))
+      || (kind === 'video' ? radios(panel).find((x) => hasIcon(x, 'videocam')) : $(S.radioGroup, panel) && $$(S.radio, $(S.radioGroup, panel))[0]);
+
     if (!r) throw err('mode_missing', `Não achei a opção de ${kind === 'video' ? 'vídeo' : 'imagem'}.`);
-    if (!isOn(r)) {
+
+    const isChecked = isOn(r)
+      || r.getAttribute('aria-selected') === 'true'
+      || r.classList.contains('active')
+      || r.classList.contains('selected')
+      || r.classList.contains('mat-button-toggle-checked');
+
+    if (!isChecked) {
       r.click();
       await human(500, 1000);
     }

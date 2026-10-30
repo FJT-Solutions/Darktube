@@ -37,7 +37,7 @@ export interface FlowJob {
 const RUNNING_TIMEOUT_MIN = 20;
 const DEFAULT_DEADLINE_MIN = 120;
 const MAX_ACTIVE_JOBS_PER_USER = 80;
-const AGENT_ONLINE_WINDOW_SEC = 45;
+const AGENT_ONLINE_WINDOW_SEC = 120;
 
 const ALLOWED_ASPECTS = ['9:16', '16:9', '1:1', '3:4', '4:3'];
 const ALLOWED_RESOLUTIONS = ['360p', '720p'];

@@ -5,7 +5,7 @@ window.DT_FLOW_SEL = {
   editor: 'div.ProseMirror',
   agentToggle: 'flow-agent-mode-toggle-chip button',
   generate: 'flow-generate-icon-button button[type=submit], button.generate-icon-button',
-  settingsBtn: 'button.settings-trigger-button',
+  settingsBtn: 'button.settings-trigger-button, .settings-trigger-button, button[aria-label*="setting" i], button[aria-label*="configura" i]',
   settingsPanel: 'flow-prompt-box-settings',
   modelBtn: 'button.mat-mdc-menu-trigger',
   imageTile: 'flow-image-tile',
