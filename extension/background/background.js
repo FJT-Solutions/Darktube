@@ -1,4 +1,6 @@
 // Dark Clips - Background Service Worker (Manifest V3)
+importScripts('flow-agent.js');
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[DarkClips] Extensão instalada com sucesso.');
   chrome.storage.local.get(['darktube_api_url'], (result) => {

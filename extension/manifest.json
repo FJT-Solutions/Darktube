@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Dark Clips Companion - Extrator Viral",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Capture e envie vídeos virais do Instagram, TikTok, YouTube Shorts e X diretamente para o Dark Clips no DarkTube com 1 clique.",
   "permissions": [
     "activeTab",
     "storage",
     "scripting",
-    "cookies"
+    "cookies",
+    "alarms"
   ],
   "host_permissions": [
     "*://*.instagram.com/*",
@@ -39,27 +40,62 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.instagram.com/*"],
-      "js": ["content/instagram.js"],
-      "css": ["content/content.css"],
+      "matches": [
+        "*://*.instagram.com/*"
+      ],
+      "js": [
+        "content/instagram.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.tiktok.com/*"],
-      "js": ["content/tiktok.js"],
-      "css": ["content/content.css"],
+      "matches": [
+        "*://*.tiktok.com/*"
+      ],
+      "js": [
+        "content/tiktok.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.youtube.com/*"],
-      "js": ["content/youtube.js"],
-      "css": ["content/content.css"],
+      "matches": [
+        "*://*.youtube.com/*"
+      ],
+      "js": [
+        "content/youtube.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.x.com/*", "*://*.twitter.com/*"],
-      "js": ["content/twitter.js"],
-      "css": ["content/content.css"],
+      "matches": [
+        "*://*.x.com/*",
+        "*://*.twitter.com/*"
+      ],
+      "js": [
+        "content/twitter.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://flow.google.com/*"
+      ],
+      "js": [
+        "content/flow-selectors.js",
+        "content/flow.js"
+      ],
       "run_at": "document_idle"
     }
   ]

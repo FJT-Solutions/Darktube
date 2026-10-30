@@ -58,6 +58,7 @@ public/*.mp4
 
 # Scratch scripts and temporary research clones
 /scratch/
+/arquivos_externos/Imagens/
 
 # Python
 __pycache__/

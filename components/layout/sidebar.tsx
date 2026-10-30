@@ -21,12 +21,14 @@ import {
   Clapperboard,
   Terminal,
   Sparkles,
+  Film,
 } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/minerar", label: "Minerar", icon: Search },
   { href: "/dark-clips", label: "Dark Clips", icon: Sparkles },
+  { href: "/flow", label: "Flow", icon: Film },
   { href: "/tracker", label: "Tracker", icon: Bookmark },
   { href: "/credentials", label: "Credenciais", icon: Key },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },

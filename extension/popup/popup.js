@@ -448,3 +448,48 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initial tab scan
   scanCurrentTab();
 });
+
+
+// ── Google Flow (agente) ──
+document.addEventListener('DOMContentLoaded', () => {
+  const en = document.getElementById('flow-enabled');
+  const live = document.getElementById('flow-live');
+  const st = document.getElementById('flow-status');
+  const btn = document.getElementById('flow-scan-btn');
+  if (!en || !live || !st || !btn) return;
+  const LABEL = {
+    desligado: 'Desligado.', sem_aba: 'Abra o Google Flow em uma aba.', sem_projeto: 'Abra um projeto do Flow.',
+    ensaio: 'Ensaio: lê a conta, não gera nada.', aguardando: 'Aguardando trabalho.', gerando: 'Gerando no Flow...',
+    ocupado: 'Página ocupada.', concluido: 'Último job concluído.', falhou: 'Último job falhou.', erro: 'Erro.',
+  };
+  const render = (s) => {
+    if (!s) return void (st.textContent = 'Desligado.');
+    st.textContent = (LABEL[s.state] || s.state) + (s.msg ? ' ' + s.msg : '');
+  };
+  chrome.storage.local.get(['flow_enabled', 'flow_live', 'flow_status'], (r) => {
+    en.checked = !!r.flow_enabled;
+    live.checked = !!r.flow_live;
+    render(r.flow_status);
+  });
+  en.addEventListener('change', () => {
+    chrome.storage.local.set({ flow_enabled: en.checked }, () => chrome.runtime.sendMessage({ type: 'FLOW_TICK_NOW' }));
+  });
+  live.addEventListener('change', () => {
+    if (live.checked && !window.confirm('Isto vai gerar vídeos de verdade e gastar créditos da sua conta do Flow. Use uma conta secundária. Continuar?')) {
+      live.checked = false;
+      return;
+    }
+    chrome.storage.local.set({ flow_live: live.checked });
+  });
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    st.textContent = 'Lendo as opções da conta...';
+    chrome.runtime.sendMessage({ type: 'FLOW_SCAN_NOW' }, (resp) => {
+      btn.disabled = false;
+      st.textContent = resp && resp.ok ? 'Conta lida e enviada ao darktube.' : (resp && resp.error) || 'Não foi possível ler a conta.';
+    });
+  });
+  chrome.storage.onChanged.addListener((ch) => {
+    if (ch.flow_status) render(ch.flow_status.newValue);
+  });
+});
