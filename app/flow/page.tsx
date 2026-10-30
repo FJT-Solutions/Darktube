@@ -522,13 +522,24 @@ function SafetyPanel() {
         )}
 
         {caps && (
-          <p className="text-xs text-muted-foreground">
-            Conta detectada pela extensão
-            {caps.plan ? ` · plano ${caps.plan}` : ""}
-            {caps.credits != null ? ` · ${caps.credits} créditos` : ""}
-            {Array.isArray(caps.videoModels) && caps.videoModels.length ? ` · modelos de vídeo: ${caps.videoModels.join(", ")}` : ""}
-            {agent.capabilitiesAt ? ` (${new Date(agent.capabilitiesAt).toLocaleString("pt-BR")})` : ""}
-          </p>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            <p>
+              Leitura da conta pela extensão
+              {agent.capabilitiesAt ? ` (${new Date(agent.capabilitiesAt).toLocaleString("pt-BR")})` : ""}
+              {caps.note ? ` · ${caps.note}` : ""}
+            </p>
+            <p>
+              Plano: {caps.plan || "não detectado"} · Créditos: {caps.credits != null ? caps.credits : "não detectado"} · Modelos de vídeo:{" "}
+              {Array.isArray(caps.videoModels) && caps.videoModels.length ? caps.videoModels.join(", ") : "não detectado"} · Modelos de imagem:{" "}
+              {Array.isArray(caps.imageModels) && caps.imageModels.length ? caps.imageModels.join(", ") : "não detectado"}
+            </p>
+            {caps.selectors && (
+              <p>
+                Diagnóstico da página: {Object.entries(caps.selectors as Record<string, unknown>).map(([k, v]) => `${k}=${typeof v === "boolean" ? (v ? "ok" : "NÃO achou") : String(v)}`).join(" · ")}
+                {caps.path ? ` · rota ${caps.path}` : ""}
+              </p>
+            )}
+          </div>
         )}
 
         <details>
