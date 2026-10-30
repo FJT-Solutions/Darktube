@@ -61,17 +61,34 @@ async function flowFindTab() {
   return tabs.find((t) => /\/project\//.test(t.url || '')) || tabs[0] || null;
 }
 
-function flowAsk(tabId, msg) {
-  return new Promise((resolve) => {
+async function flowAsk(tabId, msg) {
+  const trySend = () =>
+    new Promise((resolve) => {
+      try {
+        chrome.tabs.sendMessage(tabId, msg, (resp) => {
+          if (chrome.runtime.lastError) resolve(null);
+          else resolve(resp || null);
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+
+  let res = await trySend();
+  if (res === null && chrome.scripting) {
+    // Auto-cura: se a extensao foi recarregada e a aba perdeu a conexao, injeta os scripts automaticamente
     try {
-      chrome.tabs.sendMessage(tabId, msg, (resp) => {
-        if (chrome.runtime.lastError) resolve(null);
-        else resolve(resp || null);
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content/flow-selectors.js', 'content/flow.js'],
       });
+      await new Promise((r) => setTimeout(r, 400));
+      res = await trySend();
     } catch (e) {
-      resolve(null);
+      /* aba protegida ou fechada */
     }
-  });
+  }
+  return res;
 }
 
 async function flowTick() {

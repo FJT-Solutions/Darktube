@@ -493,3 +493,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ch.flow_status) render(ch.flow_status.newValue);
   });
 });
+
+
+// ── Janela Flutuante (Popout) ──
+document.addEventListener('DOMContentLoaded', () => {
+  const popoutBtn = document.getElementById('popout-btn');
+  if (!popoutBtn) return;
+  if (window.location.search.includes('popout=1')) {
+    document.body.classList.add('is-popout');
+    popoutBtn.style.display = 'none';
+  } else {
+    popoutBtn.addEventListener('click', () => {
+      chrome.windows.create({
+        url: chrome.runtime.getURL('popup/popup.html?popout=1'),
+        type: 'popup',
+        width: 440,
+        height: 700,
+        focused: true
+      });
+      window.close();
+    });
+  }
+});
