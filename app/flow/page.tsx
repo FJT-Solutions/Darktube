@@ -529,7 +529,7 @@ function SafetyPanel() {
               {caps.note ? ` · ${caps.note}` : ""}
             </p>
             <p>
-              Plano: {caps.plan || "não detectado"} · Créditos: {caps.credits != null ? caps.credits : "não detectado"} · Modelos de vídeo:{" "}
+              Créditos: {caps.credits != null ? caps.credits : "não detectado"} · Modelos de vídeo:{" "}
               {Array.isArray(caps.videoModels) && caps.videoModels.length ? caps.videoModels.join(", ") : "não detectado"} · Modelos de imagem:{" "}
               {Array.isArray(caps.imageModels) && caps.imageModels.length ? caps.imageModels.join(", ") : "não detectado"}
             </p>

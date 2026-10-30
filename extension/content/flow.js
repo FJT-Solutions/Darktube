@@ -86,7 +86,8 @@
   }
 
   const radios = (panel) => $$(S.radio, panel);
-  const rlabel = (r) => (r.getAttribute('aria-label') || txt(r)).trim();
+  // Remove o nome do icone (ex.: "crop_16_9 16:9" -> "16:9") que vem colado ao rotulo.
+  const rlabel = (r) => (r.getAttribute('aria-label') || txt(r)).trim().replace(/^[a-z]+(?:_[a-z0-9]+)+\s+/, '');
   const hasIcon = (r, name) => $$('mat-icon', r).some((i) => txt(i) === name);
   const isOn = (r) => r.getAttribute('aria-checked') === 'true' || r.classList.contains('mat-mdc-radio-checked');
 
@@ -317,7 +318,10 @@
       try {
         await setMode(panel, kind);
       } catch (e) {
-        caps.diag[kind] = { modeError: String((e && e.message) || e).slice(0, 120) };
+        caps.diag[kind] = {
+          modeError: String((e && e.message) || e).slice(0, 120),
+          panel: $$('[role], button', panel).map((el) => `${el.tagName.toLowerCase()}[${el.getAttribute('role') || ''}]:${(el.getAttribute('aria-label') || txt(el)).slice(0, 24)}`).slice(0, 30),
+        };
         continue;
       }
       await human(400, 800);
@@ -349,8 +353,6 @@
         acc.click();
         await human(600, 1200);
         caps.credits = readCredits();
-        const t = document.body.innerText || '';
-        if (/upgrade|fazer upgrade/i.test(t) && caps.credits != null) caps.plan = caps.plan || 'gratuito/básico (aparece "Upgrade")';
         pressEscape();
         await sleep(300);
       } else {
