@@ -64,10 +64,22 @@
     return vis(p) ? p : null;
   };
 
+  const settingsBtnEl = () => {
+    const ed = $(S.editor);
+    const box = ed ? ed.closest('flow-prompt-box, form, [class*="prompt"]') || ed.parentElement : null;
+    if (box) {
+      const b = $('button.settings-trigger-button, .settings-trigger-button', box)
+        || $$('button', box).find((btn) => /nano banana|veo|omni|\bvideo\b|\bx\d\b|\b\d+s\b/i.test(txt(btn)));
+      if (b) return b;
+    }
+    return $('button.settings-trigger-button, .settings-trigger-button')
+      || $$('button').find((btn) => !btn.closest('header, nav, flow-top-bar') && /nano banana|veo|omni|\bvideo\b|\bx\d\b/i.test(txt(btn)));
+  };
+
   async function openSettings() {
     await closeLayers();
     for (let i = 0; i < 4 && !panelEl(); i++) {
-      const b = $(S.settingsBtn);
+      const b = settingsBtnEl() || $(S.settingsBtn);
       if (!b) throw err('settings_btn_missing', 'Não achei o botão de configurações do Flow.');
       b.click(); // as vezes o primeiro clique e ignorado
       await until(panelEl, 2500);
@@ -151,7 +163,7 @@
     await closeSettings();
 
     // Confere o resumo mostrado no botao: se nao bate, aborta (nunca gera com configuracao errada).
-    const summary = txt($(S.settingsBtn));
+    const summary = txt(settingsBtnEl() || $(S.settingsBtn));
     const need = ['x' + count];
     if (job.kind === 'video') {
       if (p.resolution) need.push(p.resolution);
@@ -319,7 +331,7 @@
       imageModels: [], videoModels: [], formats: [], quantities: [], durations: [], resolutions: [], costs: [],
       credits: null, plan: null,
     };
-    if (!caps.selectors.editor || !caps.selectors.settingsBtn) {
+    if (!caps.selectors.editor || (!caps.selectors.settingsBtn && !settingsBtnEl())) {
       caps.note = 'Abra um projeto do Flow para o ensaio ler as opções.';
       return caps;
     }
