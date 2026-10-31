@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const job = body.action === 'retry'
-    ? await retryFlowJob(user.id, id, body.engine)
+    ? await retryFlowJob(user.id, id, body.engine, body.params)
     : body.action === 'cancel'
       ? await cancelFlowJob(user.id, id)
       : null;

@@ -691,12 +691,32 @@ function ProjectView({
   }
 
   const retryJob = async (id: string) => {
-    const res = await fetch(`/api/flow/jobs/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "retry" }) })
+    const res = await fetch(`/api/flow/jobs/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "retry", params: { model: project.params.model, resolution: project.params.quality, aspectRatio: project.params.aspect } }) })
     const json = await res.json()
     if (json.success) {
       toast.success("Take de volta na fila.")
       loadJobs()
     } else toast.error(json.error || "Não foi possível reenviar.")
+  }
+
+  const retryAllFailed = async () => {
+    const failed = jobs.filter((j) => j.status === "draft")
+    if (failed.length === 0) return
+    let count = 0
+    for (const j of failed) {
+      const res = await fetch(`/api/flow/jobs/${j.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "retry",
+          params: { model: project.params.model, resolution: project.params.quality, aspectRatio: project.params.aspect },
+        }),
+      })
+      const json = await res.json()
+      if (json.success) count++
+    }
+    toast.success(`${count} take(s) reenviado(s) para a fila.`)
+    loadJobs()
   }
 
   const toggle = (n: number) =>
@@ -837,6 +857,11 @@ function ProjectView({
           {queuedAny ? (
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Check className="h-4 w-4" /> Enviado. Os takes acima mostram o andamento.
+              {jobs.some((j) => j.status === "draft") && (
+                <Button size="sm" variant="outline" className="ml-3" onClick={retryAllFailed}>
+                  <Send className="mr-1.5 h-3.5 w-3.5" /> Reenviar falhas ({jobs.filter((j) => j.status === "draft").length})
+                </Button>
+              )}
               {!agentOnline && " A extensão ainda não está online neste computador."}
             </p>
           ) : !confirming ? (

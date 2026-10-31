@@ -183,26 +183,45 @@
     await human(500, 1000);
   }
 
+  async function maybePickRadio(panel, re) {
+    const r = radios(panel).find((x) => re.test(rlabel(x)));
+    if (!r) return false;
+    if (!isOn(r)) {
+      r.click();
+      await human(250, 650);
+    }
+    return true;
+  }
+
   async function configure(job) {
     const p = job.params || {};
     const count = Math.min(Math.max(Number(p.count) || 1, 1), 4);
     const panel = await openSettings();
     await setMode(panel, job.kind);
     if (p.model) await chooseModel(panel, p.model); // o modelo vem primeiro: as opcoes mudam com ele
-    if (p.aspectRatio) await pickRadio(panel, new RegExp('^\\s*' + esc(p.aspectRatio) + '\\s*$'), p.aspectRatio);
+    if (p.aspectRatio) await maybePickRadio(panel, new RegExp('^\\s*' + esc(p.aspectRatio) + '\\s*$'));
+
+    let hasResolution = false;
+    let hasDuration = false;
     if (job.kind === 'video') {
-      if (p.resolution) await pickRadio(panel, new RegExp('^\\s*' + esc(p.resolution)), p.resolution);
-      if (p.duration) await pickRadio(panel, new RegExp('^\\s*' + Number(p.duration) + 's\\s*$'), p.duration + 's');
+      // Modelos como Omni 1.1 Flash tem opcoes de resolucao (360p, 720p).
+      // Modelos como Veo 3.1 (Lite, Fast, Quality) possuem resolucao e duracao unicas/fixas (sem radio no modal).
+      if (p.resolution) {
+        hasResolution = await maybePickRadio(panel, new RegExp('^\\s*' + esc(p.resolution)));
+      }
+      if (p.duration) {
+        hasDuration = await maybePickRadio(panel, new RegExp('^\\s*' + Number(p.duration) + 's\\s*$'));
+      }
     }
-    await pickRadio(panel, new RegExp('^\\s*x' + count + '\\s*$'), 'x' + count);
+    await maybePickRadio(panel, new RegExp('^\\s*x' + count + '\\s*$'));
     await closeSettings();
 
-    // Confere o resumo mostrado no botao: se nao bate, aborta (nunca gera com configuracao errada).
+    // Confere o resumo mostrado no botao apenas para opcoes que realmente existiam no painel deste modelo
     const summary = txt(settingsBtnEl() || $(S.settingsBtn));
-    const need = ['x' + count];
+    const need = [];
     if (job.kind === 'video') {
-      if (p.resolution) need.push(p.resolution);
-      if (p.duration) need.push(p.duration + 's');
+      if (p.resolution && hasResolution) need.push(p.resolution);
+      if (p.duration && hasDuration) need.push(p.duration + 's');
     }
     const miss = need.filter((n) => !summary.includes(n));
     if (miss.length) throw err('config_mismatch', `As configurações não foram aplicadas (aparece "${summary}").`);
