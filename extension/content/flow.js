@@ -357,11 +357,32 @@
     return m ? Number(m[1]) : null;
   }
 
+  function isTileGenerating(tile) {
+    if (!tile) return false;
+    if (tile.matches && tile.matches(S.pendingTile)) return true;
+    if ($('mat-spinner, mat-progress-spinner, mat-progress-bar, [role=progressbar], .mat-mdc-progress-spinner, .mat-mdc-progress-bar, .spinner', tile)) {
+      return true;
+    }
+    const t = txt(tile);
+    if (/\b(\d{1,3}%|generating|gerando|criando|loading)\b/i.test(t)) {
+      return true;
+    }
+    const hasPlay = $('button[aria-label*="play" i], button.play, [class*="play"], [aria-label*="reproduzir" i]', tile);
+    const hasBadge = /\b(360p|720p|1080p)\b/i.test(t);
+    const hasVideo = $('video', tile);
+    if (!hasPlay && !hasBadge && !hasVideo) {
+      return true;
+    }
+    return false;
+  }
+
   async function generate(job) {
     await closeLayers();
     await ensureDirectMode();
     await writePrompt(job.prompt);
     const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
+    const initialTiles = $$(S.videoTile);
+    const initialTileCount = initialTiles.length;
     $$(tileSel()).forEach((t) => {
       t.setAttribute('data-dt-seen', '1');
       seenTileKeys.add(tileKey(t));
@@ -373,6 +394,7 @@
     if (!(await until(() => !btn.disabled, 10000))) throw err('generate_disabled', 'O botão de gerar ficou desabilitado.');
     await human(500, 1500);
     btn.click();
+    await sleep(2000);
 
     const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
     const t0 = Date.now();
@@ -380,15 +402,19 @@
       await sleep(2500);
       const prob = classifyProblem();
       if (prob) throw err(prob.code, prob.msg);
-      const fresh = unseen($$(tileSel()));
-      const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
-      if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
       if (job.kind === 'image') {
+        const fresh = unseen($$(tileSel()));
+        const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
+        if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
         const ready = $$(S.imageTileImg).filter((i) => !i.closest('[data-dt-seen]'));
         if (ready.length >= count) return { ...(await capture('image', ready[0])), costHint: hint };
       } else {
-        const ready = fresh.filter((t) => t.matches(S.videoTile));
-        const pending = fresh.filter((t) => t.matches(S.pendingTile));
+        const currentTiles = $$(S.videoTile);
+        const newTiles = currentTiles.filter((t, idx) => idx >= initialTileCount || unseen([t]).length > 0);
+        const bad = newTiles.find((t) => !isTileGenerating(t) && RX.failure.test(txt(t)));
+        if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
+        const pending = newTiles.filter(isTileGenerating);
+        const ready = newTiles.filter((t) => !isTileGenerating(t));
         if (ready.length >= count && pending.length === 0) {
           const targetTile = ready[ready.length - 1] || ready[0];
           const out = await capture('video', targetTile);
