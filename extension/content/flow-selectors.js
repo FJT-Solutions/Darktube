@@ -22,8 +22,8 @@ window.DT_FLOW_SEL = {
 window.DT_FLOW_RX = {
   // Textos que indicam geracao com erro em um bloco de resultado.
   failure: /error|erro|fail|falha|falló|unusual|inusual|incomum|não foi possível|policy|política|violat/i,
-  // Pedido de verificacao da conta: para tudo e avisa o usuario.
-  verification: /unusual activity|atividade incomum|verify it|verifique|captcha|confirm you|confirme que/i,
+  // Pedido real de verificacao da conta. Nao confunde com o rodape padrao "protected by reCAPTCHA" da conta Google.
+  verification: /(unusual activity|atividade incomum|verify your account|verifique sua conta|solve the captcha|resolva o captcha|confirm you are not a robot|confirme que você)/i,
   // Excesso de pedidos: pausa para esfriar.
   rateLimit: /too fast|muito rápid|rate limit|limite de taxa|try again later|tente novamente mais tarde|requesting too/i,
 };

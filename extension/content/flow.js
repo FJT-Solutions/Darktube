@@ -31,9 +31,33 @@
   }
 
   function pressEscape() {
-    const ev = () => new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true });
-    document.dispatchEvent(ev());
-    if (document.activeElement) document.activeElement.dispatchEvent(ev());
+    const opts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+    window.dispatchEvent(new KeyboardEvent('keydown', opts));
+    document.dispatchEvent(new KeyboardEvent('keydown', opts));
+    if (document.activeElement) {
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', opts));
+      document.activeElement.dispatchEvent(new KeyboardEvent('keyup', opts));
+    }
+    window.dispatchEvent(new KeyboardEvent('keyup', opts));
+    document.dispatchEvent(new KeyboardEvent('keyup', opts));
+  }
+
+  async function closeAccountDrawer() {
+    const all = $$('button, [role=button], mat-icon, span');
+    const closeBtn = all.find((b) =>
+      /^(close|fechar|dismiss)$/i.test((b.getAttribute('aria-label') || '').trim()) ||
+      /^(close|clear)$/i.test(txt(b).trim()) ||
+      /close|fechar/i.test(b.getAttribute('aria-label') || '')
+    );
+    if (closeBtn) {
+      const btn = closeBtn.closest('button, [role=button]') || closeBtn;
+      btn.click();
+      await sleep(200);
+    }
+    pressEscape();
+    const canvas = $('main, flow-canvas, .canvas, [role=main], div.ProseMirror');
+    if (canvas) canvas.click();
+    await sleep(300);
   }
 
   async function closeLayers() {
@@ -41,12 +65,23 @@
       pressEscape();
       await sleep(300);
     }
+    await closeAccountDrawer();
   }
 
   // ---------- problemas que exigem parar ----------
 
   function alertText() {
-    return $$(S.alerts).filter(vis).map(txt).join(' | ').slice(0, 600);
+    return $$(S.alerts)
+      .filter((el) => {
+        if (!vis(el)) return false;
+        // Ignora a gaveta da conta Google (que contem informacoes normais de conta e rodape recaptcha)
+        const t = txt(el);
+        if (/google flow credits|sign out of all accounts|manage subscription|switch account/i.test(t)) return false;
+        return true;
+      })
+      .map(txt)
+      .join(' | ')
+      .slice(0, 600);
   }
 
   function classifyProblem() {
@@ -376,8 +411,7 @@
         acc.click();
         await human(600, 1200);
         caps.credits = readCredits();
-        pressEscape();
-        await sleep(300);
+        await closeAccountDrawer();
       } else {
         caps.diag = Object.assign(caps.diag || {}, { account: 'botão da conta não encontrado' });
       }

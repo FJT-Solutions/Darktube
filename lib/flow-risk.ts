@@ -88,9 +88,9 @@ export async function getRiskUsage(userId: string, s?: RiskSettings): Promise<Ri
   const settings = s ?? (await getRiskSettings(userId))
   const gens = await pool.query(
     `SELECT
-       COUNT(*) FILTER (WHERE claimed_at > NOW() - INTERVAL '1 hour')::int AS h,
-       COUNT(*) FILTER (WHERE claimed_at > NOW() - INTERVAL '24 hours')::int AS d
-     FROM public.flow_jobs WHERE user_id = $1 AND claimed_at IS NOT NULL`,
+       COUNT(*) FILTER (WHERE status IN ('running', 'done') AND claimed_at > NOW() - INTERVAL '1 hour')::int AS h,
+       COUNT(*) FILTER (WHERE status IN ('running', 'done') AND claimed_at > NOW() - INTERVAL '24 hours')::int AS d
+     FROM public.flow_jobs WHERE user_id = $1`,
     [userId]
   )
   let posts = 0
