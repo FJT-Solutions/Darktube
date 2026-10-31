@@ -237,8 +237,31 @@
 
   // ---------- geracao e captura ----------
 
+  const seenTileKeys = new Set();
+  function tileKey(el) {
+    if (!el) return '';
+    return (
+      el.getAttribute('data-media-id') ||
+      el.getAttribute('id') ||
+      (el.querySelector && el.querySelector('[data-media-id]') && el.querySelector('[data-media-id]').getAttribute('data-media-id')) ||
+      el.dataset.dtKey ||
+      (el.dataset.dtKey = 'dt_' + Math.random().toString(36).slice(2, 9))
+    );
+  }
+
   const tileSel = () => [S.imageTile, S.videoTile, S.pendingTile].join(', ');
-  const unseen = (list) => list.filter((t) => !t.hasAttribute('data-dt-seen'));
+  const unseen = (list) => list.filter((t) => !t.hasAttribute('data-dt-seen') && !seenTileKeys.has(tileKey(t)));
+
+  function getVideoSrc(v) {
+    if (!v) return '';
+    return (
+      v.currentSrc ||
+      v.src ||
+      (v.querySelector && v.querySelector('source') && v.querySelector('source').src) ||
+      v.getAttribute('src') ||
+      ''
+    );
+  }
 
   function blobToB64(blob) {
     return new Promise((resolve, reject) => {
@@ -254,12 +277,44 @@
     if (kind === 'image') {
       src = el.currentSrc || el.src || '';
     } else {
-      let v = $('video', el);
-      if (!v) {
-        el.click(); // abre o visualizador do take
-        v = await until(() => $('video'), 8000);
+      // Loop resiliente: espera ate 25 segundos para o video ter URL carregada
+      const t0 = Date.now();
+      while (Date.now() - t0 < 25000 && !src) {
+        // 1. Procura tag <video> dentro do proprio tile
+        let v = $('video', el);
+        src = getVideoSrc(v);
+
+        // 2. Se ainda nao tem src, clica no botao de play ou no tile para iniciar carregamento
+        if (!src) {
+          const playBtn =
+            $('button[aria-label*="play" i], button.play, [class*="play"], [role=button]', el) ||
+            $('button', el) ||
+            el;
+          if (playBtn) playBtn.click();
+        }
+
+        // 3. Procura qualquer tag <video> na pagina (inclusive em modais/players)
+        if (!src) {
+          const allVideos = $$('video');
+          for (const vid of allVideos) {
+            const s = getVideoSrc(vid);
+            if (s && s.length > 5 && !s.startsWith('data:')) {
+              src = s;
+              break;
+            }
+          }
+        }
+
+        // 4. Link direto se houver
+        if (!src) {
+          const dl = $('a[href*=".mp4"], a[href*="storage.googleapis.com"]', el) || $('a[href*=".mp4"]');
+          if (dl && dl.href) src = dl.href;
+        }
+
+        if (!src) {
+          await sleep(600);
+        }
       }
-      src = v ? v.currentSrc || v.src || ($('source', v) && $('source', v).src) || '' : '';
     }
     if (!src) throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
     try {
@@ -288,7 +343,10 @@
     await ensureDirectMode();
     await writePrompt(job.prompt);
     const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
-    $$(tileSel()).forEach((t) => t.setAttribute('data-dt-seen', '1'));
+    $$(tileSel()).forEach((t) => {
+      t.setAttribute('data-dt-seen', '1');
+      seenTileKeys.add(tileKey(t));
+    });
     const hint = costHint();
 
     const btn = $(S.generate);
@@ -313,7 +371,10 @@
         const ready = fresh.filter((t) => t.matches(S.videoTile));
         const pending = fresh.filter((t) => t.matches(S.pendingTile));
         if (ready.length >= count && pending.length === 0) {
-          const out = await capture('video', ready[0]);
+          const targetTile = ready[ready.length - 1] || ready[0];
+          const out = await capture('video', targetTile);
+          targetTile.setAttribute('data-dt-seen', '1');
+          seenTileKeys.add(tileKey(targetTile));
           await closeLayers();
           return { ...out, costHint: hint };
         }
