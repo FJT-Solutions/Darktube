@@ -308,57 +308,163 @@
     return el.__dtFp || (el.__dtFp = 'fp_' + Math.random().toString(36).slice(2, 9));
   }
 
-  async function capture(kind, el) {
+  function wakeUpElement(node) {
+    if (!node) return;
+    try {
+      const rect = node.getBoundingClientRect ? node.getBoundingClientRect() : { left: 100, top: 100, width: 50, height: 50 };
+      const clientX = (rect.left || 0) + (rect.width || 0) / 2;
+      const clientY = (rect.top || 0) + (rect.height || 0) / 2;
+      const mouseOpts = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+      const pointerOpts = { bubbles: true, cancelable: true, view: window, clientX, clientY, pointerType: 'mouse', isPrimary: true };
+
+      node.dispatchEvent(new PointerEvent('pointerover', pointerOpts));
+      node.dispatchEvent(new MouseEvent('mouseover', mouseOpts));
+      node.dispatchEvent(new PointerEvent('pointerenter', pointerOpts));
+      node.dispatchEvent(new MouseEvent('mouseenter', mouseOpts));
+      node.dispatchEvent(new PointerEvent('pointermove', pointerOpts));
+      node.dispatchEvent(new MouseEvent('mousemove', mouseOpts));
+      node.dispatchEvent(new PointerEvent('pointerdown', pointerOpts));
+      node.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+      node.dispatchEvent(new PointerEvent('pointerup', pointerOpts));
+      node.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+      if (typeof node.click === 'function') node.click();
+    } catch (_) {}
+  }
+
+  function wakeUpTile(tile) {
+    if (!tile) return;
+    wakeUpElement(tile);
+    const interactive = $$(
+      'button, [role=button], mat-icon, img, .mat-mdc-button-base, [class*="chip"], [class*="badge"], [class*="play"], [aria-label*="play" i]',
+      tile
+    );
+    for (const item of interactive) {
+      wakeUpElement(item);
+    }
+    if (tile.shadowRoot) {
+      const shadowInteractive = Array.from(tile.shadowRoot.querySelectorAll('button, img, [role=button], mat-icon'));
+      for (const item of shadowInteractive) {
+        wakeUpElement(item);
+      }
+    }
+  }
+
+  function getVideoSourceFromTile(tile, knownOldUrls) {
+    if (!tile) return '';
+
+    // 1. Tags <video> estritamente DENTRO do tile (ou de seu shadowRoot)
+    const vids = [
+      ...$$('video', tile),
+      ...(tile.shadowRoot ? Array.from(tile.shadowRoot.querySelectorAll('video')) : []),
+    ];
+    for (const v of vids) {
+      const s = getVideoSrc(v);
+      if (s && s.length > 5 && !s.startsWith('data:') && (!knownOldUrls || !knownOldUrls.has(s))) {
+        return s;
+      }
+    }
+
+    // 2. Links diretos dentro do tile
+    const links = [
+      ...$$('a[href]', tile),
+      ...(tile.shadowRoot ? Array.from(tile.shadowRoot.querySelectorAll('a[href]')) : []),
+    ];
+    for (const a of links) {
+      const h = a.href || a.getAttribute('href') || '';
+      if (/\.mp4\b/i.test(h) || /googlevideo\.com/i.test(h) || /storage\.googleapis\.com/i.test(h)) {
+        if (!knownOldUrls || !knownOldUrls.has(h)) return h;
+      }
+    }
+
+    // 3. Atributos nos elementos do tile
+    const allDesc = [
+      tile,
+      ...$$('*', tile),
+      ...(tile.shadowRoot ? Array.from(tile.shadowRoot.querySelectorAll('*')) : []),
+    ];
+    for (const el of allDesc) {
+      for (const attr of ['src', 'data-src', 'data-video-url', 'data-url', 'data-media-url', 'data-download-url']) {
+        const val = el.getAttribute ? el.getAttribute(attr) : '';
+        if (val && (/\.mp4\b/i.test(val) || /storage\.googleapis\.com/i.test(val) || /blob:https/i.test(val))) {
+          if (!knownOldUrls || !knownOldUrls.has(val)) return val;
+        }
+      }
+      try {
+        const jsUrl = el.videoUrl || el.mediaUrl || (el.media && el.media.url) || (el.__data && el.__data.url);
+        if (typeof jsUrl === 'string' && jsUrl.length > 10 && (!knownOldUrls || !knownOldUrls.has(jsUrl))) {
+          return jsUrl;
+        }
+      } catch (_) {}
+    }
+
+    return '';
+  }
+
+  function getVideoSourceFromModal(knownOldUrls) {
+    const dialogs = $$('[role=dialog], mat-dialog-container, flow-media-viewer, flow-video-player, flow-lightbox, .cdk-overlay-pane')
+      .filter((d) => vis(d) && !d.closest('[aria-label*="Account" i], [aria-label*="Conta" i]'));
+
+    for (const d of dialogs) {
+      const vids = $$('video', d);
+      for (const v of vids) {
+        // NUNCA aceita <video> que pertenca a outro flow-video-tile na grade
+        if (v.closest(S.videoTile)) continue;
+        const s = getVideoSrc(v);
+        if (s && s.length > 5 && !s.startsWith('data:') && (!knownOldUrls || !knownOldUrls.has(s))) {
+          return s;
+        }
+      }
+      const links = $$('a[href]', d);
+      for (const a of links) {
+        const h = a.href || '';
+        if (/\.mp4\b/i.test(h) || /storage\.googleapis\.com/i.test(h)) {
+          if (!knownOldUrls || !knownOldUrls.has(h)) return h;
+        }
+      }
+    }
+    return '';
+  }
+
+  async function capture(kind, el, knownOldUrls) {
     let src = '';
     if (kind === 'image') {
       const img = $('img', el) || el;
       src = img.currentSrc || img.src || '';
     } else {
-      // 1. Tenta pegar direto se ja houver tag <video> com src no proprio tile
-      src = getVideoSrc($('video', el));
+      // 1. Tenta pegar direto se ja houver no proprio tile
+      src = getVideoSourceFromTile(el, knownOldUrls);
 
-      // 2. Se nao encontrou, clica no tile ou botao de play para acordar o player
+      // 2. Se nao encontrou, acorda o tile com eventos completos de ponteiro e clique
       if (!src) {
-        const clickTarget =
-          $('button[aria-label*="play" i], button.play, [class*="play"], mat-icon', el) ||
-          $('img', el) ||
-          el;
-        if (clickTarget) clickTarget.click();
-        await sleep(500);
+        wakeUpTile(el);
+        await sleep(600);
+        src = getVideoSourceFromTile(el, knownOldUrls) || getVideoSourceFromModal(knownOldUrls);
       }
 
-      // 3. Aguarda o player disponibilizar o video (no proprio tile ou no modal que se abriu)
+      // 3. Aguarda o player disponibilizar o video no tile ou no visualizador
       const t0 = Date.now();
+      let stepCount = 0;
       while (Date.now() - t0 < 35000 && !src) {
-        src = getVideoSrc($('video', el));
+        await sleep(500);
+        src = getVideoSourceFromTile(el, knownOldUrls) || getVideoSourceFromModal(knownOldUrls);
+        if (src) break;
 
-        // Procura em qualquer tag <video> na pagina (modal do visualizador do Flow)
-        if (!src) {
-          const allVideos = $$('video');
-          for (const vid of allVideos) {
-            const s = getVideoSrc(vid);
-            if (s && s.length > 5 && !s.startsWith('data:')) {
-              src = s;
-              break;
-            }
+        // A cada ~3 segundos, insiste em acordar o tile novamente
+        if (Date.now() - t0 > (stepCount + 1) * 3000) {
+          stepCount++;
+          wakeUpTile(el);
+          if (stepCount % 2 === 0) {
+            try {
+              el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+            } catch (_) {}
           }
         }
+      }
 
-        // Procura links diretos para o arquivo (.mp4)
-        if (!src) {
-          const links = $$('a[href*=".mp4"], a[href*="storage.googleapis.com"], source[src*=".mp4"]');
-          for (const l of links) {
-            const s = l.href || l.src || '';
-            if (s) { src = s; break; }
-          }
-        }
-
-        if (!src) {
-          if ((Date.now() - t0) % 5000 < 1000) {
-            el.click();
-          }
-          await sleep(600);
-        }
+      // Se abriu algum modal de visualizacao, fecha com Escape
+      if (getVideoSourceFromModal(knownOldUrls)) {
+        pressEscape();
+        await sleep(200);
       }
     }
     if (!src) throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
@@ -411,10 +517,20 @@
     await writePrompt(job.prompt);
     const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
 
-    // Registra os elementos e digitais dos tiles que JA EXISTIAM antes deste take
+    // Registra os elementos, URLs e digitais dos tiles que JA EXISTIAM antes deste take
     const prevTiles = new Set($$(S.videoTile));
     const prevFps = new Set($$(S.videoTile).map(tileFp));
+    const knownOldUrls = new Set();
+    $$('video').forEach((v) => {
+      const s = getVideoSrc(v);
+      if (s) knownOldUrls.add(s);
+    });
+    $$('flow-video-tile img, flow-image-tile img').forEach((img) => {
+      const s = img.currentSrc || img.src;
+      if (s && !s.startsWith('data:')) knownOldUrls.add(s);
+    });
     $$(tileSel()).forEach((t) => {
+      t.setAttribute('data-dt-old', '1');
       t.setAttribute('data-dt-seen', '1');
       seenTileKeys.add(tileKey(t));
     });
@@ -438,12 +554,12 @@
         const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
         if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
         const ready = $$(S.imageTileImg).filter((i) => !i.closest('[data-dt-seen]'));
-        if (ready.length >= count) return { ...(await capture('image', ready[0])), costHint: hint };
+        if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
       } else {
         const currentTiles = $$(S.videoTile);
         // O Google Flow insere novos videos no INICIO da galeria (topo/esquerda).
         // Filtra somente tiles que NAO existiam antes deste clique:
-        const newTiles = currentTiles.filter((t) => !prevTiles.has(t) && !prevFps.has(tileFp(t)));
+        const newTiles = currentTiles.filter((t) => !t.hasAttribute('data-dt-old') && !prevTiles.has(t) && !prevFps.has(tileFp(t)));
         const bad = newTiles.find((t) => !isTileGenerating(t) && RX.failure.test(txt(t)));
         if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
 
@@ -452,8 +568,9 @@
         if (ready.length >= count && pending.length === 0) {
           // O take novo fica sempre na posicao 0 (topo da galeria)
           const targetTile = ready[0];
-          const out = await capture('video', targetTile);
+          const out = await capture('video', targetTile, knownOldUrls);
           targetTile.setAttribute('data-dt-seen', '1');
+          targetTile.setAttribute('data-dt-old', '1');
           seenTileKeys.add(tileKey(targetTile));
           prevTiles.add(targetTile);
           prevFps.add(tileFp(targetTile));
