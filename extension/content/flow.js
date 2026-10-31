@@ -20,6 +20,31 @@
   const err = (code, msg) => Object.assign(new Error(msg || code), { code });
   const MAX_BYTES = 60 * 1024 * 1024;
 
+  // Log para o painel do darktube (o background guarda e envia em lote).
+  let curJob = null;
+  const shortUrl = (u) => String(u || '').slice(0, 200);
+  function dtLog(message, data = null, level = 'info') {
+    try {
+      let safe = null;
+      if (data != null) {
+        try {
+          safe = JSON.parse(JSON.stringify(data));
+        } catch (_) {
+          safe = { unserializable: String(data).slice(0, 200) };
+        }
+      }
+      chrome.runtime.sendMessage(
+        {
+          type: 'FLOW_LOG',
+          log: { message, data: safe, level, timestamp: Date.now(), jobId: curJob && curJob.id, projectId: curJob && curJob.project_id },
+        },
+        () => void chrome.runtime.lastError
+      );
+    } catch (_) {
+      /* extensao recarregada: sem para quem logar */
+    }
+  }
+
   async function until(fn, timeout = 15000, step = 250) {
     const t0 = Date.now();
     for (;;) {
@@ -42,29 +67,53 @@
     document.dispatchEvent(new KeyboardEvent('keyup', opts));
   }
 
-  async function closeAccountDrawer() {
-    const all = $$('button, [role=button], mat-icon, span');
-    const closeBtn = all.find((b) =>
-      /^(close|fechar|dismiss)$/i.test((b.getAttribute('aria-label') || '').trim()) ||
-      /^(close|clear)$/i.test(txt(b).trim()) ||
-      /close|fechar/i.test(b.getAttribute('aria-label') || '')
+  const ACCOUNT_SEL = '[aria-label*="Google Account" i], [aria-label*="Conta Google" i]';
+  const ACCOUNT_SIGNATURE = /google flow credits|sign out of all accounts|sair de todas as contas|manage subscription|switch account/i;
+
+  // Gaveta/menu da conta aberta. O botao que abre a gaveta tambem tem esse aria-label, entao so conta
+  // o que NAO e botao/link, ou um painel visivel com o texto tipico da conta.
+  function accountDrawers() {
+    const byLabel = $$(ACCOUNT_SEL).filter((el) => vis(el) && !/^(button|a)$/i.test(el.tagName) && el.getAttribute('role') !== 'button');
+    const bySig = $$('[role=dialog], [role=menu], .cdk-overlay-pane, [class*="drawer" i], [class*="account" i]').filter(
+      (el) => vis(el) && ACCOUNT_SIGNATURE.test(txt(el)) && txt(el).length < 1500
     );
-    if (closeBtn) {
-      const btn = closeBtn.closest('button, [role=button]') || closeBtn;
-      btn.click();
+    return Array.from(new Set([...byLabel, ...bySig]));
+  }
+
+  async function closeAccountDrawer(force = false) {
+    const drawers = accountDrawers();
+    if (!drawers.length && !force) return;
+    if (drawers.length) dtLog('Gaveta da conta Google aberta: fechando.', { drawers: drawers.length });
+    for (const d of drawers) {
+      const closeBtn = $('button[aria-label*="Close" i], button[aria-label*="Fechar" i], .close-button', d);
+      if (closeBtn) {
+        closeBtn.click();
+        await sleep(200);
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      pressEscape();
       await sleep(200);
     }
-    pressEscape();
-    const canvas = $('main, flow-canvas, .canvas, [role=main], div.ProseMirror');
-    if (canvas) canvas.click();
-    await sleep(300);
+    if (accountDrawers().length || force) {
+      const canvas = $('main, flow-canvas, .canvas, [role=main], div.ProseMirror');
+      if (canvas) canvas.click();
+      await sleep(300);
+    }
+    if (accountDrawers().length) dtLog('A gaveta da conta continua aberta apos fechar.', null, 'warn');
   }
 
   async function closeLayers() {
     for (let i = 0; i < 5 && ($(S.overlay) || vis($(S.settingsPanel))); i++) {
+      if (i === 0) dtLog('Fechando camadas/overlays da pagina.', { backdrop: !!$(S.overlay), settings: !!vis($(S.settingsPanel)) });
       pressEscape();
+      if ($(S.overlay)) {
+        const main = $('main, [role=main], flow-canvas, .canvas');
+        if (i > 0 && main) main.click();
+      }
       await sleep(300);
     }
+    if ($(S.overlay)) dtLog('Backdrop ainda presente apos fechar as camadas.', null, 'warn');
     await closeAccountDrawer();
   }
 
@@ -425,59 +474,177 @@
     return '';
   }
 
+  const BADGE_SEL = 'button, [role=button], [class*="chip"], [class*="play"], mat-icon';
+
+  // Resumo do tile para o log: o que existe dentro dele agora.
+  function describeTile(tile) {
+    if (!tile) return null;
+    const inner = [...$$(BADGE_SEL, tile), ...(tile.shadowRoot ? Array.from(tile.shadowRoot.querySelectorAll(BADGE_SEL)) : [])];
+    return {
+      tag: tile.tagName.toLowerCase(),
+      mediaId: tile.getAttribute('data-media-id') || ($('[data-media-id]', tile) && $('[data-media-id]', tile).getAttribute('data-media-id')) || null,
+      videos: $$('video', tile).map((v) => ({ src: shortUrl(getVideoSrc(v)), readyState: v.readyState })),
+      imgs: $$('img', tile).length,
+      links: $$('a[href]', tile).length,
+      shadowRoot: !!tile.shadowRoot,
+      buttons: inner.slice(0, 12).map((b) => `${b.tagName.toLowerCase()}:${(b.getAttribute('aria-label') || txt(b)).slice(0, 30)}`),
+      text: txt(tile).slice(0, 80),
+    };
+  }
+
+  // Badge de resolucao/play (canto superior esquerdo do flow-video-tile: "play 360p"/"play 720p").
+  function findPlayBadges(tile) {
+    const box = tile.getBoundingClientRect();
+    const cands = [...$$(BADGE_SEL, tile), ...(tile.shadowRoot ? Array.from(tile.shadowRoot.querySelectorAll(BADGE_SEL)) : [])];
+    const score = (el) => {
+      const t = txt(el) + ' ' + (el.getAttribute('aria-label') || '');
+      let sc = 0;
+      if (/\b(360p|720p|1080p)\b/i.test(t)) sc += 3;
+      if (/play|reproduzir|▶/i.test(t)) sc += 3;
+      const r = el.getBoundingClientRect();
+      if (sc && r.width && box.width && r.left - box.left < box.width * 0.5 && r.top - box.top < box.height * 0.35) sc += 2;
+      return sc;
+    };
+    const picked = new Map();
+    for (const el of cands) {
+      const sc = score(el);
+      if (sc <= 0) continue;
+      const target = el.closest('button, [role=button]') || el;
+      picked.set(target, Math.max(sc, picked.get(target) || 0));
+    }
+    return Array.from(picked.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([el]) => el);
+  }
+
+  // pointerdown + pointerup + click direto no badge para o player carregar o video.
+  function clickPlayBadge(tile) {
+    const badges = findPlayBadges(tile);
+    for (const b of badges) {
+      const r = b.getBoundingClientRect();
+      const clientX = r.left + r.width / 2;
+      const clientY = r.top + r.height / 2;
+      const mo = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+      const po = { ...mo, pointerType: 'mouse', isPrimary: true };
+      try {
+        b.dispatchEvent(new PointerEvent('pointerdown', po));
+        b.dispatchEvent(new MouseEvent('mousedown', mo));
+        b.dispatchEvent(new PointerEvent('pointerup', po));
+        b.dispatchEvent(new MouseEvent('mouseup', mo));
+        b.dispatchEvent(new MouseEvent('click', mo));
+      } catch (_) {}
+    }
+    return badges.map((b) => ({ tag: b.tagName.toLowerCase(), text: txt(b).slice(0, 30), aria: (b.getAttribute('aria-label') || '').slice(0, 40) }));
+  }
+
+  const viewerDialogs = () =>
+    $$('[role=dialog], mat-dialog-container, flow-media-viewer, flow-video-player, flow-lightbox, .cdk-overlay-pane').filter(
+      (d) => vis(d) && !d.closest('[aria-label*="Account" i], [aria-label*="Conta" i]')
+    );
+
   async function capture(kind, el, knownOldUrls) {
     let src = '';
+    let via = '';
+    dtLog(`Captura de ${kind} iniciada.`, describeTile(el));
     if (kind === 'image') {
       const img = $('img', el) || el;
       src = img.currentSrc || img.src || '';
+      via = 'img';
     } else {
+      try {
+        el.scrollIntoView({ block: 'center', behavior: 'instant' }); // galerias carregam o player so com o tile visivel
+      } catch (_) {}
+
       // 1. Tenta pegar direto se ja houver no proprio tile
       src = getVideoSourceFromTile(el, knownOldUrls);
+      if (src) via = 'tile';
 
-      // 2. Se nao encontrou, acorda o tile com eventos completos de ponteiro e clique
+      // 2. Se nao encontrou, acorda o tile e clica no badge de play/resolucao
       if (!src) {
+        dtLog('Nenhum <video> no tile ainda: acordando o tile e clicando no badge de play.', describeTile(el));
         wakeUpTile(el);
+        const clicked = clickPlayBadge(el);
+        dtLog(clicked.length ? 'Badge de play/resolução clicado.' : 'Nenhum badge de play/resolução encontrado no tile.', { badges: clicked }, clicked.length ? 'info' : 'warn');
         await sleep(600);
-        src = getVideoSourceFromTile(el, knownOldUrls) || getVideoSourceFromModal(knownOldUrls);
+        src = getVideoSourceFromTile(el, knownOldUrls);
+        if (src) via = 'tile';
+        else {
+          src = getVideoSourceFromModal(knownOldUrls);
+          if (src) via = 'visualizador';
+        }
       }
 
       // 3. Aguarda o player disponibilizar o video no tile ou no visualizador
       const t0 = Date.now();
       let stepCount = 0;
+      let viewerWaits = 0;
       while (Date.now() - t0 < 35000 && !src) {
         await sleep(500);
-        src = getVideoSourceFromTile(el, knownOldUrls) || getVideoSourceFromModal(knownOldUrls);
-        if (src) break;
+        src = getVideoSourceFromTile(el, knownOldUrls);
+        if (src) {
+          via = 'tile';
+          break;
+        }
+        src = getVideoSourceFromModal(knownOldUrls);
+        if (src) {
+          via = 'visualizador';
+          break;
+        }
 
         // A cada ~3 segundos, insiste em acordar o tile novamente
         if (Date.now() - t0 > (stepCount + 1) * 3000) {
           stepCount++;
+          const viewers = viewerDialogs();
+          if (viewers.length && viewerWaits < 2) {
+            // Um visualizador ja abriu: clicar de novo poderia fecha-lo. Espera o <video> aparecer.
+            viewerWaits++;
+            dtLog(`Tentativa ${stepCount}: visualizador aberto sem <video> ainda, aguardando.`, { dialogs: viewers.map((d) => d.tagName.toLowerCase()) });
+            continue;
+          }
+          if (viewers.length) {
+            dtLog(`Tentativa ${stepCount}: visualizador sem <video>, fechando e tentando de novo.`, null, 'warn');
+            pressEscape();
+            viewerWaits = 0;
+            await sleep(300);
+          }
           wakeUpTile(el);
+          const clicked = clickPlayBadge(el);
           if (stepCount % 2 === 0) {
             try {
               el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
             } catch (_) {}
           }
+          dtLog(`Tentativa ${stepCount} de capturar o vídeo (${Math.round((Date.now() - t0) / 1000)}s).`, { badges: clicked, tile: describeTile(el) });
         }
       }
 
       // Se abriu algum modal de visualizacao, fecha com Escape
-      if (getVideoSourceFromModal(knownOldUrls)) {
+      if (viewerDialogs().length) {
         pressEscape();
         await sleep(200);
       }
     }
-    if (!src) throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
+    if (!src) {
+      dtLog('Captura falhou: nenhum arquivo de vídeo/imagem encontrado.', { tile: describeTile(el), html: String(el.outerHTML || '').slice(0, 1500), dialogs: viewerDialogs().length }, 'error');
+      throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
+    }
+    dtLog(`Fonte ${kind} encontrada (${via}).`, { url: shortUrl(src) });
     try {
       const res = await fetch(src, { credentials: 'include' });
       if (!res.ok) throw new Error(String(res.status));
       const blob = await res.blob();
       if (blob.size > MAX_BYTES) throw err('too_big', 'Arquivo grande demais.');
+      dtLog(`Mídia lida pela página com sucesso.`, { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'success');
       return { ok: true, kind, mime: blob.type, b64: await blobToB64(blob) };
     } catch (e) {
-      if (e && e.code === 'too_big') throw e;
+      if (e && e.code === 'too_big') {
+        dtLog('Arquivo grande demais.', { url: shortUrl(src) }, 'error');
+        throw e;
+      }
       // A pagina nao deixou ler (CORS): o background tenta baixar pela URL, se ela for publica.
-      if (/^https?:/i.test(src)) return { ok: true, kind, url: src };
+      if (/^https?:/i.test(src)) {
+        dtLog('A página não deixou ler a mídia; o background baixará pela URL.', { url: shortUrl(src), reason: String((e && e.message) || e) }, 'warn');
+        return { ok: true, kind, url: src };
+      }
+      dtLog('Não consegui ler a mídia gerada.', { url: shortUrl(src), reason: String((e && e.message) || e) }, 'error');
       throw err('capture_failed', 'Não consegui ler a mídia gerada.');
     }
   }
@@ -512,10 +679,13 @@
   }
 
   async function generate(job) {
+    const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
+    dtLog(`Iniciando geração (${job.kind}).`, { params: job.params, count, prompt: String(job.prompt || '').slice(0, 300) });
+    await closeAccountDrawer();
     await closeLayers();
     await ensureDirectMode();
     await writePrompt(job.prompt);
-    const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
+    dtLog('Prompt escrito na caixa do Flow.');
 
     // Registra os elementos, URLs e digitais dos tiles que JA EXISTIAM antes deste take
     const prevTiles = new Set($$(S.videoTile));
@@ -535,16 +705,19 @@
       seenTileKeys.add(tileKey(t));
     });
     const hint = costHint();
+    dtLog('Tiles antes de gerar.', { videoTiles: $$(S.videoTile).length, imageTiles: $$(S.imageTile).length, pendingTiles: $$(S.pendingTile).length, knownUrls: knownOldUrls.size });
 
     const btn = $(S.generate);
     if (!btn) throw err('generate_missing', 'Não achei o botão de gerar.');
     if (!(await until(() => !btn.disabled, 10000))) throw err('generate_disabled', 'O botão de gerar ficou desabilitado.');
     await human(500, 1500);
     btn.click();
+    dtLog('Botão de gerar clicado.', { creditsHint: hint });
     await sleep(2000);
 
     const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
     const t0 = Date.now();
+    let lastShape = '';
     for (;;) {
       await sleep(2500);
       const prob = classifyProblem();
@@ -554,6 +727,7 @@
         const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
         if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
         const ready = $$(S.imageTileImg).filter((i) => !i.closest('[data-dt-seen]'));
+        if (ready.length >= count) dtLog('Imagem gerada detectada.', { prontas: ready.length, mediaId: ready[0].getAttribute('data-media-id') }, 'success');
         if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
       } else {
         const currentTiles = $$(S.videoTile);
@@ -565,9 +739,15 @@
 
         const pending = newTiles.filter(isTileGenerating);
         const ready = newTiles.filter((t) => !isTileGenerating(t));
+        const shape = `${currentTiles.length}/${newTiles.length}/${pending.length}/${ready.length}`;
+        if (shape !== lastShape) {
+          lastShape = shape;
+          dtLog('Tiles depois de gerar.', { total: currentTiles.length, novos: newTiles.length, gerando: pending.length, prontos: ready.length, segundos: Math.round((Date.now() - t0) / 1000) });
+        }
         if (ready.length >= count && pending.length === 0) {
           // O take novo fica sempre na posicao 0 (topo da galeria)
           const targetTile = ready[0];
+          dtLog('Tile gerado detectado.', describeTile(targetTile), 'success');
           const out = await capture('video', targetTile, knownOldUrls);
           targetTile.setAttribute('data-dt-seen', '1');
           targetTile.setAttribute('data-dt-old', '1');
@@ -583,13 +763,19 @@
   }
 
   async function runJob(job) {
+    curJob = job;
     try {
+      dtLog('Job iniciado na aba do Flow.', { kind: job.kind, take: job.take_index, params: job.params });
       const prob = classifyProblem();
       if (prob) throw err(prob.code, prob.msg);
       if (!$(S.editor)) throw err('no_project', 'Abra um projeto do Flow (a caixa de prompt não apareceu).');
       await configure(job);
-      return await generate(job);
+      dtLog('Configurações aplicadas.', { summary: txt(settingsBtnEl() || $(S.settingsBtn)).slice(0, 80) });
+      const out = await generate(job);
+      dtLog('Geração e captura concluídas.', null, 'success');
+      return out;
     } catch (e) {
+      dtLog('Job falhou: ' + String((e && e.message) || e).slice(0, 300), { code: (e && e.code) || 'error' }, 'error');
       return { ok: false, error: String((e && e.message) || e).slice(0, 300), code: (e && e.code) || 'error' };
     }
   }
@@ -668,10 +854,11 @@
       // Os creditos ficam no menu da conta: abre, le e fecha (so leitura).
       const acc = $$('button, a, [role=button]').find((b) => /google account|conta google/i.test(b.getAttribute('aria-label') || ''));
       if (acc) {
+        dtLog('Ensaio: abrindo o menu da conta para ler os créditos.');
         acc.click();
         await human(600, 1200);
         caps.credits = readCredits();
-        await closeAccountDrawer();
+        await closeAccountDrawer(true);
       } else {
         caps.diag = Object.assign(caps.diag || {}, { account: 'botão da conta não encontrado' });
       }
@@ -710,7 +897,10 @@
       runJob(msg.job)
         .then((result) => chrome.runtime.sendMessage({ type: 'FLOW_JOB_RESULT', jobId: msg.job.id, result }))
         .catch(() => {})
-        .finally(() => (running = false));
+        .finally(() => {
+          running = false;
+          curJob = null;
+        });
     }
   });
 })();

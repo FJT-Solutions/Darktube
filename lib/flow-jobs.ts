@@ -78,6 +78,19 @@ export async function ensureFlowTablesExist() {
     ALTER TABLE public.flow_agents ADD COLUMN IF NOT EXISTS paused_until TIMESTAMPTZ;
     ALTER TABLE public.flow_agents ADD COLUMN IF NOT EXISTS pause_reason TEXT;
     ALTER TABLE public.flow_agents ADD COLUMN IF NOT EXISTS next_allowed_at TIMESTAMPTZ;
+
+    CREATE TABLE IF NOT EXISTS public.flow_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL,
+      job_id UUID,
+      project_id UUID,
+      level TEXT NOT NULL DEFAULT 'info',
+      message TEXT NOT NULL,
+      data JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS flow_logs_user_idx ON public.flow_logs (user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS flow_logs_job_idx ON public.flow_logs (job_id, created_at DESC);
   `);
   tablesReady = true;
 }
@@ -332,4 +345,76 @@ export async function failFlowJob(userId: string, id: string, message: string): 
     [id, userId, (message || 'Falha na geração').slice(0, 500)]
   );
   return res.rows[0] ?? null;
+}
+
+// ---------- logs da extensao (aparecem em tempo real no painel do Flow) ----------
+
+export interface FlowLogEntry {
+  id: string;
+  user_id: string;
+  job_id: string | null;
+  project_id: string | null;
+  level: string;
+  message: string;
+  data: any;
+  created_at: string;
+}
+
+const LOG_LEVELS = ['info', 'warn', 'error', 'success'];
+const MAX_LOG_BATCH = 100;
+const MAX_LOG_DATA_CHARS = 8000;
+const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const asUuid = (v: unknown) => (typeof v === 'string' && UUID_RX.test(v) ? v : null);
+
+// Aceita um item ou um lote. Cada item pode trazer o proprio horario (timestamp em ms) para manter a ordem real.
+export async function addFlowLogs(
+  userId: string,
+  entries:
+    | { message: string; level?: string; jobId?: string | null; projectId?: string | null; data?: any; timestamp?: number }
+    | Array<{ message: string; level?: string; jobId?: string | null; projectId?: string | null; data?: any; timestamp?: number }>
+) {
+  await ensureFlowTablesExist();
+  const list = (Array.isArray(entries) ? entries : [entries]).slice(0, MAX_LOG_BATCH);
+  for (const e of list) {
+    const message = String(e?.message ?? '').trim().slice(0, 1000);
+    if (!message) continue;
+    const level = LOG_LEVELS.includes(String(e.level)) ? String(e.level) : 'info';
+    let data: string | null = null;
+    if (e.data !== undefined && e.data !== null) {
+      try {
+        const s = JSON.stringify(e.data);
+        data = s.length > MAX_LOG_DATA_CHARS ? JSON.stringify({ truncated: s.slice(0, MAX_LOG_DATA_CHARS) }) : s;
+      } catch {
+        data = null;
+      }
+    }
+    const ts = Number.isFinite(e.timestamp) ? new Date(e.timestamp as number) : null;
+    await pool.query(
+      `INSERT INTO public.flow_logs (user_id, job_id, project_id, level, message, data, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, COALESCE($7::timestamptz, NOW()))`,
+      [userId, asUuid(e.jobId), asUuid(e.projectId), level, message, data, ts && !isNaN(ts.getTime()) ? ts.toISOString() : null]
+    );
+  }
+}
+
+// Com projectId traz os logs daquele projeto e os gerais da extensao (sem projeto, ex.: o vigia periodico).
+export async function listFlowLogs(userId: string, limit = 100, projectId?: string): Promise<FlowLogEntry[]> {
+  await ensureFlowTablesExist();
+  const n = Math.min(Math.max(Math.round(limit) || 100, 1), 500);
+  const res = projectId && asUuid(projectId)
+    ? await pool.query(
+        `SELECT * FROM public.flow_logs WHERE user_id = $1 AND (project_id = $2 OR project_id IS NULL) ORDER BY created_at DESC LIMIT $3`,
+        [userId, projectId, n]
+      )
+    : await pool.query(`SELECT * FROM public.flow_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`, [userId, n]);
+  return res.rows;
+}
+
+export async function clearFlowLogs(userId: string, projectId?: string) {
+  await ensureFlowTablesExist();
+  if (projectId && asUuid(projectId)) {
+    await pool.query(`DELETE FROM public.flow_logs WHERE user_id = $1 AND (project_id = $2 OR project_id IS NULL)`, [userId, projectId]);
+  } else {
+    await pool.query(`DELETE FROM public.flow_logs WHERE user_id = $1`, [userId]);
+  }
 }

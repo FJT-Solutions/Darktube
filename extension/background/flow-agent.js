@@ -9,7 +9,59 @@ const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;
 const FLOW_DEFAULT_BASE = 'https://darktube.fjt-solutions.com';
 
+const flowJson = { 'Content-Type': 'application/json' };
+
 let flowTicking = false;
+
+// ---------- logs: tudo que a extensao faz vai para o painel do darktube ----------
+const FLOW_LOG_FLUSH_MS = 1000;
+const FLOW_LOG_BUFFER_MAX = 300;
+let flowLogBuf = [];
+let flowLogTimer = null;
+let flowLogFlushing = false;
+let flowLastTickLog = '';
+
+function flowLog(message, data, level, ids) {
+  flowLogBuf.push({
+    message: String(message || '').slice(0, 1000),
+    level: level || 'info',
+    data: data == null ? undefined : data,
+    timestamp: (ids && ids.timestamp) || Date.now(),
+    jobId: (ids && ids.jobId) || undefined,
+    projectId: (ids && ids.projectId) || undefined,
+  });
+  if (flowLogBuf.length > FLOW_LOG_BUFFER_MAX) flowLogBuf = flowLogBuf.slice(-FLOW_LOG_BUFFER_MAX);
+  if (!flowLogTimer) flowLogTimer = setTimeout(flowLogFlush, FLOW_LOG_FLUSH_MS);
+}
+
+// Avisos de ciclo repetidos (ex.: "Nada na fila.") so entram quando mudam.
+function flowLogTick(message, data, level) {
+  if (flowLastTickLog === message) return;
+  flowLastTickLog = message;
+  flowLog(message, data, level);
+}
+
+async function flowLogFlush() {
+  flowLogTimer = null;
+  if (flowLogFlushing || !flowLogBuf.length) return;
+  flowLogFlushing = true;
+  const batch = flowLogBuf.splice(0, 100);
+  try {
+    const c = await flowCfg();
+    if (!c.darktube_token) return; // sem login nao ha para onde mandar: descarta
+    const res = await fetch(c.base + '/api/flow/agent/logs', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + c.darktube_token, ...flowJson },
+      body: JSON.stringify({ logs: batch }),
+    });
+    if (!res.ok && res.status !== 401) throw new Error(String(res.status));
+  } catch (e) {
+    flowLogBuf = batch.concat(flowLogBuf).slice(-FLOW_LOG_BUFFER_MAX); // sem rede: tenta de novo no proximo envio
+  } finally {
+    flowLogFlushing = false;
+    if (flowLogBuf.length && !flowLogTimer) flowLogTimer = setTimeout(flowLogFlush, FLOW_LOG_FLUSH_MS * 5);
+  }
+}
 
 chrome.alarms.create(FLOW_ALARM, { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((a) => {
@@ -36,8 +88,6 @@ async function flowApi(c, path, init) {
   if (res.status === 401) throw new Error('Sessão do darktube expirada. Entre de novo no popup.');
   return res.json().catch(() => ({}));
 }
-
-const flowJson = { 'Content-Type': 'application/json' };
 
 async function flowHeartbeat(c, caps) {
   const body = { version: FLOW_VERSION, mode: c.flow_live ? 'live' : 'dry' };
@@ -101,6 +151,7 @@ async function flowTick() {
     // Vigia: um job que ficou sem resposta da pagina por muito tempo.
     if (c.flow_current) {
       if (Date.now() - c.flow_current.startedAt > FLOW_JOB_TIMEOUT_MS) {
+        flowLog('Vigia: a aba do Flow não respondeu a tempo.', null, 'error', c.flow_current);
         await flowFail(c, c.flow_current.jobId, 'A aba do Flow não respondeu a tempo.', 'timeout');
         await chrome.storage.local.remove('flow_current');
         // Nao pega outro job no mesmo ciclo: a pagina pode estar travada.
@@ -113,36 +164,59 @@ async function flowTick() {
 
     await flowHeartbeat(c);
     const tab = await flowFindTab();
-    if (!tab) return void (await flowStatus('sem_aba', { msg: 'Abra o Google Flow em uma aba deste Chrome.' }));
+    if (!tab) {
+      flowLogTick('Nenhuma aba do Google Flow aberta.', null, 'warn');
+      return void (await flowStatus('sem_aba', { msg: 'Abra o Google Flow em uma aba deste Chrome.' }));
+    }
     const ping = await flowAsk(tab.id, { type: 'FLOW_PING' });
-    if (!ping || !ping.ready) return void (await flowStatus('sem_projeto', { msg: 'Abra um projeto do Flow (com a caixa de prompt).' }));
+    if (!ping || !ping.ready) {
+      flowLogTick('Aba do Flow sem projeto aberto (caixa de prompt não encontrada).', { ping }, 'warn');
+      return void (await flowStatus('sem_projeto', { msg: 'Abra um projeto do Flow (com a caixa de prompt).' }));
+    }
     if (ping.busy) return void (await flowStatus('ocupado'));
 
-    // Ensaio periodico: le as opcoes da conta e manda ao darktube.
+    // Ensaio periodico: le as opcoes da conta (abre o menu da conta). So roda em repouso:
+    // nunca com job em andamento nem com job esperando na fila (veja o claim abaixo).
     const stale = !c.flow_caps || Date.now() - c.flow_caps.at > FLOW_SCAN_EVERY_MS;
-    if (stale) {
+    const scanIdle = async () => {
+      if (!stale) return;
+      flowLog('Ensaio: lendo opções e créditos da conta (sem jobs na fila).');
       const r = await flowAsk(tab.id, { type: 'FLOW_SCAN' });
       if (r && r.ok) {
         await chrome.storage.local.set({ flow_caps: { at: Date.now(), data: r.caps } });
         await flowHeartbeat(c, r.caps);
+        flowLog('Ensaio concluído.', { credits: r.caps && r.caps.credits }, 'success');
+      } else {
+        flowLog('Ensaio falhou.', { error: r && r.error }, 'warn');
       }
-    }
+    };
 
-    if (!c.flow_live) return void (await flowStatus('ensaio', { msg: 'Modo ensaio: lê a conta, mas não gera nada.' }));
+    if (!c.flow_live) {
+      await scanIdle(); // modo ensaio nunca gera: nao ha fila para proteger
+      return void (await flowStatus('ensaio', { msg: 'Modo ensaio: lê a conta, mas não gera nada.' }));
+    }
 
     const claim = await flowApi(c, '/api/flow/agent/claim', { method: 'POST' });
     if (!claim || !claim.job) {
       const why = { empty: 'Nada na fila.', paused: 'Pausado pelo darktube.', gap: 'Aguardando o intervalo entre gerações.', limit_hour: 'Limite por hora atingido.', limit_day: 'Limite diário atingido.', running: 'Há um job em andamento.' };
-      return void (await flowStatus('aguardando', { msg: why[claim && claim.reason] || 'Nada na fila.' }));
+      const reason = claim && claim.reason;
+      // Fila vazia de verdade (e nao "em espera"/"limite"): unico momento seguro para o ensaio.
+      if (reason === 'empty') await scanIdle();
+      flowLogTick(why[reason] || 'Nada na fila.', { reason });
+      return void (await flowStatus('aguardando', { msg: why[reason] || 'Nada na fila.' }));
     }
-    await chrome.storage.local.set({ flow_current: { jobId: claim.job.id, kind: claim.job.kind, startedAt: Date.now() } });
+    flowLastTickLog = '';
+    await chrome.storage.local.set({ flow_current: { jobId: claim.job.id, projectId: claim.job.project_id || null, kind: claim.job.kind, startedAt: Date.now() } });
+    flowLog(`Job recebido: ${claim.job.kind} (take ${claim.job.take_index ?? '-'})`, { params: claim.job.params, prompt: String(claim.job.prompt || '').slice(0, 300) }, 'info', { jobId: claim.job.id, projectId: claim.job.project_id });
     await flowStatus('gerando', { jobId: claim.job.id });
     const started = await flowAsk(tab.id, { type: 'FLOW_RUN_JOB', job: claim.job });
     if (!started || !started.started) {
+      flowLog('A aba do Flow não aceitou o trabalho.', { started }, 'error', { jobId: claim.job.id, projectId: claim.job.project_id });
       await flowFail(c, claim.job.id, 'A aba do Flow não aceitou o trabalho.', 'tab');
       await chrome.storage.local.remove('flow_current');
     }
   } catch (e) {
+    flowLogTick('Erro no ciclo da extensão: ' + String((e && e.message) || e).slice(0, 200), null, 'error');
     await flowStatus('erro', { msg: String((e && e.message) || e).slice(0, 200) });
   } finally {
     flowTicking = false;
@@ -167,8 +241,10 @@ async function flowHandleResult(msg) {
   const cur = c.flow_current;
   if (!cur || cur.jobId !== msg.jobId) return;
   const r = msg.result || {};
+  const ids = { jobId: msg.jobId, projectId: cur.projectId };
   try {
     if (!r.ok) {
+      flowLog('Falha na geração: ' + (r.error || 'sem detalhe'), { code: r.code }, 'error', ids);
       await flowFail(c, msg.jobId, r.error || 'Falha na geração.', r.code);
       return void (await flowStatus('falhou', { msg: r.error, code: r.code }));
     }
@@ -182,6 +258,7 @@ async function flowHandleResult(msg) {
     } else {
       throw new Error('A página não devolveu a mídia.');
     }
+    flowLog('Mídia recebida pela extensão.', { via: r.b64 ? 'base64' : 'url', bytes: blob.size, type: blob.type }, 'info', ids);
     const mime = flowMime(blob.type, r.kind);
     const ext = mime.split('/')[1].replace('jpeg', 'jpg');
     const fd = new FormData();
@@ -190,8 +267,10 @@ async function flowHandleResult(msg) {
       method: 'POST', headers: { Authorization: 'Bearer ' + c.darktube_token }, body: fd,
     });
     if (!up.ok) throw new Error('O darktube recusou o arquivo (' + up.status + ').');
+    flowLog('Mídia enviada ao darktube. Job concluído.', null, 'success', ids);
     await flowStatus('concluido', { jobId: msg.jobId });
   } catch (e) {
+    flowLog('Erro ao enviar a mídia: ' + String((e && e.message) || e).slice(0, 200), null, 'error', ids);
     await flowFail(c, msg.jobId, String((e && e.message) || e), 'upload');
     await flowStatus('erro', { msg: String((e && e.message) || e).slice(0, 200) });
   } finally {
@@ -205,9 +284,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     flowHandleResult(msg).finally(() => sendResponse({ ok: true }));
     return true;
   }
+  if (msg.type === 'FLOW_LOG') {
+    const l = msg.log || {};
+    flowLog(l.message, l.data, l.level, l);
+    sendResponse({ ok: true });
+    return;
+  }
   if (msg.type === 'FLOW_SCAN_NOW') {
     (async () => {
       const c = await flowCfg();
+      if (c.flow_current) return sendResponse({ ok: false, error: 'Há um job em andamento; a leitura da conta espera ele terminar.' });
       const tab = await flowFindTab();
       if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
       const r = await flowAsk(tab.id, { type: 'FLOW_SCAN' });
