@@ -291,28 +291,48 @@
     });
   }
 
+  function tileFp(el) {
+    if (!el) return '';
+    const id = el.getAttribute('data-media-id') || $('[data-media-id]', el)?.getAttribute('data-media-id') || '';
+    if (id) return 'id:' + id;
+    const img = $('img', el);
+    const src = (img && (img.src || img.currentSrc)) || '';
+    if (src && !src.startsWith('data:')) {
+      return 'img:' + src.split('?')[0].split('/').slice(-3).join('/');
+    }
+    const vid = $('video', el);
+    const vsrc = (vid && (vid.src || vid.currentSrc)) || '';
+    if (vsrc && !vsrc.startsWith('data:')) {
+      return 'vid:' + vsrc.split('?')[0].split('/').slice(-3).join('/');
+    }
+    return el.__dtFp || (el.__dtFp = 'fp_' + Math.random().toString(36).slice(2, 9));
+  }
+
   async function capture(kind, el) {
     let src = '';
     if (kind === 'image') {
-      src = el.currentSrc || el.src || '';
+      const img = $('img', el) || el;
+      src = img.currentSrc || img.src || '';
     } else {
-      // Loop resiliente: espera ate 25 segundos para o video ter URL carregada
+      // 1. Tenta pegar direto se ja houver tag <video> com src no proprio tile
+      src = getVideoSrc($('video', el));
+
+      // 2. Se nao encontrou, clica no tile ou botao de play para acordar o player
+      if (!src) {
+        const clickTarget =
+          $('button[aria-label*="play" i], button.play, [class*="play"], mat-icon', el) ||
+          $('img', el) ||
+          el;
+        if (clickTarget) clickTarget.click();
+        await sleep(500);
+      }
+
+      // 3. Aguarda o player disponibilizar o video (no proprio tile ou no modal que se abriu)
       const t0 = Date.now();
-      while (Date.now() - t0 < 25000 && !src) {
-        // 1. Procura tag <video> dentro do proprio tile
-        let v = $('video', el);
-        src = getVideoSrc(v);
+      while (Date.now() - t0 < 35000 && !src) {
+        src = getVideoSrc($('video', el));
 
-        // 2. Se ainda nao tem src, clica no botao de play ou no tile para iniciar carregamento
-        if (!src) {
-          const playBtn =
-            $('button[aria-label*="play" i], button.play, [class*="play"], [role=button]', el) ||
-            $('button', el) ||
-            el;
-          if (playBtn) playBtn.click();
-        }
-
-        // 3. Procura qualquer tag <video> na pagina (inclusive em modais/players)
+        // Procura em qualquer tag <video> na pagina (modal do visualizador do Flow)
         if (!src) {
           const allVideos = $$('video');
           for (const vid of allVideos) {
@@ -324,13 +344,19 @@
           }
         }
 
-        // 4. Link direto se houver
+        // Procura links diretos para o arquivo (.mp4)
         if (!src) {
-          const dl = $('a[href*=".mp4"], a[href*="storage.googleapis.com"]', el) || $('a[href*=".mp4"]');
-          if (dl && dl.href) src = dl.href;
+          const links = $$('a[href*=".mp4"], a[href*="storage.googleapis.com"], source[src*=".mp4"]');
+          for (const l of links) {
+            const s = l.href || l.src || '';
+            if (s) { src = s; break; }
+          }
         }
 
         if (!src) {
+          if ((Date.now() - t0) % 5000 < 1000) {
+            el.click();
+          }
           await sleep(600);
         }
       }
@@ -367,10 +393,13 @@
     if (/\b(\d{1,3}%|generating|gerando|criando|loading)\b/i.test(t)) {
       return true;
     }
-    const hasPlay = $('button[aria-label*="play" i], button.play, [class*="play"], [aria-label*="reproduzir" i]', tile);
-    const hasBadge = /\b(360p|720p|1080p)\b/i.test(t);
+    const img = $('img', tile);
+    const hasImage = img && (img.naturalWidth > 40 || (img.src && !img.src.startsWith('data:')));
     const hasVideo = $('video', tile);
-    if (!hasPlay && !hasBadge && !hasVideo) {
+    const hasBadge = /\b(360p|720p|1080p|\d+s)\b/i.test(t);
+    const hasPlay = $$('mat-icon, button, [role=button]', tile).some((el) => /play/i.test(txt(el)) || /play|reproduzir/i.test(el.getAttribute('aria-label') || ''));
+
+    if (!hasImage && !hasVideo && !hasBadge && !hasPlay) {
       return true;
     }
     return false;
@@ -381,8 +410,10 @@
     await ensureDirectMode();
     await writePrompt(job.prompt);
     const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
-    const initialTiles = $$(S.videoTile);
-    const initialTileCount = initialTiles.length;
+
+    // Registra os elementos e digitais dos tiles que JA EXISTIAM antes deste take
+    const prevTiles = new Set($$(S.videoTile));
+    const prevFps = new Set($$(S.videoTile).map(tileFp));
     $$(tileSel()).forEach((t) => {
       t.setAttribute('data-dt-seen', '1');
       seenTileKeys.add(tileKey(t));
@@ -410,16 +441,22 @@
         if (ready.length >= count) return { ...(await capture('image', ready[0])), costHint: hint };
       } else {
         const currentTiles = $$(S.videoTile);
-        const newTiles = currentTiles.filter((t, idx) => idx >= initialTileCount || unseen([t]).length > 0);
+        // O Google Flow insere novos videos no INICIO da galeria (topo/esquerda).
+        // Filtra somente tiles que NAO existiam antes deste clique:
+        const newTiles = currentTiles.filter((t) => !prevTiles.has(t) && !prevFps.has(tileFp(t)));
         const bad = newTiles.find((t) => !isTileGenerating(t) && RX.failure.test(txt(t)));
         if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
+
         const pending = newTiles.filter(isTileGenerating);
         const ready = newTiles.filter((t) => !isTileGenerating(t));
         if (ready.length >= count && pending.length === 0) {
-          const targetTile = ready[ready.length - 1] || ready[0];
+          // O take novo fica sempre na posicao 0 (topo da galeria)
+          const targetTile = ready[0];
           const out = await capture('video', targetTile);
           targetTile.setAttribute('data-dt-seen', '1');
           seenTileKeys.add(tileKey(targetTile));
+          prevTiles.add(targetTile);
+          prevFps.add(tileFp(targetTile));
           await closeLayers();
           return { ...out, costHint: hint };
         }

@@ -797,9 +797,12 @@ function ProjectView({
                       </Badge>
                     )}
                     {job?.status === "draft" && (
-                      <Button size="sm" variant="outline" onClick={() => retryJob(job.id)}>
-                        Reenviar
-                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => retryJob(job.id)}>Reenviar</Button>
+                    )}
+                    {job?.status === "done" && (
+                      <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => retryJob(job.id)}>Regerar</Button>
+
+
                     )}
                   </div>
                 </div>
