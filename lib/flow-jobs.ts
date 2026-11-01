@@ -336,6 +336,19 @@ export async function completeFlowJob(userId: string, id: string, resultUrl: str
 }
 
 // Falha vira rascunho: o usuário reenvia ao Flow ou escolhe outro motor.
+/** Devolve um job em execucao para a fila sem gastar a tentativa (problema na tela do Flow, nao no take). */
+export async function releaseFlowJob(userId: string, id: string): Promise<FlowJob | null> {
+  await ensureFlowTablesExist();
+  const res = await pool.query(
+    `UPDATE public.flow_jobs SET status = 'queued', claimed_at = NULL, error_message = NULL,
+            deadline_at = NOW() + ($3 || ' minutes')::interval
+      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      RETURNING *`,
+    [id, userId, String(DEFAULT_DEADLINE_MIN)]
+  );
+  return res.rows[0] ?? null;
+}
+
 export const MAX_POLICY_RETRIES = 2;
 
 /**

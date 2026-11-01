@@ -673,7 +673,8 @@
     const img = $('img', tile);
     const hasImg = !!img && (img.naturalWidth > 40 || (img.src && !img.src.startsWith('data:')));
     const hasVideo = !!$('video', tile);
-    const failed = FAILED_RX.test(t) && !hasVideo;
+    // O Flow desenha a recusa num componente proprio (flow-error-tile: "Failed", Retry / Reuse prompt / Delete).
+    const failed = !!$('flow-error-tile, .error-tile', tile) || (FAILED_RX.test(t) && !hasVideo);
     return { generating: !failed && (pending || spinner || GEN_RX.test(t)), failed, hasImg, hasVideo, badge: RES_RX.test(t), text: t.slice(0, 60) };
   }
   function isTileGenerating(tile) {
@@ -1331,6 +1332,19 @@
     try {
       dtLog('Job iniciado na aba do Flow.', { kind: job.kind, take: job.take_index, params: job.params });
       await closeViewer(); // um visualizador esquecido aberto esconderia a galeria e a caixa de prompt
+      // Menu "+" (biblioteca de midia) ou outro popover aberto pelo usuario cobre o painel de ajustes.
+      for (let i = 0; i < 4 && $('flow-add-menu-popover-content, .cdk-overlay-pane .flow-menu-panel'); i++) {
+        if (i === 0) dtLog('Fechando o menu "+" (biblioteca de mídia) que estava aberto.');
+        if (i < 2) pressEscape();
+        else {
+          // Escape nao fechou: clica fora (fundo do overlay) ou no proprio botao "+" para alternar.
+          const backdrop = $('.cdk-overlay-backdrop');
+          const plus = $$('button').find((b) => /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+          realClick(backdrop || plus || document.body);
+        }
+        await sleep(400);
+      }
+      await closeLayers();
       const prob = classifyProblem();
       if (prob) throw err(prob.code, prob.msg);
       if (!$(S.editor)) throw err('no_project', 'Abra um projeto do Flow (a caixa de prompt não apareceu).');

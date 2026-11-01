@@ -3,8 +3,10 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.2.8';
-const FLOW_BUILD = '2026-11-01-mapa-referencias'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.0';
+const FLOW_BUILD = '2026-11-01-segura-fila'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+// Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
+const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
 const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;
@@ -210,6 +212,12 @@ async function flowTick() {
       return void (await flowStatus('ensaio', { msg: 'Modo ensaio: lê a conta, mas não gera nada.' }));
     }
 
+    // Depois de um problema de tela (menu aberto, painel diferente), espera antes de pegar o proximo take.
+    const hold = (await chrome.storage.local.get(['flow_hold_until'])).flow_hold_until || 0;
+    if (hold > Date.now()) {
+      return void (await flowStatus('aguardando', { msg: `A tela do Flow não estava pronta; nova tentativa em ${Math.ceil((hold - Date.now()) / 1000)} s. Feche menus e janelas abertos no Flow.` }));
+    }
+
     const claim = await flowApi(c, '/api/flow/agent/claim', { method: 'POST' });
     if (!claim || !claim.job) {
       const why = { empty: 'Nada na fila.', paused: 'Pausado pelo darktube.', gap: 'Aguardando o intervalo entre gerações.', limit_hour: 'Limite por hora atingido.', limit_day: 'Limite diário atingido.', running: 'Há um job em andamento.' };
@@ -274,6 +282,21 @@ async function flowHandleResult(msg) {
   const r = msg.result || {};
   const ids = { jobId: msg.jobId, projectId: cur.projectId };
   try {
+    if (!r.ok && FLOW_UI_CODES.includes(r.code)) {
+      // Problema de tela (menu/janela aberta, painel em outro estado): nao queima o take. Ele volta para a fila e o
+      // agente espera 2 min. So na 3a vez seguida vira rascunho, para o usuario ver.
+      const n = ((await chrome.storage.local.get(['flow_ui_fail'])).flow_ui_fail || 0) + 1;
+      if (n < 3) {
+        await chrome.storage.local.set({ flow_ui_fail: n, flow_hold_until: Date.now() + 120000 });
+        flowLog(`A tela do Flow não estava pronta (${r.error || r.code}). O take volta para a fila; nova tentativa em 2 min (${n}/2).`, { code: r.code }, 'warn', ids);
+        try {
+          await flowApi(c, `/api/flow/agent/jobs/${msg.jobId}/release`, { method: 'POST' });
+        } catch (_) {}
+        return void (await flowStatus('aguardando', { msg: 'A tela do Flow não estava pronta; feche menus e janelas abertos. Nova tentativa em 2 min.' }));
+      }
+      await chrome.storage.local.set({ flow_ui_fail: 0 });
+    }
+    if (r.ok || !FLOW_UI_CODES.includes(r.code)) await chrome.storage.local.set({ flow_ui_fail: 0 });
     if (!r.ok) {
       flowLog('Falha na geração: ' + (r.error || 'sem detalhe'), { code: r.code }, 'error', ids);
       await flowFail(c, msg.jobId, r.error || 'Falha na geração.', r.code);
