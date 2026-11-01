@@ -34,19 +34,64 @@ export function srtTime(sec: number): string {
   return `${p(Math.floor(ms / 3600000))}:${p(Math.floor((ms % 3600000) / 60000))}:${p(Math.floor((ms % 60000) / 1000))},${p(ms % 1000, 3)}`
 }
 
-/** Quebra o texto em linhas curtas para caber na tela vertical. */
+/** Quebra em ate duas linhas equilibradas (no espaco mais perto do meio), sem deixar palavra solta. */
 export function wrapCaption(text: string, maxChars = 30): string {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  const lines: string[] = []
-  let cur = ''
-  for (const w of words) {
-    if ((cur + ' ' + w).trim().length > maxChars && cur) {
-      lines.push(cur)
-      cur = w
-    } else cur = (cur + ' ' + w).trim()
+  const t = text.trim().replace(/\s+/g, ' ')
+  if (t.length <= maxChars) return t
+  const mid = t.length / 2
+  let best = -1
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i
   }
-  if (cur) lines.push(cur)
-  return lines.join('\n')
+  return best < 0 ? t : t.slice(0, best) + '\n' + t.slice(best + 1)
+}
+
+export interface TimedWord {
+  start: number
+  end: number
+  word: string
+}
+
+/**
+ * Palavras com tempo da resposta verbose_json do Whisper. Descarta trechos que o proprio Whisper marca como
+ * provavel nao-fala (musica/ruido costumam gerar texto inventado).
+ */
+export function wordsFromWhisper(json: any): TimedWord[] {
+  const out: TimedWord[] = []
+  const push = (w: any) => {
+    const word = String(w?.word ?? '').trim()
+    const start = Number(w?.start)
+    const end = Number(w?.end)
+    if (word && Number.isFinite(start) && Number.isFinite(end) && end >= start) out.push({ start, end, word })
+  }
+  const segs: any[] = Array.isArray(json?.segments) ? json.segments : []
+  if (segs.some((s) => Array.isArray(s?.words))) {
+    for (const s of segs) {
+      if (Number(s?.no_speech_prob ?? 0) > 0.6 || Number(s?.avg_logprob ?? 0) < -1.2) continue
+      for (const w of s.words || []) push(w)
+    }
+  } else {
+    for (const w of Array.isArray(json?.words) ? json.words : []) push(w)
+  }
+  return out.sort((a, b) => a.start - b.start)
+}
+
+/** Agrupa palavras em frases curtas: quebra apos pontuacao, a cada maxWords palavras ou numa pausa longa. */
+export function cuesFromWords(words: TimedWord[], maxWords = 6, maxGap = 0.7): Cue[] {
+  const cues: Cue[] = []
+  let cur: TimedWord[] = []
+  const flush = () => {
+    if (cur.length) cues.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cur.map((w) => w.word).join(' ') })
+    cur = []
+  }
+  for (const w of words) {
+    if (cur.length && w.start - cur[cur.length - 1].end > maxGap) flush()
+    cur.push(w)
+    if (cur.length >= maxWords || (cur.length >= 3 && /[.!?;:…]$/.test(w.word))) flush()
+  }
+  flush()
+  // Uma folga curta no fim de cada frase, sem invadir a seguinte.
+  return cues.map((c, i) => ({ ...c, end: Math.min(c.end + 0.15, cues[i + 1] ? cues[i + 1].start - 0.02 : c.end + 0.15) }))
 }
 
 export function buildSrt(cues: Cue[]): string {
@@ -170,6 +215,33 @@ async function detectVoice(file: string, duration: number) {
   }
 }
 
+// Servidor Whisper proprio (API compativel com a da OpenAI). FLOW_WHISPER_URL=off desliga.
+const whisperUrl = () => process.env.FLOW_WHISPER_URL || 'https://whisper.fjt-solutions.com/v1/audio/transcriptions'
+
+/** Transcreve o audio do video com tempo por palavra. Null se o servidor falhar ou nao achar fala. */
+async function transcribeWhisper(file: string, language?: string): Promise<TimedWord[] | null> {
+  const url = whisperUrl()
+  if (url === 'off') return null
+  try {
+    // So o audio, mono 16 kHz: arquivo pequeno e e o formato que o Whisper usa por dentro.
+    const audio = path.join(path.dirname(file), 'speech.m4a')
+    await run(ffmpegBin(), ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '64k', audio], { timeout: 120000 })
+    const fd = new FormData()
+    fd.append('file', new Blob([fs.readFileSync(audio)], { type: 'audio/mp4' }), 'speech.m4a')
+    fd.append('model', process.env.FLOW_WHISPER_MODEL || 'Systran/faster-whisper-medium')
+    fd.append('response_format', 'verbose_json')
+    fd.append('timestamp_granularities[]', 'word')
+    if (language) fd.append('language', language)
+    const res = await fetch(url, { method: 'POST', body: fd, signal: AbortSignal.timeout(300000) })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const words = wordsFromWhisper(await res.json())
+    return words.length ? words : null
+  } catch (err: any) {
+    console.log(`[Flow] whisper indisponível, usando o texto do roteiro: ${String(err?.message || err).slice(0, 120)}`)
+    return null
+  }
+}
+
 async function readStored(url: string): Promise<Buffer> {
   const filename = decodeURIComponent(url.split('/').pop() || '')
   const { rows } = await pool.query(`SELECT content FROM public.storage_files WHERE filename = $1`, [filename])
@@ -222,10 +294,17 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
-    // Legenda a partir das falas do roteiro, com a duracao real de cada clipe.
+    // Legenda: 1) transcricao com tempo por palavra (Whisper) do video ja unido; mostra o que e falado, quando e falado.
+    // 2) sem Whisper, cai no texto do roteiro com a janela medida/estimada por take.
     const cues: Cue[] = []
+    const hasLines = t.mode !== 'ambiente' && takes.some((k) => k.line.trim())
+    const words = hasLines ? await transcribeWhisper(joined, String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined) : null
+    if (words) {
+      cues.push(...cuesFromWords(words))
+      console.log(`[Flow] legenda: whisper ${words.length} palavras em ${cues.length} frases`)
+    }
     let at = 0
-    for (let i = 0; i < takes.length; i++) {
+    for (let i = 0; i < takes.length && !words; i++) {
       const k = takes[i]
       if (t.mode !== 'ambiente' && k.line.trim()) {
         const dur = durations[i]
