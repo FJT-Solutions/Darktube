@@ -432,9 +432,13 @@
       ...(tile.shadowRoot ? Array.from(tile.shadowRoot.querySelectorAll('*')) : []),
     ];
     for (const el of allDesc) {
+      // Posters (<img>) tambem moram em storage.googleapis.com: nunca sao o video.
+      if (el.tagName === 'IMG' || el.tagName === 'PICTURE') continue;
       for (const attr of ['src', 'data-src', 'data-video-url', 'data-url', 'data-media-url', 'data-download-url']) {
         const val = el.getAttribute ? el.getAttribute(attr) : '';
-        if (val && (/\.mp4\b/i.test(val) || /storage\.googleapis\.com/i.test(val) || /blob:https/i.test(val))) {
+        const looksVideo = /\.(mp4|webm)\b/i.test(val || '') || /\/video\//i.test(val || '') || /^blob:/i.test(val || '');
+        const looksImage = /\.(png|jpe?g|webp|gif)\b/i.test(val || '') || /\/image\//i.test(val || '');
+        if (val && looksVideo && !looksImage) {
           if (!knownOldUrls || !knownOldUrls.has(val)) return val;
         }
       }
@@ -656,26 +660,301 @@
     return m ? Number(m[1]) : null;
   }
 
-  function isTileGenerating(tile) {
-    if (!tile) return false;
-    if (tile.matches && tile.matches(S.pendingTile)) return true;
-    if ($('mat-spinner, mat-progress-spinner, mat-progress-bar, [role=progressbar], .mat-mdc-progress-spinner, .mat-mdc-progress-bar, .spinner', tile)) {
-      return true;
-    }
+  // Estado de um tile da galeria. "8%" sozinho tambem conta como gerando (o \b depois do % nao casava).
+  const GEN_RX = /(\d{1,3}\s?%|\bgenerating\b|\bgerando\b|\bcriando\b|\bloading\b|\bqueued\b|\bna fila\b)/i;
+  const RES_RX = /\b\d{3,4}p\b/i;
+  function tileState(tile) {
     const t = txt(tile);
-    if (/\b(\d{1,3}%|generating|gerando|criando|loading)\b/i.test(t)) {
-      return true;
-    }
+    const spinner = !!$('mat-spinner, mat-progress-spinner, mat-progress-bar, [role=progressbar], .mat-mdc-progress-spinner, .mat-mdc-progress-bar, .spinner', tile);
+    const pending = !!(tile.matches && tile.matches(S.pendingTile));
     const img = $('img', tile);
-    const hasImage = img && (img.naturalWidth > 40 || (img.src && !img.src.startsWith('data:')));
-    const hasVideo = $('video', tile);
-    const hasBadge = /\b(360p|720p|1080p|\d+s)\b/i.test(t);
-    const hasPlay = $$('mat-icon, button, [role=button]', tile).some((el) => /play/i.test(txt(el)) || /play|reproduzir/i.test(el.getAttribute('aria-label') || ''));
+    const hasImg = !!img && (img.naturalWidth > 40 || (img.src && !img.src.startsWith('data:')));
+    const hasVideo = !!$('video', tile);
+    return { generating: pending || spinner || GEN_RX.test(t), hasImg, hasVideo, badge: RES_RX.test(t), text: t.slice(0, 60) };
+  }
+  function isTileGenerating(tile) {
+    return !!tile && tileState(tile).generating;
+  }
 
-    if (!hasImage && !hasVideo && !hasBadge && !hasPlay) {
-      return true;
+  // ---------- visualizador do Flow (tela inteira dentro da pagina, nao e um dialogo) ----------
+
+  function realClick(node) {
+    if (!node) return;
+    try {
+      const r = node.getBoundingClientRect ? node.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+      const clientX = r.left + r.width / 2;
+      const clientY = r.top + r.height / 2;
+      const mo = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+      const po = { ...mo, pointerType: 'mouse', isPrimary: true };
+      node.dispatchEvent(new PointerEvent('pointerdown', po));
+      node.dispatchEvent(new MouseEvent('mousedown', mo));
+      node.dispatchEvent(new PointerEvent('pointerup', po));
+      node.dispatchEvent(new MouseEvent('mouseup', mo));
+      node.dispatchEvent(new MouseEvent('click', mo)); // um unico clique: dois cliques fechariam o que o primeiro abriu
+    } catch (_) {}
+  }
+
+  // O <video> do visualizador: visivel, com fonte, e fora de qualquer tile da galeria.
+  function viewerVideoEl() {
+    return (
+      $$('video').find((v) => {
+        if (!vis(v) || v.closest(S.videoTile) || v.closest(S.imageTile)) return false;
+        const s = getVideoSrc(v);
+        return !!s && s.length > 5 && !s.startsWith('data:');
+      }) || null
+    );
+  }
+
+  async function closeViewer() {
+    for (let i = 0; i < 3; i++) {
+      if (!viewerVideoEl()) return true;
+      const clean = (b) => txt(b).replace(/^[a-z]+(?:_[a-z0-9]+)*\s+/, '');
+      const done = $$('button, [role=button]').find((b) => vis(b) && /^(done|concluído|concluido|concluir|fechar|close)$/i.test(clean(b)));
+      const back = $$('button').find((b) => {
+        if (!vis(b)) return false;
+        const ic = $('mat-icon', b);
+        return (ic && txt(ic) === 'arrow_back') || /^(back|voltar)$/i.test(b.getAttribute('aria-label') || '');
+      });
+      const target = done || back;
+      dtLog(target ? 'Fechando o visualizador pelo botão.' : 'Fechando o visualizador com Escape.', { botao: target ? clean(target) || 'voltar' : 'Escape' });
+      if (target) realClick(target);
+      else pressEscape();
+      await until(() => !viewerVideoEl(), 4000, 300);
     }
-    return false;
+    const closed = !viewerVideoEl();
+    if (!closed) dtLog('O visualizador não fechou.', null, 'warn');
+    return closed;
+  }
+
+  const normText = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+  // Texto da pagina SEM a caixa de prompt e campos de entrada: ela ainda guarda o prompt digitado
+  // e faria qualquer visualizador parecer o certo.
+  function pageTextWithoutInputs() {
+    const clone = document.body.cloneNode(true);
+    clone.querySelectorAll('[contenteditable], textarea, input, flow-base-prompt-box, flow-prompt-box, script, style, noscript').forEach((e) => e.remove());
+    return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  // O visualizador mostra o prompt do video aberto. Compara com o prompt do job para nao pegar o take de outro projeto.
+  function promptMatches(prompt, bodyText) {
+    const p = normText(prompt);
+    const b = normText(bodyText);
+    const m = /\[scene \d+ of \d+\]/i.exec(p);
+    if (!m) return { known: false };
+    const i = b.indexOf(m[0]);
+    if (i < 0) return { known: false };
+    let seg = b.slice(i, i + 240);
+    const cut = seg.search(/\.\.\.|…/);
+    if (cut >= 40) seg = seg.slice(0, cut);
+    seg = seg.trim();
+    if (seg.length < 40) return { known: false, seg };
+    return { known: true, match: p.startsWith(seg.slice(0, 160)), seg: seg.slice(0, 90) };
+  }
+
+  // Confere os primeiros bytes: MP4 tem "ftyp" na posicao 4; WebM comeca com 1A 45 DF A3.
+  async function looksLikeVideo(blob) {
+    try {
+      const b = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+      const ascii = String.fromCharCode(...b.slice(4, 8));
+      return ascii === 'ftyp' || (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3);
+    } catch (_) {
+      return /^video\//i.test(blob.type || '');
+    }
+  }
+
+  async function fetchMedia(kind, src) {
+    try {
+      const res = await fetch(src, { credentials: 'include' });
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      if (blob.size > MAX_BYTES) throw err('too_big', 'Arquivo grande demais.');
+      if (kind === 'video' && !(await looksLikeVideo(blob))) {
+        dtLog('O arquivo lido não é um vídeo (provavelmente a miniatura). Descartado.', { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'error');
+        throw err('not_video', 'O arquivo encontrado não é um vídeo.');
+      }
+      dtLog('Mídia lida pela página com sucesso.', { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'success');
+      return { ok: true, kind, mime: blob.type, b64: await blobToB64(blob) };
+    } catch (e) {
+      if (e && (e.code === 'too_big' || e.code === 'not_video')) throw e;
+      if (/^https?:/i.test(src)) {
+        dtLog('A página não deixou ler a mídia; o background baixará pela URL.', { url: shortUrl(src), reason: String((e && e.message) || e) }, 'warn');
+        return { ok: true, kind, url: src };
+      }
+      dtLog('Não consegui ler a mídia gerada.', { url: shortUrl(src), reason: String((e && e.message) || e) }, 'error');
+      throw err('capture_failed', 'Não consegui ler a mídia gerada.');
+    }
+  }
+
+  // ---------- retrato da pagina: estrutura compacta e SEM dados pessoais, enviada ao log ----------
+
+  const SNAP_MAX_NODES = 220;
+  const SNAP_MAX_DEPTH = 9;
+  const SNAP_CHUNK = 4500; // o log aceita 8000 caracteres por entrada (com o escape do JSON)
+
+  function snapClean(s) {
+    return String(s || '')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '<email>')
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<uuid>')
+      .replace(/\b[A-Za-z0-9_-]{28,}\b/g, '<token>');
+  }
+
+  // Endereco de midia: so o host e o fim do caminho, nunca a parte assinada (?query).
+  function snapUrl(u) {
+    try {
+      if (/^blob:/i.test(u)) return 'blob:';
+      if (/^data:/i.test(u)) return 'data:';
+      const x = new URL(u, location.href);
+      return x.host + '/…/' + x.pathname.split('/').slice(-2).join('/');
+    } catch (_) {
+      return String(u).slice(0, 40);
+    }
+  }
+
+  function ancestor(el, n) {
+    let e = el;
+    for (let i = 0; i < n && e && e.parentElement && e.parentElement !== document.body; i++) e = e.parentElement;
+    return e;
+  }
+
+  function snapOutline(root) {
+    if (!root) return [];
+    const lines = [];
+    let nodes = 0;
+    const walk = (el, depth) => {
+      if (nodes >= SNAP_MAX_NODES || depth > SNAP_MAX_DEPTH) return;
+      const tag = el.tagName.toLowerCase();
+      if (/^(script|style|noscript|svg|path|defs|link|meta)$/.test(tag)) return;
+      nodes++;
+      const cls = (typeof el.className === 'string' ? el.className : '')
+        .split(/\s+/)
+        .filter((c) => c && !/^ng-|^_ng|^cdk-|^mat-mdc-(?!button|menu)/.test(c))
+        .slice(0, 3)
+        .join('.');
+      let s = '  '.repeat(depth) + tag + (cls ? '.' + cls : '');
+      for (const a of ['role', 'aria-label', 'aria-selected', 'aria-checked', 'aria-pressed', 'aria-disabled', 'disabled', 'type', 'data-media-id']) {
+        const v = el.getAttribute && el.getAttribute(a);
+        if (v != null && v !== '') s += `[${a}=${a === 'data-media-id' ? String(v).slice(0, 6) : snapClean(v).slice(0, 30)}]`;
+      }
+      if (/^(img|video|source|a|iframe)$/.test(tag)) {
+        const u = el.currentSrc || el.getAttribute('src') || el.getAttribute('href');
+        if (u) s += ` @${snapClean(snapUrl(u))}`;
+      }
+      if (tag === 'video') s += ` rs=${el.readyState}`;
+      const own = Array.from(el.childNodes)
+        .filter((n) => n.nodeType === 3)
+        .map((n) => n.textContent)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (own) s += ` "${snapClean(own).slice(0, 40)}"`;
+      lines.push(s);
+      for (const c of el.children) walk(c, depth + 1);
+      if (el.shadowRoot) for (const c of el.shadowRoot.children) walk(c, depth + 1);
+    };
+    walk(root, 0);
+    return lines;
+  }
+
+  // Envia o retrato de uma regiao ao log (em ate 3 partes). Devolve quantas partes foram geradas.
+  function dtSnapshot(label, root, level = 'info') {
+    const lines = snapOutline(root);
+    if (!lines.length) {
+      dtLog(`Retrato "${label}": região não encontrada.`, null, 'warn');
+      return 0;
+    }
+    const text = lines.join('\n');
+    const parts = [];
+    for (let i = 0; i < text.length; i += SNAP_CHUNK) parts.push(text.slice(i, i + SNAP_CHUNK));
+    const sent = parts.slice(0, 3);
+    sent.forEach((p, i) => dtLog(`Retrato "${label}" (${i + 1}/${sent.length})`, { outline: p, nos: lines.length }, level));
+    return sent.length;
+  }
+
+  function snapshotFailure(tile) {
+    dtSnapshot('galeria: tile candidato e vizinhos', ancestor(tile, 2), 'warn');
+    const v = viewerVideoEl();
+    if (v) dtSnapshot('visualizador aberto', ancestor(v, 6), 'warn');
+  }
+
+  // Retrato manual (botao do popup): tudo o que estiver na tela agora.
+  function snapshotAll() {
+    let parts = 0;
+    const ed = $(S.editor);
+    if (ed) parts += dtSnapshot('caixa de prompt', ancestor(ed, 3));
+    const panel = panelEl();
+    parts += panel ? dtSnapshot('painel de ajustes', panel) : 0;
+    const tile = $(S.videoTile) || $(S.imageTile);
+    if (tile) parts += dtSnapshot('galeria: primeiro tile e vizinhos', ancestor(tile, 2));
+    const gen = $$(S.videoTile).find((t) => tileState(t).generating);
+    if (gen) parts += dtSnapshot('tile gerando', gen);
+    const v = viewerVideoEl();
+    if (v) parts += dtSnapshot('visualizador', ancestor(v, 6));
+    dtLog('Retrato da página concluído.', { partes: parts, rota: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') }, 'success');
+    return parts;
+  }
+
+  // Captura do video: abre o visualizador de cada candidato (do mais novo para o mais antigo),
+  // confere o prompt, le o <video> e fecha pelo botao Done.
+  async function captureVideo(job, candidates, knownOldUrls) {
+    const list = candidates.slice(0, 4);
+    let snappedGallery = false;
+    let snappedViewer = false;
+    for (let n = 0; n < list.length; n++) {
+      const tile = list[n];
+      dtLog(`Captura do vídeo: candidato ${n + 1}/${list.length}.`, describeTile(tile));
+      try {
+        tile.scrollIntoView({ block: 'center', behavior: 'instant' });
+      } catch (_) {}
+      await sleep(400);
+
+      // Se o proprio tile ja traz o <video> com fonte, usa direto.
+      const direct = getVideoSourceFromTile(tile, knownOldUrls);
+      if (direct) {
+        dtLog('Vídeo encontrado dentro do próprio tile.', { url: shortUrl(direct) });
+        return fetchMedia('video', direct);
+      }
+
+      realClick($('img', tile) || tile);
+      const v = await until(() => viewerVideoEl(), 15000, 400);
+      if (!v) {
+        dtLog('O visualizador não abriu ou não trouxe <video>.', { tile: describeTile(tile) }, 'warn');
+        if (!snappedGallery) {
+          snappedGallery = true;
+          snapshotFailure(tile);
+        }
+        await closeViewer();
+        continue;
+      }
+      await sleep(600);
+      const body = pageTextWithoutInputs();
+      const pm = promptMatches(job.prompt, body);
+      const src = getVideoSrc(v);
+      dtLog('Visualizador aberto.', { src: shortUrl(src), prompt: pm, texto: body.slice(0, 160) });
+      if (pm.known && !pm.match) {
+        dtLog('Este visualizador é de outro take; tentando o próximo candidato.', { visto: pm.seg }, 'warn');
+        await closeViewer();
+        continue;
+      }
+      if (!pm.known) {
+        dtLog('Não consegui conferir o prompt no visualizador; aceitando o candidato mais novo.', { prompt: pm }, 'warn');
+        if (!snappedViewer) {
+          snappedViewer = true;
+          dtSnapshot('visualizador (prompt não localizado)', ancestor(v, 6), 'warn');
+        }
+      }
+      try {
+        const out = await fetchMedia('video', src);
+        await closeViewer();
+        return out;
+      } catch (e) {
+        await closeViewer();
+        throw e;
+      }
+    }
+    if (!snappedGallery && list[0]) snapshotFailure(list[0]);
+    dtLog('Captura falhou: nenhum candidato rendeu um vídeo.', { candidatos: list.length, html: String((list[0] && list[0].outerHTML) || '').slice(0, 1200) }, 'error');
+    throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
   }
 
   async function generate(job) {
@@ -718,6 +997,7 @@
     const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
     const t0 = Date.now();
     let lastShape = '';
+    const readySince = new Map();
     for (;;) {
       await sleep(2500);
       const prob = classifyProblem();
@@ -734,26 +1014,37 @@
         // O Google Flow insere novos videos no INICIO da galeria (topo/esquerda).
         // Filtra somente tiles que NAO existiam antes deste clique:
         const newTiles = currentTiles.filter((t) => !t.hasAttribute('data-dt-old') && !prevTiles.has(t) && !prevFps.has(tileFp(t)));
-        const bad = newTiles.find((t) => !isTileGenerating(t) && RX.failure.test(txt(t)));
-        if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
+        const states = newTiles.map((t) => ({ t, s: tileState(t) }));
+        const bad = states.find((x) => !x.s.generating && RX.failure.test(txt(x.t)));
+        if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad.t).slice(0, 180));
 
-        const pending = newTiles.filter(isTileGenerating);
-        const ready = newTiles.filter((t) => !isTileGenerating(t));
-        const shape = `${currentTiles.length}/${newTiles.length}/${pending.length}/${ready.length}`;
+        const now = Date.now();
+        for (const x of states) {
+          if (!x.s.generating && (x.s.badge || x.s.hasImg || x.s.hasVideo)) {
+            if (!readySince.has(x.t)) readySince.set(x.t, now);
+          } else readySince.delete(x.t);
+        }
+        const pending = states.filter((x) => x.s.generating);
+        // Pronto = sem "%"/spinner, com o selo de resolucao (ou imagem) e estavel por alguns segundos.
+        const stable = (x) => readySince.has(x.t) && now - readySince.get(x.t) >= 4000 && (x.s.badge || x.s.hasVideo || now - readySince.get(x.t) >= 15000);
+        const readyTiles = states.filter(stable).map((x) => x.t);
+        // Um tile que acabou de ficar pronto ainda esta "esquentando": espera, para nao capturar so os outros.
+        const warming = states.filter((x) => readySince.has(x.t) && !stable(x));
+        const shape = `${currentTiles.length}/${newTiles.length}/${pending.length}/${readyTiles.length}`;
         if (shape !== lastShape) {
           lastShape = shape;
-          dtLog('Tiles depois de gerar.', { total: currentTiles.length, novos: newTiles.length, gerando: pending.length, prontos: ready.length, segundos: Math.round((Date.now() - t0) / 1000) });
+          dtLog('Tiles depois de gerar.', { total: currentTiles.length, novos: newTiles.length, gerando: pending.length, prontos: readyTiles.length, estados: states.slice(0, 4).map((x) => x.s), segundos: Math.round((now - t0) / 1000) });
         }
-        if (ready.length >= count && pending.length === 0) {
-          // O take novo fica sempre na posicao 0 (topo da galeria)
-          const targetTile = ready[0];
-          dtLog('Tile gerado detectado.', describeTile(targetTile), 'success');
-          const out = await capture('video', targetTile, knownOldUrls);
-          targetTile.setAttribute('data-dt-seen', '1');
-          targetTile.setAttribute('data-dt-old', '1');
-          seenTileKeys.add(tileKey(targetTile));
-          prevTiles.add(targetTile);
-          prevFps.add(tileFp(targetTile));
+        if (readyTiles.length >= count && pending.length === 0 && warming.length === 0) {
+          dtLog('Tile gerado detectado.', describeTile(readyTiles[0]), 'success');
+          const out = await captureVideo(job, readyTiles, knownOldUrls);
+          for (const t of readyTiles) {
+            t.setAttribute('data-dt-seen', '1');
+            t.setAttribute('data-dt-old', '1');
+            seenTileKeys.add(tileKey(t));
+            prevTiles.add(t);
+            prevFps.add(tileFp(t));
+          }
           await closeLayers();
           return { ...out, costHint: hint };
         }
@@ -766,6 +1057,7 @@
     curJob = job;
     try {
       dtLog('Job iniciado na aba do Flow.', { kind: job.kind, take: job.take_index, params: job.params });
+      await closeViewer(); // um visualizador esquecido aberto esconderia a galeria e a caixa de prompt
       const prob = classifyProblem();
       if (prob) throw err(prob.code, prob.msg);
       if (!$(S.editor)) throw err('no_project', 'Abra um projeto do Flow (a caixa de prompt não apareceu).');
@@ -871,6 +1163,14 @@
   let running = false;
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string') return;
+    if (msg.type === 'FLOW_SNAPSHOT') {
+      try {
+        sendResponse({ ok: true, partes: snapshotAll() });
+      } catch (e) {
+        sendResponse({ ok: false, error: String((e && e.message) || e) });
+      }
+      return;
+    }
     if (msg.type === 'FLOW_PING') {
       sendResponse({ ok: true, ready: !!$(S.editor), busy: running, path: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') });
       return;

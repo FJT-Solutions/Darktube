@@ -3,7 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.1.0';
+const FLOW_VERSION = '1.2.1';
+const FLOW_BUILD = '2026-10-31-retrato'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 const FLOW_ALARM = 'flow-tick';
 const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;
@@ -14,12 +15,13 @@ const flowJson = { 'Content-Type': 'application/json' };
 let flowTicking = false;
 
 // ---------- logs: tudo que a extensao faz vai para o painel do darktube ----------
-const FLOW_LOG_FLUSH_MS = 1000;
+const FLOW_LOG_FLUSH_MS = 400;
 const FLOW_LOG_BUFFER_MAX = 300;
 let flowLogBuf = [];
 let flowLogTimer = null;
 let flowLogFlushing = false;
 let flowLastTickLog = '';
+let flowForceLogsUntil = 0;
 
 function flowLog(message, data, level, ids) {
   flowLogBuf.push({
@@ -46,16 +48,25 @@ async function flowLogFlush() {
   if (flowLogFlushing || !flowLogBuf.length) return;
   flowLogFlushing = true;
   const batch = flowLogBuf.splice(0, 100);
+  const stat = async (o) => {
+    try {
+      await chrome.storage.local.set({ flow_logstat: { at: Date.now(), ...o } });
+    } catch (_) {}
+  };
   try {
     const c = await flowCfg();
-    if (!c.darktube_token) return; // sem login nao ha para onde mandar: descarta
+    if (!c.darktube_token) return await stat({ ok: false, err: 'sem login no popup' }); // sem login nao ha para onde mandar: descarta
+    // agente desligado: nada e enviado, exceto durante um retrato manual pedido pelo usuario
+    if (!c.flow_enabled && Date.now() > flowForceLogsUntil) return await stat({ ok: true, off: true });
     const res = await fetch(c.base + '/api/flow/agent/logs', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + c.darktube_token, ...flowJson },
       body: JSON.stringify({ logs: batch }),
     });
+    await stat({ ok: res.ok, status: res.status, sent: batch.length });
     if (!res.ok && res.status !== 401) throw new Error(String(res.status));
   } catch (e) {
+    await stat({ ok: false, err: String((e && e.message) || e).slice(0, 80) });
     flowLogBuf = batch.concat(flowLogBuf).slice(-FLOW_LOG_BUFFER_MAX); // sem rede: tenta de novo no proximo envio
   } finally {
     flowLogFlushing = false;
@@ -90,7 +101,7 @@ async function flowApi(c, path, init) {
 }
 
 async function flowHeartbeat(c, caps) {
-  const body = { version: FLOW_VERSION, mode: c.flow_live ? 'live' : 'dry' };
+  const body = { version: FLOW_VERSION, build: FLOW_BUILD, mode: c.flow_live ? 'live' : 'dry' };
   const cached = caps || (c.flow_caps && c.flow_caps.data);
   if (cached) body.capabilities = cached;
   return flowApi(c, '/api/flow/agent/heartbeat', { method: 'POST', headers: flowJson, body: JSON.stringify(body) });
@@ -141,10 +152,13 @@ async function flowAsk(tabId, msg) {
   return res;
 }
 
+flowLog('Agente Flow iniciado.', { version: FLOW_VERSION, build: FLOW_BUILD }, 'info');
+
 async function flowTick() {
   if (flowTicking) return;
   flowTicking = true;
   try {
+    flowLogFlush(); // garante o envio de logs que ficaram para tras
     const c = await flowCfg();
     if (!c.darktube_token || !c.flow_enabled) return void (await flowStatus('desligado'));
 
@@ -304,6 +318,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else {
         sendResponse({ ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
       }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_SNAPSHOT_NOW') {
+    // Espera alguns segundos para o usuario deixar a tela no estado desejado (painel aberto, tile gerando...).
+    (async () => {
+      const tab = await flowFindTab();
+      if (!tab) return sendResponse({ ok: false, error: 'Abra o Google Flow primeiro.' });
+      const wait = Math.min(Math.max(Number(msg.delayMs) || 6000, 0), 15000);
+      flowForceLogsUntil = Date.now() + wait + 30000;
+      await new Promise((r) => setTimeout(r, wait));
+      const r = await flowAsk(tab.id, { type: 'FLOW_SNAPSHOT' });
+      await flowLogFlush();
+      sendResponse(r && r.ok ? { ok: true, partes: r.partes } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
     })();
     return true;
   }

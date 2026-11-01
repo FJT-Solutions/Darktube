@@ -462,13 +462,28 @@ document.addEventListener('DOMContentLoaded', () => {
     ensaio: 'Ensaio: lê a conta, não gera nada.', aguardando: 'Aguardando trabalho.', gerando: 'Gerando no Flow...',
     ocupado: 'Página ocupada.', concluido: 'Último job concluído.', falhou: 'Último job falhou.', erro: 'Erro.',
   };
-  const render = (s) => {
-    if (!s) return void (st.textContent = 'Desligado.');
-    st.textContent = (LABEL[s.state] || s.state) + (s.msg ? ' ' + s.msg : '');
+  // Linha de diagnostico: versao da extensao e resultado do ultimo envio de logs para o darktube.
+  let logLine = '';
+  const renderLog = (ls) => {
+    const v = chrome.runtime.getManifest().version;
+    if (!ls) logLine = `v${v} · logs: nenhum envio ainda`;
+    else {
+      const hh = new Date(ls.at).toLocaleTimeString('pt-BR');
+      logLine = ls.off
+        ? `v${v} · logs: pausados (agente desligado)`
+        : `v${v} · logs: ${ls.ok ? 'enviados' : 'FALHA ' + (ls.status || ls.err || '')} às ${hh}`;
+    }
   };
-  chrome.storage.local.get(['flow_enabled', 'flow_live', 'flow_status'], (r) => {
+  let lastStatus = null;
+  const render = (s) => {
+    lastStatus = s;
+    const base = !s ? 'Desligado.' : (LABEL[s.state] || s.state) + (s.msg ? ' ' + s.msg : '');
+    st.textContent = base + ' ' + logLine;
+  };
+  chrome.storage.local.get(['flow_enabled', 'flow_live', 'flow_status', 'flow_logstat'], (r) => {
     en.checked = !!r.flow_enabled;
     live.checked = !!r.flow_live;
+    renderLog(r.flow_logstat);
     render(r.flow_status);
   });
   en.addEventListener('change', () => {
@@ -489,7 +504,24 @@ document.addEventListener('DOMContentLoaded', () => {
       st.textContent = resp && resp.ok ? 'Conta lida e enviada ao darktube.' : (resp && resp.error) || 'Não foi possível ler a conta.';
     });
   });
+  const snapBtn = document.getElementById('flow-snap-btn');
+  if (snapBtn) {
+    snapBtn.addEventListener('click', () => {
+      snapBtn.disabled = true;
+      st.textContent = 'Retrato em 6 segundos: deixe a página do Flow no estado que quer registrar...';
+      chrome.runtime.sendMessage({ type: 'FLOW_SNAPSHOT_NOW', delayMs: 6000 }, (resp) => {
+        snapBtn.disabled = false;
+        st.textContent = resp && resp.ok
+          ? `Retrato enviado ao log do darktube (${resp.partes} parte(s)).`
+          : (resp && resp.error) || 'Não foi possível salvar o retrato.';
+      });
+    });
+  }
   chrome.storage.onChanged.addListener((ch) => {
+    if (ch.flow_logstat) {
+      renderLog(ch.flow_logstat.newValue);
+      render(lastStatus);
+    }
     if (ch.flow_status) render(ch.flow_status.newValue);
   });
 });
