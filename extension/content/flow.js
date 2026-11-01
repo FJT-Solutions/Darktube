@@ -743,6 +743,71 @@
     }
   }
 
+  // Endereco do poster do tile sem sufixo (?query ou "=..."): a URL do video usa o mesmo codigo com outro sufixo.
+  function tileThumbBase(tile) {
+    const img = $('img', tile);
+    const src = img ? img.currentSrc || img.src || '' : '';
+    if (!/^https?:/i.test(src)) return '';
+    return src.split('?')[0].split('=')[0];
+  }
+
+  // Possiveis URLs do video do tile: o que a pagina ja pediu com o codigo do poster (ex.: ...=mm,18,15),
+  // midia de video pedida depois do clique e, por fim, sufixos de formato conhecidos do Google.
+  function videoUrlCandidates(base, sinceMs) {
+    const out = [];
+    const seen = new Set();
+    const add = (url, from) => {
+      if (url && !seen.has(url) && /^https?:/i.test(url)) {
+        seen.add(url);
+        out.push({ url, from });
+      }
+    };
+    let entries = [];
+    try {
+      entries = performance.getEntriesByType('resource').slice().reverse();
+    } catch (_) {}
+    if (base) {
+      for (const e of entries) {
+        if (e.initiatorType !== 'img' && e.name.startsWith(base) && e.name.length > base.length) add(e.name, 'timeline-poster');
+      }
+    }
+    for (const u of mediaFromTimeline(sinceMs)) add(u, 'timeline-midia');
+    if (base) {
+      for (const suf of ['=mm,18,15', '=m18', '=m22']) add(base + suf, 'palpite');
+    }
+    return out;
+  }
+
+  // Le a URL e confere os bytes sem registrar erro: devolve { blob } se for video, ou { why }.
+  async function probeVideoUrl(u) {
+    try {
+      const res = await fetch(u, { credentials: 'include' });
+      if (!res.ok) return { why: 'http ' + res.status };
+      const blob = await res.blob();
+      if (blob.size > MAX_BYTES) return { why: 'grande demais ' + blob.size };
+      if (!(await looksLikeVideo(blob))) return { why: `não é vídeo (${blob.type || '?'}, ${blob.size} bytes)` };
+      return { blob };
+    } catch (e) {
+      return { why: String((e && e.message) || e).slice(0, 60) };
+    }
+  }
+
+  // Diagnostico: abre o menu "Download media" do visualizador, registra as opcoes e fecha com Escape.
+  async function snapshotDownloadMenu() {
+    const btn = $$('button').find((b) => vis(b) && /download/i.test(b.getAttribute('aria-label') || ''));
+    if (!btn) {
+      dtLog('Botão de download não encontrado no visualizador.', null, 'warn');
+      return;
+    }
+    realClick(btn);
+    await sleep(900);
+    const overlay = $('.cdk-overlay-container');
+    if (overlay && txt(overlay)) dtSnapshot('menu de download', overlay, 'warn');
+    else dtLog('O botão de download não abriu um menu.', null, 'warn');
+    pressEscape();
+    await sleep(300);
+  }
+
   // O player pode so mostrar o poster ate alguem clicar em play: tenta o palco e botoes de play fora da galeria.
   function tryPlayViewer() {
     const stage = viewerStage();
@@ -977,6 +1042,7 @@
     const list = candidates.slice(0, 4);
     let snappedGallery = false;
     let snappedViewer = false;
+    let snappedMenu = false;
     for (let n = 0; n < list.length; n++) {
       const tile = list[n];
       dtLog(`Captura do vídeo: candidato ${n + 1}/${list.length}.`, describeTile(tile));
@@ -992,25 +1058,57 @@
         return fetchMedia('video', direct);
       }
 
+      const thumbBase = tileThumbBase(tile);
+      // Primeiro tenta o arquivo direto, sem abrir a tela de edicao: so URLs ligadas ao poster DESTE tile
+      // (a midia solta da timeline pode ser de outro take, entao fica de fora).
+      const pre = videoUrlCandidates(thumbBase, Infinity);
+      if (pre.length) {
+        dtLog('Testando o arquivo direto, sem abrir o visualizador.', { candidatos: pre.map((c) => ({ de: c.from, url: snapClean(snapUrl(c.url)) })) });
+        for (const c of pre.slice(0, 6)) {
+          const r = await probeVideoUrl(c.url);
+          dtLog(r.blob ? 'Mídia de vídeo lida (direto).' : 'URL descartada (direto).', { de: c.from, url: snapClean(snapUrl(c.url)), motivo: r.why, bytes: r.blob ? r.blob.size : undefined }, r.blob ? 'success' : 'info');
+          if (r.blob) return { ok: true, kind: 'video', mime: r.blob.type || 'video/mp4', b64: await blobToB64(r.blob) };
+        }
+      }
+
       const clickedAt = performance.now();
       realClick($('img', tile) || tile);
-      let v = await until(() => viewerVideoEl(), 8000, 400);
-      if (!v && viewerOpen()) {
-        // Abriu a rota de edicao mas o <video> nao apareceu: o player pode esperar um play.
+      // A rota de edicao pode demorar a abrir: espera ate 12 s e repete o clique uma vez se nada mudou em 6 s.
+      let opened = await until(() => viewerOpen(), 6000, 300);
+      if (!opened) {
+        dtLog('O clique não abriu o visualizador; clicando de novo.', { rota: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') }, 'warn');
+        realClick($('img', tile) || tile);
+        opened = await until(() => viewerOpen(), 6000, 300);
+      }
+      let v = opened ? await until(() => viewerVideoEl(), 3000, 300) : null;
+      if (!v && opened) {
+        // O Scene Builder desenha o video num <canvas> e so mostra o poster ate o play: tenta o play.
         tryPlayViewer();
-        v = await until(() => viewerVideoEl(), 8000, 400);
+        v = await until(() => viewerVideoEl(), 4000, 300);
       }
       let src = v ? getVideoSrc(v) : '';
-      if (!src && viewerOpen()) {
-        // Ultimo recurso: a midia que a pagina acabou de baixar (imagens ficam de fora).
-        const urls = mediaFromTimeline(clickedAt - 500).slice(0, 3);
-        dtLog('Sem <video>; procurando mídia baixada pela página.', { encontradas: urls.map((u) => snapClean(snapUrl(u))) });
-        for (const u of urls) {
-          try {
-            const out = await fetchMedia('video', u);
+      if (!src && opened) {
+        // Sem <video>: procura o arquivo pela URL do tile (midia que a propria pagina pediu) e confere os bytes.
+        const cands = videoUrlCandidates(thumbBase, clickedAt - 500);
+        dtLog('Sem <video>; testando URLs de mídia.', { candidatos: cands.map((c) => ({ de: c.from, url: snapClean(snapUrl(c.url)), sufixo: snapClean(c.url.slice(thumbBase ? thumbBase.length : 0, (thumbBase ? thumbBase.length : 0) + 24)) })) });
+        const body0 = pageTextWithoutInputs();
+        const pm0 = promptMatches(job.prompt, body0);
+        if (pm0.known && !pm0.match) {
+          dtLog('Este visualizador é de outro take; tentando o próximo candidato.', { visto: pm0.seg }, 'warn');
+          await closeViewer();
+          continue;
+        }
+        for (const c of cands.slice(0, 8)) {
+          const r = await probeVideoUrl(c.url);
+          dtLog(r.blob ? 'Mídia de vídeo lida.' : 'URL descartada.', { de: c.from, url: snapClean(snapUrl(c.url)), motivo: r.why, bytes: r.blob ? r.blob.size : undefined }, r.blob ? 'success' : 'info');
+          if (r.blob) {
             await closeViewer();
-            return out;
-          } catch (_) {}
+            return { ok: true, kind: 'video', mime: r.blob.type || 'video/mp4', b64: await blobToB64(r.blob) };
+          }
+        }
+        if (!snappedMenu) {
+          snappedMenu = true;
+          await snapshotDownloadMenu();
         }
       }
       if (!src) {
