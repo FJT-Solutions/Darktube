@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.2.5';
-const FLOW_BUILD = '2026-11-01-arquivo-direto'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.2.6';
+const FLOW_BUILD = '2026-11-01-sonda-segundo-plano'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 const FLOW_ALARM = 'flow-tick';
 const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;
@@ -244,6 +244,23 @@ function flowB64ToBlob(b64, mime) {
   return new Blob([bytes], { type: mime });
 }
 
+// MP4 tem "ftyp" na posicao 4; WebM comeca com 1A 45 DF A3.
+async function flowIsVideoBlob(blob) {
+  try {
+    const b = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+    return String.fromCharCode(b[4], b[5], b[6], b[7]) === 'ftyp' || (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function flowBlobToB64(blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
 function flowMime(blobType, kind) {
   const ok = ['image/png', 'image/jpeg', 'image/webp', 'video/mp4', 'video/webm'];
   if (ok.includes(blobType)) return blobType;
@@ -269,6 +286,11 @@ async function flowHandleResult(msg) {
       const dl = await fetch(r.url, { credentials: 'include' });
       if (!dl.ok) throw new Error('Não foi possível baixar a mídia (' + dl.status + ').');
       blob = await dl.blob();
+      if (r.kind === 'video' && !(await flowIsVideoBlob(blob))) {
+        flowLog('O arquivo baixado pela URL não é um vídeo; descartado.', { bytes: blob.size, type: blob.type }, 'error', ids);
+        await flowFail(c, msg.jobId, 'O arquivo encontrado não é um vídeo.', 'capture_failed');
+        return void (await flowStatus('falhou', { msg: 'O arquivo encontrado não é um vídeo.', code: 'capture_failed' }));
+      }
     } else {
       throw new Error('A página não devolveu a mídia.');
     }
@@ -317,6 +339,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ ok: true, caps: r.caps });
       } else {
         sendResponse({ ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_PROBE_URL') {
+    // A pagina nao consegue ler algumas URLs de midia (redirecionam para outro dominio sem CORS); o segundo plano
+    // tem permissao de host, baixa, confere se e video e devolve os bytes.
+    (async () => {
+      try {
+        const res = await fetch(String(msg.url || ''), { credentials: 'include' });
+        if (!res.ok) return sendResponse({ ok: false, why: 'http ' + res.status });
+        const blob = await res.blob();
+        if (blob.size > 60 * 1024 * 1024) return sendResponse({ ok: false, why: 'grande demais ' + blob.size });
+        if (!(await flowIsVideoBlob(blob))) return sendResponse({ ok: false, why: 'não é vídeo (' + (blob.type || '?') + ', ' + blob.size + ' bytes)' });
+        sendResponse({ ok: true, mime: blob.type || 'video/mp4', b64: await flowBlobToB64(blob), size: blob.size });
+      } catch (e) {
+        sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 60) });
       }
     })();
     return true;

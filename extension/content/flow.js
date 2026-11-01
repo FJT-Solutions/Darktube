@@ -788,7 +788,24 @@
       if (!(await looksLikeVideo(blob))) return { why: `não é vídeo (${blob.type || '?'}, ${blob.size} bytes)` };
       return { blob };
     } catch (e) {
-      return { why: String((e && e.message) || e).slice(0, 60) };
+      // Erro de rede/CORS na pagina (redirecionamento para outro dominio): o segundo plano baixa e confere os bytes.
+      const viaBg = await new Promise((resolve) => {
+        try {
+          chrome.runtime.sendMessage({ type: 'FLOW_PROBE_URL', url: u }, (r) => {
+            void chrome.runtime.lastError;
+            resolve(r || null);
+          });
+        } catch (_) {
+          resolve(null);
+        }
+      });
+      if (viaBg && viaBg.ok && viaBg.b64) {
+        const bin = atob(viaBg.b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return { blob: new Blob([bytes], { type: viaBg.mime || 'video/mp4' }) };
+      }
+      return { why: viaBg && viaBg.why ? 'segundo plano: ' + viaBg.why : String((e && e.message) || e).slice(0, 60) };
     }
   }
 
