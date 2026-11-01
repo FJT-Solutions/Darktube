@@ -76,6 +76,21 @@ export function wordsFromWhisper(json: any): TimedWord[] {
   return out.sort((a, b) => a.start - b.start)
 }
 
+/**
+ * O Whisper costuma esticar a primeira palavra de um trecho para tras (engole a musica/silencio antes dela)
+ * e a ultima para frente. Limita cada palavra a uma duracao plausivel pelo tamanho:
+ * a que comeca um trecho perde o inicio; as demais perdem o fim.
+ */
+export function tightenWords(words: TimedWord[]): TimedWord[] {
+  return words.map((w, i) => {
+    const maxDur = Math.max(0.3, 0.2 + 0.09 * w.word.replace(/[^\p{L}\p{N}]/gu, '').length)
+    if (w.end - w.start <= maxDur) return w
+    const prev = words[i - 1]
+    const startsChunk = !prev || w.start - prev.end > 0.3
+    return startsChunk ? { ...w, start: w.end - maxDur } : { ...w, end: w.start + maxDur }
+  })
+}
+
 /** Agrupa palavras em frases curtas: quebra apos pontuacao, a cada maxWords palavras ou numa pausa longa. */
 export function cuesFromWords(words: TimedWord[], maxWords = 6, maxGap = 0.7): Cue[] {
   const cues: Cue[] = []
@@ -218,13 +233,13 @@ async function detectVoice(file: string, duration: number) {
 // Servidor Whisper proprio (API compativel com a da OpenAI). FLOW_WHISPER_URL=off desliga.
 const whisperUrl = () => process.env.FLOW_WHISPER_URL || 'https://whisper.fjt-solutions.com/v1/audio/transcriptions'
 
-/** Transcreve o audio do video com tempo por palavra. Null se o servidor falhar ou nao achar fala. */
-async function transcribeWhisper(file: string, language?: string): Promise<TimedWord[] | null> {
+/** Transcreve o audio com tempo por palavra. Null se nao achar fala; 'down' se o servidor falhar. */
+async function transcribeWhisper(file: string, language?: string): Promise<TimedWord[] | null | 'down'> {
   const url = whisperUrl()
-  if (url === 'off') return null
+  if (url === 'off') return 'down'
   try {
     // So o audio, mono 16 kHz: arquivo pequeno e e o formato que o Whisper usa por dentro.
-    const audio = path.join(path.dirname(file), 'speech.m4a')
+    const audio = path.join(path.dirname(file), path.basename(file, path.extname(file)) + '_speech.m4a')
     await run(ffmpegBin(), ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '64k', audio], { timeout: 120000 })
     const fd = new FormData()
     fd.append('file', new Blob([fs.readFileSync(audio)], { type: 'audio/mp4' }), 'speech.m4a')
@@ -238,7 +253,7 @@ async function transcribeWhisper(file: string, language?: string): Promise<Timed
     return words.length ? words : null
   } catch (err: any) {
     console.log(`[Flow] whisper indisponível, usando o texto do roteiro: ${String(err?.message || err).slice(0, 120)}`)
-    return null
+    return 'down'
   }
 }
 
@@ -294,27 +309,33 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
-    // Legenda: 1) transcricao com tempo por palavra (Whisper) do video ja unido; mostra o que e falado, quando e falado.
-    // 2) sem Whisper, cai no texto do roteiro com a janela medida/estimada por take.
+    // Legenda, take por take (o erro de tempo de um take nao contamina os outros):
+    // 1) Whisper com tempo por palavra: mostra o que e falado, quando e falado.
+    // 2) sem Whisper para aquele take, texto do roteiro na janela medida/estimada.
     const cues: Cue[] = []
-    const hasLines = t.mode !== 'ambiente' && takes.some((k) => k.line.trim())
-    const words = hasLines ? await transcribeWhisper(joined, String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined) : null
-    if (words) {
-      cues.push(...cuesFromWords(words))
-      console.log(`[Flow] legenda: whisper ${words.length} palavras em ${cues.length} frases`)
-    }
+    const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
+    let whisperDown = false
     let at = 0
-    for (let i = 0; i < takes.length && !words; i++) {
+    for (let i = 0; i < takes.length; i++) {
       const k = takes[i]
+      const dur = durations[i]
       if (t.mode !== 'ambiente' && k.line.trim()) {
-        const dur = durations[i]
-        // Janela medida no audio quando possivel; senao estimada pelo tamanho da fala. Nunca o clipe inteiro.
-        const voice = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
-        const win = voice ?? estimateSpeech(k.line, dur)
-        console.log(`[Flow] legenda take ${k.n}: ${voice ? 'voz medida' : 'estimada'} ${win.start.toFixed(1)}s-${win.end.toFixed(1)}s de ${dur.toFixed(1)}s`)
-        cues.push(...timeChunks(splitCaption(k.line), at + win.start, at + win.end))
+        const res = hasAudio[i] && !whisperDown ? await transcribeWhisper(normalized[i], lang) : null
+        if (res === 'down') whisperDown = true // servidor fora: nao espera por ele nos proximos takes
+        const words = Array.isArray(res) ? res : null
+        if (words) {
+          const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur)).map((c) => ({ ...c, start: at + c.start, end: at + Math.min(c.end, dur - 0.05) }))
+          cues.push(...takeCues)
+          console.log(`[Flow] legenda take ${k.n}: whisper ${words.length} palavras, ${takeCues.length} frases, ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
+        } else {
+          // Janela medida no audio quando possivel; senao estimada pelo tamanho da fala. Nunca o clipe inteiro.
+          const voice = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
+          const win = voice ?? estimateSpeech(k.line, dur)
+          console.log(`[Flow] legenda take ${k.n}: roteiro, ${voice ? 'voz medida' : 'estimada'} ${win.start.toFixed(1)}s-${win.end.toFixed(1)}s de ${dur.toFixed(1)}s`)
+          cues.push(...timeChunks(splitCaption(k.line), at + win.start, at + win.end))
+        }
       }
-      at += durations[i]
+      at += dur
     }
     const srt = buildSrt(cues)
 
