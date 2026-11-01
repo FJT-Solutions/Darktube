@@ -191,7 +191,8 @@ export function buildTakePrompt(script: FlowScript, take: FlowTake, params: Flow
   const lines: string[] = []
   lines.push(`[Scene ${take.n} of ${total}] ${take.seconds} seconds, ${aspect === '16:9' ? 'horizontal 16:9' : 'vertical 9:16'}.`)
   if (visible.length) {
-    lines.push(`[Characters (keep identical in every scene)]: ${visible.map((c) => `${c.name}: ${c.description}`).join(' | ')}`)
+    // Personagens ficticios: o filtro do Flow recusa o que parece "pessoa conhecida" (rosto descrito + hiper-realismo).
+    lines.push(`[Characters (fictional, original, not based on any real or famous person; keep identical in every scene)]: ${visible.map((c) => `${c.name}: ${c.description}`).join(' | ')}`)
   }
   if (loc) lines.push(`[Environment & Scene Setting]: ${loc.description}`)
   lines.push(`[Action & Camera]: ${take.action}`)
@@ -220,4 +221,24 @@ export function exportScriptText(script: FlowScript, params: FlowParams, mode: F
   }
   out.push('===== SEO =====', `Título: ${script.seo.title}`, `Legenda: ${script.seo.caption}`, `Gancho: ${script.seo.hook}`, `Hashtags: ${script.seo.hashtags.join(' ')}`)
   return out.join('\n')
+}
+
+/**
+ * Versao do prompt para nova tentativa apos recusa por politica ("prominent people"): troca SO a linha de estilo
+ * (hiper-realismo de pele/rosto e o que mais aciona o filtro) e reforca que os personagens sao ficticios.
+ * Personagens, cenario, acao, fala e som ficam identicos, para a cena continuar encaixando com a anterior e a seguinte.
+ */
+export function softenFlowPrompt(prompt: string): string {
+  return prompt
+    .split('\n')
+    .map((l) => {
+      if (l.startsWith('[Global Style & Realism]:')) {
+        return '[Global Style & Realism]: cinematic film look, natural soft lighting, consistent lighting and color across scenes; fictional characters only.'
+      }
+      if (l.startsWith('[Characters (keep identical in every scene)]:')) {
+        return l.replace('[Characters (keep identical in every scene)]:', '[Characters (fictional, original, not based on any real or famous person; keep identical in every scene)]:')
+      }
+      return l
+    })
+    .join('\n')
 }

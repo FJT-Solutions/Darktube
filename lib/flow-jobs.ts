@@ -336,6 +336,40 @@ export async function completeFlowJob(userId: string, id: string, resultUrl: str
 }
 
 // Falha vira rascunho: o usuário reenvia ao Flow ou escolhe outro motor.
+export const MAX_POLICY_RETRIES = 2;
+
+/**
+ * Recusa por politica do Flow: devolve a MESMA cena para a fila (mantem a ordem dos takes) com o prompt dado,
+ * ate MAX_POLICY_RETRIES vezes. Devolve null quando as tentativas acabaram (o chamador marca como rascunho).
+ */
+export async function requeueAfterPolicy(
+  userId: string,
+  id: string,
+  buildPrompt: (prompt: string, attempt: number) => string
+): Promise<{ job: FlowJob; attempt: number } | null> {
+  await ensureFlowTablesExist();
+  const { rows } = await pool.query(
+    `SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status = 'running'`,
+    [id, userId]
+  );
+  const job = rows[0] as FlowJob | undefined;
+  if (!job) return null;
+  const done = Number((job.params as any)?.policyRetries) || 0;
+  if (done >= MAX_POLICY_RETRIES) return null;
+  const attempt = done + 1;
+  const res = await pool.query(
+    `UPDATE public.flow_jobs
+        SET status = 'queued', prompt = $3, error_message = NULL, result_url = NULL,
+            claimed_at = NULL, finished_at = NULL,
+            params = params || jsonb_build_object('policyRetries', $4::int),
+            deadline_at = NOW() + ($5 || ' minutes')::interval
+      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      RETURNING *`,
+    [id, userId, buildPrompt(job.prompt, attempt), attempt, String(DEFAULT_DEADLINE_MIN)]
+  );
+  return res.rows[0] ? { job: res.rows[0], attempt } : null;
+}
+
 export async function failFlowJob(userId: string, id: string, message: string): Promise<FlowJob | null> {
   await ensureFlowTablesExist();
   const res = await pool.query(
