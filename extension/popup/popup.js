@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       return new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: 'GET_COOKIES', domain: 'instagram.com' }, (response) => {
+          void chrome.runtime.lastError; // le o erro para o Chrome nao registrar "Unchecked runtime.lastError"
           resolve(response?.cookies || []);
         });
       });
@@ -513,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true;
     st.textContent = 'Lendo as opções da conta...';
     chrome.runtime.sendMessage({ type: 'FLOW_SCAN_NOW' }, (resp) => {
+      void chrome.runtime.lastError;
       btn.disabled = false;
       st.textContent = resp && resp.ok ? 'Conta lida e enviada ao darktube.' : (resp && resp.error) || 'Não foi possível ler a conta.';
     });
@@ -523,6 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
       snapBtn.disabled = true;
       st.textContent = 'Retrato em 6 segundos: deixe a página do Flow no estado que quer registrar...';
       chrome.runtime.sendMessage({ type: 'FLOW_SNAPSHOT_NOW', delayMs: 6000 }, (resp) => {
+        void chrome.runtime.lastError;
         snapBtn.disabled = false;
         st.textContent = resp && resp.ok
           ? `Retrato enviado ao log do darktube (${resp.partes} parte(s)).`
