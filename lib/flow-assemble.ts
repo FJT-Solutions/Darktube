@@ -56,6 +56,86 @@ export function buildSrt(cues: Cue[]): string {
     .join('\n')
 }
 
+/** Janela estimada da fala quando nao da para medir o audio: ~2,6 palavras/s, comecando um pouco depois do inicio. */
+export function estimateSpeech(text: string, clipSeconds: number): { start: number; end: number } {
+  const words = text.trim().split(/\s+/).filter(Boolean).length
+  const start = Math.min(0.4, Math.max(clipSeconds * 0.05, 0))
+  const speak = Math.max(1.5, words / 2.6 + 0.4)
+  const end = Math.min(start + speak, Math.max(clipSeconds - 0.2, start + 0.5))
+  return { start, end }
+}
+
+/** Trechos COM som, a partir da saida do filtro silencedetect do ffmpeg. */
+export function parseVoiced(stderr: string, duration: number): { start: number; end: number }[] {
+  const silent: { start: number; end: number }[] = []
+  let open: number | null = null
+  for (const line of stderr.split(/\r?\n/)) {
+    const a = /silence_start:\s*(-?\d+(?:\.\d+)?)/.exec(line)
+    if (a) open = Math.max(0, Number(a[1]))
+    const b = /silence_end:\s*(-?\d+(?:\.\d+)?)/.exec(line)
+    if (b && open !== null) {
+      silent.push({ start: open, end: Number(b[1]) })
+      open = null
+    }
+  }
+  if (open !== null) silent.push({ start: open, end: duration })
+  const voiced: { start: number; end: number }[] = []
+  let at = 0
+  for (const sl of silent.sort((x, y) => x.start - y.start)) {
+    if (sl.start - at >= 0.25) voiced.push({ start: at, end: sl.start })
+    at = Math.max(at, sl.end)
+  }
+  if (duration - at >= 0.25) voiced.push({ start: at, end: duration })
+  return voiced
+}
+
+/**
+ * Janela da fala medida no audio (primeiro ao ultimo trecho com som). Devolve null quando a medida nao e confiavel:
+ * sem silencio nenhum (musica/ambiente cobrindo o clipe todo) ou janela curta demais.
+ */
+export function speechWindow(voiced: { start: number; end: number }[], duration: number): { start: number; end: number } | null {
+  if (!voiced.length || duration <= 0) return null
+  const start = voiced[0].start
+  const end = voiced[voiced.length - 1].end
+  const covered = voiced.reduce((n, v) => n + (v.end - v.start), 0)
+  if (voiced.length === 1 && covered >= duration * 0.9) return null
+  if (end - start < 0.8) return null
+  return { start: Math.max(0.1, start), end: Math.min(duration - 0.1, end) }
+}
+
+/** Divide a fala em frases curtas (ate maxWords palavras), preferindo quebrar apos pontuacao. */
+export function splitCaption(text: string, maxWords = 6): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  if (words.length <= maxWords + 1) return words.length ? [words.join(' ')] : []
+  const chunks: string[] = []
+  let cur: string[] = []
+  for (const w of words) {
+    cur.push(w)
+    if ((cur.length >= 3 && /[.!?;:…]$/.test(w)) || cur.length >= maxWords) {
+      chunks.push(cur.join(' '))
+      cur = []
+    }
+  }
+  if (cur.length) {
+    if (chunks.length && cur.length < 3) chunks[chunks.length - 1] += ' ' + cur.join(' ')
+    else chunks.push(cur.join(' '))
+  }
+  return chunks
+}
+
+/** Distribui as frases dentro da janela [start, end], proporcional ao tamanho de cada uma. */
+export function timeChunks(chunks: string[], start: number, end: number): Cue[] {
+  const total = chunks.reduce((n, c) => n + c.length, 0) || 1
+  const span = Math.max(end - start, 0.5)
+  let at = start
+  return chunks.map((text, i) => {
+    const len = (text.length / total) * span
+    const cue = { start: at, end: i === chunks.length - 1 ? start + span : at + len - 0.05, text }
+    at += len
+    return cue
+  })
+}
+
 /** Para cada take, escolhe o clipe pronto de melhor qualidade (final 720p antes do rascunho). */
 export function pickClips(takeNumbers: number[], jobs: Pick<FlowJob, 'take_index' | 'role' | 'status' | 'result_url' | 'finished_at'>[]) {
   const picked: { n: number; url: string; final: boolean }[] = []
@@ -77,6 +157,16 @@ async function probe(file: string) {
     return parseProbe('')
   } catch (err: any) {
     return parseProbe(String(err?.stderr || ''))
+  }
+}
+
+/** Mede em que parte do clipe ha voz (silencedetect). Null se nao der para medir com seguranca. */
+async function detectVoice(file: string, duration: number) {
+  try {
+    const { stderr } = await run(ffmpegBin(), ['-hide_banner', '-nostats', '-i', file, '-af', 'silencedetect=noise=-32dB:d=0.3', '-f', 'null', '-'], { timeout: 120000 })
+    return speechWindow(parseVoiced(String(stderr || ''), duration), duration)
+  } catch {
+    return null
   }
 }
 
@@ -111,11 +201,13 @@ export async function assembleFlowProject(userId: string, projectId: string) {
 
     const normalized: string[] = []
     const durations: number[] = []
+    const hasAudio: boolean[] = []
     for (const clip of picked) {
       const raw = path.join(dir, `raw_${clip.n}.mp4`)
       const out = path.join(dir, `norm_${clip.n}.mp4`)
       fs.writeFileSync(raw, await readStored(clip.url))
       const info = await probe(raw)
+      hasAudio.push(info.hasAudio)
       const args = info.hasAudio
         ? ['-y', '-i', raw, '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '44100', '-ac', '2', out]
         : ['-y', '-i', raw, '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', '1:a', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', out]
@@ -133,10 +225,18 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     // Legenda a partir das falas do roteiro, com a duracao real de cada clipe.
     const cues: Cue[] = []
     let at = 0
-    takes.forEach((k, i) => {
-      if (t.mode !== 'ambiente' && k.line.trim()) cues.push({ start: at + 0.2, end: at + durations[i] - 0.2, text: k.line })
+    for (let i = 0; i < takes.length; i++) {
+      const k = takes[i]
+      if (t.mode !== 'ambiente' && k.line.trim()) {
+        const dur = durations[i]
+        // Janela medida no audio quando possivel; senao estimada pelo tamanho da fala. Nunca o clipe inteiro.
+        const voice = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
+        const win = voice ?? estimateSpeech(k.line, dur)
+        console.log(`[Flow] legenda take ${k.n}: ${voice ? 'voz medida' : 'estimada'} ${win.start.toFixed(1)}s-${win.end.toFixed(1)}s de ${dur.toFixed(1)}s`)
+        cues.push(...timeChunks(splitCaption(k.line), at + win.start, at + win.end))
+      }
       at += durations[i]
-    })
+    }
     const srt = buildSrt(cues)
 
     let finalFile = joined
