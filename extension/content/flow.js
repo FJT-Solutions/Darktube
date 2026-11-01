@@ -663,6 +663,9 @@
   // Estado de um tile da galeria. "8%" sozinho tambem conta como gerando (o \b depois do % nao casava).
   const GEN_RX = /(\d{1,3}\s?%|\bgenerating\b|\bgerando\b|\bcriando\b|\bloading\b|\bqueued\b|\bna fila\b)/i;
   const RES_RX = /\b\d{3,4}p\b/i;
+  // Tile que o Flow recusou ("warning Failed This prompt might violate our policies..."): continua dentro do
+  // tile pendente, entao sem esta checagem parecia "gerando" para sempre.
+  const FAILED_RX = /\bfailed\b|might violate|violate our polic|will be refunded|não foi possível gerar|geração falhou|falhou/i;
   function tileState(tile) {
     const t = txt(tile);
     const spinner = !!$('mat-spinner, mat-progress-spinner, mat-progress-bar, [role=progressbar], .mat-mdc-progress-spinner, .mat-mdc-progress-bar, .spinner', tile);
@@ -670,7 +673,8 @@
     const img = $('img', tile);
     const hasImg = !!img && (img.naturalWidth > 40 || (img.src && !img.src.startsWith('data:')));
     const hasVideo = !!$('video', tile);
-    return { generating: pending || spinner || GEN_RX.test(t), hasImg, hasVideo, badge: RES_RX.test(t), text: t.slice(0, 60) };
+    const failed = FAILED_RX.test(t) && !hasVideo;
+    return { generating: !failed && (pending || spinner || GEN_RX.test(t)), failed, hasImg, hasVideo, badge: RES_RX.test(t), text: t.slice(0, 60) };
   }
   function isTileGenerating(tile) {
     return !!tile && tileState(tile).generating;
@@ -1037,7 +1041,7 @@
   }
 
   // Retrato manual (botao do popup): tudo o que estiver na tela agora.
-  function snapshotAll() {
+  async function snapshotAll() {
     let parts = 0;
     const ed = $(S.editor);
     if (ed) parts += dtSnapshot('caixa de prompt', ancestor(ed, 3));
@@ -1049,7 +1053,61 @@
     if (gen) parts += dtSnapshot('tile gerando', gen);
     const v = viewerVideoEl();
     if (v) parts += dtSnapshot('visualizador', ancestor(v, 6));
+    parts += await snapshotReferences(!!ed);
     dtLog('Retrato da página concluído.', { partes: parts, rota: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') }, 'success');
+    return parts;
+  }
+
+  // ---------- mapeamento de imagens de referencia (Ingredients / Characters do Flow) ----------
+
+  // Campos de envio de arquivo da pagina: e por eles que a extensao vai anexar as folhas de personagem.
+  function fileInputsInfo() {
+    return $$('input[type=file]').map((i) => ({
+      accept: i.getAttribute('accept') || '',
+      multiple: i.multiple,
+      visivel: vis(i),
+      dentro: [1, 2, 3, 4]
+        .map((n) => ancestor(i, n))
+        .filter(Boolean)
+        .map((e) => e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.split(/\s+/).filter((c) => c && !/^ng-|^_ng|^cdk-/.test(c)).slice(0, 2).join('.') : ''))
+        .join(' < '),
+    }));
+  }
+
+  // Itens do menu lateral do Flow (All media, Videos, Characters, Scenes...), com o caminho do link.
+  function sideNavInfo() {
+    return $$('a[href], nav button, [role=navigation] button, [role=link]')
+      .filter((e) => vis(e) && txt(e).length > 1 && txt(e).length < 40)
+      .slice(0, 30)
+      .map((e) => {
+        const href = e.getAttribute('href') || '';
+        return snapClean(txt(e).replace(/^[a-z]+(?:_[a-z0-9]+)*\s+/, '')) + (href ? ' -> ' + snapClean(href.replace(/[0-9a-f-]{20,}/gi, ':id')) : '');
+      });
+  }
+
+  // Retrato das partes que importam para referencias: menu/janela aberta pelo usuario, campos de arquivo,
+  // menu lateral, conteudo da pagina quando nao e a do projeto e o menu "+ Add ingredients" (aberto e fechado sozinho).
+  async function snapshotReferences(hasEditor) {
+    let parts = 0;
+    const overlay = $('.cdk-overlay-container');
+    if (overlay && txt(overlay)) parts += dtSnapshot('menu ou janela aberta', overlay);
+    if (!hasEditor) {
+      const main = $('main') || $('[role=main]') || viewerStage()?.parentElement || null;
+      if (main) parts += dtSnapshot('conteúdo da página', ancestor(main, 1));
+    }
+    dtLog('Referências: campos de arquivo e menu lateral.', { arquivos: fileInputsInfo(), menu: sideNavInfo() });
+    parts += 1;
+    const addBtn = hasEditor && !running ? $$('button').find((b) => vis(b) && /add ingredients|ingredient|adicionar/i.test(b.getAttribute('aria-label') || '')) : null;
+    if (addBtn && !(overlay && txt(overlay))) {
+      realClick(addBtn);
+      await sleep(900);
+      const menu = $('.cdk-overlay-container');
+      if (menu && txt(menu)) parts += dtSnapshot('menu + Add ingredients', menu);
+      else dtLog('O botão "Add ingredients" não abriu um menu.', null, 'warn');
+      dtLog('Campos de arquivo com o menu aberto.', { arquivos: fileInputsInfo() });
+      pressEscape();
+      await sleep(300);
+    }
     return parts;
   }
 
@@ -1225,8 +1283,13 @@
         // Filtra somente tiles que NAO existiam antes deste clique:
         const newTiles = currentTiles.filter((t) => !t.hasAttribute('data-dt-old') && !prevTiles.has(t) && !prevFps.has(tileFp(t)));
         const states = newTiles.map((t) => ({ t, s: tileState(t) }));
-        const bad = states.find((x) => !x.s.generating && RX.failure.test(txt(x.t)));
-        if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad.t).slice(0, 180));
+        const bad = states.find((x) => x.s.failed || (!x.s.generating && RX.failure.test(txt(x.t))));
+        if (bad) {
+          const msg = txt(bad.t).replace(/^warning\s*/i, '').slice(0, 220);
+          const code = /polic|violat|prominent|pessoas|people/i.test(msg) ? 'policy' : 'failed';
+          dtLog('O Flow recusou este take.', { code, motivo: msg }, 'error');
+          throw err(code, 'O Flow recusou a geração: ' + msg);
+        }
 
         const now = Date.now();
         for (const x of states) {
@@ -1378,12 +1441,10 @@
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string') return;
     if (msg.type === 'FLOW_SNAPSHOT') {
-      try {
-        sendResponse({ ok: true, partes: snapshotAll() });
-      } catch (e) {
-        sendResponse({ ok: false, error: String((e && e.message) || e) });
-      }
-      return;
+      snapshotAll()
+        .then((partes) => sendResponse({ ok: true, partes }))
+        .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+      return true;
     }
     if (msg.type === 'FLOW_PING') {
       sendResponse({ ok: true, ready: !!$(S.editor), busy: running, path: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') });
