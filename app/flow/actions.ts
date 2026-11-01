@@ -16,14 +16,16 @@ import {
   createFlowProject,
   deleteFlowProject,
   getFlowProject,
+  getLatestFlowPost,
   listFlowProjects,
+  syncFlowPublishStatus,
   updateFlowProject,
 } from "@/lib/flow-projects"
 import { createFlowJob, resumeFlowAgent } from "@/lib/flow-jobs"
 import { assembleFlowProject } from "@/lib/flow-assemble"
 import { getRiskSettings, getRiskUsage, saveRiskSettings, type RiskSettings } from "@/lib/flow-risk"
 import { getSocialAccounts } from "@/lib/social-accounts"
-import { saveDarkClipPost } from "@/lib/database"
+import { deleteDarkClipPost, saveDarkClipPost, updateDarkClipPostStatus } from "@/lib/database"
 import { isValidVideoUrl, triggerSocialDispatcher } from "@/lib/social-dispatcher"
 
 async function requireUser() {
@@ -97,9 +99,10 @@ export async function listFlowProjectsAction() {
 export async function getFlowProjectAction(id: string) {
   try {
     const user = await requireUser()
-    const project = await getFlowProject(user.id, id)
-    if (!project) throw new Error("Projeto não encontrado.")
-    return { success: true as const, project }
+    const found = await getFlowProject(user.id, id)
+    if (!found) throw new Error("Projeto não encontrado.")
+    const { project, publish } = await syncFlowPublishStatus(user.id, found)
+    return { success: true as const, project, publish }
   } catch (err) {
     return fail(err)
   }
@@ -260,7 +263,7 @@ export async function resumeFlowAgentAction() {
 /** Publica agora ou agenda o video final nas contas escolhidas, pelo despachante que ja existe. */
 export async function publishFlowProjectAction(
   id: string,
-  input: { accounts: Record<string, string>; scheduledAt?: string; dispatchNow: boolean }
+  input: { accounts: Record<string, string>; scheduledAt?: string; dispatchNow: boolean; facebookPageId?: string }
 ) {
   try {
     const user = await requireUser()
@@ -304,6 +307,7 @@ export async function publishFlowProjectAction(
         hashtags: seo.hashtags,
         flow_project_id: project.id,
         dispatch_now: input.dispatchNow,
+        facebook_page_id: accounts.facebook ? input.facebookPageId || undefined : undefined,
         selected_accounts_by_platform: accounts,
       } as any,
       scheduled_at: scheduledAt,
@@ -312,7 +316,14 @@ export async function publishFlowProjectAction(
     })
 
     if (input.dispatchNow) {
-      await triggerSocialDispatcher({ post, videoUrl: post.rendered_video_url, targetAccounts: platforms, title: post.title, accountMap: accounts })
+      await triggerSocialDispatcher({
+        post,
+        videoUrl: post.rendered_video_url,
+        targetAccounts: platforms,
+        title: post.title,
+        accountMap: accounts,
+        facebookPageId: accounts.facebook ? input.facebookPageId || undefined : undefined,
+      })
     } else {
       try {
         const { checkDueScheduledPosts } = await import("@/lib/dark-clips-scheduler")
@@ -321,6 +332,48 @@ export async function publishFlowProjectAction(
     }
     await updateFlowProject(user.id, id, { status: input.dispatchNow ? "publishing" : "scheduled" })
     return { success: true as const, postId: post.id, warning: overPosts ? "Acima do limite recomendado de postagens: risco de bloqueio nas redes." : undefined }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+// Reenvia a ultima publicacao do projeto que falhou (mesmas contas, pagina e legenda).
+export async function retryFlowPublishAction(id: string) {
+  try {
+    const user = await requireUser()
+    const project = await getFlowProject(user.id, id)
+    if (!project) throw new Error("Projeto não encontrado.")
+    const post = await getLatestFlowPost(user.id, id)
+    if (!post) throw new Error("Nenhuma publicação encontrada para este projeto.")
+    if (post.status !== "failed") throw new Error("Só dá para reenviar uma publicação que falhou.")
+    const remodel = typeof post.remodel_data === "string" ? JSON.parse(post.remodel_data) : post.remodel_data || {}
+    await updateDarkClipPostStatus(post.id, "publishing")
+    await updateFlowProject(user.id, id, { status: "publishing" })
+    const targets: string[] = typeof post.target_accounts === "string" ? JSON.parse(post.target_accounts) : post.target_accounts || []
+    await triggerSocialDispatcher({
+      post: { ...post, status: "publishing", remodel_data: remodel },
+      videoUrl: post.rendered_video_url,
+      targetAccounts: targets,
+      title: post.title,
+      accountMap: remodel.selected_accounts_by_platform,
+      facebookPageId: remodel.facebook_page_id || undefined,
+    })
+    return { success: true as const }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+// Exclui a ultima publicacao que falhou e devolve o projeto para "montado", pronto para publicar de novo.
+export async function deleteFlowPublishAction(id: string) {
+  try {
+    const user = await requireUser()
+    const post = await getLatestFlowPost(user.id, id)
+    if (!post) throw new Error("Nenhuma publicação encontrada para este projeto.")
+    if (post.status !== "failed") throw new Error("Só dá para excluir uma publicação que falhou.")
+    await deleteDarkClipPost(post.id)
+    await updateFlowProject(user.id, id, { status: "assembled" })
+    return { success: true as const }
   } catch (err) {
     return fail(err)
   }

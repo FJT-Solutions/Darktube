@@ -57,6 +57,8 @@ import {
   assembleFlowProjectAction,
   listFlowAccountsAction,
   publishFlowProjectAction,
+  retryFlowPublishAction,
+  deleteFlowPublishAction,
   getFlowRiskAction,
   saveFlowRiskAction,
   resumeFlowAgentAction,
@@ -592,9 +594,13 @@ function ProjectView({
   const [queueing, setQueueing] = useState(false)
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [agentOnline, setAgentOnline] = useState(false)
+  const [publish, setPublish] = useState<{ status: string; error: string | null; publishedAt: string | null } | null>(null)
   const [approved, setApproved] = useState<Set<number>>(new Set())
   const [accounts, setAccounts] = useState<{ id: string; platform: string; name: string }[]>([])
   const [picked, setPicked] = useState<Record<string, string>>({})
+  // Paginas do Facebook sincronizadas (as mesmas do Dark Clips); o Reel vai para a pagina escolhida.
+  const [fbPages, setFbPages] = useState<{ id: string; name: string }[]>([])
+  const [fbPage, setFbPage] = useState("")
   const [when, setWhen] = useState("")
   const [now, setNow] = useState(true)
   const [busy, setBusy] = useState("")
@@ -617,20 +623,39 @@ function ProjectView({
     if (res.success) {
       setProject(res.project as FlowProject)
       onChanged(res.project as FlowProject)
+      setPublish(res.publish ?? null)
     }
   }, [project.id, onChanged])
 
+  // Consulta rapida (6 s) so enquanto algo anda: take na fila/gerando, montagem ou publicacao.
+  // Parado, consulta a cada 30 s so para o status da extensao.
+  const jobsMoving = jobs.some((j) => j.status === "queued" || j.status === "running")
+  const projectMoving = project.status === "assembling" || project.status === "publishing"
   useEffect(() => {
     loadJobs()
     const t = setInterval(() => {
       loadJobs()
-      if (project.status === "assembling" || project.status === "publishing") refreshProject()
-    }, 6000)
+      if (projectMoving) refreshProject()
+    }, jobsMoving || projectMoving ? 6000 : 30000)
     return () => clearInterval(t)
-  }, [loadJobs, refreshProject, project.status])
+  }, [loadJobs, refreshProject, jobsMoving, projectMoving])
+
+  // Ao abrir um projeto ja publicado/agendado, busca o resultado do post.
+  useEffect(() => {
+    if (["publishing", "scheduled", "published", "publish_failed"].includes(project.status)) refreshProject()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id])
 
   useEffect(() => {
     listFlowAccountsAction().then((r) => r.success && setAccounts(r.accounts))
+    fetch("/api/social", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const pages = Array.isArray(d?.facebookPages) ? d.facebookPages : []
+        setFbPages(pages)
+        if (pages[0]) setFbPage((p) => p || pages[0].id)
+      })
+      .catch(() => {})
   }, [])
 
   const params = project.params
@@ -807,7 +832,8 @@ function ProjectView({
                   </div>
                 </div>
                 {job?.status === "done" && job.result_url && (
-                  <video src={job.result_url} controls preload="metadata" className="max-h-72 rounded-md bg-black" />
+                  // Com o video final pronto, os takes so carregam ao dar play: menos videos pesando na pagina.
+                  <video src={job.result_url} controls preload={project.final_url ? "none" : "metadata"} className="max-h-72 rounded-md bg-black" />
                 )}
                 {template.mode !== "ambiente" && (
                   <div className="space-y-1">
@@ -977,6 +1003,18 @@ function ProjectView({
                 })}
               </div>
             )}
+            {picked.facebook && (
+              fbPages.length > 0 ? (
+                <label className="flex flex-wrap items-center gap-2 text-sm">
+                  Página do Facebook:
+                  <select className="h-8 rounded-md border bg-background px-2 text-sm" value={fbPage} onChange={(e) => setFbPage(e.target.value)}>
+                    {fbPages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </label>
+              ) : (
+                <p className="text-xs text-amber-500">Nenhuma página do Facebook sincronizada: o Reel vai para a página padrão do Meta Business Suite. Sincronize as páginas em Credenciais.</p>
+              )
+            )}
             <div className="flex flex-wrap items-center gap-3 text-sm">
               <label className="flex items-center gap-1.5"><input type="radio" checked={now} onChange={() => setNow(true)} /> Publicar agora</label>
               <label className="flex items-center gap-1.5"><input type="radio" checked={!now} onChange={() => setNow(false)} /> Agendar</label>
@@ -985,7 +1023,7 @@ function ProjectView({
             <Button
               disabled={busy === "pub" || Object.keys(picked).length === 0}
               onClick={async () => {
-                const res = await publishFlowProjectAction(project.id, { accounts: picked, dispatchNow: now, scheduledAt: now ? undefined : when ? new Date(when).toISOString() : undefined })
+                const res = await publishFlowProjectAction(project.id, { accounts: picked, dispatchNow: now, scheduledAt: now ? undefined : when ? new Date(when).toISOString() : undefined, facebookPageId: picked.facebook ? fbPage || undefined : undefined })
                 if (!res.success) return void toast.error(res.error)
                 toast.success(now ? "Enviado para publicação." : "Postagem agendada.")
                 if (res.warning) toast.warning(res.warning)
@@ -995,7 +1033,41 @@ function ProjectView({
               <Send className="mr-2 h-4 w-4" /> {now ? "Publicar agora" : "Agendar postagem"}
             </Button>
             {(status === "scheduled" || status === "publishing") && (
-              <p className="text-xs text-muted-foreground">{status === "scheduled" ? "Agendado." : "Em publicação."} O andamento aparece em Dark Clips.</p>
+              <p className="text-xs text-muted-foreground">{status === "scheduled" ? "Agendado." : "Em publicação..."} O andamento também aparece em Dark Clips.</p>
+            )}
+            {status === "published" && (
+              <p className="text-sm text-emerald-500">
+                Publicado{publish?.publishedAt ? ` em ${new Date(publish.publishedAt).toLocaleString("pt-BR")}` : ""}.
+              </p>
+            )}
+            {status === "publish_failed" && (
+              <div className="space-y-2">
+                <p className="text-sm text-destructive">Falha na publicação{publish?.error ? `: ${publish.error}` : "."}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy === "repub"}
+                    onClick={async () => {
+                      if (await run("repub", () => retryFlowPublishAction(project.id), "Publicação reenviada.")) refreshProject()
+                    }}
+                  >
+                    {busy === "repub" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Reenviar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={busy === "delpub"}
+                    onClick={async () => {
+                      if (!confirm("Excluir esta publicação que falhou? O vídeo montado continua guardado.")) return
+                      if (await run("delpub", () => deleteFlowPublishAction(project.id), "Publicação excluída.")) refreshProject()
+                    }}
+                  >
+                    Excluir
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

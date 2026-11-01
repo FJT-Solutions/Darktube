@@ -108,6 +108,39 @@ export async function deleteFlowProject(userId: string, id: string): Promise<boo
   return (res.rowCount ?? 0) > 0
 }
 
+/** Post mais recente (dark_clips_posts) criado a partir deste projeto Flow. */
+export async function getLatestFlowPost(userId: string, projectId: string): Promise<any | null> {
+  const { rows } = await pool.query(
+    `SELECT * FROM public.dark_clips_posts
+      WHERE user_id = $1 AND remodel_data->>'flow_project_id' = $2
+      ORDER BY created_at DESC LIMIT 1`,
+    [userId, projectId]
+  )
+  return rows[0] ?? null
+}
+
+export interface FlowPublishInfo {
+  status: string
+  error: string | null
+  publishedAt: string | null
+}
+
+/**
+ * O post vai para dark_clips_posts e quem atualiza o resultado e o despachante. Aqui o projeto acompanha
+ * o post mais recente: publicado -> 'published', falhou -> 'publish_failed' (o erro vem junto para a tela).
+ */
+export async function syncFlowPublishStatus(userId: string, project: FlowProject): Promise<{ project: FlowProject; publish: FlowPublishInfo | null }> {
+  const post = await getLatestFlowPost(userId, project.id)
+  if (!post) return { project, publish: null }
+  const publish: FlowPublishInfo = { status: post.status, error: post.error_message ?? null, publishedAt: post.published_at ?? null }
+  const next = post.status === 'published' ? 'published' : post.status === 'failed' ? 'publish_failed' : null
+  if (next && next !== project.status && (project.status === 'publishing' || project.status === 'scheduled' || project.status === 'publish_failed')) {
+    const updated = await updateFlowProject(userId, project.id, { status: next })
+    return { project: updated ?? project, publish }
+  }
+  return { project, publish }
+}
+
 export async function setFlowProjectAssembly(
   userId: string,
   id: string,
