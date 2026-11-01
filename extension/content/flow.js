@@ -1083,7 +1083,11 @@
     pressEscape();
     await sleep(300);
     return {
-      models: items.map((t) => t.replace(/\d{1,4}\s*(credits|créditos|cr)\b.*$/i, '').trim()).filter(Boolean).slice(0, 12),
+      // Tira o nome do icone colado ao rotulo (ex.: "volume_up Omni 1.1 Flash") e o custo no fim.
+      models: items
+        .map((t) => t.replace(/\d{1,4}\s*(credits|créditos|cr)\b.*$/i, '').replace(/^(?:[a-z]+(?:_[a-z0-9]+)+\s+)+/, '').trim())
+        .filter(Boolean)
+        .slice(0, 12),
       costs: items.filter((t) => /\d\s*(credits|créditos|cr)\b/i.test(t)).map((t) => t.slice(0, 80)).slice(0, 12),
     };
   }

@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.2.1';
-const FLOW_BUILD = '2026-10-31-retrato'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.2.2';
+const FLOW_BUILD = '2026-11-01-aviso-desatualizada'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 const FLOW_ALARM = 'flow-tick';
 const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;
@@ -320,6 +320,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
     })();
     return true;
+  }
+  if (msg.type === 'FLOW_HELLO') {
+    // O popup pergunta qual versao do segundo plano esta rodando: arquivos do popup atualizam sozinhos
+    // no disco, mas o segundo plano so atualiza ao recarregar a extensao em chrome://extensions.
+    sendResponse({ ok: true, version: FLOW_VERSION, build: FLOW_BUILD });
+    return;
   }
   if (msg.type === 'FLOW_SNAPSHOT_NOW') {
     // Espera alguns segundos para o usuario deixar a tela no estado desejado (painel aberto, tile gerando...).

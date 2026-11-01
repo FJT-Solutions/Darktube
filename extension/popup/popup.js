@@ -475,11 +475,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
   let lastStatus = null;
+  let staleMsg = '';
   const render = (s) => {
     lastStatus = s;
     const base = !s ? 'Desligado.' : (LABEL[s.state] || s.state) + (s.msg ? ' ' + s.msg : '');
-    st.textContent = base + ' ' + logLine;
+    st.textContent = (staleMsg ? staleMsg + ' ' : '') + base + ' ' + logLine;
   };
+  // A pagina do popup atualiza sozinha; o segundo plano so ao recarregar a extensao. Avisa se estiverem diferentes.
+  chrome.runtime.sendMessage({ type: 'FLOW_HELLO' }, (resp) => {
+    const mv = chrome.runtime.getManifest().version;
+    if (chrome.runtime.lastError || !resp || !resp.ok) {
+      staleMsg = `ATENÇÃO: o segundo plano da extensão está DESATUALIZADO (não responde ao popup v${mv}). Recarregue a extensão em chrome://extensions.`;
+    } else if (resp.version !== mv) {
+      staleMsg = `ATENÇÃO: segundo plano v${resp.version} ≠ popup v${mv}. Recarregue a extensão em chrome://extensions.`;
+    } else {
+      staleMsg = '';
+    }
+    render(lastStatus);
+  });
   chrome.storage.local.get(['flow_enabled', 'flow_live', 'flow_status', 'flow_logstat'], (r) => {
     en.checked = !!r.flow_enabled;
     live.checked = !!r.flow_live;
