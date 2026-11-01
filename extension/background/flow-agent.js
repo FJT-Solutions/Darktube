@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.2.2';
-const FLOW_BUILD = '2026-11-01-aviso-desatualizada'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.2.3';
+const FLOW_BUILD = '2026-11-01-rota-edit'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 const FLOW_ALARM = 'flow-tick';
 const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;

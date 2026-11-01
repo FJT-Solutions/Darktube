@@ -694,20 +694,72 @@
     } catch (_) {}
   }
 
-  // O <video> do visualizador: visivel, com fonte, e fora de qualquer tile da galeria.
+  // Clicar num tile abre a rota /project/:id/edit/:id (visualizador/editor do video).
+  const inEditRoute = () => /\/edit\//.test(location.pathname);
+
+  // O <video> do visualizador: visivel, com fonte. Fora da rota de edicao nao pode estar num tile da galeria;
+  // dentro dela o proprio player pode ser um flow-video-tile (tem barra de progresso), entao vale qualquer <video>.
   function viewerVideoEl() {
+    const edit = inEditRoute();
     return (
       $$('video').find((v) => {
-        if (!vis(v) || v.closest(S.videoTile) || v.closest(S.imageTile)) return false;
+        if (!vis(v)) return false;
+        if (!edit && (v.closest(S.videoTile) || v.closest(S.imageTile))) return false;
         const s = getVideoSrc(v);
         return !!s && s.length > 5 && !s.startsWith('data:');
       }) || null
     );
   }
 
+  // Aberto = tem <video> do visualizador ou a pagina esta na rota de edicao.
+  const viewerOpen = () => !!viewerVideoEl() || inEditRoute();
+
+  // Maior imagem/video/canvas visivel da tela (o "palco" do visualizador), para retrato e clique de play.
+  function viewerStage() {
+    let best = null;
+    let bestArea = 0;
+    for (const el of $$('video, img, canvas')) {
+      if (!vis(el)) continue;
+      const r = el.getBoundingClientRect();
+      const area = r.width * r.height;
+      if (area > bestArea) {
+        best = el;
+        bestArea = area;
+      }
+    }
+    return bestArea > 20000 ? best : null;
+  }
+
+  // URLs de midia que a pagina ja baixou (so as de video, nunca imagem), da mais nova para a mais antiga.
+  function mediaFromTimeline(sinceMs) {
+    try {
+      return performance
+        .getEntriesByType('resource')
+        .filter((e) => e.startTime >= sinceMs && e.initiatorType !== 'img' && e.initiatorType !== 'css' && (e.initiatorType === 'video' || /\.mp4\b|\.webm\b|videoplayback|\/video\//i.test(e.name)) && !/\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(e.name))
+        .map((e) => e.name)
+        .reverse();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // O player pode so mostrar o poster ate alguem clicar em play: tenta o palco e botoes de play fora da galeria.
+  function tryPlayViewer() {
+    const stage = viewerStage();
+    const playBtn = $$('button, [role=button]').find((b) => {
+      if (!vis(b)) return false;
+      const ic = $('mat-icon', b);
+      const t = ic ? txt(ic) : '';
+      return /^(play_arrow|play_circle|play_circle_filled|slideshow)$/.test(t) && !b.closest('flow-tile-hover-footer');
+    });
+    dtLog('Tentando iniciar o player do visualizador.', { palco: stage ? stage.tagName.toLowerCase() : null, botaoPlay: !!playBtn });
+    if (playBtn) realClick(playBtn);
+    else if (stage) realClick(stage);
+  }
+
   async function closeViewer() {
     for (let i = 0; i < 3; i++) {
-      if (!viewerVideoEl()) return true;
+      if (!viewerOpen()) return true;
       const clean = (b) => txt(b).replace(/^[a-z]+(?:_[a-z0-9]+)*\s+/, '');
       const done = $$('button, [role=button]').find((b) => vis(b) && /^(done|concluído|concluido|concluir|fechar|close)$/i.test(clean(b)));
       const back = $$('button').find((b) => {
@@ -716,12 +768,15 @@
         return (ic && txt(ic) === 'arrow_back') || /^(back|voltar)$/i.test(b.getAttribute('aria-label') || '');
       });
       const target = done || back;
-      dtLog(target ? 'Fechando o visualizador pelo botão.' : 'Fechando o visualizador com Escape.', { botao: target ? clean(target) || 'voltar' : 'Escape' });
+      // Ultima tentativa na rota de edicao sem botao reconhecido: voltar no historico.
+      const viaHistory = !target && i >= 1 && inEditRoute();
+      dtLog(target ? 'Fechando o visualizador pelo botão.' : viaHistory ? 'Fechando o visualizador voltando no histórico.' : 'Fechando o visualizador com Escape.', { botao: target ? clean(target) || 'voltar' : viaHistory ? 'history.back' : 'Escape' });
       if (target) realClick(target);
+      else if (viaHistory) history.back();
       else pressEscape();
-      await until(() => !viewerVideoEl(), 4000, 300);
+      await until(() => !viewerOpen(), 4000, 300);
     }
-    const closed = !viewerVideoEl();
+    const closed = !viewerOpen();
     if (!closed) dtLog('O visualizador não fechou.', null, 'warn');
     return closed;
   }
@@ -875,6 +930,28 @@
     dtSnapshot('galeria: tile candidato e vizinhos', ancestor(tile, 2), 'warn');
     const v = viewerVideoEl();
     if (v) dtSnapshot('visualizador aberto', ancestor(v, 6), 'warn');
+    else if (inEditRoute()) {
+      // Visualizador aberto sem <video> reconhecido: registra tudo o que ajuda a achar o player e o botao de fechar.
+      const botoes = $$('button, [role=button]')
+        .filter((b) => vis(b))
+        .slice(0, 40)
+        .map((b) => {
+          const ic = $('mat-icon', b);
+          return snapClean((b.getAttribute('aria-label') || (ic ? txt(ic) : '') || txt(b)).slice(0, 30));
+        });
+      dtLog(
+        'Diagnóstico do visualizador sem vídeo.',
+        {
+          rota: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id'),
+          videos: $$('video').map((x) => ({ src: snapClean(snapUrl(getVideoSrc(x))), rs: x.readyState, visivel: vis(x), emTile: !!x.closest(S.videoTile) })),
+          midias: mediaFromTimeline(0).slice(0, 5).map((u) => snapClean(snapUrl(u))),
+          botoes,
+        },
+        'warn'
+      );
+      const stage = viewerStage();
+      if (stage) dtSnapshot('visualizador: palco', ancestor(stage, 5), 'warn');
+    }
   }
 
   // Retrato manual (botao do popup): tudo o que estiver na tela agora.
@@ -915,10 +992,29 @@
         return fetchMedia('video', direct);
       }
 
+      const clickedAt = performance.now();
       realClick($('img', tile) || tile);
-      const v = await until(() => viewerVideoEl(), 15000, 400);
-      if (!v) {
-        dtLog('O visualizador não abriu ou não trouxe <video>.', { tile: describeTile(tile) }, 'warn');
+      let v = await until(() => viewerVideoEl(), 8000, 400);
+      if (!v && viewerOpen()) {
+        // Abriu a rota de edicao mas o <video> nao apareceu: o player pode esperar um play.
+        tryPlayViewer();
+        v = await until(() => viewerVideoEl(), 8000, 400);
+      }
+      let src = v ? getVideoSrc(v) : '';
+      if (!src && viewerOpen()) {
+        // Ultimo recurso: a midia que a pagina acabou de baixar (imagens ficam de fora).
+        const urls = mediaFromTimeline(clickedAt - 500).slice(0, 3);
+        dtLog('Sem <video>; procurando mídia baixada pela página.', { encontradas: urls.map((u) => snapClean(snapUrl(u))) });
+        for (const u of urls) {
+          try {
+            const out = await fetchMedia('video', u);
+            await closeViewer();
+            return out;
+          } catch (_) {}
+        }
+      }
+      if (!src) {
+        dtLog('O visualizador não abriu ou não trouxe <video>.', { tile: describeTile(tile), rota: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') }, 'warn');
         if (!snappedGallery) {
           snappedGallery = true;
           snapshotFailure(tile);
@@ -929,7 +1025,6 @@
       await sleep(600);
       const body = pageTextWithoutInputs();
       const pm = promptMatches(job.prompt, body);
-      const src = getVideoSrc(v);
       dtLog('Visualizador aberto.', { src: shortUrl(src), prompt: pm, texto: body.slice(0, 160) });
       if (pm.known && !pm.match) {
         dtLog('Este visualizador é de outro take; tentando o próximo candidato.', { visto: pm.seg }, 'warn');
