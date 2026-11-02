@@ -1187,6 +1187,121 @@
     return result;
   }
 
+  // ---------- anexar uma imagem como referencia (ingrediente) na caixa de prompt ----------
+
+  const promptBox = () => $('flow-base-prompt-box') || ($(S.editor) && ancestor($(S.editor), 4));
+
+  // Remove todos os chips de ingrediente da caixa de prompt (clique no X de cada um).
+  async function clearIngredients() {
+    for (let i = 0; i < 6 && ingredientChips() > 0; i++) {
+      const chip = $('flow-ingredient-chip button.chip-container, flow-ingredient-chip');
+      if (!chip) break;
+      realClick(chip);
+      await sleep(300);
+      const x = $$('flow-ingredient-chip mat-icon, flow-ingredient-chip button').find((e) => /cancel|close|remove|delete/i.test(txt(e) + ' ' + (e.getAttribute('aria-label') || '')));
+      if (x) realClick(x);
+      await sleep(500);
+    }
+    return ingredientChips() === 0;
+  }
+
+  // Caminho 1: soltar o arquivo sobre a caixa de prompt (como arrastar do computador).
+  async function attachByDrop(file) {
+    const box = promptBox();
+    const target = $(S.editor) || box;
+    if (!target) return false;
+    const before = ingredientChips();
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    for (const type of ['dragenter', 'dragover', 'drop']) {
+      const ev = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+      target.dispatchEvent(ev);
+      await sleep(150);
+    }
+    return !!(await until(() => ingredientChips() > before, 8000, 400));
+  }
+
+  // Caminho 2: colar a imagem na caixa de prompt.
+  async function attachByPaste(file) {
+    const ed = $(S.editor);
+    if (!ed) return false;
+    const before = ingredientChips();
+    ed.focus();
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    ed.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+    return !!(await until(() => ingredientChips() > before, 8000, 400));
+  }
+
+  // Caminho 3: escolher pelo nome na biblioteca do menu "+" (imagem ja enviada antes).
+  async function attachFromLibrary(name) {
+    const before = ingredientChips();
+    const plus = $$('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+    if (!plus) return false;
+    realClick(plus);
+    const menu = await until(() => $('flow-add-menu-popover-content'), 6000, 250);
+    if (!menu) return false;
+    const search = $('input.search-input, input[aria-label="Search assets"]', menu);
+    if (search) {
+      search.focus();
+      search.value = name;
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      search.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'e' }));
+      await sleep(1500);
+    }
+    const list = $('flow-add-menu-asset-list', menu);
+    if (list) dtSnapshot('anexar: lista da biblioteca', list, 'info');
+    // Item da lista: algo clicavel com a imagem ou o nome do arquivo.
+    const items = $$('[role=option], .asset-item, flow-add-menu-asset-item, cdk-virtual-scroll-viewport [class*=asset]', menu).filter((e) => vis(e));
+    const item = items.find((e) => new RegExp(name.replace(/[.*+?^()[\]{}|]/g, ''), 'i').test(txt(e) + ' ' + ($('img', e)?.alt || ''))) || items[0];
+    dtLog('Anexar pela biblioteca: itens na lista.', { itens: items.length, escolhido: item ? snapClean(txt(item).slice(0, 60)) : null });
+    if (!item) return false;
+    realClick(item);
+    await sleep(1200);
+    const pane = $('flow-add-menu-detail-pane', menu);
+    if (pane) dtSnapshot('anexar: painel de detalhe', pane, 'info');
+    const addBtn = $$('button', pane || menu).find((b) => vis(b) && /^(add|adicionar|use|usar|insert|inserir|add to prompt|select|selecionar)/i.test((txt(b) || b.getAttribute('aria-label') || '').replace(/^[a-z_]+\s+/, '')));
+    dtLog('Anexar pela biblioteca: botão de adicionar.', { achado: !!addBtn, texto: addBtn ? txt(addBtn).slice(0, 40) : null });
+    if (addBtn) realClick(addBtn);
+    const ok = !!(await until(() => ingredientChips() > before, 6000, 400));
+    for (let i = 0; i < 3 && $('flow-add-menu-popover-content'); i++) {
+      pressEscape();
+      await sleep(400);
+    }
+    return ok;
+  }
+
+  async function attachTest() {
+    dtLog('Teste de anexar: início.', { chipsAntes: ingredientChips() });
+    await clearIngredients();
+    const file = await testPng();
+    const tries = [
+      ['soltar na caixa de prompt', () => attachByDrop(file)],
+      ['colar na caixa de prompt', () => attachByPaste(file)],
+      ['escolher na biblioteca do menu "+"', () => attachFromLibrary('darktube-teste-referencia')],
+    ];
+    const worked = [];
+    for (const [label, fn] of tries) {
+      let ok = false;
+      try {
+        ok = await fn();
+      } catch (e) {
+        dtLog('Teste de anexar: erro em "' + label + '".', { erro: String((e && e.message) || e).slice(0, 160) }, 'warn');
+      }
+      dtLog('Teste de anexar: ' + label + ' -> ' + (ok ? 'FUNCIONOU' : 'não funcionou') + '.', { chips: ingredientChips() }, ok ? 'success' : 'info');
+      if (ok) {
+        worked.push(label);
+        const ed = $(S.editor);
+        if (ed) dtSnapshot('anexar: caixa de prompt com a referência', ancestor(ed, 3), 'info');
+        await clearIngredients();
+      }
+      await sleep(800);
+    }
+    const result = worked.length ? 'funcionou por: ' + worked.join(', ') : 'nenhum caminho anexou a imagem';
+    dtLog('Teste de anexar: ' + result + '.', { chipsNoFim: ingredientChips() }, worked.length ? 'success' : 'warn');
+    return result;
+  }
+
   // ---------- mapeamento de imagens de referencia (Ingredients / Characters do Flow) ----------
 
   // Campos de envio de arquivo da pagina: e por eles que a extensao vai anexar as folhas de personagem.
@@ -1585,6 +1700,16 @@
     if (msg.type === 'FLOW_SNAPSHOT') {
       snapshotAll()
         .then((partes) => sendResponse({ ok: true, partes }))
+        .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+      return true;
+    }
+    if (msg.type === 'FLOW_ATTACH_TEST') {
+      if (running) {
+        sendResponse({ ok: false, error: 'Há um take gerando.' });
+        return;
+      }
+      attachTest()
+        .then((result) => sendResponse({ ok: true, result }))
         .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
       return true;
     }

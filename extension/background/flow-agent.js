@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.3';
-const FLOW_BUILD = '2026-11-02-teste-envio-fix'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.4';
+const FLOW_BUILD = '2026-11-02-teste-anexar'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -435,6 +435,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
       flowForceLogsUntil = Date.now() + 90000;
       const r = await flowAsk(tab.id, { type: 'FLOW_UPLOAD_TEST' });
+      await flowLogFlush();
+      sendResponse(r && r.ok ? { ok: true, result: r.result } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_ATTACH_TEST_NOW') {
+    (async () => {
+      const c = await flowCfg();
+      if (c.flow_current) return sendResponse({ ok: false, error: 'Há um take gerando; teste com a fila parada.' });
+      const tab = await flowFindTab();
+      if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
+      flowForceLogsUntil = Date.now() + 120000;
+      const r = await flowAsk(tab.id, { type: 'FLOW_ATTACH_TEST' });
       await flowLogFlush();
       sendResponse(r && r.ok ? { ok: true, result: r.result } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
     })();

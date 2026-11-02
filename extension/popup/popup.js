@@ -547,6 +547,20 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+  const atBtn = document.getElementById('flow-attach-test-btn');
+  if (atBtn) {
+    atBtn.addEventListener('click', () => {
+      atBtn.disabled = true;
+      st.textContent = 'Testando anexar a imagem de teste como referência...';
+      chrome.runtime.sendMessage({ type: 'FLOW_ATTACH_TEST_NOW' }, (resp) => {
+        void chrome.runtime.lastError;
+        atBtn.disabled = false;
+        st.textContent = resp && resp.ok
+          ? 'Teste de anexar: ' + (resp.result || 'concluído') + ' (detalhes no log do darktube).'
+          : (resp && resp.error) || 'O teste de anexar não respondeu.';
+      });
+    });
+  }
   chrome.storage.onChanged.addListener((ch) => {
     if (ch.flow_logstat) {
       renderLog(ch.flow_logstat.newValue);
