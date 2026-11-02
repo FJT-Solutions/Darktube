@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.8';
-const FLOW_BUILD = '2026-11-02-gerar-confirmado'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.9';
+const FLOW_BUILD = '2026-11-02-job-orfao'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -194,6 +194,20 @@ async function flowTick() {
         // Nao pega outro job no mesmo ciclo: a pagina pode estar travada.
         return void (await flowStatus('falhou', { msg: 'A aba do Flow não respondeu a tempo.', code: 'timeout' }));
       } else {
+        // Job orfao: a extensao foi recarregada ou a aba recarregou no meio do take e a pagina nao esta mais
+        // trabalhando nele. Em vez de esperar o vigia (20 min), devolve o take para a fila na hora.
+        if (Date.now() - c.flow_current.startedAt > 45000) {
+          const t = c.flow_current.tabId ? { id: c.flow_current.tabId } : await flowFindTab();
+          const ping = t ? await flowAsk(t.id, { type: 'FLOW_PING' }) : null;
+          if (ping && ping.ok && !ping.busy) {
+            flowLog('O take em andamento foi interrompido (extensão ou aba recarregada); ele volta para a fila.', null, 'warn', c.flow_current);
+            try {
+              await flowApi(c, `/api/flow/agent/jobs/${c.flow_current.jobId}/release`, { method: 'POST' });
+            } catch (_) {}
+            await chrome.storage.local.remove('flow_current');
+            return void (await flowStatus('aguardando', { msg: 'Take interrompido devolvido para a fila.' }));
+          }
+        }
         await flowHeartbeat(c);
         if (c.flow_current.tabId) flowKeepAwake(c.flow_current.tabId); // o segundo plano pode ter reiniciado no meio do job
         return void (await flowStatus('gerando', { jobId: c.flow_current.jobId }));
