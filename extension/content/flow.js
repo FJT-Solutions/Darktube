@@ -1593,8 +1593,33 @@
     if (!btn) throw err('generate_missing', 'Não achei o botão de gerar.');
     if (!(await until(() => !btn.disabled, 10000))) throw err('generate_disabled', 'O botão de gerar ficou desabilitado.');
     await human(500, 1500);
-    btn.click();
-    dtLog('Botão de gerar clicado.', { creditsHint: hint });
+    // Confirma que a geracao comecou (tile novo, pendente, ou a caixa de prompt esvaziou). No modo imagem o clique
+    // simples as vezes nao vale: tenta de novo com clique completo e depois com Enter na caixa de prompt.
+    const tilesBefore = $$(tileSel()).length;
+    const started = () =>
+      $$(tileSel()).length > tilesBefore || $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) || !txt($(S.editor) || document.createElement('i'));
+    const attempts = [
+      ['clique', () => btn.click()],
+      ['clique completo', () => realClick($(S.generate) || btn)],
+      ['Enter', () => {
+        const ed = $(S.editor);
+        if (ed) {
+          ed.focus();
+          for (const type of ['keydown', 'keypress', 'keyup']) ed.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+        }
+      }],
+    ];
+    let how = '';
+    for (const [label, fire] of attempts) {
+      fire();
+      if (await until(started, label === 'clique' ? 10000 : 6000, 400)) {
+        how = label;
+        break;
+      }
+      dtLog(`A geração não começou com ${label}; tentando de outro jeito.`, null, 'warn');
+    }
+    if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
+    dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
     await sleep(2000);
 
     const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
