@@ -218,11 +218,12 @@
   }
 
   async function setMode(panel, kind) {
-    const rx = kind === 'video' ? /^\s*video\b/i : /^\s*image\b/i;
-    // 1. Procura botao, tab ou toggle com o texto ou aria-label "Video" ou "Image" no topo do painel
+    const rx = kind === 'video' ? /^\s*(videocam\s+)?video\b/i : /^\s*(image\s+)?image\b/i;
+    // 1. O radio do modo tem o icone (videocam / image) e o rotulo; procura primeiro pelo icone, depois pelo texto.
     const candidates = $$('button, [role=tab], [role=radio], mat-button-toggle, .mat-mdc-button-toggle', panel);
-    const r = candidates.find((el) => rx.test(txt(el)) || (el.getAttribute('aria-label') && rx.test(el.getAttribute('aria-label'))))
-      || (kind === 'video' ? radios(panel).find((x) => hasIcon(x, 'videocam')) : $(S.radioGroup, panel) && $$(S.radio, $(S.radioGroup, panel))[0]);
+    const r = radios(panel).find((x) => hasIcon(x, kind === 'video' ? 'videocam' : 'image') && rx.test(txt(x)))
+      || radios(panel).find((x) => hasIcon(x, kind === 'video' ? 'videocam' : 'image'))
+      || candidates.find((el) => rx.test(txt(el)) || (el.getAttribute('aria-label') && rx.test(el.getAttribute('aria-label'))));
 
     if (!r) throw err('mode_missing', `Não achei a opção de ${kind === 'video' ? 'vídeo' : 'imagem'}.`);
 
@@ -233,9 +234,14 @@
       || r.classList.contains('mat-button-toggle-checked');
 
     if (!isChecked) {
-      r.click();
+      realClick(r);
       await human(500, 1000);
+      if (!(isOn(r) || r.getAttribute('aria-selected') === 'true' || r.classList.contains('selected') || r.classList.contains('mat-button-toggle-checked'))) {
+        r.click();
+        await human(400, 800);
+      }
     }
+    dtLog('Modo escolhido: ' + (kind === 'video' ? 'vídeo' : 'imagem') + '.', { opcao: txt(r).slice(0, 30) });
   }
 
   async function chooseModel(panel, name) {
@@ -295,6 +301,12 @@
     }
     const miss = need.filter((n) => !summary.includes(n));
     if (miss.length) throw err('config_mismatch', `As configurações não foram aplicadas (aparece "${summary}").`);
+    // O resumo comeca com o modo ("Video · 360p..." / "Image · ..."): gerar video no lugar de imagem gasta credito a toa.
+    const wantMode = job.kind === 'video' ? /^\s*video\b/i : /^\s*image\b/i;
+    const summaryMode = summary.replace(/^[a-z_]+\s+(?=[A-Z])/, '');
+    if (/^\s*(video|image)\b/i.test(summaryMode) && !wantMode.test(summaryMode)) {
+      throw err('config_mismatch', `O Flow ficou no modo errado (aparece "${summary}").`);
+    }
   }
 
   // ---------- prompt ----------
@@ -1549,6 +1561,8 @@
     // Registra os elementos, URLs e digitais dos tiles que JA EXISTIAM antes deste take
     const prevTiles = new Set($$(S.videoTile));
     const prevFps = new Set($$(S.videoTile).map(tileFp));
+    const prevImageIds = new Set($$('img[data-media-id]').map((i) => i.getAttribute('data-media-id')));
+    const prevImageSrcs = new Set($$('img').map((i) => (i.currentSrc || i.src || '').split('?')[0]).filter(Boolean));
     const knownOldUrls = new Set();
     $$('video').forEach((v) => {
       const s = getVideoSrc(v);
@@ -1586,7 +1600,9 @@
         const fresh = unseen($$(tileSel()));
         const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
         if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
-        const ready = $$(S.imageTileImg).filter((i) => !i.closest('[data-dt-seen]'));
+        const ready = $$(S.imageTileImg).filter(
+          (i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id')) && !prevImageSrcs.has((i.currentSrc || i.src || '').split('?')[0])
+        );
         if (ready.length >= count) dtLog('Imagem gerada detectada.', { prontas: ready.length, mediaId: ready[0].getAttribute('data-media-id') }, 'success');
         if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
       } else {
