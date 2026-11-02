@@ -1187,6 +1187,73 @@
     return result;
   }
 
+  // ---------- referencias do take (folha do personagem/elenco e video do take anterior) ----------
+
+  async function fetchRefFile(url, fallbackName) {
+    const r = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'FLOW_FETCH_REF', url }, (resp) => {
+          void chrome.runtime.lastError;
+          resolve(resp || null);
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    if (!r || !r.ok || !r.b64) throw new Error('não consegui baixar a referência (' + ((r && r.why) || 'sem resposta') + ')');
+    const bin = atob(r.b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const name = (String(url).split('/').pop() || fallbackName).replace(/[^\w.-]/g, '_');
+    return new File([bytes], name, { type: r.mime || (/\.mp4$/i.test(name) ? 'video/mp4' : 'image/png') });
+  }
+
+  // Envia o arquivo pela biblioteca do menu "+" (mesmo caminho do teste de envio).
+  async function uploadToLibrary(file) {
+    const plus = $$('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+    if (!plus) return false;
+    realClick(plus);
+    if (!(await until(() => $('flow-add-menu-popover-content'), 6000, 250))) return false;
+    const input = await until(() => $('input[type=file]'), 3000, 250);
+    if (!input) return false;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(4000);
+    for (let i = 0; i < 3 && $('flow-add-menu-popover-content'); i++) {
+      pressEscape();
+      await sleep(400);
+    }
+    return true;
+  }
+
+  // Anexa um arquivo como ingrediente: soltar na caixa, colar, ou enviar e escolher na biblioteca.
+  async function attachFile(file) {
+    if (await attachByDrop(file)) return 'soltar';
+    if (await attachByPaste(file)) return 'colar';
+    if ((await uploadToLibrary(file)) && (await attachFromLibrary(file.name.replace(/\.[a-z0-9]+$/i, '')))) return 'biblioteca';
+    return '';
+  }
+
+  // Referencias do job: 1 imagem (folha) e 1 video (take anterior). Sem sucesso, segue sem referencia (com aviso).
+  async function attachJobReferences(job) {
+    const p = job.params || {};
+    const refs = [];
+    if (p.refImageUrl) refs.push(['imagem de referência (folha)', p.refImageUrl, 'referencia.png']);
+    if (p.refVideoUrl) refs.push(['vídeo do take anterior', p.refVideoUrl, 'take-anterior.mp4']);
+    for (const [label, url, name] of refs) {
+      try {
+        const file = await fetchRefFile(url, name);
+        const how = await attachFile(file);
+        dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chips: ingredientChips() }, how ? 'success' : 'warn');
+      } catch (e) {
+        dtLog('Referência não anexada (' + label + '): ' + String((e && e.message) || e).slice(0, 160), null, 'warn');
+      }
+    }
+  }
+
   // ---------- anexar uma imagem como referencia (ingrediente) na caixa de prompt ----------
 
   const promptBox = () => $('flow-base-prompt-box') || ($(S.editor) && ancestor($(S.editor), 4));
@@ -1477,6 +1544,7 @@
     await ensureDirectMode();
     await writePrompt(job.prompt);
     dtLog('Prompt escrito na caixa do Flow.');
+    await attachJobReferences(job);
 
     // Registra os elementos, URLs e digitais dos tiles que JA EXISTIAM antes deste take
     const prevTiles = new Set($$(S.videoTile));
@@ -1588,6 +1656,10 @@
         await sleep(400);
       }
       await closeLayers();
+      if (ingredientChips() > 0) {
+        dtLog('Removendo referências que sobraram do take anterior.', { chips: ingredientChips() });
+        await clearIngredients();
+      }
       const prob = classifyProblem();
       if (prob) throw err(prob.code, prob.msg);
       if (!$(S.editor)) throw err('no_project', 'Abra um projeto do Flow (a caixa de prompt não apareceu).');
