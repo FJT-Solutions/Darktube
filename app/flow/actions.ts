@@ -7,6 +7,7 @@ import {
   buildRepairPrompt,
   buildSystemPrompt,
   buildTakePrompt,
+  takeReference,
   extractJson,
   normalizeScript,
   validateScript,
@@ -23,7 +24,14 @@ import {
   syncFlowPublishStatus,
   updateFlowProject,
 } from "@/lib/flow-projects"
-import { createFlowJob, resumeFlowAgent } from "@/lib/flow-jobs"
+import {
+  buildCastPrompt,
+  buildSheetPrompt,
+  getLibraryCharacter,
+  listFlowLibrary,
+  saveToLibrary,
+} from "@/lib/flow-characters"
+import { cancelFlowJob, createFlowJob, listFlowJobs, resumeFlowAgent } from "@/lib/flow-jobs"
 import { assembleFlowProject } from "@/lib/flow-assemble"
 import { getRiskSettings, getRiskUsage, saveRiskSettings, type RiskSettings } from "@/lib/flow-risk"
 import { getSocialAccounts } from "@/lib/social-accounts"
@@ -66,6 +74,13 @@ function cleanParams(raw: Record<string, any>, templateId: string): FlowParams {
   out.aspect = out.aspect === "16:9" ? "16:9" : "9:16"
   out.model = String(out.model || t.defaults.model).slice(0, 60)
   out.quality = out.quality === "720p" ? "720p" : "360p"
+  out.refImages = out.refImages === "0" ? "0" : "1"
+  out.refPrevVideo =
+    out.refPrevVideo === "1" || out.refPrevVideo === "0"
+      ? out.refPrevVideo
+      : t.mode === "dialogo"
+        ? "1"
+        : "0"
   return out
 }
 
@@ -209,15 +224,19 @@ export async function queueFlowProjectAction(id: string) {
 
     const created = []
     for (const take of project.script.takes) {
+      // Referencias aprovadas (folha do personagem ou do elenco) e o take anterior como video de continuidade.
+      const ref = takeReference(project.script, take, project.params)
       const job = await createFlowJob({
         userId: user.id,
         kind: "video",
-        prompt: buildTakePrompt(project.script, take, project.params, t.mode),
+        prompt: buildTakePrompt(project.script, take, project.params, t.mode) + (ref.promptLine ? "\n" + ref.promptLine : ""),
         params: {
           aspectRatio: String(project.params.aspect),
           duration: take.seconds,
           resolution: String(project.params.quality),
           model: String(project.params.model),
+          ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
+          ...(ref.refPrevVideo ? { refPrevVideo: true } : {}),
         },
         projectId: project.id,
         takeIndex: take.n,
@@ -244,12 +263,14 @@ export async function regenerateFinalAction(id: string, takeNumbers: number[]) {
     const wanted = new Set(takeNumbers.map((n) => Math.round(Number(n))))
     const takes = project.script.takes.filter((k) => wanted.has(k.n))
     if (takes.length === 0) throw new Error("Escolha pelo menos um take.")
+    const finalRef = (take: (typeof takes)[number]) => takeReference(project.script, take, { ...project.params, refPrevVideo: "0" })
     for (const take of takes) {
       await createFlowJob({
         userId: user.id,
         kind: "video",
-        prompt: buildTakePrompt(project.script, take, project.params, t.mode),
-        params: { aspectRatio: String(project.params.aspect), duration: take.seconds, resolution: "720p", model: String(project.params.model) },
+        // 720p usa a mesma folha de referencia (o video do take anterior fica so nos rascunhos).
+        prompt: buildTakePrompt(project.script, take, project.params, t.mode) + (finalRef(take).promptLine ? "\n" + finalRef(take).promptLine : ""),
+        params: { aspectRatio: String(project.params.aspect), duration: take.seconds, resolution: "720p", model: String(project.params.model), ...(finalRef(take).refImageUrl ? { refImageUrl: finalRef(take).refImageUrl } : {}) },
         projectId: project.id,
         takeIndex: take.n,
         role: "take_final",
@@ -436,6 +457,309 @@ export async function deleteFlowPublishAction(id: string) {
     await deleteDarkClipPost(post.id)
     await updateFlowProject(user.id, id, { status: "assembled" })
     return { success: true as const }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function generateCharacterSheetAction(projectId: string, characterId: string) {
+  try {
+    const user = await requireUser()
+    const project = await getFlowProject(user.id, projectId)
+    if (!project) throw new Error("Projeto não encontrado.")
+    const c = project.script.characters.find((x) => x.id === characterId)
+    if (!c) throw new Error("Personagem não encontrado.")
+    if (!c.description.trim()) throw new Error("Preencha a descrição do personagem antes de gerar a folha.")
+
+    const job = await createFlowJob({
+      userId: user.id,
+      kind: "image",
+      prompt: buildSheetPrompt(c),
+      params: { aspectRatio: "16:9", model: "Omni 1.1 Flash", characterId },
+      projectId: project.id,
+      role: "character_sheet",
+    })
+
+    const nextScript: FlowScript = {
+      ...project.script,
+      characters: project.script.characters.map((x) =>
+        x.id === characterId ? { ...x, sheetStatus: "gerando" } : x
+      ),
+    }
+    const updated = await updateFlowProject(user.id, project.id, { script: nextScript })
+    return { success: true as const, project: updated ?? { ...project, script: nextScript }, jobId: job.id }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function generateCastSheetAction(projectId: string) {
+  try {
+    const user = await requireUser()
+    const project = await getFlowProject(user.id, projectId)
+    if (!project) throw new Error("Projeto não encontrado.")
+    const chars = project.script.characters
+    if (chars.length < 2) throw new Error("Adicione pelo menos 2 personagens para gerar a folha do elenco.")
+    if (chars.some((c) => !c.description.trim())) {
+      throw new Error("Preencha a descrição de todos os personagens antes de gerar a folha do elenco.")
+    }
+
+    const job = await createFlowJob({
+      userId: user.id,
+      kind: "image",
+      prompt: buildCastPrompt(chars),
+      params: { aspectRatio: "16:9", model: "Omni 1.1 Flash" },
+      projectId: project.id,
+      role: "cast_sheet",
+    })
+
+    const nextScript: FlowScript = {
+      ...project.script,
+      castSheetStatus: "gerando",
+    }
+    const updated = await updateFlowProject(user.id, project.id, { script: nextScript })
+    return { success: true as const, project: updated ?? { ...project, script: nextScript }, jobId: job.id }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function syncSheetsAction(projectId: string) {
+  try {
+    const user = await requireUser()
+    const current = await getFlowProject(user.id, projectId)
+    if (!current) throw new Error("Projeto não encontrado.")
+    const jobs = await listFlowJobs(user.id, 200, projectId)
+    const script: FlowScript = JSON.parse(JSON.stringify(current.script))
+    let changed = false
+
+    const charSheetJobs = jobs.filter((j) => j.role === "character_sheet" && j.status !== "cancelled")
+    const generatingChars = script.characters.filter((x) => x.sheetStatus === "gerando")
+
+    for (const c of script.characters) {
+      if (c.sheetStatus === "aprovada") continue
+      const expectedPrompt = buildSheetPrompt(c)
+      const matching = charSheetJobs.filter(
+        (j) => (j.params as any)?.characterId === c.id || j.prompt === expectedPrompt
+      )
+      let latest = matching[matching.length - 1]
+      if (!latest && c.sheetStatus === "gerando" && generatingChars.length === 1) {
+        latest = charSheetJobs[charSheetJobs.length - 1]
+      }
+      if (!latest || latest.status !== "done" || !latest.result_url) continue
+      if (!c.sheetStatus && !c.sheetUrl && latest.finished_at && new Date(latest.finished_at).getTime() < new Date(current.updated_at).getTime()) {
+        continue
+      }
+      if (c.sheetUrl !== latest.result_url || c.sheetStatus !== "aguardando") {
+        c.sheetUrl = latest.result_url
+        c.sheetStatus = "aguardando"
+        changed = true
+      }
+    }
+
+    if (script.castSheetStatus !== "aprovada") {
+      const castJobs = jobs.filter((j) => j.role === "cast_sheet" && j.status !== "cancelled")
+      const latestCast = castJobs[castJobs.length - 1]
+      if (latestCast && latestCast.status === "done" && latestCast.result_url) {
+        const clearedAfter =
+          !script.castSheetStatus &&
+          !script.castSheetUrl &&
+          latestCast.finished_at &&
+          new Date(latestCast.finished_at).getTime() < new Date(current.updated_at).getTime()
+        if (!clearedAfter && (script.castSheetUrl !== latestCast.result_url || script.castSheetStatus !== "aguardando")) {
+          script.castSheetUrl = latestCast.result_url
+          script.castSheetStatus = "aguardando"
+          changed = true
+        }
+      }
+    }
+
+    const project = changed ? (await updateFlowProject(user.id, projectId, { script })) ?? { ...current, script } : current
+    return { success: true as const, project }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function approveSheetAction(projectId: string, target: string) {
+  try {
+    const user = await requireUser()
+    const current = await getFlowProject(user.id, projectId)
+    if (!current) throw new Error("Projeto não encontrado.")
+
+    let nextScript: FlowScript
+    if (target === "cast") {
+      if (!current.script.castSheetUrl) throw new Error("Nenhuma folha do elenco para aprovar.")
+      nextScript = { ...current.script, castSheetStatus: "aprovada" }
+    } else {
+      const c = current.script.characters.find((x) => x.id === target)
+      if (!c || !c.sheetUrl) throw new Error("Nenhuma folha do personagem para aprovar.")
+      nextScript = {
+        ...current.script,
+        characters: current.script.characters.map((x) =>
+          x.id === target ? { ...x, sheetStatus: "aprovada" } : x
+        ),
+      }
+    }
+    const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    return { success: true as const, project: project ?? { ...current, script: nextScript } }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function clearSheetAction(projectId: string, target: string) {
+  try {
+    const user = await requireUser()
+    const current = await getFlowProject(user.id, projectId)
+    if (!current) throw new Error("Projeto não encontrado.")
+
+    const jobs = await listFlowJobs(user.id, 200, projectId)
+    let nextScript: FlowScript
+    if (target === "cast") {
+      for (const j of jobs) {
+        if (j.role === "cast_sheet" && (j.status === "queued" || j.status === "running")) {
+          await cancelFlowJob(user.id, j.id)
+        }
+      }
+      const copy: FlowScript = { ...current.script }
+      delete copy.castSheetUrl
+      delete copy.castSheetStatus
+      nextScript = copy
+    } else {
+      const c = current.script.characters.find((x) => x.id === target)
+      if (!c) throw new Error("Personagem não encontrado.")
+      const expectedPrompt = buildSheetPrompt(c)
+      for (const j of jobs) {
+        if (
+          j.role === "character_sheet" &&
+          (j.status === "queued" || j.status === "running") &&
+          ((j.params as any)?.characterId === target || j.prompt === expectedPrompt)
+        ) {
+          await cancelFlowJob(user.id, j.id)
+        }
+      }
+      nextScript = {
+        ...current.script,
+        characters: current.script.characters.map((x) => {
+          if (x.id !== target) return x
+          const copy = { ...x }
+          delete copy.sheetUrl
+          delete copy.sheetStatus
+          return copy
+        }),
+      }
+    }
+    const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    return { success: true as const, project: project ?? { ...current, script: nextScript } }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function saveCharacterToLibraryAction(projectId: string, characterId: string) {
+  try {
+    const user = await requireUser()
+    const current = await getFlowProject(user.id, projectId)
+    if (!current) throw new Error("Projeto não encontrado.")
+    const c = current.script.characters.find((x) => x.id === characterId)
+    if (!c) throw new Error("Personagem não encontrado.")
+
+    const saved = await saveToLibrary(user.id, c)
+    const nextScript: FlowScript = {
+      ...current.script,
+      characters: current.script.characters.map((x) =>
+        x.id === characterId ? { ...x, libraryId: saved.id } : x
+      ),
+    }
+    const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    return {
+      success: true as const,
+      character: saved,
+      project: project ?? { ...current, script: nextScript },
+    }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function useLibraryCharacterAction(projectId: string, characterId: string, libraryId: string) {
+  try {
+    const user = await requireUser()
+    const current = await getFlowProject(user.id, projectId)
+    if (!current) throw new Error("Projeto não encontrado.")
+    const libChar = await getLibraryCharacter(user.id, libraryId)
+    if (!libChar) throw new Error("Personagem da biblioteca não encontrado.")
+
+    const nextScript: FlowScript = {
+      ...current.script,
+      characters: current.script.characters.map((x) => {
+        if (x.id !== characterId) return x
+        const next = {
+          ...x,
+          name: libChar.name,
+          description: libChar.description,
+          voice: libChar.voice,
+          libraryId: libChar.id,
+        }
+        if (libChar.sheet_url) {
+          next.sheetUrl = libChar.sheet_url
+          next.sheetStatus = "aprovada"
+        } else {
+          delete next.sheetUrl
+          delete next.sheetStatus
+        }
+        return next
+      }),
+    }
+    const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    return { success: true as const, project: project ?? { ...current, script: nextScript } }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function listFlowLibraryAction() {
+  try {
+    const user = await requireUser()
+    const characters = await listFlowLibrary(user.id)
+    return { success: true as const, characters }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function saveFlowRefOptionsAction(
+  projectId: string,
+  input: { refImages?: string | boolean; refPrevVideo?: string | boolean }
+) {
+  try {
+    const user = await requireUser()
+    const current = await getFlowProject(user.id, projectId)
+    if (!current) throw new Error("Projeto não encontrado.")
+    const t = getFlowTemplate(current.template_id)
+    const defaultPrev = t?.mode === "dialogo" ? "1" : "0"
+    const nextParams: FlowParams = {
+      ...current.params,
+      refImages:
+        input.refImages !== undefined
+          ? input.refImages === "0" || input.refImages === false
+            ? "0"
+            : "1"
+          : String(current.params.refImages ?? "1") === "0"
+            ? "0"
+            : "1",
+      refPrevVideo:
+        input.refPrevVideo !== undefined
+          ? input.refPrevVideo === "1" || input.refPrevVideo === true
+            ? "1"
+            : "0"
+          : String(current.params.refPrevVideo ?? defaultPrev) === "1"
+            ? "1"
+            : "0",
+    }
+    const project = await updateFlowProject(user.id, projectId, { params: nextParams })
+    return { success: true as const, project: project ?? { ...current, params: nextParams } }
   } catch (err) {
     return fail(err)
   }

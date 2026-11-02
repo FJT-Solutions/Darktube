@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
-import { claimNextFlowJob, touchFlowAgent, getFlowAgentState } from '@/lib/flow-jobs';
+import { claimNextFlowJob, touchFlowAgent, getFlowAgentState, previousTakeVideo } from '@/lib/flow-jobs';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +16,11 @@ export async function POST(req: Request) {
   const result = await claimNextFlowJob(user.id);
 
   const who = String(user.id).slice(0, 8);
+  const job: any = result.job;
+  if (job?.params?.refPrevVideo && job.project_id && Number(job.take_index) > 1) {
+    const prev = await previousTakeVideo(user.id, job.project_id, Number(job.take_index)).catch(() => null);
+    if (prev) job.params = { ...job.params, refVideoUrl: prev };
+  }
   if (result.job) {
     lastReason.delete(user.id);
     console.log(`[FLOW EXTENSION][INFO] claim user=${who} job entregue: ${result.job.kind} take ${result.job.take_index ?? '-'} (projeto ${String(result.job.project_id ?? '-').slice(0, 8)})`);

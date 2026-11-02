@@ -13,6 +13,9 @@ export interface FlowCharacter {
   description: string
   /** Sotaque e timbre, em ingles curto. */
   voice: string
+  sheetUrl?: string
+  sheetStatus?: 'gerando' | 'aguardando' | 'aprovada'
+  libraryId?: string
 }
 
 export interface FlowLocation {
@@ -57,6 +60,8 @@ export interface FlowScript {
   locations: FlowLocation[]
   takes: FlowTake[]
   seo: FlowSeo
+  castSheetUrl?: string
+  castSheetStatus?: 'gerando' | 'aguardando' | 'aprovada'
 }
 
 export interface FlowParams {
@@ -159,18 +164,29 @@ export function extractJson(text: string): any {
 
 const str = (v: any, max = 600) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const KINDS: FlowTakeKind[] = ['dialogo', 'narracao', 'ambiente']
+const SHEET_STATUSES = ['gerando', 'aguardando', 'aprovada'] as const
+const parseSheetStatus = (v: any): 'gerando' | 'aguardando' | 'aprovada' | undefined =>
+  SHEET_STATUSES.includes(v) ? v : undefined
 
 /** Normaliza a resposta da IA (ou o roteiro editado) para o formato interno, sem confiar em nada. */
 export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): FlowScript {
   const baseSeconds = Number(params.seconds) || t.defaults.seconds
   const characters: FlowCharacter[] = (Array.isArray(raw?.characters) ? raw.characters : [])
     .slice(0, 8)
-    .map((c: any, i: number) => ({
-      id: str(c?.id, 20) || `c${i + 1}`,
-      name: str(c?.name, 60) || `Personagem ${i + 1}`,
-      description: str(c?.description, 500),
-      voice: str(c?.voice, 160),
-    }))
+    .map((c: any, i: number) => {
+      const sheetUrl = str(c?.sheetUrl, 300)
+      const sheetStatus = parseSheetStatus(c?.sheetStatus)
+      const libraryId = str(c?.libraryId, 60)
+      return {
+        id: str(c?.id, 20) || `c${i + 1}`,
+        name: str(c?.name, 60) || `Personagem ${i + 1}`,
+        description: str(c?.description, 500),
+        voice: str(c?.voice, 160),
+        ...(sheetUrl ? { sheetUrl } : {}),
+        ...(sheetStatus ? { sheetStatus } : {}),
+        ...(libraryId ? { libraryId } : {}),
+      }
+    })
   const locations: FlowLocation[] = (Array.isArray(raw?.locations) ? raw.locations : [])
     .slice(0, 12)
     .map((l: any, i: number) => ({
@@ -201,6 +217,8 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
   })
   if (takes.length === 0) throw new Error('A IA não devolveu nenhum take.')
   const seo = raw?.seo || {}
+  const castSheetUrl = str(raw?.castSheetUrl, 300)
+  const castSheetStatus = parseSheetStatus(raw?.castSheetStatus)
   return {
     title: str(raw?.title, 120) || t.name,
     logline: str(raw?.logline, 300),
@@ -216,6 +234,8 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
         .filter(Boolean)
         .slice(0, 15),
     },
+    ...(castSheetUrl ? { castSheetUrl } : {}),
+    ...(castSheetStatus ? { castSheetStatus } : {}),
   }
 }
 
@@ -357,4 +377,33 @@ export function softenFlowPrompt(prompt: string): string {
       return l
     })
     .join('\n')
+}
+
+/**
+ * Referencias de um take (o Flow aceita 1 imagem e 1 video por take): com 1 personagem visivel, a folha dele;
+ * com 2 ou mais, a folha do elenco (ou, sem ela, a folha de quem fala). So folhas aprovadas.
+ * Devolve tambem a linha que avisa o modelo no prompt.
+ */
+export function takeReference(script: FlowScript, take: FlowTake, params: FlowParams): { refImageUrl?: string; refPrevVideo?: boolean; promptLine?: string } {
+  const out: { refImageUrl?: string; refPrevVideo?: boolean; promptLine?: string } = {}
+  if (String(params.refImages ?? '1') !== '0') {
+    const visible = script.characters.filter((c) => take.characters.includes(c.id))
+    const ok = (c?: FlowCharacter) => (c && c.sheetStatus === 'aprovada' && c.sheetUrl ? c.sheetUrl : undefined)
+    if (visible.length === 1 && ok(visible[0])) {
+      out.refImageUrl = ok(visible[0])
+      out.promptLine = `[Reference Image]: the attached image is the character reference sheet of ${visible[0].name}; keep the face, hair, body and outfit exactly as in it. Ignore its plain background and layout.`
+    } else if (visible.length > 1 && script.castSheetStatus === 'aprovada' && script.castSheetUrl) {
+      out.refImageUrl = script.castSheetUrl
+      const order = script.characters.filter((c) => visible.includes(c)).map((c) => c.name).join(', ')
+      out.promptLine = `[Reference Image]: the attached image shows the cast from left to right (${script.characters.map((c) => c.name).join(', ')}); in this scene appear ${order}. Keep their faces, hair and outfits exactly as in it. Ignore its plain background and layout.`
+    } else if (visible.length > 1) {
+      const sp = script.characters.find((c) => c.id === take.speaker)
+      if (ok(sp)) {
+        out.refImageUrl = ok(sp)
+        out.promptLine = `[Reference Image]: the attached image is the reference sheet of ${sp!.name}; keep ${sp!.name}'s face, hair and outfit exactly as in it.`
+      }
+    }
+  }
+  if (String(params.refPrevVideo ?? '0') === '1' && take.n > 1) out.refPrevVideo = true
+  return out
 }

@@ -20,6 +20,9 @@ import {
   ShieldAlert,
   CalendarClock,
   Hammer,
+  Upload,
+  RefreshCw,
+  BookmarkPlus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -46,6 +49,7 @@ import {
 import { buildTakePrompt, countWords, exportScriptText, takeKind, validateScript, type FlowScript, type FlowTake, type FlowTakeKind } from "@/lib/flow-script"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject } from "@/lib/flow-projects"
+import type { FlowLibraryCharacter } from "@/lib/flow-characters"
 import {
   deleteFlowProjectAction,
   generateFlowProjectAction,
@@ -65,6 +69,15 @@ import {
   getFlowRiskAction,
   saveFlowRiskAction,
   resumeFlowAgentAction,
+  generateCharacterSheetAction,
+  generateCastSheetAction,
+  syncSheetsAction,
+  approveSheetAction,
+  clearSheetAction,
+  saveCharacterToLibraryAction,
+  useLibraryCharacterAction,
+  listFlowLibraryAction,
+  saveFlowRefOptionsAction,
 } from "./actions"
 
 type View = "novo" | "projeto" | "projetos"
@@ -92,6 +105,12 @@ const STATUS_LABEL: Record<string, string> = {
   done: "Pronto",
   draft: "Rascunho",
   cancelled: "Cancelado",
+}
+
+const SHEET_STATUS_LABEL: Record<string, string> = {
+  gerando: "Gerando no Flow...",
+  aguardando: "Aguardando aprovação",
+  aprovada: "Aprovada",
 }
 
 /** Duracao legivel: "48 s", "3 min 12 s". */
@@ -672,6 +691,9 @@ function ProjectView({
   const [when, setWhen] = useState("")
   const [now, setNow] = useState(true)
   const [busy, setBusy] = useState("")
+  const [sheetBusy, setSheetBusy] = useState("")
+  const [library, setLibrary] = useState<FlowLibraryCharacter[]>([])
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const loadJobs = useCallback(async () => {
     try {
@@ -685,6 +707,35 @@ function ProjectView({
       /* sem rede: mantem o ultimo estado */
     }
   }, [project.id])
+
+  const loadLibrary = useCallback(async () => {
+    const res = await listFlowLibraryAction()
+    if (res.success) setLibrary(res.characters)
+  }, [])
+
+  const applyProjectFromSheet = useCallback(
+    (updated: FlowProject, fullCharId?: string) => {
+      setProject(updated)
+      onChanged(updated)
+      setScript((prev) => ({
+        ...prev,
+        castSheetUrl: updated.script.castSheetUrl,
+        castSheetStatus: updated.script.castSheetStatus,
+        characters: prev.characters.map((c) => {
+          const uc = updated.script.characters.find((x) => x.id === c.id)
+          if (!uc) return c
+          if (fullCharId === c.id) return { ...uc }
+          return {
+            ...c,
+            sheetUrl: uc.sheetUrl,
+            sheetStatus: uc.sheetStatus,
+            libraryId: uc.libraryId,
+          }
+        }),
+      }))
+    },
+    [onChanged]
+  )
 
   const refreshProject = useCallback(async () => {
     const res = await getFlowProjectAction(project.id)
@@ -708,6 +759,25 @@ function ProjectView({
     return () => clearInterval(t)
   }, [loadJobs, refreshProject, jobsMoving, projectMoving])
 
+  // Enquanto houver folha 'gerando', chama syncSheetsAction a cada 8 s.
+  const anySheetGenerating =
+    script.castSheetStatus === "gerando" ||
+    script.characters.some((c) => c.sheetStatus === "gerando")
+
+  useEffect(() => {
+    if (!anySheetGenerating) return
+    const runSync = async () => {
+      const res = await syncSheetsAction(project.id)
+      if (res.success && res.project) {
+        applyProjectFromSheet(res.project as FlowProject)
+      }
+      loadJobs()
+    }
+    runSync()
+    const timer = setInterval(runSync, 8000)
+    return () => clearInterval(timer)
+  }, [anySheetGenerating, project.id, applyProjectFromSheet, loadJobs])
+
   // Ao abrir um projeto ja publicado/agendado, busca o resultado do post.
   useEffect(() => {
     if (["publishing", "scheduled", "published", "publish_failed"].includes(project.status)) refreshProject()
@@ -716,7 +786,8 @@ function ProjectView({
 
   useEffect(() => {
     getFlowRiskAction().then((r) => r.success && setRisk(r.settings))
-  }, [])
+    loadLibrary()
+  }, [loadLibrary])
 
   useEffect(() => {
     listFlowAccountsAction().then((r) => r.success && setAccounts(r.accounts))
@@ -737,15 +808,20 @@ function ProjectView({
     [script, template.mode]
   )
 
+  const takeJobs = useMemo(
+    () => jobs.filter((j) => j.role === "take" || j.role === "take_final" || !j.role),
+    [jobs]
+  )
+
   // Melhor job de cada take: o final (720p) pronto, senao o primeiro pronto, senao o ultimo da lista.
   const bestJob = (n: number) => {
-    const list = jobs.filter((j) => j.take_index === n)
+    const list = takeJobs.filter((j) => j.take_index === n)
     const done = list.filter((j) => j.status === "done" && j.result_url)
     return done.find((j) => j.role === "take_final") ?? done[0] ?? list[list.length - 1]
   }
   const allDone = script.takes.every((t) => bestJob(t.n)?.status === "done")
   const drafts = script.takes.filter((t) => bestJob(t.n)?.status === "done" && bestJob(t.n)?.role !== "take_final")
-  const queuedAny = jobs.length > 0
+  const queuedAny = takeJobs.length > 0
 
   // Edicao do roteiro: qualquer campo do take, dos personagens e dos cenarios (no modo Livre, tudo).
   const edit = (fn: (s: FlowScript) => FlowScript) => {
@@ -794,6 +870,137 @@ function ProjectView({
     onChanged(res.project as FlowProject)
     setDirty(false)
     toast.success("Alterações salvas.")
+  }
+
+  const ensureSavedIfDirty = async (): Promise<boolean> => {
+    if (!dirty) return true
+    const res = await saveFlowScriptAction(project.id, script)
+    if (!res.success) {
+      toast.error(res.error)
+      return false
+    }
+    setProject(res.project as FlowProject)
+    onChanged(res.project as FlowProject)
+    setDirty(false)
+    return true
+  }
+
+  const handleGenerateCharSheet = async (characterId: string) => {
+    setSheetBusy(`gen_${characterId}`)
+    if (!(await ensureSavedIfDirty())) {
+      setSheetBusy("")
+      return
+    }
+    const res = await generateCharacterSheetAction(project.id, characterId)
+    setSheetBusy("")
+    if (!res.success) return void toast.error(res.error)
+    applyProjectFromSheet(res.project as FlowProject)
+    loadJobs()
+    toast.success("Folha do personagem enviada para a fila do Flow.")
+  }
+
+  const handleGenerateCastSheet = async () => {
+    setSheetBusy("gen_cast")
+    if (!(await ensureSavedIfDirty())) {
+      setSheetBusy("")
+      return
+    }
+    const res = await generateCastSheetAction(project.id)
+    setSheetBusy("")
+    if (!res.success) return void toast.error(res.error)
+    applyProjectFromSheet(res.project as FlowProject)
+    loadJobs()
+    toast.success("Folha do elenco enviada para a fila do Flow.")
+  }
+
+  const handleUploadSheet = async (target: string, file: File | undefined) => {
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 8 MB.")
+      return
+    }
+    setSheetBusy(`up_${target}`)
+    if (!(await ensureSavedIfDirty())) {
+      setSheetBusy("")
+      return
+    }
+    try {
+      const fd = new FormData()
+      fd.append("projectId", project.id)
+      fd.append("characterId", target)
+      fd.append("file", file)
+      const res = await fetch("/api/flow/characters/sheet", { method: "POST", body: fd })
+      const json = await res.json()
+      setSheetBusy("")
+      if (!json.success) {
+        toast.error(json.error || "Não foi possível enviar a imagem.")
+        return
+      }
+      applyProjectFromSheet(json.project as FlowProject)
+      toast.success("Imagem enviada e aprovada.")
+    } catch {
+      setSheetBusy("")
+      toast.error("Erro de rede ao enviar a imagem.")
+    }
+  }
+
+  const handleApproveSheet = async (target: string) => {
+    setSheetBusy(`ap_${target}`)
+    const res = await approveSheetAction(project.id, target)
+    setSheetBusy("")
+    if (!res.success) return void toast.error(res.error)
+    applyProjectFromSheet(res.project as FlowProject)
+    toast.success("Folha aprovada.")
+  }
+
+  const handleClearSheet = async (target: string) => {
+    setSheetBusy(`rm_${target}`)
+    const res = await clearSheetAction(project.id, target)
+    setSheetBusy("")
+    if (!res.success) return void toast.error(res.error)
+    applyProjectFromSheet(res.project as FlowProject)
+    loadJobs()
+    toast.success("Folha removida.")
+  }
+
+  const handleSaveToLibrary = async (characterId: string) => {
+    setSheetBusy(`lib_save_${characterId}`)
+    if (!(await ensureSavedIfDirty())) {
+      setSheetBusy("")
+      return
+    }
+    const res = await saveCharacterToLibraryAction(project.id, characterId)
+    setSheetBusy("")
+    if (!res.success) return void toast.error(res.error)
+    applyProjectFromSheet(res.project as FlowProject)
+    loadLibrary()
+    toast.success("Personagem salvo na biblioteca.")
+  }
+
+  const handleUseFromLibrary = async (characterId: string, libraryId: string) => {
+    if (!libraryId || libraryId === "_") return
+    setSheetBusy(`lib_use_${characterId}`)
+    if (!(await ensureSavedIfDirty())) {
+      setSheetBusy("")
+      return
+    }
+    const res = await useLibraryCharacterAction(project.id, characterId, libraryId)
+    setSheetBusy("")
+    if (!res.success) return void toast.error(res.error)
+    applyProjectFromSheet(res.project as FlowProject, characterId)
+    toast.success("Personagem carregado da biblioteca.")
+  }
+
+  const refImagesOn = String(params.refImages ?? "1") !== "0"
+  const refPrevVideoDefault = template.mode === "dialogo" ? "1" : "0"
+  const refPrevVideoOn = String(params.refPrevVideo ?? refPrevVideoDefault) === "1"
+
+  const handleRefOptionChange = async (patch: { refImages?: string; refPrevVideo?: string }) => {
+    const res = await saveFlowRefOptionsAction(project.id, patch)
+    if (!res.success) return void toast.error(res.error)
+    setProject(res.project as FlowProject)
+    onChanged(res.project as FlowProject)
+    toast.success("Opções de referência atualizadas.")
   }
 
   const queue = async () => {
@@ -880,19 +1087,279 @@ function ProjectView({
       </div>
 
       {(script.characters.length > 0 || free) && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Personagens <span className="text-xs font-normal text-muted-foreground">(descrição fixa em inglês: idade, rosto, cabelo, corpo, roupa; 25 a 35 palavras)</span></p>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium">
+              Personagens{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                (descrição fixa em inglês: idade, rosto, cabelo, corpo, roupa; 25 a 35 palavras)
+              </span>
+            </p>
             <Button size="sm" variant="outline" onClick={addCharacter}>Adicionar personagem</Button>
           </div>
+
+          <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-muted/30 p-3 text-xs">
+            <label className="flex cursor-pointer items-center gap-2 font-medium">
+              <input
+                type="checkbox"
+                checked={refImagesOn}
+                onChange={(e) => handleRefOptionChange({ refImages: e.target.checked ? "1" : "0" })}
+              />
+              Usar as folhas aprovadas como referência
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 font-medium">
+              <input
+                type="checkbox"
+                checked={refPrevVideoOn}
+                onChange={(e) => handleRefOptionChange({ refPrevVideo: e.target.checked ? "1" : "0" })}
+              />
+              Usar o take anterior como vídeo de referência
+            </label>
+          </div>
+
+          <Card className="border-dashed">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Folha do elenco (cenas com mais de um personagem)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Imagem 16:9 com os personagens lado a lado para manter a aparência quando contracenam no mesmo take.
+                  </p>
+                </div>
+                <Badge variant={script.castSheetStatus === "aprovada" ? "default" : "outline"}>
+                  {script.castSheetStatus ? (SHEET_STATUS_LABEL[script.castSheetStatus] ?? script.castSheetStatus) : "Sem folha"}
+                </Badge>
+              </div>
+
+              {script.castSheetUrl && (
+                <img
+                  src={script.castSheetUrl}
+                  alt="Folha do elenco"
+                  className="max-h-44 rounded-md border bg-muted object-contain"
+                />
+              )}
+
+              <input
+                ref={(el) => {
+                  fileInputRefs.current["cast"] = el
+                }}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ""
+                  handleUploadSheet("cast", f)
+                }}
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!!sheetBusy || script.castSheetStatus === "gerando" || script.characters.length < 2}
+                  onClick={handleGenerateCastSheet}
+                >
+                  {sheetBusy === "gen_cast" || script.castSheetStatus === "gerando" ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Gerar folha no Flow
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!!sheetBusy}
+                  onClick={() => fileInputRefs.current["cast"]?.click()}
+                >
+                  {sheetBusy === "up_cast" ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Enviar imagem
+                </Button>
+                {script.castSheetStatus === "aguardando" && (
+                  <Button
+                    size="sm"
+                    disabled={!!sheetBusy}
+                    onClick={() => handleApproveSheet("cast")}
+                  >
+                    <Check className="mr-1.5 h-3.5 w-3.5" /> Aprovar
+                  </Button>
+                )}
+                {(script.castSheetUrl || script.castSheetStatus) && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!!sheetBusy || script.castSheetStatus === "gerando" || script.characters.length < 2}
+                      onClick={handleGenerateCastSheet}
+                    >
+                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refazer
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      disabled={!!sheetBusy}
+                      onClick={() => handleClearSheet("cast")}
+                    >
+                      <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remover
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-3 sm:grid-cols-2">
             {script.characters.map((c) => (
               <Card key={c.id}>
-                <CardContent className="space-y-2 p-4">
-                  <Input value={c.name} onChange={(e) => setCharacter(c.id, { name: e.target.value })} maxLength={60} />
-                  <Textarea value={c.description} onChange={(e) => setCharacter(c.id, { description: e.target.value })} rows={3} maxLength={500} placeholder="Ex.: 35-year-old fictional woman, olive skin, shoulder-length curly dark hair, faded navy jumpsuit..." />
-                  <Input value={c.voice} onChange={(e) => setCharacter(c.id, { voice: e.target.value })} maxLength={160} placeholder="Voz (ex.: warm, calm Brazilian accent)" />
+                <CardContent className="space-y-2.5 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <Input value={c.name} onChange={(e) => setCharacter(c.id, { name: e.target.value })} maxLength={60} />
+                    <Badge variant={c.sheetStatus === "aprovada" ? "default" : "outline"} className="shrink-0">
+                      {c.sheetStatus ? (SHEET_STATUS_LABEL[c.sheetStatus] ?? c.sheetStatus) : "Sem folha"}
+                    </Badge>
+                  </div>
+
+                  {c.sheetUrl && (
+                    <img
+                      src={c.sheetUrl}
+                      alt={`Folha de ${c.name}`}
+                      className="max-h-40 w-full rounded-md border bg-muted object-contain"
+                    />
+                  )}
+
+                  <Textarea
+                    value={c.description}
+                    onChange={(e) => setCharacter(c.id, { description: e.target.value })}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Ex.: 35-year-old fictional woman, olive skin, shoulder-length curly dark hair, faded navy jumpsuit..."
+                  />
+                  <Input
+                    value={c.voice}
+                    onChange={(e) => setCharacter(c.id, { voice: e.target.value })}
+                    maxLength={160}
+                    placeholder="Voz (ex.: warm, calm Brazilian accent)"
+                  />
                   <p className="text-[11px] text-muted-foreground">{countWords(c.description)} palavras</p>
+
+                  <input
+                    ref={(el) => {
+                      fileInputRefs.current[c.id] = el
+                    }}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      e.target.value = ""
+                      handleUploadSheet(c.id, f)
+                    }}
+                  />
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      disabled={!!sheetBusy || c.sheetStatus === "gerando"}
+                      onClick={() => handleGenerateCharSheet(c.id)}
+                    >
+                      {sheetBusy === `gen_${c.id}` || c.sheetStatus === "gerando" ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1 h-3.5 w-3.5" />
+                      )}
+                      Gerar folha no Flow
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      disabled={!!sheetBusy}
+                      onClick={() => fileInputRefs.current[c.id]?.click()}
+                    >
+                      {sheetBusy === `up_${c.id}` ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="mr-1 h-3.5 w-3.5" />
+                      )}
+                      Enviar imagem
+                    </Button>
+                    {c.sheetStatus === "aguardando" && (
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs"
+                        disabled={!!sheetBusy}
+                        onClick={() => handleApproveSheet(c.id)}
+                      >
+                        <Check className="mr-1 h-3.5 w-3.5" /> Aprovar
+                      </Button>
+                    )}
+                    {(c.sheetUrl || c.sheetStatus) && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs"
+                          disabled={!!sheetBusy || c.sheetStatus === "gerando"}
+                          onClick={() => handleGenerateCharSheet(c.id)}
+                        >
+                          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refazer
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs text-destructive"
+                          disabled={!!sheetBusy}
+                          onClick={() => handleClearSheet(c.id)}
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      disabled={!!sheetBusy}
+                      onClick={() => handleSaveToLibrary(c.id)}
+                    >
+                      {sheetBusy === `lib_save_${c.id}` ? (
+                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <BookmarkPlus className="mr-1 h-3.5 w-3.5" />
+                      )}
+                      Salvar na biblioteca
+                    </Button>
+                  </div>
+
+                  <div className="pt-1">
+                    <Select
+                      value={c.libraryId && library.some((l) => l.id === c.libraryId) ? c.libraryId : "_"}
+                      onValueChange={(v) => handleUseFromLibrary(c.id, v)}
+                      disabled={library.length === 0 || !!sheetBusy}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Usar da biblioteca" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_">
+                          {library.length === 0 ? "Usar da biblioteca (vazia)" : "Usar da biblioteca..."}
+                        </SelectItem>
+                        {library.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name} {item.sheet_url ? "· com folha" : "· sem folha"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -951,8 +1418,6 @@ function ProjectView({
                     )}
                     {job?.status === "done" && (
                       <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => retryJob(job.id)}>Regerar</Button>
-
-
                     )}
                   </div>
                 </div>
@@ -1091,9 +1556,9 @@ function ProjectView({
           {queuedAny ? (
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Check className="h-4 w-4" /> Enviado. Os takes acima mostram o andamento.
-              {jobs.some((j) => j.status === "draft") && (
+              {takeJobs.some((j) => j.status === "draft") && (
                 <Button size="sm" variant="outline" className="ml-3" onClick={retryAllFailed}>
-                  <Send className="mr-1.5 h-3.5 w-3.5" /> Reenviar falhas ({jobs.filter((j) => j.status === "draft").length})
+                  <Send className="mr-1.5 h-3.5 w-3.5" /> Reenviar falhas ({takeJobs.filter((j) => j.status === "draft").length})
                 </Button>
               )}
               {!agentOnline && " A extensão ainda não está online neste computador."}

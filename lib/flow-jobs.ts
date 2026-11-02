@@ -10,6 +10,14 @@ export interface FlowJobParams {
   duration?: number;
   resolution?: string;
   count?: number;
+  /** Folha de personagem: qual personagem do projeto esta imagem representa. */
+  characterId?: string;
+  /** Imagem de referencia do take (folha do personagem ou do elenco), em /api/storage/... */
+  refImageUrl?: string;
+  /** Usar o video do take anterior como referencia de continuidade (resolvido na entrega do job). */
+  refPrevVideo?: boolean;
+  /** Preenchido na entrega: video do take anterior. */
+  refVideoUrl?: string;
 }
 
 export interface FlowJob {
@@ -103,7 +111,22 @@ function cleanParams(raw: any): FlowJobParams {
   if (typeof raw.model === 'string') p.model = raw.model.slice(0, 60);
   if (Number.isFinite(raw.duration)) p.duration = Math.min(Math.max(Math.round(raw.duration), 2), 12);
   if (Number.isFinite(raw.count)) p.count = Math.min(Math.max(Math.round(raw.count), 1), 4);
+  if (typeof raw.characterId === 'string') p.characterId = raw.characterId.slice(0, 40);
+  if (typeof raw.refImageUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.refImageUrl)) p.refImageUrl = raw.refImageUrl.slice(0, 200);
+  if (raw.refPrevVideo === true) p.refPrevVideo = true;
   return p;
+}
+
+/** Video pronto do take anterior do mesmo projeto (o final em 720p se houver), para referencia de continuidade. */
+export async function previousTakeVideo(userId: string, projectId: string, takeIndex: number): Promise<string | null> {
+  const { rows } = await pool.query(
+    `SELECT result_url FROM public.flow_jobs
+      WHERE user_id = $1 AND project_id = $2 AND take_index = $3 AND status = 'done' AND result_url IS NOT NULL
+        AND role IN ('take', 'take_final')
+      ORDER BY (role = 'take_final') DESC, finished_at DESC LIMIT 1`,
+    [userId, projectId, takeIndex - 1]
+  );
+  return rows[0]?.result_url ?? null;
 }
 
 // Expira o que ficou preso: job rodando há demais e job na fila que passou do prazo viram rascunho.
