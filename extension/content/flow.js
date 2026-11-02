@@ -8,7 +8,28 @@
 
   const S = window.DT_FLOW_SEL;
   const RX = window.DT_FLOW_RX;
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Com a aba em segundo plano o Chrome atrasa os timers para 1 vez por minuto. Durante um job o segundo plano
+  // da extensao manda "FLOW_WAKE" a cada 2 s; cada espera termina no que vier primeiro: o timer ou um despertar
+  // depois do tempo pedido. Assim a aba escondida roda quase na velocidade normal, sem precisar ficar visivel.
+  const wakeWaiters = new Set();
+  const sleep = (ms) =>
+    new Promise((r) => {
+      const t0 = Date.now();
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        wakeWaiters.delete(check);
+        r();
+      };
+      const check = () => {
+        if (Date.now() - t0 >= ms) finish();
+      };
+      const timer = setTimeout(finish, ms);
+      wakeWaiters.add(check);
+    });
+  const wakeAll = () => Array.from(wakeWaiters).forEach((f) => f());
   const rand = (a, b) => a + Math.random() * (b - a);
   const human = (a = 350, b = 1100) => sleep(rand(a, b));
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -1059,6 +1080,105 @@
     return parts;
   }
 
+  // ---------- teste de envio de imagem (base para anexar as folhas de personagem) ----------
+
+  // Imagem PNG pequena e identificavel, feita na hora (sem baixar nada).
+  function testPng() {
+    return new Promise((resolve) => {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 256, 256);
+      grad.addColorStop(0, '#1e3a8a');
+      grad.addColorStop(1, '#f59e0b');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 256, 256);
+      g.fillStyle = '#ffffff';
+      g.beginPath();
+      g.arc(128, 128, 60, 0, Math.PI * 2);
+      g.fill();
+      c.toBlob((b) => resolve(new File([b], 'darktube-teste-referencia.png', { type: 'image/png' })), 'image/png');
+    });
+  }
+
+  const ingredientChips = () => $('flow-ingredient-chip, flow-image-ingredient-chip').length;
+
+  // Abre o menu "+", entrega a imagem ao campo de arquivo do Flow por codigo (sem a janela do Windows),
+  // registra o que mudou (biblioteca, chip de ingrediente) e fecha o menu.
+  async function uploadTest() {
+    dtLog('Teste de envio: início.', { chipsAntes: ingredientChips(), camposArquivo: fileInputsInfo().length });
+    const plus = $('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+    if (!plus) throw new Error('Não achei o botão "+" da caixa de prompt (abra um projeto do Flow).');
+    realClick(plus);
+    const menu = await until(() => $('flow-add-menu-popover-content'), 6000, 250);
+    if (!menu) throw new Error('O menu "+" não abriu.');
+    let input = await until(() => $('input[type=file]'), 3000, 250);
+    if (!input) {
+      // Alguns menus so criam o campo ao clicar em enviar: clica e captura, sem abrir a janela do Windows.
+      const up = $('.sidebar-upload-btn') || $('button', menu).find((b) => /upload|enviar/i.test(txt(b) + (b.getAttribute('aria-label') || '')));
+      const origClick = HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click = function () {
+        if (this.type === 'file') {
+          input = this;
+          return;
+        }
+        return origClick.apply(this, arguments);
+      };
+      try {
+        if (up) realClick(up);
+        await until(() => input || $('input[type=file]'), 3000, 200);
+        input = input || $('input[type=file]');
+      } finally {
+        HTMLInputElement.prototype.click = origClick;
+      }
+    }
+    if (!input) {
+      pressEscape();
+      throw new Error('O Flow não criou o campo de envio de arquivo.');
+    }
+    const file = await testPng();
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    dtLog('Teste de envio: imagem entregue ao campo de arquivo.', { accept: input.getAttribute('accept'), multiple: input.multiple, bytes: file.size });
+
+    // Espera algum sinal: chip novo na caixa de prompt, item novo na biblioteca, barra de envio ou erro do Flow.
+    const t0 = Date.now();
+    let seen = '';
+    for (; Date.now() - t0 < 30000; ) {
+      await sleep(1000);
+      if (ingredientChips() > 0) {
+        seen = 'imagem anexada como ingrediente';
+        break;
+      }
+      const pop = $('flow-add-menu-popover-content');
+      const t = txt(pop || document.body);
+      if (/upload(ing|ed)|enviando|carregando|processing/i.test(t)) seen = seen || 'envio em andamento';
+      if (/darktube-teste-referencia/i.test(t) || $('img', pop || document).some((i) => /darktube-teste/i.test(i.alt || ''))) {
+        seen = 'imagem apareceu na biblioteca';
+        break;
+      }
+      if (/failed|error|erro|not supported|não suportad/i.test(t) && /upload|envio/i.test(t)) {
+        seen = 'o Flow mostrou erro no envio';
+        break;
+      }
+    }
+    const menuNow = $('.cdk-overlay-container');
+    if (menuNow && txt(menuNow)) dtSnapshot('teste de envio: menu depois do envio', menuNow, 'info');
+    const ed = $(S.editor);
+    if (ed) dtSnapshot('teste de envio: caixa de prompt depois do envio', ancestor(ed, 3), 'info');
+    const result = seen || 'sem sinal visível em 30 s (confira a biblioteca do projeto)';
+    dtLog('Teste de envio: ' + result + '.', { chipsDepois: ingredientChips() }, seen && !/erro/.test(seen) ? 'success' : 'warn');
+    for (let i = 0; i < 3 && $('flow-add-menu-popover-content'); i++) {
+      pressEscape();
+      await sleep(400);
+    }
+    return result;
+  }
+
   // ---------- mapeamento de imagens de referencia (Ingredients / Characters do Flow) ----------
 
   // Campos de envio de arquivo da pagina: e por eles que a extensao vai anexar as folhas de personagem.
@@ -1459,6 +1579,21 @@
         .then((partes) => sendResponse({ ok: true, partes }))
         .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
       return true;
+    }
+    if (msg.type === 'FLOW_UPLOAD_TEST') {
+      if (running) {
+        sendResponse({ ok: false, error: 'Há um take gerando.' });
+        return;
+      }
+      uploadTest()
+        .then((result) => sendResponse({ ok: true, result }))
+        .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+      return true;
+    }
+    if (msg.type === 'FLOW_WAKE') {
+      wakeAll();
+      sendResponse({ ok: true, busy: running });
+      return;
     }
     if (msg.type === 'FLOW_PING') {
       sendResponse({ ok: true, ready: !!$(S.editor), busy: running, path: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') });

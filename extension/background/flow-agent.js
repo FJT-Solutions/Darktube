@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.0';
-const FLOW_BUILD = '2026-11-01-segura-fila'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.2';
+const FLOW_BUILD = '2026-11-02-teste-envio'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -109,6 +109,27 @@ async function flowHeartbeat(c, caps) {
   return flowApi(c, '/api/flow/agent/heartbeat', { method: 'POST', headers: flowJson, body: JSON.stringify(body) });
 }
 
+// Aba escondida: o Chrome atrasa os timers dela para 1 vez por minuto. Enquanto ha job, acorda a aba a cada 2 s
+// (sem trazer para a frente nem trocar de aba) e impede que o Chrome a descarregue para poupar memoria.
+let flowWakeTimer = null;
+function flowKeepAwake(tabId) {
+  if (flowWakeTimer || !tabId) return;
+  try {
+    chrome.tabs.update(tabId, { autoDiscardable: false }, () => void chrome.runtime.lastError);
+  } catch (_) {}
+  flowWakeTimer = setInterval(async () => {
+    const cur = (await chrome.storage.local.get(['flow_current'])).flow_current;
+    if (!cur) {
+      clearInterval(flowWakeTimer);
+      flowWakeTimer = null;
+      return;
+    }
+    try {
+      chrome.tabs.sendMessage(tabId, { type: 'FLOW_WAKE' }, () => void chrome.runtime.lastError);
+    } catch (_) {}
+  }, 2000);
+}
+
 async function flowFail(c, jobId, error, code) {
   try {
     await flowApi(c, `/api/flow/agent/jobs/${jobId}/fail`, {
@@ -174,6 +195,7 @@ async function flowTick() {
         return void (await flowStatus('falhou', { msg: 'A aba do Flow não respondeu a tempo.', code: 'timeout' }));
       } else {
         await flowHeartbeat(c);
+        if (c.flow_current.tabId) flowKeepAwake(c.flow_current.tabId); // o segundo plano pode ter reiniciado no meio do job
         return void (await flowStatus('gerando', { jobId: c.flow_current.jobId }));
       }
     }
@@ -228,10 +250,11 @@ async function flowTick() {
       return void (await flowStatus('aguardando', { msg: why[reason] || 'Nada na fila.' }));
     }
     flowLastTickLog = '';
-    await chrome.storage.local.set({ flow_current: { jobId: claim.job.id, projectId: claim.job.project_id || null, kind: claim.job.kind, startedAt: Date.now() } });
+    await chrome.storage.local.set({ flow_current: { jobId: claim.job.id, projectId: claim.job.project_id || null, kind: claim.job.kind, startedAt: Date.now(), tabId: tab.id } });
     flowLog(`Job recebido: ${claim.job.kind} (take ${claim.job.take_index ?? '-'})`, { params: claim.job.params, prompt: String(claim.job.prompt || '').slice(0, 300) }, 'info', { jobId: claim.job.id, projectId: claim.job.project_id });
     await flowStatus('gerando', { jobId: claim.job.id });
     const started = await flowAsk(tab.id, { type: 'FLOW_RUN_JOB', job: claim.job });
+    if (started && started.started) flowKeepAwake(tab.id);
     if (!started || !started.started) {
       flowLog('A aba do Flow não aceitou o trabalho.', { started }, 'error', { jobId: claim.job.id, projectId: claim.job.project_id });
       await flowFail(c, claim.job.id, 'A aba do Flow não aceitou o trabalho.', 'tab');
@@ -400,6 +423,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const r = await flowAsk(tab.id, { type: 'FLOW_SNAPSHOT' });
       await flowLogFlush();
       sendResponse(r && r.ok ? { ok: true, partes: r.partes } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_UPLOAD_TEST_NOW') {
+    // Teste: a aba envia uma imagem pequena para a biblioteca de midia do projeto (so com a fila parada).
+    (async () => {
+      const c = await flowCfg();
+      if (c.flow_current) return sendResponse({ ok: false, error: 'Há um take gerando; teste com a fila parada.' });
+      const tab = await flowFindTab();
+      if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
+      flowForceLogsUntil = Date.now() + 90000;
+      const r = await flowAsk(tab.id, { type: 'FLOW_UPLOAD_TEST' });
+      await flowLogFlush();
+      sendResponse(r && r.ok ? { ok: true, result: r.result } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
     })();
     return true;
   }

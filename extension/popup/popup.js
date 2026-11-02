@@ -533,6 +533,20 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+  const upBtn = document.getElementById('flow-upload-test-btn');
+  if (upBtn) {
+    upBtn.addEventListener('click', () => {
+      upBtn.disabled = true;
+      st.textContent = 'Testando o envio de uma imagem de teste para o Flow...';
+      chrome.runtime.sendMessage({ type: 'FLOW_UPLOAD_TEST_NOW' }, (resp) => {
+        void chrome.runtime.lastError;
+        upBtn.disabled = false;
+        st.textContent = resp && resp.ok
+          ? 'Teste de envio: ' + (resp.result || 'concluído') + ' (detalhes no log do darktube).'
+          : (resp && resp.error) || 'O teste de envio não respondeu.';
+      });
+    });
+  }
   chrome.storage.onChanged.addListener((ch) => {
     if (ch.flow_logstat) {
       renderLog(ch.flow_logstat.newValue);
