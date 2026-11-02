@@ -191,16 +191,16 @@ export async function getFlowJob(userId: string, id: string): Promise<FlowJob | 
 }
 
 // Reenvio: volta pra fila, podendo trocar o motor (só 'flow' é consumido pelo agente por enquanto).
-export async function retryFlowJob(userId: string, id: string, engine?: string, patchParams?: Partial<FlowJobParams>): Promise<FlowJob | null> {
+export async function retryFlowJob(userId: string, id: string, engine?: string, patchParams?: Partial<FlowJobParams>, prompt?: string): Promise<FlowJob | null> {
   await ensureFlowTablesExist();
   const res = await pool.query(
     `UPDATE public.flow_jobs
-        SET status = 'queued', engine = COALESCE($3, engine), error_message = NULL,
-            result_url = NULL, claimed_at = NULL, finished_at = NULL, params = CASE WHEN $5::jsonb IS NOT NULL THEN params || $5::jsonb ELSE params END,
+        SET status = 'queued', engine = COALESCE($3, engine), error_message = NULL, prompt = COALESCE($6, prompt),
+            result_url = NULL, claimed_at = NULL, finished_at = NULL, params = (CASE WHEN $5::jsonb IS NOT NULL THEN params || $5::jsonb ELSE params END) - 'policyRetries',
             deadline_at = NOW() + ($4 || ' minutes')::interval
       WHERE id = $1 AND user_id = $2 AND status IN ('draft','cancelled','done')
       RETURNING *`,
-    [id, userId, engine ? engine.slice(0, 30) : null, String(DEFAULT_DEADLINE_MIN), patchParams ? JSON.stringify(cleanParams(patchParams)) : null]
+    [id, userId, engine ? engine.slice(0, 30) : null, String(DEFAULT_DEADLINE_MIN), patchParams ? JSON.stringify(cleanParams(patchParams)) : null, prompt || null]
   );
   return res.rows[0] ?? null;
 }
