@@ -662,6 +662,7 @@ function ProjectView({
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [agentOnline, setAgentOnline] = useState(false)
   const [publish, setPublish] = useState<{ status: string; error: string | null; publishedAt: string | null } | null>(null)
+  const [risk, setRisk] = useState<{ riskMode: boolean; hourlyLimit: number; dailyLimit: number; minGapSec: number } | null>(null)
   const [approved, setApproved] = useState<Set<number>>(new Set())
   const [accounts, setAccounts] = useState<{ id: string; platform: string; name: string }[]>([])
   const [picked, setPicked] = useState<Record<string, string>>({})
@@ -712,6 +713,10 @@ function ProjectView({
     if (["publishing", "scheduled", "published", "publish_failed"].includes(project.status)) refreshProject()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id])
+
+  useEffect(() => {
+    getFlowRiskAction().then((r) => r.success && setRisk(r.settings))
+  }, [])
 
   useEffect(() => {
     listFlowAccountsAction().then((r) => r.success && setAccounts(r.accounts))
@@ -1060,6 +1065,29 @@ function ProjectView({
       <Card className="border-primary/40">
         <CardContent className="space-y-3 p-4">
           <p className="font-medium">1. Gerar os vídeos no Google Flow</p>
+          {(() => {
+            // Estimativa com os limites atuais: cada take leva ~1,5 min no Flow + o intervalo minimo entre geracoes.
+            if (!risk) return null
+            const pending = script.takes.filter((t) => bestJob(t.n)?.status !== "done").length
+            if (pending === 0) return null
+            const perTakeMin = 1.5 + (risk.minGapSec || 0) / 60
+            const byGap = Math.max(1, Math.floor(60 / perTakeMin))
+            const perHour = risk.riskMode ? byGap : Math.max(1, Math.min(risk.hourlyLimit || byGap, byGap))
+            const perDay = risk.riskMode ? perHour * 24 : Math.max(1, risk.dailyLimit || perHour * 24)
+            const days = Math.ceil(pending / perDay)
+            const hours = pending / perHour
+            const text =
+              days > 1
+                ? "cerca de " + days + " dias (limite de " + perDay + " gerações por dia)"
+                : hours < 1
+                  ? "cerca de " + Math.max(1, Math.round(hours * 60)) + " min"
+                  : "cerca de " + (Math.round(hours * 10) / 10).toString().replace(".", ",") + " h"
+            return (
+              <p className={cn("text-xs", days > 1 || hours > 2 ? "text-amber-500" : "text-muted-foreground")}>
+                Com os seus limites atuais ({risk.riskMode ? "limites ignorados" : risk.hourlyLimit + " por hora, " + risk.dailyLimit + " por dia"}, intervalo de {risk.minGapSec}s), os {pending} takes que faltam levam {text} para gerar. Você pode mudar os limites no painel de segurança.
+              </p>
+            )
+          })()}
           {queuedAny ? (
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Check className="h-4 w-4" /> Enviado. Os takes acima mostram o andamento.
@@ -1125,7 +1153,7 @@ function ProjectView({
       <Card>
         <CardContent className="space-y-3 p-4">
           <p className="font-medium">3. Montar o vídeo final</p>
-          <p className="text-sm text-muted-foreground">Junta os takes (usando a versão 720p quando existir), grava a legenda a partir das falas e gera o arquivo .srt.</p>
+          <p className="text-sm text-muted-foreground">Junta os takes (usando a versão 720p quando existir) e gera a legenda a partir do que é falado: nos vídeos curtos ela é gravada no vídeo; nos longos sai só o arquivo .srt, para ativar no YouTube.</p>
           <Button
             disabled={!allDone || status === "assembling" || busy === "asm"}
             onClick={async () => {

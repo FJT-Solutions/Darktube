@@ -341,7 +341,11 @@ export async function assembleFlowProject(userId: string, projectId: string) {
 
     let finalFile = joined
     let burned = false
-    if (srt) {
+    // Curtos: legenda gravada no video (retencao no feed, muita gente assiste sem som).
+    // Longos (YouTube 16:9): so o .srt, que vira legenda ativavel e traduzivel no YouTube e nao cobre a imagem.
+    const burn = !!srt && t.length !== 'longo'
+    if (srt) fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
+    if (burn) {
       fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
       const style = `FontSize=${vertical ? 16 : 20},Outline=2,Shadow=0,Alignment=2,MarginV=${vertical ? 90 : 40},PrimaryColour=&H00FFFFFF&`
       const burnedFile = path.join(dir, 'final.mp4')
@@ -366,7 +370,7 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       status: 'assembled',
       finalUrl,
       srtUrl,
-      error: srt && !burned ? 'Legenda não foi gravada no vídeo (ffmpeg sem suporte). O arquivo .srt está disponível.' : null,
+      error: burn && !burned ? 'Legenda não foi gravada no vídeo (ffmpeg sem suporte). O arquivo .srt está disponível.' : null,
     })
     return { finalUrl, srtUrl, burned, takes: picked.length, seconds: Math.round(durations.reduce((a, b) => a + b, 0)) }
   } catch (err: any) {
