@@ -33,6 +33,7 @@ import {
   COMMON_FIELDS,
   FLOW_TEMPLATES,
   LANGUAGES,
+  MAX_TAKES,
   REALISM,
   TAKE_SECONDS,
   VIDEO_MODELS,
@@ -42,12 +43,14 @@ import {
   type FlowField,
   type FlowTemplate,
 } from "@/lib/flow-templates"
-import { buildTakePrompt, countWords, exportScriptText, type FlowScript } from "@/lib/flow-script"
+import { buildTakePrompt, countWords, exportScriptText, takeKind, validateScript, type FlowScript, type FlowTake, type FlowTakeKind } from "@/lib/flow-script"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject } from "@/lib/flow-projects"
 import {
   deleteFlowProjectAction,
   generateFlowProjectAction,
+  createBlankFlowProjectAction,
+  checkFlowScriptAction,
   getFlowProjectAction,
   getFlowProvidersAction,
   listFlowProjectsAction,
@@ -75,6 +78,13 @@ interface JobRow {
   error_message: string | null
   result_url: string | null
 }
+
+const MODE_LABEL: Record<string, string> = { dialogo: "Fala", narracao: "Narração", ambiente: "Sem fala", livre: "Livre" }
+const KIND_OPTIONS: { value: FlowTakeKind; label: string }[] = [
+  { value: "dialogo", label: "Personagem fala" },
+  { value: "narracao", label: "Narrador" },
+  { value: "ambiente", label: "Sem fala" },
+]
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Na fila",
@@ -118,7 +128,7 @@ function FieldInput({ field, value, onChange }: { field: FlowField; value: strin
           </SelectContent>
         </Select>
       ) : field.type === "textarea" ? (
-        <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} rows={3} maxLength={900} />
+        <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} rows={field.id === "roteiro" ? 8 : 3} maxLength={field.id === "roteiro" ? 8000 : 900} />
       ) : (
         <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder} maxLength={200} />
       )}
@@ -139,6 +149,12 @@ export default function FlowPage() {
   const [aspect, setAspect] = useState(FLOW_TEMPLATES[0].defaults.aspect)
   const [model, setModel] = useState(FLOW_TEMPLATES[0].defaults.model)
   const [quality, setQuality] = useState(FLOW_TEMPLATES[0].defaults.quality)
+
+  const [lengthFilter, setLengthFilter] = useState<"todos" | "curto" | "longo">("todos")
+  const [trendFilter, setTrendFilter] = useState<"todos" | "viral" | "atemporal">("todos")
+  const shownTemplates = FLOW_TEMPLATES.filter(
+    (t) => t.id === "livre" || ((lengthFilter === "todos" || t.length === lengthFilter) && (trendFilter === "todos" || t.trend === trendFilter))
+  )
 
   const [providers, setProviders] = useState<string[]>([])
   const [provider, setProvider] = useState("")
@@ -193,6 +209,17 @@ export default function FlowPage() {
     setProject(res.project as FlowProject)
     setView("projeto")
     toast.success("Roteiro gerado e salvo.")
+    if (res.issues?.length) toast.warning(`Confira o roteiro: ${res.issues.length} ponto(s) fora das regras do formato.`)
+  }
+
+  const startBlank = async () => {
+    setGenerating(true)
+    const res = await createBlankFlowProjectAction({ params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality } })
+    setGenerating(false)
+    if (!res.success) return void toast.error(res.error)
+    setProject(res.project as FlowProject)
+    setView("projeto")
+    toast.success("Projeto em branco criado: escreva cada take.")
   }
 
   const openProject = async (id: string) => {
@@ -246,7 +273,20 @@ export default function FlowPage() {
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <div className="space-y-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Templates</p>
-            {FLOW_TEMPLATES.map((t) => (
+            <div className="flex flex-wrap gap-1">
+              {(["todos", "curto", "longo"] as const).map((v) => (
+                <Button key={v} size="sm" variant={lengthFilter === v ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setLengthFilter(v)}>
+                  {v === "todos" ? "Todos" : v === "curto" ? "Curtos" : "Longos"}
+                </Button>
+              ))}
+              {(["todos", "viral", "atemporal"] as const).map((v) => (
+                <Button key={"t" + v} size="sm" variant={trendFilter === v ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setTrendFilter(v)}>
+                  {v === "todos" ? "Qualquer" : v === "viral" ? "Virais" : "Atemporais"}
+                </Button>
+              ))}
+            </div>
+            <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
+            {shownTemplates.map((t) => (
               <button
                 key={t.id}
                 onClick={() => pickTemplate(t.id)}
@@ -257,12 +297,17 @@ export default function FlowPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">{t.name}</span>
-                  <Badge variant="outline">{t.mode}</Badge>
+                  <Badge variant="outline">{MODE_LABEL[t.mode] ?? t.mode}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{t.niche} · {t.subniche}</p>
+                <div className="mt-1 flex gap-1">
+                  <Badge variant="secondary" className="text-[10px]">{t.length === "longo" ? "Longo" : "Curto"}</Badge>
+                  <Badge variant="secondary" className="text-[10px]">{t.trend === "viral" ? "Viral" : "Atemporal"}</Badge>
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
               </button>
             ))}
+            </div>
           </div>
 
           <Card>
@@ -300,7 +345,8 @@ export default function FlowPage() {
                   <label className="text-sm font-medium">Quantidade de takes</label>
                   <span className="text-sm font-semibold">{takes}</span>
                 </div>
-                <Slider min={2} max={40} step={1} value={[takes]} onValueChange={(v) => setTakes(v[0])} />
+                <Slider min={1} max={MAX_TAKES} step={1} value={[takes]} onValueChange={(v) => setTakes(v[0])} />
+                <p className="text-xs text-muted-foreground">Duração total: cerca de {Math.round((takes * seconds) / 6) / 10} min</p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-4">
@@ -368,8 +414,13 @@ export default function FlowPage() {
 
               <Button onClick={generate} disabled={generating || !provider} className="w-full">
                 {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                {generating ? "Gerando roteiro..." : "Gerar roteiro"}
+                {generating ? "Gerando roteiro..." : template.mode === "livre" ? "Montar com IA (completa o que faltar)" : "Gerar roteiro"}
               </Button>
+              {template.mode === "livre" && (
+                <Button variant="outline" onClick={startBlank} disabled={generating} className="w-full">
+                  Começar em branco (escrevo cada take, sem IA)
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -675,10 +726,31 @@ function ProjectView({
   const drafts = script.takes.filter((t) => bestJob(t.n)?.status === "done" && bestJob(t.n)?.role !== "take_final")
   const queuedAny = jobs.length > 0
 
-  const setLine = (n: number, line: string) => {
-    setScript((s) => ({ ...s, takes: s.takes.map((t) => (t.n === n ? { ...t, line } : t)) }))
+  // Edicao do roteiro: qualquer campo do take, dos personagens e dos cenarios (no modo Livre, tudo).
+  const edit = (fn: (s: FlowScript) => FlowScript) => {
+    setScript(fn)
     setDirty(true)
   }
+  const setTake = (n: number, patch: Partial<FlowTake>) => edit((s) => ({ ...s, takes: s.takes.map((t) => (t.n === n ? { ...t, ...patch } : t)) }))
+  const setLine = (n: number, line: string) => setTake(n, { line })
+  const renumber = (takes: FlowTake[]) => takes.map((t, i) => ({ ...t, n: i + 1 }))
+  const addTake = () =>
+    edit((s) => {
+      const last = s.takes[s.takes.length - 1]
+      const blank: FlowTake = { n: 0, seconds: last?.seconds ?? (Number(params.seconds) || 8), speaker: "", line: "", action: "", location: last?.location ?? s.locations[0]?.id ?? "", characters: [], sound: "", camera: "", kind: last?.kind ?? "dialogo" }
+      return { ...s, takes: renumber([...s.takes, blank]) }
+    })
+  const removeTake = (n: number) => edit((s) => ({ ...s, takes: renumber(s.takes.filter((t) => t.n !== n)) }))
+  const addCharacter = () =>
+    edit((s) => ({ ...s, characters: [...s.characters, { id: "c" + (s.characters.length + 1) + (Date.now() % 1000), name: "Personagem " + (s.characters.length + 1), description: "", voice: "" }] }))
+  const setCharacter = (id: string, patch: Partial<FlowScript["characters"][number]>) =>
+    edit((s) => ({ ...s, characters: s.characters.map((c) => (c.id === id ? { ...c, ...patch } : c)) }))
+  const addLocation = () => edit((s) => ({ ...s, locations: [...s.locations, { id: "l" + (s.locations.length + 1) + (Date.now() % 1000), name: "Local " + (s.locations.length + 1), description: "" }] }))
+  const setLocation = (id: string, patch: { name?: string; description?: string }) =>
+    edit((s) => ({ ...s, locations: s.locations.map((l) => (l.id === id ? { ...l, ...patch } : l)) }))
+  const free = template.mode === "livre"
+  // Conferencia ao vivo contra as regras do formato (copia: a conferencia ajusta campos).
+  const issues = useMemo(() => validateScript(JSON.parse(JSON.stringify(script)), template, params), [script, template, params])
 
   const run = async (key: string, fn: () => Promise<{ success: boolean; error?: string }>, okMsg: string) => {
     setBusy(key)
@@ -786,25 +858,57 @@ function ProjectView({
         </p>
       </div>
 
-      {script.characters.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {script.characters.map((c) => (
-            <Card key={c.id}>
-              <CardContent className="space-y-1 p-4">
-                <p className="font-medium">{c.name}</p>
-                <p className="text-xs text-muted-foreground">{c.description}</p>
-                {c.voice && <p className="text-xs text-muted-foreground">Voz: {c.voice}</p>}
-              </CardContent>
-            </Card>
-          ))}
+      {(script.characters.length > 0 || free) && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Personagens <span className="text-xs font-normal text-muted-foreground">(descrição fixa em inglês: idade, rosto, cabelo, corpo, roupa; 25 a 35 palavras)</span></p>
+            <Button size="sm" variant="outline" onClick={addCharacter}>Adicionar personagem</Button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {script.characters.map((c) => (
+              <Card key={c.id}>
+                <CardContent className="space-y-2 p-4">
+                  <Input value={c.name} onChange={(e) => setCharacter(c.id, { name: e.target.value })} maxLength={60} />
+                  <Textarea value={c.description} onChange={(e) => setCharacter(c.id, { description: e.target.value })} rows={3} maxLength={500} placeholder="Ex.: 35-year-old fictional woman, olive skin, shoulder-length curly dark hair, faded navy jumpsuit..." />
+                  <Input value={c.voice} onChange={(e) => setCharacter(c.id, { voice: e.target.value })} maxLength={160} placeholder="Voz (ex.: warm, calm Brazilian accent)" />
+                  <p className="text-[11px] text-muted-foreground">{countWords(c.description)} palavras</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
+      )}
+
+      {(free || script.locations.length > 0) && (
+        <details className="rounded-lg border p-3" open={free}>
+          <summary className="cursor-pointer text-sm font-medium">Cenários ({script.locations.length})</summary>
+          <div className="mt-3 space-y-2">
+            {script.locations.map((l) => (
+              <div key={l.id} className="grid gap-2 sm:grid-cols-[160px_1fr]">
+                <Input value={l.name} onChange={(e) => setLocation(l.id, { name: e.target.value })} maxLength={60} />
+                <Textarea value={l.description} onChange={(e) => setLocation(l.id, { description: e.target.value })} rows={2} maxLength={600} placeholder="Descrição em inglês: lugar, hora do dia, luz, texturas" />
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={addLocation}>Adicionar cenário</Button>
+          </div>
+        </details>
+      )}
+
+      {issues.length > 0 && (
+        <Card className="border-amber-500/40">
+          <CardContent className="space-y-1 p-4 text-sm">
+            <p className="font-medium text-amber-500">Conferência do roteiro ({issues.length})</p>
+            {issues.slice(0, 12).map((i, k) => <p key={k} className="text-xs text-muted-foreground">• {i.message}</p>)}
+          </CardContent>
+        </Card>
       )}
 
       <div className="space-y-3">
         {script.takes.map((t) => {
           const words = countWords(t.line)
           const limit = wordLimit(t.seconds)
-          const over = template.mode !== "ambiente" && words > limit
+          const kind = takeKind(t, template.mode)
+          const over = kind !== "ambiente" && words > limit
           const job = bestJob(t.n)
           const prompt = buildTakePrompt(script, t, params, template.mode)
           return (
@@ -812,7 +916,7 @@ function ProjectView({
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">
-                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s</span>
+                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s{t.beat ? " · " + t.beat : ""}</span>
                   </p>
                   <div className="flex items-center gap-2">
                     {job && (
@@ -835,7 +939,29 @@ function ProjectView({
                   // Com o video final pronto, os takes so carregam ao dar play: menos videos pesando na pagina.
                   <video src={job.result_url} controls preload={project.final_url ? "none" : "metadata"} className="max-h-72 rounded-md bg-black" />
                 )}
-                {template.mode !== "ambiente" && (
+                {free && (
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Select value={kind} onValueChange={(v) => setTake(t.n, { kind: v as FlowTakeKind, ...(v === "ambiente" ? { line: "", speaker: "" } : v === "narracao" ? { speaker: "narrator" } : {}) })}>
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>{KIND_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={String(t.seconds)} onValueChange={(v) => setTake(t.n, { seconds: Number(v) })}>
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>{TAKE_SECONDS.map((x) => <SelectItem key={x} value={String(x)}>{x}s</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => removeTake(t.n)} disabled={script.takes.length <= 1}>Remover take</Button>
+                  </div>
+                )}
+                {kind === "dialogo" && script.characters.length > 0 && (
+                  <Select value={t.speaker || "_"} onValueChange={(v) => setTake(t.n, { speaker: v === "_" ? "" : v, characters: v !== "_" && !t.characters.includes(v) ? [...t.characters, v] : t.characters })}>
+                    <SelectTrigger className="h-8"><SelectValue placeholder="Quem fala" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_">Quem fala...</SelectItem>
+                      {script.characters.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+                {kind !== "ambiente" && (
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>{speakerName(t.speaker) || "Fala"}</span>
@@ -844,7 +970,37 @@ function ProjectView({
                     <Textarea value={t.line} onChange={(e) => setLine(t.n, e.target.value)} rows={2} maxLength={400} />
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">{t.action}</p>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Ação da cena (em inglês: uma ação concreta, o objeto e a expressão)</label>
+                  <Textarea value={t.action} onChange={(e) => setTake(t.n, { action: e.target.value })} rows={2} maxLength={600} />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input value={t.camera || ""} onChange={(e) => setTake(t.n, { camera: e.target.value })} maxLength={200} placeholder="Câmera (ex.: close-up, slow push-in)" />
+                  <Input value={t.sound} onChange={(e) => setTake(t.n, { sound: e.target.value })} maxLength={240} placeholder="Som (ex.: rain on glass, distant traffic)" />
+                </div>
+                {(free || script.locations.length > 1 || script.characters.length > 0) && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {script.locations.length > 0 && (
+                      <Select value={t.location || script.locations[0]?.id} onValueChange={(v) => setTake(t.n, { location: v })}>
+                        <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>{script.locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    )}
+                    {script.characters.map((c) => {
+                      const on = t.characters.includes(c.id)
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={cn("rounded-md border px-2 py-0.5", on && "border-primary bg-primary/10")}
+                          onClick={() => setTake(t.n, { characters: on ? t.characters.filter((x) => x !== c.id) : [...t.characters, c.id] })}
+                        >
+                          {c.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
                 {job?.status === "draft" && job.error_message && <p className="text-xs text-destructive">{job.error_message}</p>}
                 <details className="text-xs">
                   <summary className="cursor-pointer text-muted-foreground">Prompt do Flow</summary>
@@ -857,6 +1013,11 @@ function ProjectView({
             </Card>
           )
         })}
+        {free && (
+          <Button variant="outline" className="w-full" onClick={addTake} disabled={script.takes.length >= MAX_TAKES}>
+            Adicionar take
+          </Button>
+        )}
       </div>
 
       <Card>

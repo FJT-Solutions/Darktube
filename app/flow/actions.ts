@@ -2,12 +2,14 @@
 
 import { getCurrentUser } from "@/lib/auth-helpers"
 import { getUserApiKey } from "@/lib/database"
-import { getFlowTemplate, TAKE_SECONDS } from "@/lib/flow-templates"
+import { getFlowTemplate, MAX_TAKES, TAKE_SECONDS } from "@/lib/flow-templates"
 import {
+  buildRepairPrompt,
   buildSystemPrompt,
   buildTakePrompt,
   extractJson,
   normalizeScript,
+  validateScript,
   type FlowParams,
   type FlowScript,
 } from "@/lib/flow-script"
@@ -54,11 +56,11 @@ function cleanParams(raw: Record<string, any>, templateId: string): FlowParams {
   if (!t) throw new Error("Template inválido.")
   const out: FlowParams = {}
   for (const [k, v] of Object.entries(raw || {})) {
-    if (typeof v === "string") out[k] = v.slice(0, 900)
+    if (typeof v === "string") out[k] = v.slice(0, k === "roteiro" ? 8000 : 900)
     else if (typeof v === "number" && Number.isFinite(v)) out[k] = v
   }
   const takes = Math.round(Number(out.takes) || t.defaults.takes)
-  out.takes = Math.min(Math.max(takes, 2), 40)
+  out.takes = Math.min(Math.max(takes, 1), MAX_TAKES)
   const seconds = Number(out.seconds) || t.defaults.seconds
   out.seconds = TAKE_SECONDS.includes(seconds) ? seconds : t.defaults.seconds
   out.aspect = out.aspect === "16:9" ? "16:9" : "9:16"
@@ -79,9 +81,66 @@ export async function generateFlowProjectAction(input: { templateId: string; par
 
     const system = buildSystemPrompt(t, params)
     const text = await callFlowLLM(provider, key, system, "Gere o roteiro agora.")
-    const script = normalizeScript(extractJson(text), t, params)
+    let script = normalizeScript(extractJson(text), t, params)
+    // Confere contra as regras do formato; se houver erro, pede uma correcao (uma vez) a mesma IA.
+    let issues = validateScript(script, t, params)
+    if (issues.some((i) => i.level === "erro")) {
+      try {
+        const fixed = await callFlowLLM(provider, key, system, buildRepairPrompt(script, issues.filter((i) => i.level === "erro")))
+        const repaired = normalizeScript(extractJson(fixed), t, params)
+        const after = validateScript(repaired, t, params)
+        if (after.filter((i) => i.level === "erro").length <= issues.filter((i) => i.level === "erro").length) {
+          script = repaired
+          issues = after
+        }
+      } catch {
+        /* fica com a primeira versao; os problemas aparecem como aviso */
+      }
+    }
     const project = await createFlowProject({ userId: user.id, templateId: t.id, params, script, provider })
+    return { success: true as const, project, issues: issues.map((i) => i.message) }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Modo Livre sem IA: cria o projeto com takes vazios para o usuario escrever take por take. */
+export async function createBlankFlowProjectAction(input: { params: Record<string, any> }) {
+  try {
+    const user = await requireUser()
+    const t = getFlowTemplate("livre")
+    if (!t) throw new Error("Template inválido.")
+    const params = cleanParams(input.params, t.id)
+    const n = Number(params.takes) || t.defaults.takes
+    const seconds = Number(params.seconds) || t.defaults.seconds
+    const kind = ["dialogo", "narracao", "ambiente"].includes(String(params.tipo)) ? String(params.tipo) : "dialogo"
+    const script = normalizeScript(
+      {
+        title: String(params.tema || "").trim().slice(0, 80) || "Projeto livre",
+        characters: [],
+        locations: [{ id: "l1", name: "Local 1", description: "" }],
+        takes: Array.from({ length: n }, () => ({ seconds, kind, speaker: kind === "narracao" ? "narrator" : "", line: "", action: "", camera: "", sound: "", location: "l1", characters: [] })),
+        seo: {},
+      },
+      t,
+      params
+    )
+    const project = await createFlowProject({ userId: user.id, templateId: t.id, params, script, provider: "manual" })
     return { success: true as const, project }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Confere o roteiro atual (avisos na tela, inclusive no modo Livre). */
+export async function checkFlowScriptAction(id: string) {
+  try {
+    const user = await requireUser()
+    const p = await getFlowProject(user.id, id)
+    if (!p) throw new Error("Projeto não encontrado.")
+    const t = getFlowTemplate(p.template_id)
+    if (!t) throw new Error("Template inválido.")
+    return { success: true as const, issues: validateScript(normalizeScript(p.script, t, p.params), t, p.params) }
   } catch (err) {
     return fail(err)
   }
@@ -144,6 +203,9 @@ export async function queueFlowProjectAction(id: string) {
     if (!project) throw new Error("Projeto não encontrado.")
     const t = getFlowTemplate(project.template_id)
     if (!t) throw new Error("Template inválido.")
+    // No modo Livre o usuario escreve os takes: sem acao descrita o Flow nao tem o que gerar.
+    const empty = project.script.takes.filter((k) => !k.action.trim()).map((k) => k.n)
+    if (empty.length) throw new Error(`Descreva a ação (o que acontece na cena) dos takes: ${empty.join(", ")}.`)
 
     const created = []
     for (const take of project.script.takes) {
