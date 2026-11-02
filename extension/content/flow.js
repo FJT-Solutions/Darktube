@@ -1088,7 +1088,15 @@
       const c = document.createElement('canvas');
       c.width = 256;
       c.height = 256;
-      const g = c.getContext('2d');
+      const g = c.getContext && c.getContext('2d');
+      if (!g) {
+        // Sem canvas: PNG 8x8 laranja embutida.
+        const b64 = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4/58BK2IYlRIBAPg2/w6bR6qJAAAAAElFTkSuQmCC';
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return resolve(new File([bytes], 'darktube-teste-referencia.png', { type: 'image/png' }));
+      }
       const grad = g.createLinearGradient(0, 0, 256, 256);
       grad.addColorStop(0, '#1e3a8a');
       grad.addColorStop(1, '#f59e0b');
@@ -1102,13 +1110,13 @@
     });
   }
 
-  const ingredientChips = () => $('flow-ingredient-chip, flow-image-ingredient-chip').length;
+  const ingredientChips = () => $$('flow-ingredient-chip, flow-image-ingredient-chip').length;
 
   // Abre o menu "+", entrega a imagem ao campo de arquivo do Flow por codigo (sem a janela do Windows),
   // registra o que mudou (biblioteca, chip de ingrediente) e fecha o menu.
   async function uploadTest() {
     dtLog('Teste de envio: início.', { chipsAntes: ingredientChips(), camposArquivo: fileInputsInfo().length });
-    const plus = $('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+    const plus = $$('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
     if (!plus) throw new Error('Não achei o botão "+" da caixa de prompt (abra um projeto do Flow).');
     realClick(plus);
     const menu = await until(() => $('flow-add-menu-popover-content'), 6000, 250);
@@ -1116,7 +1124,7 @@
     let input = await until(() => $('input[type=file]'), 3000, 250);
     if (!input) {
       // Alguns menus so criam o campo ao clicar em enviar: clica e captura, sem abrir a janela do Windows.
-      const up = $('.sidebar-upload-btn') || $('button', menu).find((b) => /upload|enviar/i.test(txt(b) + (b.getAttribute('aria-label') || '')));
+      const up = $('.sidebar-upload-btn') || $$('button', menu).find((b) => /upload|enviar/i.test(txt(b) + (b.getAttribute('aria-label') || '')));
       const origClick = HTMLInputElement.prototype.click;
       HTMLInputElement.prototype.click = function () {
         if (this.type === 'file') {
@@ -1157,7 +1165,7 @@
       const pop = $('flow-add-menu-popover-content');
       const t = txt(pop || document.body);
       if (/upload(ing|ed)|enviando|carregando|processing/i.test(t)) seen = seen || 'envio em andamento';
-      if (/darktube-teste-referencia/i.test(t) || $('img', pop || document).some((i) => /darktube-teste/i.test(i.alt || ''))) {
+      if (/darktube-teste-referencia/i.test(t) || $$('img', pop || document).some((i) => /darktube-teste/i.test(i.alt || ''))) {
         seen = 'imagem apareceu na biblioteca';
         break;
       }
