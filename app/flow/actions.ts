@@ -475,7 +475,7 @@ export async function generateCharacterSheetAction(projectId: string, characterI
       userId: user.id,
       kind: "image",
       prompt: buildSheetPrompt(c),
-      params: { aspectRatio: "16:9", model: "Omni 1.1 Flash", characterId },
+      params: { aspectRatio: "16:9", model: "Nano Banana Pro", characterId },
       projectId: project.id,
       role: "character_sheet",
     })
@@ -508,7 +508,7 @@ export async function generateCastSheetAction(projectId: string) {
       userId: user.id,
       kind: "image",
       prompt: buildCastPrompt(chars),
-      params: { aspectRatio: "16:9", model: "Omni 1.1 Flash" },
+      params: { aspectRatio: "16:9", model: "Nano Banana Pro" },
       projectId: project.id,
       role: "cast_sheet",
     })

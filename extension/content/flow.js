@@ -274,7 +274,16 @@
     const count = Math.min(Math.max(Number(p.count) || 1, 1), 4);
     const panel = await openSettings();
     await setMode(panel, job.kind);
-    if (p.model) await chooseModel(panel, p.model); // o modelo vem primeiro: as opcoes mudam com ele
+    if (p.model) {
+      // o modelo vem primeiro: as opcoes mudam com ele
+      try {
+        await chooseModel(panel, p.model);
+      } catch (e) {
+        // Imagem: os modelos sao outros (Nano Banana...). Sem o pedido, usa o que estiver selecionado em vez de falhar.
+        if (job.kind !== 'image' || !e || e.code !== 'model_missing') throw e;
+        dtLog(`O modelo "${p.model}" não existe no modo imagem; usando o modelo já selecionado.`, { atual: txt($(S.modelBtn, panel) || document.createElement('i')).slice(0, 40) }, 'warn');
+      }
+    }
     if (p.aspectRatio) await maybePickRadio(panel, new RegExp('^\\s*' + esc(p.aspectRatio) + '\\s*$'));
 
     let hasResolution = false;
