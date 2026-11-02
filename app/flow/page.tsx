@@ -94,6 +94,21 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelado",
 }
 
+/** Duracao legivel: "48 s", "3 min 12 s". */
+function fmtDuration(totalSec: number): string {
+  const t = Math.max(0, Math.round(totalSec))
+  if (t < 60) return t + " s"
+  const m = Math.floor(t / 60)
+  const r = t % 60
+  return r ? m + " min " + r + " s" : m + " min"
+}
+
+/** Posicao no video final: "1:04". */
+function fmtClock(sec: number): string {
+  const t = Math.max(0, Math.round(sec))
+  return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0")
+}
+
 function copyText(text: string, label = "Copiado") {
   navigator.clipboard.writeText(text).then(
     () => toast.success(label),
@@ -303,6 +318,7 @@ export default function FlowPage() {
                 <div className="mt-1 flex gap-1">
                   <Badge variant="secondary" className="text-[10px]">{t.length === "longo" ? "Longo" : "Curto"}</Badge>
                   <Badge variant="secondary" className="text-[10px]">{t.trend === "viral" ? "Viral" : "Atemporal"}</Badge>
+                  <Badge variant="secondary" className="text-[10px]">{t.defaults.takes} × {t.defaults.seconds} s ≈ {fmtDuration(t.defaults.takes * t.defaults.seconds)}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
               </button>
@@ -346,7 +362,7 @@ export default function FlowPage() {
                   <span className="text-sm font-semibold">{takes}</span>
                 </div>
                 <Slider min={1} max={MAX_TAKES} step={1} value={[takes]} onValueChange={(v) => setTakes(v[0])} />
-                <p className="text-xs text-muted-foreground">Duração total: cerca de {Math.round((takes * seconds) / 6) / 10} min</p>
+                <p className="text-xs text-muted-foreground">Duração total: {takes} takes × {seconds} s = <span className="font-semibold text-foreground">{fmtDuration(takes * seconds)}</span></p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-4">
@@ -854,7 +870,7 @@ function ProjectView({
         <h2 className="text-lg font-semibold">{script.title}</h2>
         <p className="text-sm text-muted-foreground">{script.logline}</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {template.name} · {script.takes.length} takes de {params.seconds}s · {String(params.model)} · {String(params.quality)}
+          {template.name} · {script.takes.length} takes · total {fmtDuration(script.takes.reduce((n, k) => n + k.seconds, 0))} · {String(params.model)} · {String(params.quality)}
         </p>
       </div>
 
@@ -916,7 +932,7 @@ function ProjectView({
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">
-                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s{t.beat ? " · " + t.beat : ""}</span>
+                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s · {fmtClock(script.takes.slice(0, t.n - 1).reduce((n, k) => n + k.seconds, 0))}–{fmtClock(script.takes.slice(0, t.n).reduce((n, k) => n + k.seconds, 0))}{t.beat ? " · " + t.beat : ""}</span>
                   </p>
                   <div className="flex items-center gap-2">
                     {job && (
