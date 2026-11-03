@@ -1344,6 +1344,33 @@
     return '';
   }
 
+  // Resumo das ultimas chamadas de rede do Flow (gravado pelo gancho do mundo da pagina).
+  function netTail(n) {
+    try {
+      const arr = JSON.parse(document.documentElement.getAttribute('data-dt-net') || '[]');
+      return arr.slice(-(n || 8));
+    } catch (_) {
+      return [];
+    }
+  }
+  // Avisos do Flow fora dos tiles (toast/snackbar/alerta).
+  function pageToasts() {
+    return $$('snack-bar-container, simple-snack-bar, [role=alert], [role=status], .mdc-snackbar, .toast')
+      .map((e) => snapClean(txt(e)).slice(0, 160))
+      .filter(Boolean)
+      .slice(0, 4);
+  }
+  // Estado das referencias e do botao na hora de gerar (confirma se o envio terminou).
+  function refState(btn) {
+    const chips = $$('flow-ingredient-chip');
+    return {
+      chips: chips.length,
+      chipsComImagem: chips.map((c) => { const i = $('img', c); return i ? (i.complete && i.naturalWidth > 0 ? 'ok' : 'carregando') : 'sem-img'; }),
+      pendentes: $$(S.pendingTile).length,
+      botaoDesabilitado: !!(btn && (btn.disabled || btn.getAttribute('aria-disabled') === 'true')),
+    };
+  }
+
   // Referencias do job: 1 imagem (folha) e 1 video (take anterior). Sem sucesso, segue sem referencia (com aviso).
   async function attachJobReferences(job) {
     const p = job.params || {};
@@ -1354,7 +1381,21 @@
       try {
         const file = await fetchRefFile(url, name);
         const t0 = Date.now();
+        try {
+          if (String(file.type).indexOf('image/') === 0) {
+            const bmp = await createImageBitmap(file);
+            dtLog('Referência: dimensões do arquivo.', { largura: bmp.width, altura: bmp.height, proporcao: (bmp.width / bmp.height).toFixed(2), tipo: file.type, bytes: file.size });
+            bmp.close && bmp.close();
+          }
+        } catch (_) {}
         const how = await attachFile(file);
+        if (how) {
+          // O chip aparece antes do envio terminar: gerar nesse intervalo faz o Flow falhar em segundos.
+          const pend0 = $$(S.pendingTile).length;
+          const fim = await until(() => $$(S.pendingTile).length === 0, 40000, 500);
+          dtLog('Esperando o envio da referência terminar.', { pendentesAntes: pend0, terminou: !!fim });
+          await sleep(3000);
+        }
         dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chips: ingredientChips(), segundos: Math.round((Date.now() - t0) / 1000) }, how ? 'success' : 'warn');
       } catch (e) {
         dtLog('Referência não anexada (' + label + '): ' + String((e && e.message) || e).slice(0, 160), null, 'warn');
@@ -1928,6 +1969,8 @@
     // No modo imagem o clique simples as vezes nao vale: tenta de novo com clique completo (incluindo icone/host) e depois com Enter.
     // O Flow so aceita a geracao com a aba visivel (as falhas "failed to generate" aconteceram com a aba escondida).
     startSilentAudioKeepAlive();
+    await askBg({ type: 'FLOW_NETLOG_INSTALL' }, 5000);
+    dtLog('Estado antes de gerar.', refState(btn));
     const vis0 = document.visibilityState;
     let visInfo = null;
     if (vis0 !== 'visible') {
@@ -1940,6 +1983,7 @@
       if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
       dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
       await sleep(2000);
+      dtLog('Rede do Flow logo após o clique.', { chamadas: netTail(6) });
 
       const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
       const t0 = Date.now();
@@ -1955,6 +1999,7 @@
           if (bad) {
             const m = txt(bad).replace(/^warning\s*/i, '').slice(0, 180);
             dtLog('O Flow recusou esta imagem.', { code: failCode(m), motivo: m }, 'error');
+            dtLog('Detalhes da recusa.', { rede: netTail(10), avisos: pageToasts(), tile: String(bad.outerHTML || '').replace(/[ \t\r\n]+/g, ' ').slice(0, 700) }, 'error');
             throw err(failCode(m), 'O Flow recusou a geração: ' + m);
           }
           const ready = $$(S.imageTileImg).filter(
@@ -1973,6 +2018,7 @@
             const msg = txt(bad.t).replace(/^warning\s*/i, '').slice(0, 220);
             const code = failCode(msg);
             dtLog('O Flow recusou este take.', { code, motivo: msg }, 'error');
+            dtLog('Detalhes da recusa.', { rede: netTail(10), avisos: pageToasts(), tile: String(bad.t.outerHTML || '').replace(/[ \t\r\n]+/g, ' ').slice(0, 700), referencias: refState(null) }, 'error');
             throw err(code, 'O Flow recusou a geração: ' + msg);
           }
 

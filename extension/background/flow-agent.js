@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.16';
-const FLOW_BUILD = '2026-11-03-janela-fantasma-e-audio-keepalive'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.17';
+const FLOW_BUILD = '2026-11-03-espera-envio-referencia'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -394,7 +394,7 @@ async function flowHandleResult(msg) {
       flowLog('Falha na geração: ' + (r.error || 'sem detalhe'), { code: r.code }, 'error', ids);
       await flowFail(c, msg.jobId, r.error || 'Falha na geração.', r.code);
       // Falha generica do Flow: o servidor devolve o take para a fila; espera alguns minutos antes de pegar de novo.
-      if (r.code === 'gen_failed') await chrome.storage.local.set({ flow_hold_until: Date.now() + 180000, flow_hold_msg: 'O Flow falhou ao gerar; nova tentativa automática em 3 min.' });
+      if (r.code === 'gen_failed') await chrome.storage.local.set({ flow_hold_until: Date.now() + 20000, flow_hold_msg: 'O Flow falhou ao gerar; nova tentativa automática em instantes.' });
       return void (await flowStatus('falhou', { msg: r.error, code: r.code }));
     }
     let blob;
@@ -559,6 +559,58 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (previous) {
           try { await chrome.tabs.update(previous, { active: true }); } catch (e) {}
         }
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_NETLOG_INSTALL') {
+    // Registra (so leitura) as chamadas de rede do Flow no mundo da pagina; o content script le o resumo no atributo data-dt-net.
+    (async () => {
+      try {
+        const tabId = sender && sender.tab && sender.tab.id;
+        if (!tabId || !chrome.scripting) return sendResponse({ ok: false });
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: () => {
+            if (window.__dtNetHook) return;
+            window.__dtNetHook = true;
+            const buf = [];
+            const clean = (s) => String(s || '').replace(/[A-Za-z0-9_-]{40,}/g, '<token>').replace(/[ \t\r\n]+/g, ' ').slice(0, 320);
+            const push = (e) => {
+              buf.push(e);
+              if (buf.length > 30) buf.shift();
+              try { document.documentElement.setAttribute('data-dt-net', JSON.stringify(buf)); } catch (_) {}
+            };
+            const path = (u) => { try { const x = new URL(u, location.href); return x.host + x.pathname.slice(0, 90); } catch (_) { return String(u).slice(0, 90); } };
+            const rf = window.fetch;
+            window.fetch = function (input, init) {
+              const t0 = Date.now();
+              const m = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+              const u = typeof input === 'string' ? input : (input && input.url) || '';
+              const p = rf.apply(this, arguments);
+              if (m !== 'GET' || /generate|video|image|media|upload|batch|operation/i.test(u)) {
+                p.then((r) => {
+                  const e = { t: new Date().toISOString().slice(11, 19), m, p: path(u), s: r.status, ms: Date.now() - t0 };
+                  if (r.status >= 400 || /generate|video/i.test(u)) {
+                    try { r.clone().text().then((b) => { e.b = clean(b); push(e); }).catch(() => push(e)); } catch (_) { push(e); }
+                  } else push(e);
+                }).catch((er) => push({ t: new Date().toISOString().slice(11, 19), m, p: path(u), s: 0, err: String(er).slice(0, 80) }));
+              }
+              return p;
+            };
+            const ro = XMLHttpRequest.prototype.open, rs = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function (m, u) { this.__dt = { m: String(m).toUpperCase(), u }; return ro.apply(this, arguments); };
+            XMLHttpRequest.prototype.send = function () {
+              const d = this.__dt, t0 = Date.now();
+              if (d && d.m !== 'GET') this.addEventListener('loadend', () => push({ t: new Date().toISOString().slice(11, 19), m: d.m, p: path(d.u), s: this.status, ms: Date.now() - t0, b: this.status >= 400 ? clean(this.responseText) : undefined }));
+              return rs.apply(this, arguments);
+            };
+          },
+        });
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 120) });
       }
     })();
     return true;

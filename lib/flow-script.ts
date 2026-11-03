@@ -344,7 +344,8 @@ export function buildTakePrompt(script: FlowScript, take: FlowTake, params: Flow
   }
   lines.push(`[Style & Constraints]: ${look}, consistent lighting and color across scenes. ${CLEAN}`)
   lines.push(`[Negative Prompt]: ${NEGATIVE}`)
-  return lines.join('\n')
+  // Simbolos de moeda costumam derrubar a geracao no Flow: escreve por extenso.
+  return lines.join('\n').replace(/R\$\s?([\d.,]+)/g, '$1 reais').replace(/[$€£]/g, ' ')
 }
 
 /** Texto completo para baixar ou copiar. */
