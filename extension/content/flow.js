@@ -1166,7 +1166,13 @@
     });
   }
 
-  const ingredientChips = () => $$('flow-ingredient-chip, flow-image-ingredient-chip').length;
+  // Chips de referencia na caixa de prompt (o Flow cria o chip so depois de processar a imagem enviada).
+  const ingredientChips = () =>
+    Math.max(
+      $$('flow-ingredient-chip').length,
+      $$('flow-image-ingredient-chip, flow-video-ingredient-chip').length,
+      $$('flow-ingredient-bar img.chip-image, flow-ingredient-bar .chip-container').length
+    );
 
   // Abre o menu "+", entrega a imagem ao campo de arquivo do Flow por codigo (sem a janela do Windows),
   // registra o que mudou (biblioteca, chip de ingrediente) e fecha o menu.
@@ -1302,8 +1308,9 @@
     for (const [label, url, name] of refs) {
       try {
         const file = await fetchRefFile(url, name);
+        const t0 = Date.now();
         const how = await attachFile(file);
-        dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chips: ingredientChips() }, how ? 'success' : 'warn');
+        dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chips: ingredientChips(), segundos: Math.round((Date.now() - t0) / 1000) }, how ? 'success' : 'warn');
       } catch (e) {
         dtLog('Referência não anexada (' + label + '): ' + String((e && e.message) || e).slice(0, 160), null, 'warn');
       }
@@ -1341,7 +1348,7 @@
       target.dispatchEvent(ev);
       await sleep(150);
     }
-    return !!(await until(() => ingredientChips() > before, 8000, 400));
+    return !!(await until(() => ingredientChips() > before, 45000, 500)); // o Flow processa a imagem antes de mostrar o chip
   }
 
   // Caminho 2: colar a imagem na caixa de prompt.
@@ -1353,7 +1360,7 @@
     const dt = new DataTransfer();
     dt.items.add(file);
     ed.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
-    return !!(await until(() => ingredientChips() > before, 8000, 400));
+    return !!(await until(() => ingredientChips() > before, 15000, 500));
   }
 
   // Caminho 3: escolher pelo nome na biblioteca do menu "+" (imagem ja enviada antes).
@@ -1804,7 +1811,7 @@
     if (!(await until(() => {
       const b = generateBtnEl() || btn;
       return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true';
-    }, 10000))) {
+    }, job.params && (job.params.refImageUrl || job.params.refVideoUrl) ? 60000 : 10000))) {
       dtLog('Botão de gerar permaneceu desabilitado.', { btn: descBtn(generateBtnEl() || btn), todos: $$(S.generate).map(descBtn) }, 'warn');
       throw err('generate_disabled', 'O botão de gerar ficou desabilitado.');
     }
