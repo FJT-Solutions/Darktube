@@ -785,7 +785,7 @@
   // tile pendente, entao sem esta checagem parecia "gerando" para sempre.
   // Politica ("prominent people") x falha generica e passageira ("failed to generate") x outra.
   const failCode = (msg) =>
-    /polic|violat|prominent|pessoas|people/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate/i.test(msg) ? 'gen_failed' : 'failed';
+    /polic|violat|prominent|pessoas|people/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate|unable to edit|try a different prompt/i.test(msg) ? 'gen_failed' : 'failed';
   const FAILED_RX = /\bfailed\b|might violate|violate our polic|will be refunded|não foi possível gerar|geração falhou|falhou/i;
   function tileState(tile) {
     const t = txt(tile);

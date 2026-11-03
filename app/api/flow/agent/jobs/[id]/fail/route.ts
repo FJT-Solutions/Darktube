@@ -33,7 +33,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return NextResponse.json({ success: false, error: 'Não autenticado.' }, { status: 401 });
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const code = String(body.code || '');
+  // Falhas passageiras do Flow que a extensao antiga marca como 'failed' (ex.: "Unable to edit the speech in this
+  // video"): reenviar o mesmo take costuma funcionar, entao entram na nova tentativa automatica.
+  const rawCode = String(body.code || '');
+  const code =
+    rawCode === 'failed' && /failed to generate|something went wrong|try again|unable to (generate|edit)|couldn.t generate|try a different prompt/i.test(String(body.error || '')) && !/polic|violat/i.test(String(body.error || ''))
+      ? 'gen_failed'
+      : rawCode;
 
   // Recusa por politica: a mesma cena volta para a fila sozinha, com o prompt ajustado ao motivo da recusa
   // (1a e 2a tentativas, ver softenFlowPrompt) e, na 3a, reescrito pela IA do projeto. A cena nao muda.
