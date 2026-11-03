@@ -1371,12 +1371,11 @@
     };
   }
 
-  // Referencias do job: 1 imagem (folha) e 1 video (take anterior). Sem sucesso, segue sem referencia (com aviso).
+  // Referencias do job: apenas imagens (retrato/folha). A caixa de prompt do Flow nao aceita videos como ingredientes.
   async function attachJobReferences(job) {
     const p = job.params || {};
     const refs = [];
-    if (p.refImageUrl) refs.push(['imagem de referência (folha)', p.refImageUrl, 'referencia.png']);
-    if (p.refVideoUrl) refs.push(['vídeo do take anterior', p.refVideoUrl, 'take-anterior.mp4']);
+    if (p.refImageUrl) refs.push(['imagem de referência (retrato)', p.refImageUrl, 'referencia.png']);
     for (const [label, url, name] of refs) {
       try {
         const file = await fetchRefFile(url, name);
