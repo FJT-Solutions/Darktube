@@ -32,10 +32,14 @@
   const wakeAll = () => Array.from(wakeWaiters).forEach((f) => f());
 
   // Keep-alive por áudio silencioso: o Chromium nunca suspende abas que estejam reproduzindo áudio.
-  // Timers, WebSockets e renderização continuam ativos mesmo em segundo plano ou na janela fantasma.
+  // Conforme a Chrome Autoplay Policy, o AudioContext só é criado/retomado após uma ativação do usuário
+  // (clique ou tecla na página), evitando o aviso de console 'The AudioContext was not allowed to start'.
   let silentAudioCtx = null;
   function startSilentAudioKeepAlive() {
     try {
+      if (typeof navigator !== 'undefined' && navigator.userActivation && !navigator.userActivation.hasBeenActive) {
+        return;
+      }
       if (!silentAudioCtx) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
@@ -63,8 +67,10 @@
       }
     } catch (_) {}
   }
-  startSilentAudioKeepAlive();
-  window.addEventListener('click', () => startSilentAudioKeepAlive(), { capture: true, passive: true });
+  const onGestureKeepAlive = () => startSilentAudioKeepAlive();
+  window.addEventListener('pointerdown', onGestureKeepAlive, { capture: true, passive: true });
+  window.addEventListener('click', onGestureKeepAlive, { capture: true, passive: true });
+  window.addEventListener('keydown', onGestureKeepAlive, { capture: true, passive: true });
   const rand = (a, b) => a + Math.random() * (b - a);
   const human = (a = 350, b = 1100) => sleep(rand(a, b));
   const $ = (sel, root = document) => root.querySelector(sel);
