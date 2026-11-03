@@ -92,6 +92,9 @@ export const REALISM: FlowFieldOption[] = [
   { value: 'animacao3d', label: 'Animação 3D (estilo filme de animação)' },
   { value: 'massinha', label: 'Massinha / feltro (stop motion)' },
   { value: 'ilustrado2d', label: 'Ilustração 2D (personagem P&B em cenário pintado)' },
+  { value: 'stickman2d', label: 'Cartum 2D (bonecos simples, cenário detalhado)' },
+  { value: 'avatar3d', label: 'Avatar 3D de blocos (estilo jogo)' },
+  { value: 'brinquedo3d', label: 'Maquete 3D de brinquedo (explicador)' },
 ]
 
 /** Texto em ingles de cada estilo, para o prompt do Flow (o rotulo em portugues e so para a tela). */
@@ -103,6 +106,12 @@ export const REALISM_PROMPT: Record<string, string> = {
   massinha: 'handmade claymation and felt stop-motion look, tactile textures, warm light',
   ilustrado2d:
     'hand-painted 2D illustrated animation with limited motion (parallax, steam, light flicker); every person is a flat grayscale ink figure (white and gray, thick black outlines, simple dot eyes) placed inside richly painted, saturated, weathered environments, food and props with painterly texture and warm tungsten light',
+  stickman2d:
+    'flat 2D cartoon animation in the style of simple web comics: round-headed characters with dot eyes, thin limbs and thick outlines, placed in detailed painted historical backgrounds, bold clean colors, expressive exaggerated reactions, snappy limited animation',
+  avatar3d:
+    'stylized 3D game-avatar look: blocky toy-like characters with smooth plastic skin and simple faces, bright sunny saturated colors, soft shadows, clean polished render, playful physics-style motion',
+  brinquedo3d:
+    'clean 3D miniature diorama look: toy-like low-poly buildings and objects on a bright green and blue landscape, soft studio lighting, smooth glossy materials, simple stylized shapes, smooth camera moves',
 }
 
 export const VIDEO_MODELS: FlowFieldOption[] = [
