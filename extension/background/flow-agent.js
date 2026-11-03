@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.10';
-const FLOW_BUILD = '2026-11-02-botao-gerar-imagem'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.11';
+const FLOW_BUILD = '2026-11-03-clique-mundo-pagina'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -374,7 +374,7 @@ async function flowHandleResult(msg) {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg.type !== 'string') return;
   if (msg.type === 'FLOW_JOB_RESULT') {
     flowHandleResult(msg).finally(() => sendResponse({ ok: true }));
@@ -451,6 +451,44 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const r = await flowAsk(tab.id, { type: 'FLOW_UPLOAD_TEST' });
       await flowLogFlush();
       sendResponse(r && r.ok ? { ok: true, result: r.result } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_MAIN_CLICK') {
+    // Clique dentro do "mundo" da pagina (nao no da extensao), no elemento que esta de fato no centro do botao:
+    // e onde cai o clique de um usuario. Alguns botoes do Flow ignoram o clique feito pelo mundo isolado.
+    (async () => {
+      try {
+        const tabId = sender && sender.tab && sender.tab.id;
+        if (!tabId || !chrome.scripting) return sendResponse({ ok: false, why: 'sem aba ou sem scripting' });
+        const res = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          args: [String(msg.selector || '')],
+          func: (sel) => {
+            const btn = document.querySelector(sel);
+            if (!btn) return { found: false };
+            try { btn.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+            const r = btn.getBoundingClientRect();
+            const x = r.left + r.width / 2;
+            const y = r.top + r.height / 2;
+            const top = document.elementFromPoint(x, y) || btn;
+            const mo = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y, button: 0, buttons: 1 };
+            const po = { ...mo, pointerType: 'mouse', isPrimary: true };
+            top.dispatchEvent(new PointerEvent('pointerover', { ...po, buttons: 0 }));
+            top.dispatchEvent(new MouseEvent('mouseover', { ...mo, buttons: 0 }));
+            top.dispatchEvent(new PointerEvent('pointerdown', po));
+            top.dispatchEvent(new MouseEvent('mousedown', mo));
+            top.dispatchEvent(new PointerEvent('pointerup', { ...po, buttons: 0 }));
+            top.dispatchEvent(new MouseEvent('mouseup', { ...mo, buttons: 0 }));
+            top.dispatchEvent(new MouseEvent('click', { ...mo, buttons: 0 }));
+            return { found: true, igualAoBotao: top === btn, dentroDoBotao: btn.contains(top), noCentro: top.tagName.toLowerCase() + '.' + String(top.className || '').slice(0, 60) };
+          },
+        });
+        sendResponse({ ok: true, info: res && res[0] && res[0].result });
+      } catch (e) {
+        sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 120) });
+      }
     })();
     return true;
   }

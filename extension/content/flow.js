@@ -1683,6 +1683,23 @@
         const b = generateBtnEl() || btn;
         pressAndClick(b);
       }],
+      ['clique no mundo da página', async () => {
+        const b = generateBtnEl() || btn;
+        if (!b) return;
+        b.setAttribute('data-dt-gen', '1');
+        const resp = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage({ type: 'FLOW_MAIN_CLICK', selector: '[data-dt-gen="1"]' }, (r) => {
+              void chrome.runtime.lastError;
+              resolve(r || null);
+            });
+          } catch (_) {
+            resolve(null);
+          }
+        });
+        b.removeAttribute('data-dt-gen');
+        dtLog('Clique no mundo da página.', resp);
+      }],
       ['clique completo', () => {
         const b = generateBtnEl() || btn;
         const icon = b && $('mat-icon, svg, span, i', b);
@@ -1721,7 +1738,7 @@
     ];
     let how = '';
     for (const [label, fire] of attempts) {
-      fire();
+      await fire();
       if (await until(started, label === 'clique' ? 10000 : 6000, 400)) {
         how = label;
         break;
@@ -1729,7 +1746,18 @@
       const box = promptBox();
       dtLog(
         `A geração não começou com ${label}; tentando de outro jeito.`,
-        { btn: descBtn(generateBtnEl() || btn), botoesCaixa: box ? $$('button, [role=button]', box).filter(vis).map(descBtn) : [] },
+        {
+          btn: descBtn(generateBtnEl() || btn),
+          noCentro: (() => {
+            // O que um clique de usuario atingiria no centro do botao (pode ser outro elemento por cima).
+            const b = generateBtnEl() || btn;
+            const r = b && b.getBoundingClientRect();
+            const el = r && document.elementFromPoint ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
+            return el ? { ...descBtn(el), igualAoBotao: el === b, dentroDoBotao: b.contains(el) } : null;
+          })(),
+          botoesCaixa: box ? $$('button, [role=button]', box).filter(vis).map(descBtn) : [],
+          foco: { aba: document.hasFocus ? document.hasFocus() : null, visivel: document.visibilityState },
+        },
         'warn'
       );
     }
