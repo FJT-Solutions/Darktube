@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.11';
-const FLOW_BUILD = '2026-11-03-clique-mundo-pagina'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.12';
+const FLOW_BUILD = '2026-11-03-clique-real'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -454,6 +454,57 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true;
   }
+  if (msg.type === 'FLOW_TRUSTED_CLICK') {
+    // Clique de mouse de verdade (confiavel) pelo depurador do navegador. A barra amarela "depurando" aparece so
+    // enquanto o depurador esta ligado (cerca de 1 s). Com "ativar", a aba do Flow vira a ativa da propria janela
+    // durante o clique e a aba anterior volta depois.
+    (async () => {
+      const tabId = sender && sender.tab && sender.tab.id;
+      if (!tabId || !chrome.debugger) return sendResponse({ ok: false, why: 'sem aba ou sem permissão debugger' });
+      const target = { tabId };
+      const send = (method, params) =>
+        new Promise((resolve, reject) =>
+          chrome.debugger.sendCommand(target, method, params || {}, (r) => (chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r)))
+        );
+      let attached = false;
+      let previous = null;
+      try {
+        if (msg.ativar) {
+          const tab = await chrome.tabs.get(tabId);
+          const act = await chrome.tabs.query({ windowId: tab.windowId, active: true });
+          if (act[0] && act[0].id !== tabId) previous = act[0].id;
+          if (!tab.active) {
+            await chrome.tabs.update(tabId, { active: true });
+            await new Promise((r) => setTimeout(r, 600));
+          }
+        }
+        await new Promise((resolve, reject) => chrome.debugger.attach(target, '1.3', () => (chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve())));
+        attached = true;
+        try { await send('Emulation.setFocusEmulationEnabled', { enabled: true }); } catch (e) { /* opcional */ }
+        const x = Number(msg.x) || 0;
+        const y = Number(msg.y) || 0;
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x - 6, y: y - 4, button: 'none', buttons: 0 });
+        await new Promise((r) => setTimeout(r, 120));
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0 });
+        await new Promise((r) => setTimeout(r, 120));
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+        await new Promise((r) => setTimeout(r, 80));
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 140) });
+      } finally {
+        if (attached) {
+          await new Promise((r) => setTimeout(r, 400));
+          try { chrome.debugger.detach(target, () => void chrome.runtime.lastError); } catch (e) {}
+        }
+        if (previous) {
+          try { await chrome.tabs.update(previous, { active: true }); } catch (e) {}
+        }
+      }
+    })();
+    return true;
+  }
   if (msg.type === 'FLOW_MAIN_CLICK') {
     // Clique dentro do "mundo" da pagina (nao no da extensao), no elemento que esta de fato no centro do botao:
     // e onde cai o clique de um usuario. Alguns botoes do Flow ignoram o clique feito pelo mundo isolado.
@@ -507,6 +558,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       } catch (e) {
         sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 80) });
       }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_CLICK_LAB_NOW') {
+    (async () => {
+      const c = await flowCfg();
+      if (c.flow_current) return sendResponse({ ok: false, error: 'Há um take gerando; teste com a fila parada.' });
+      const tab = await flowFindTab();
+      if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
+      flowForceLogsUntil = Date.now() + 180000;
+      const r = await flowAsk(tab.id, { type: 'FLOW_CLICK_LAB' });
+      await flowLogFlush();
+      sendResponse(r && r.ok ? { ok: true, result: r.result } : { ok: false, error: (r && r.error) || 'A aba do Flow não respondeu.' });
     })();
     return true;
   }

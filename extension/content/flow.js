@@ -1592,6 +1592,163 @@
     throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
   }
 
+  // Clique real: o segundo plano liga o depurador do navegador na aba por um instante e envia um clique de mouse
+  // de verdade (evento confiavel), que o Flow nao distingue do clique de uma pessoa. "ativar" deixa a aba do Flow
+  // como a ativa da propria janela durante o clique (e devolve a aba anterior depois).
+  async function trustedClick(el, ativar) {
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    const resp = await new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'FLOW_TRUSTED_CLICK', x, y, ativar: !!ativar }, (r2) => {
+          void chrome.runtime.lastError;
+          resolve(r2 || null);
+        });
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    dtLog('Clique real (depurador).', { ...(resp || { ok: false, why: 'sem resposta do segundo plano' }), x, y, ativar: !!ativar });
+    return resp;
+  }
+
+  // Tenta iniciar a geracao por varios caminhos, do mais simples ao mais forte, e para no primeiro que funcionar
+  // (cada clique que "pega" cria uma geracao, entao nunca continua depois de um sucesso). Devolve o nome do caminho ou ''.
+  async function clickGenerate(btn, prevImageIds, descBtn) {
+    const tilesBefore = $$(tileSel()).length;
+    const started = () =>
+      $$(tileSel()).length > tilesBefore ||
+      $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) ||
+      $$(S.imageTileImg).some((i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id'))) ||
+      !txt($(S.editor) || document.createElement('i'));
+    const pressAndClick = (target) => {
+      if (!target) return;
+      try {
+        if (typeof target.focus === 'function') target.focus();
+        const r = target.getBoundingClientRect ? target.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+        const clientX = r.left + r.width / 2;
+        const clientY = r.top + r.height / 2;
+        const mo = { bubbles: true, cancelable: true, view: window, clientX, clientY, button: 0, buttons: 1 };
+        const po = { ...mo, pointerType: 'mouse', isPrimary: true };
+        target.dispatchEvent(new PointerEvent('pointerdown', po));
+        target.dispatchEvent(new MouseEvent('mousedown', mo));
+        target.dispatchEvent(new PointerEvent('pointerup', { ...po, buttons: 0 }));
+        target.dispatchEvent(new MouseEvent('mouseup', { ...mo, buttons: 0 }));
+      } catch (_) {}
+      if (typeof target.click === 'function') target.click();
+    };
+    const attempts = [
+      ['clique', () => {
+        const b = generateBtnEl() || btn;
+        pressAndClick(b);
+      }],
+      ['clique real (depurador)', async () => {
+        const b = generateBtnEl() || btn;
+        if (b) await trustedClick(b, false);
+      }],
+      ['clique no mundo da página', async () => {
+        const b = generateBtnEl() || btn;
+        if (!b) return;
+        b.setAttribute('data-dt-gen', '1');
+        const resp = await new Promise((resolve) => {
+          try {
+            chrome.runtime.sendMessage({ type: 'FLOW_MAIN_CLICK', selector: '[data-dt-gen="1"]' }, (r) => {
+              void chrome.runtime.lastError;
+              resolve(r || null);
+            });
+          } catch (_) {
+            resolve(null);
+          }
+        });
+        b.removeAttribute('data-dt-gen');
+        dtLog('Clique no mundo da página.', resp);
+      }],
+      ['clique real com a aba ativa', async () => {
+        const b = generateBtnEl() || btn;
+        if (b) await trustedClick(b, true);
+      }],
+      ['clique completo', () => {
+        const b = generateBtnEl() || btn;
+        const icon = b && $('mat-icon, svg, span, i', b);
+        const host = b && b.closest('flow-generate-icon-button');
+        if (icon) realClick(icon);
+        realClick(b);
+        if (b && typeof b.click === 'function') b.click();
+        if (host && host !== b) {
+          realClick(host);
+          if (typeof host.click === 'function') host.click();
+        }
+        const form = b && b.closest('form');
+        if (form && typeof form.requestSubmit === 'function') {
+          try { form.requestSubmit(); } catch (_) {}
+        }
+      }],
+      ['Enter', () => {
+        const ed = $(S.editor);
+        if (ed) {
+          ed.focus();
+          try {
+            const sel = window.getSelection && window.getSelection();
+            if (sel) {
+              const range = document.createRange();
+              range.selectNodeContents(ed);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } catch (_) {}
+          for (const type of ['keydown', 'keypress', 'keyup']) {
+            ed.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+          }
+        }
+      }],
+    ];
+    let how = '';
+    for (const [label, fire] of attempts) {
+      await fire();
+      if (await until(started, label === 'clique' ? 10000 : 6000, 400)) {
+        how = label;
+        break;
+      }
+      const box = promptBox();
+      dtLog(
+        `A geração não começou com ${label}; tentando de outro jeito.`,
+        {
+          btn: descBtn(generateBtnEl() || btn),
+          noCentro: (() => {
+            // O que um clique de usuario atingiria no centro do botao (pode ser outro elemento por cima).
+            const b = generateBtnEl() || btn;
+            const r = b && b.getBoundingClientRect();
+            const el = r && document.elementFromPoint ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
+            return el ? { ...descBtn(el), igualAoBotao: el === b, dentroDoBotao: b.contains(el) } : null;
+          })(),
+          botoesCaixa: box ? $$('button, [role=button]', box).filter(vis).map(descBtn) : [],
+          foco: { aba: document.hasFocus ? document.hasFocus() : null, visivel: document.visibilityState },
+        },
+        'warn'
+      );
+    }
+    return how;
+  }
+
+  // Laboratorio: com o prompt ja escrito na caixa do Flow, tenta iniciar a geracao pelos caminhos, um de cada vez,
+  // e registra qual funcionou. Para no primeiro (uma geracao so; no modo imagem o Nano Banana nao gasta credito).
+  async function clickLab() {
+    const ed = $(S.editor);
+    if (!ed || !txt(ed)) throw new Error('Escreva um prompt curto na caixa do Flow antes (ex.: "a red apple on a table").');
+    const btn = generateBtnEl();
+    if (!btn) throw new Error('Não achei o botão de gerar.');
+    const summary = txt(settingsBtnEl() || $(S.settingsBtn)).slice(0, 60);
+    dtLog('Laboratório de clique: início.', { resumoDoBotao: summary, aba: { foco: document.hasFocus ? document.hasFocus() : null, visivel: document.visibilityState } });
+    const prevImageIds = new Set($$('img[data-media-id]').map((i) => i.getAttribute('data-media-id')));
+    const descBtn = (b) => (b ? { tag: b.tagName.toLowerCase(), aria: b.getAttribute('aria-label'), disabled: !!b.disabled, vis: vis(b) } : null);
+    const how = await clickGenerate(btn, prevImageIds, descBtn);
+    const result = how ? 'funcionou por: ' + how : 'nenhum caminho iniciou a geração';
+    dtLog('Laboratório de clique: ' + result + '.', { aba: { foco: document.hasFocus ? document.hasFocus() : null, visivel: document.visibilityState } }, how ? 'success' : 'warn');
+    return result;
+  }
+
   async function generate(job) {
     const count = Math.min(Math.max(Number((job.params || {}).count) || 1, 1), 4);
     dtLog(`Iniciando geração (${job.kind}).`, { params: job.params, count, prompt: String(job.prompt || '').slice(0, 300) });
@@ -1656,111 +1813,7 @@
     await human(500, 1500);
     // Confirma que a geracao comecou (tile novo, pendente, imagem nova ou a caixa de prompt esvaziou).
     // No modo imagem o clique simples as vezes nao vale: tenta de novo com clique completo (incluindo icone/host) e depois com Enter.
-    const tilesBefore = $$(tileSel()).length;
-    const started = () =>
-      $$(tileSel()).length > tilesBefore ||
-      $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) ||
-      $$(S.imageTileImg).some((i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id'))) ||
-      !txt($(S.editor) || document.createElement('i'));
-    const pressAndClick = (target) => {
-      if (!target) return;
-      try {
-        if (typeof target.focus === 'function') target.focus();
-        const r = target.getBoundingClientRect ? target.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
-        const clientX = r.left + r.width / 2;
-        const clientY = r.top + r.height / 2;
-        const mo = { bubbles: true, cancelable: true, view: window, clientX, clientY, button: 0, buttons: 1 };
-        const po = { ...mo, pointerType: 'mouse', isPrimary: true };
-        target.dispatchEvent(new PointerEvent('pointerdown', po));
-        target.dispatchEvent(new MouseEvent('mousedown', mo));
-        target.dispatchEvent(new PointerEvent('pointerup', { ...po, buttons: 0 }));
-        target.dispatchEvent(new MouseEvent('mouseup', { ...mo, buttons: 0 }));
-      } catch (_) {}
-      if (typeof target.click === 'function') target.click();
-    };
-    const attempts = [
-      ['clique', () => {
-        const b = generateBtnEl() || btn;
-        pressAndClick(b);
-      }],
-      ['clique no mundo da página', async () => {
-        const b = generateBtnEl() || btn;
-        if (!b) return;
-        b.setAttribute('data-dt-gen', '1');
-        const resp = await new Promise((resolve) => {
-          try {
-            chrome.runtime.sendMessage({ type: 'FLOW_MAIN_CLICK', selector: '[data-dt-gen="1"]' }, (r) => {
-              void chrome.runtime.lastError;
-              resolve(r || null);
-            });
-          } catch (_) {
-            resolve(null);
-          }
-        });
-        b.removeAttribute('data-dt-gen');
-        dtLog('Clique no mundo da página.', resp);
-      }],
-      ['clique completo', () => {
-        const b = generateBtnEl() || btn;
-        const icon = b && $('mat-icon, svg, span, i', b);
-        const host = b && b.closest('flow-generate-icon-button');
-        if (icon) realClick(icon);
-        realClick(b);
-        if (b && typeof b.click === 'function') b.click();
-        if (host && host !== b) {
-          realClick(host);
-          if (typeof host.click === 'function') host.click();
-        }
-        const form = b && b.closest('form');
-        if (form && typeof form.requestSubmit === 'function') {
-          try { form.requestSubmit(); } catch (_) {}
-        }
-      }],
-      ['Enter', () => {
-        const ed = $(S.editor);
-        if (ed) {
-          ed.focus();
-          try {
-            const sel = window.getSelection && window.getSelection();
-            if (sel) {
-              const range = document.createRange();
-              range.selectNodeContents(ed);
-              range.collapse(false);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          } catch (_) {}
-          for (const type of ['keydown', 'keypress', 'keyup']) {
-            ed.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
-          }
-        }
-      }],
-    ];
-    let how = '';
-    for (const [label, fire] of attempts) {
-      await fire();
-      if (await until(started, label === 'clique' ? 10000 : 6000, 400)) {
-        how = label;
-        break;
-      }
-      const box = promptBox();
-      dtLog(
-        `A geração não começou com ${label}; tentando de outro jeito.`,
-        {
-          btn: descBtn(generateBtnEl() || btn),
-          noCentro: (() => {
-            // O que um clique de usuario atingiria no centro do botao (pode ser outro elemento por cima).
-            const b = generateBtnEl() || btn;
-            const r = b && b.getBoundingClientRect();
-            const el = r && document.elementFromPoint ? document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) : null;
-            return el ? { ...descBtn(el), igualAoBotao: el === b, dentroDoBotao: b.contains(el) } : null;
-          })(),
-          botoesCaixa: box ? $$('button, [role=button]', box).filter(vis).map(descBtn) : [],
-          foco: { aba: document.hasFocus ? document.hasFocus() : null, visivel: document.visibilityState },
-        },
-        'warn'
-      );
-    }
+    const how = await clickGenerate(btn, prevImageIds, descBtn);
     if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
     dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
     await sleep(2000);
@@ -1965,6 +2018,16 @@
     if (msg.type === 'FLOW_SNAPSHOT') {
       snapshotAll()
         .then((partes) => sendResponse({ ok: true, partes }))
+        .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+      return true;
+    }
+    if (msg.type === 'FLOW_CLICK_LAB') {
+      if (running) {
+        sendResponse({ ok: false, error: 'Há um take gerando.' });
+        return;
+      }
+      clickLab()
+        .then((result) => sendResponse({ ok: true, result }))
         .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
       return true;
     }

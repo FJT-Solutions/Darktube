@@ -547,6 +547,20 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+  const labBtn = document.getElementById('flow-click-lab-btn');
+  if (labBtn) {
+    labBtn.addEventListener('click', () => {
+      labBtn.disabled = true;
+      st.textContent = 'Testando os caminhos de clique no botão de gerar (até 1 min)...';
+      chrome.runtime.sendMessage({ type: 'FLOW_CLICK_LAB_NOW' }, (resp) => {
+        void chrome.runtime.lastError;
+        labBtn.disabled = false;
+        st.textContent = resp && resp.ok
+          ? 'Teste de clique: ' + (resp.result || 'concluído') + ' (detalhes no log do darktube).'
+          : (resp && resp.error) || 'O teste de clique não respondeu.';
+      });
+    });
+  }
   const atBtn = document.getElementById('flow-attach-test-btn');
   if (atBtn) {
     atBtn.addEventListener('click', () => {
