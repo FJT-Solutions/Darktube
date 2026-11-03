@@ -134,7 +134,7 @@ export async function syncFlowPublishStatus(userId: string, project: FlowProject
   if (!post) return { project, publish: null }
   const publish: FlowPublishInfo = { status: post.status, error: post.error_message ?? null, publishedAt: post.published_at ?? null }
   const next = post.status === 'published' ? 'published' : post.status === 'failed' ? 'publish_failed' : null
-  if (next && next !== project.status && (project.status === 'publishing' || project.status === 'scheduled' || project.status === 'publish_failed')) {
+  if (next && next !== project.status && (project.status === 'publishing' || project.status === 'scheduled' || project.status === 'publish_failed' || next === 'published')) {
     const updated = await updateFlowProject(userId, project.id, { status: next })
     return { project: updated ?? project, publish }
   }

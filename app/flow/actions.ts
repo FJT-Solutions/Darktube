@@ -362,6 +362,22 @@ export async function publishFlowProjectAction(
     if (!project) throw new Error("Projeto não encontrado.")
     if (!isValidVideoUrl(project.final_url)) throw new Error("Monte o vídeo final antes de publicar.")
 
+    // Trava de seguranca anti-duplicacao / idempotencia: impede cliques multiplos concorrentes
+    if (project.status === "publishing") {
+      const updatedAt = new Date(project.updated_at).getTime()
+      if (Date.now() - updatedAt < 5 * 60 * 1000) {
+        throw new Error("Este projeto já está sendo publicado no momento. Aguarde a confirmação das redes.")
+      }
+    }
+
+    const latestPost = await getLatestFlowPost(user.id, id)
+    if (latestPost && latestPost.status === "publishing") {
+      const postAge = Date.now() - new Date(latestPost.created_at).getTime()
+      if (postAge < 5 * 60 * 1000) {
+        throw new Error("Já existe uma publicação em andamento para este vídeo. Aguarde a conclusão.")
+      }
+    }
+
     const connected = await getSocialAccounts(user.id)
     const accounts: Record<string, string> = {}
     for (const [platform, accId] of Object.entries(input.accounts || {})) {

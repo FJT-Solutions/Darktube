@@ -1721,23 +1721,58 @@ function ProjectView({
               {!now && <Input type="datetime-local" className="h-8 w-56" value={when} onChange={(e) => setWhen(e.target.value)} />}
             </div>
             <Button
-              disabled={busy === "pub" || Object.keys(picked).length === 0}
+              disabled={busy === "pub" || status === "publishing" || Object.keys(picked).length === 0}
               onClick={async () => {
-                const res = await publishFlowProjectAction(project.id, { accounts: picked, dispatchNow: now, scheduledAt: now ? undefined : when ? new Date(when).toISOString() : undefined, facebookPageId: picked.facebook ? fbPage || undefined : undefined })
-                if (!res.success) return void toast.error(res.error)
-                toast.success(now ? "Enviado para publicação." : "Postagem agendada.")
-                if (res.warning) toast.warning(res.warning)
-                refreshProject()
+                if (busy === "pub" || status === "publishing") return
+                setBusy("pub")
+                try {
+                  const res = await publishFlowProjectAction(project.id, {
+                    accounts: picked,
+                    dispatchNow: now,
+                    scheduledAt: now ? undefined : when ? new Date(when).toISOString() : undefined,
+                    facebookPageId: picked.facebook ? fbPage || undefined : undefined,
+                  })
+                  if (!res.success) {
+                    toast.error(res.error)
+                    return
+                  }
+                  toast.success(now ? "Enviado para publicação." : "Postagem agendada.")
+                  if (res.warning) toast.warning(res.warning)
+                  await refreshProject()
+                } finally {
+                  setBusy("")
+                }
               }}
             >
-              <Send className="mr-2 h-4 w-4" /> {now ? "Publicar agora" : "Agendar postagem"}
+              {busy === "pub" || status === "publishing" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {now ? "Publicando..." : "Agendando..."}
+                </>
+              ) : status === "published" ? (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  {now ? "Publicar novamente" : "Agendar postagem"}
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  {now ? "Publicar agora" : "Agendar postagem"}
+                </>
+              )}
             </Button>
-            {(status === "scheduled" || status === "publishing") && (
-              <p className="text-xs text-muted-foreground">{status === "scheduled" ? "Agendado." : "Em publicação..."} O andamento também aparece em Dark Clips.</p>
+            {status === "publishing" && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                Em publicação nas redes selecionadas... O andamento também aparece em Dark Clips.
+              </p>
+            )}
+            {status === "scheduled" && (
+              <p className="text-xs text-muted-foreground">Agendado. O andamento também aparece em Dark Clips.</p>
             )}
             {status === "published" && (
-              <p className="text-sm text-emerald-500">
-                Publicado{publish?.publishedAt ? ` em ${new Date(publish.publishedAt).toLocaleString("pt-BR")}` : ""}.
+              <p className="text-sm font-medium text-emerald-500">
+                ✓ Publicado com sucesso{publish?.publishedAt ? ` em ${new Date(publish.publishedAt).toLocaleString("pt-BR")}` : ""}.
               </p>
             )}
             {status === "publish_failed" && (
