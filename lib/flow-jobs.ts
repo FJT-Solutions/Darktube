@@ -325,7 +325,8 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
       WHERE id = (
         SELECT id FROM public.flow_jobs
          WHERE user_id = $1 AND engine = 'flow' AND status = 'queued'
-         ORDER BY created_at ASC
+         -- Folhas de personagem (curtas e pedidas na hora) passam na frente dos takes; dentro de cada grupo, ordem de chegada.
+         ORDER BY (role IN ('character_sheet', 'cast_sheet')) DESC, created_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED
       )

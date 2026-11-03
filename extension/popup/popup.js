@@ -547,6 +547,32 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+  const ghostBtn = document.getElementById('flow-ghost-btn');
+  if (ghostBtn) {
+    chrome.runtime.sendMessage({ type: 'FLOW_GHOST_STATUS' }, (resp) => {
+      void chrome.runtime.lastError;
+      if (resp && resp.ok && resp.isGhost) {
+        ghostBtn.textContent = '👁️ Trazer Flow para a tela';
+      } else {
+        ghostBtn.textContent = '👻 Ocultar Flow (Janela Fantasma)';
+      }
+    });
+    ghostBtn.addEventListener('click', () => {
+      ghostBtn.disabled = true;
+      chrome.runtime.sendMessage({ type: 'FLOW_GHOST_WINDOW' }, (resp) => {
+        void chrome.runtime.lastError;
+        ghostBtn.disabled = false;
+        if (resp && resp.ok) {
+          ghostBtn.textContent = resp.isGhost ? '👁️ Trazer Flow para a tela' : '👻 Ocultar Flow (Janela Fantasma)';
+          st.textContent = resp.isGhost
+            ? 'Janela Fantasma ativada: o Flow está rodando fora da tela, sem congelar.'
+            : 'Flow restaurado para a tela.';
+        } else {
+          st.textContent = (resp && resp.error) || 'Não foi possível mover a janela do Flow.';
+        }
+      });
+    });
+  }
   const ownBtn = document.getElementById('flow-own-window-btn');
   if (ownBtn) {
     ownBtn.addEventListener('click', () => {

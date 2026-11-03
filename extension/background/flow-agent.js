@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.15';
-const FLOW_BUILD = '2026-11-03-visivel-e-nova-tentativa'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.16';
+const FLOW_BUILD = '2026-11-03-janela-fantasma-e-audio-keepalive'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -126,11 +126,43 @@ async function flowRestoreVisible() {
   }
 }
 
+// Injeta na página do Flow (mundo MAIN) o override da Page Visibility API.
+// O Flow acredita que a aba está sempre visível e com foco, mesmo se minimizada ou fora da tela.
+async function flowInjectMainSpoof(tabId) {
+  if (!tabId || !chrome.scripting) return;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: () => {
+        if (window.__dtVisibilitySpoofed) return;
+        window.__dtVisibilitySpoofed = true;
+        try {
+          Object.defineProperty(Document.prototype, 'visibilityState', { get: () => 'visible', configurable: true });
+          Object.defineProperty(Document.prototype, 'hidden', { get: () => false, configurable: true });
+          Object.defineProperty(Document.prototype, 'webkitHidden', { get: () => false, configurable: true });
+          Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+          Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+          const stopVis = (e) => {
+            if (e && typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+          };
+          window.addEventListener('visibilitychange', stopVis, true);
+          document.addEventListener('visibilitychange', stopVis, true);
+          window.addEventListener('webkitvisibilitychange', stopVis, true);
+          document.addEventListener('webkitvisibilitychange', stopVis, true);
+          document.hasFocus = () => true;
+        } catch (_) {}
+      },
+    });
+  } catch (_) {}
+}
+
 // Aba escondida: o Chrome atrasa os timers dela para 1 vez por minuto. Enquanto ha job, acorda a aba a cada 2 s
 // (sem trazer para a frente nem trocar de aba) e impede que o Chrome a descarregue para poupar memoria.
 let flowWakeTimer = null;
 function flowKeepAwake(tabId) {
   if (flowWakeTimer || !tabId) return;
+  flowInjectMainSpoof(tabId).catch(() => {});
   try {
     chrome.tabs.update(tabId, { autoDiscardable: false }, () => void chrome.runtime.lastError);
   } catch (_) {}
@@ -183,11 +215,14 @@ async function flowAsk(tabId, msg) {
         target: { tabId },
         files: ['content/flow-selectors.js', 'content/flow.js'],
       });
+      await flowInjectMainSpoof(tabId);
       await new Promise((r) => setTimeout(r, 400));
       res = await trySend();
     } catch (e) {
       /* aba protegida ou fechada */
     }
+  } else if (res !== null) {
+    flowInjectMainSpoof(tabId).catch(() => {});
   }
   return res;
 }
@@ -574,6 +609,74 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (tabs.length === 1) return sendResponse({ ok: true, ja: true });
         await chrome.windows.create({ tabId: tab.id, focused: false, width: 560, height: 800, state: 'normal' });
         sendResponse({ ok: true, ja: false });
+      } catch (e) {
+        sendResponse({ ok: false, error: String((e && e.message) || e).slice(0, 120) });
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_GHOST_STATUS') {
+    (async () => {
+      try {
+        const tab = await flowFindTab();
+        if (!tab) return sendResponse({ ok: false, isGhost: false });
+        const win = await chrome.windows.get(tab.windowId);
+        const st = await chrome.storage.local.get(['flow_ghost_active']);
+        const isGhost = !!st.flow_ghost_active || (win.left != null && win.left < -1500);
+        sendResponse({ ok: true, isGhost });
+      } catch (_) {
+        sendResponse({ ok: false, isGhost: false });
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_GHOST_WINDOW') {
+    // Janela Fantasma: move a janela do Flow para fora das coordenadas do monitor (ex: left: -3200, top: 0)
+    // mantendo state: 'normal'. A janela continua 100% ativa para o Windows e Chromium (GPU e WebSockets sem corte)
+    // mas invisível para o usuário. Clicar novamente restaura a janela para o centro da tela.
+    (async () => {
+      try {
+        const tab = await flowFindTab();
+        if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
+        const win = await chrome.windows.get(tab.windowId);
+        const st = await chrome.storage.local.get(['flow_ghost_active', 'flow_prev_pos']);
+        const isGhost = !!st.flow_ghost_active || (win.left != null && win.left < -1500);
+
+        if (msg.action === 'show' || (msg.action !== 'hide' && isGhost)) {
+          // Trazer de volta para a tela visível
+          const pos = st.flow_prev_pos || { left: 80, top: 80, width: 620, height: 860 };
+          await chrome.windows.update(tab.windowId, {
+            state: 'normal',
+            left: Math.max(pos.left != null ? pos.left : 80, 40),
+            top: Math.max(pos.top != null ? pos.top : 80, 40),
+            width: Math.max(pos.width || 620, 400),
+            height: Math.max(pos.height || 860, 500),
+            focused: true,
+          });
+          await chrome.storage.local.set({ flow_ghost_active: false });
+          sendResponse({ ok: true, isGhost: false });
+        } else {
+          // Salvar posição e mover para fora da tela (janela fantasma)
+          if (win.left != null && win.left > -1000) {
+            await chrome.storage.local.set({ flow_prev_pos: { left: win.left, top: win.top, width: win.width, height: win.height } });
+          }
+          const tabs = await chrome.tabs.query({ windowId: tab.windowId });
+          let targetWinId = tab.windowId;
+          if (tabs.length > 1) {
+            const created = await chrome.windows.create({ tabId: tab.id, focused: false, width: 620, height: 860, state: 'normal' });
+            targetWinId = created.id;
+          }
+          await chrome.windows.update(targetWinId, {
+            state: 'normal',
+            left: -3200,
+            top: 0,
+            width: 620,
+            height: 860,
+            focused: false,
+          });
+          await chrome.storage.local.set({ flow_ghost_active: true });
+          sendResponse({ ok: true, isGhost: true });
+        }
       } catch (e) {
         sendResponse({ ok: false, error: String((e && e.message) || e).slice(0, 120) });
       }

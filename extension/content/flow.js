@@ -30,6 +30,41 @@
       wakeWaiters.add(check);
     });
   const wakeAll = () => Array.from(wakeWaiters).forEach((f) => f());
+
+  // Keep-alive por áudio silencioso: o Chromium nunca suspende abas que estejam reproduzindo áudio.
+  // Timers, WebSockets e renderização continuam ativos mesmo em segundo plano ou na janela fantasma.
+  let silentAudioCtx = null;
+  function startSilentAudioKeepAlive() {
+    try {
+      if (!silentAudioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          silentAudioCtx = new AudioCtx();
+          const osc = silentAudioCtx.createOscillator();
+          const gain = silentAudioCtx.createGain();
+          gain.gain.value = 0.00001;
+          osc.connect(gain);
+          gain.connect(silentAudioCtx.destination);
+          osc.start();
+        }
+      }
+      if (silentAudioCtx && silentAudioCtx.state === 'suspended') {
+        silentAudioCtx.resume().catch(() => {});
+      }
+      if (!document.getElementById('__dt_silent_audio')) {
+        const audio = document.createElement('audio');
+        audio.id = '__dt_silent_audio';
+        audio.loop = true;
+        audio.volume = 0.01;
+        audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        audio.style.display = 'none';
+        (document.body || document.documentElement).appendChild(audio);
+        audio.play().catch(() => {});
+      }
+    } catch (_) {}
+  }
+  startSilentAudioKeepAlive();
+  window.addEventListener('click', () => startSilentAudioKeepAlive(), { capture: true, passive: true });
   const rand = (a, b) => a + Math.random() * (b - a);
   const human = (a = 350, b = 1100) => sleep(rand(a, b));
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -1886,6 +1921,7 @@
     // Confirma que a geracao comecou (tile novo, pendente, imagem nova ou a caixa de prompt esvaziou).
     // No modo imagem o clique simples as vezes nao vale: tenta de novo com clique completo (incluindo icone/host) e depois com Enter.
     // O Flow so aceita a geracao com a aba visivel (as falhas "failed to generate" aconteceram com a aba escondida).
+    startSilentAudioKeepAlive();
     const vis0 = document.visibilityState;
     let visInfo = null;
     if (vis0 !== 'visible') {
@@ -1893,83 +1929,82 @@
       if (document.visibilityState !== 'visible') visInfo = await ensureVisible(true);
     }
     dtLog('Visibilidade da aba na hora de gerar.', { antes: vis0, depois: document.visibilityState, foco: document.hasFocus ? document.hasFocus() : null, ajuste: visInfo });
-    let how = '';
     try {
-      how = await clickGenerate(btn, prevImageIds, descBtn, job.kind);
+      const how = await clickGenerate(btn, prevImageIds, descBtn, job.kind);
+      if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
+      dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
+      await sleep(2000);
+
+      const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
+      const t0 = Date.now();
+      let lastShape = '';
+      const readySince = new Map();
+      for (;;) {
+        await sleep(2500);
+        const prob = classifyProblem();
+        if (prob) throw err(prob.code, prob.msg);
+        if (job.kind === 'image') {
+          const fresh = unseen($$(tileSel()));
+          const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
+          if (bad) {
+            const m = txt(bad).replace(/^warning\s*/i, '').slice(0, 180);
+            dtLog('O Flow recusou esta imagem.', { code: failCode(m), motivo: m }, 'error');
+            throw err(failCode(m), 'O Flow recusou a geração: ' + m);
+          }
+          const ready = $$(S.imageTileImg).filter(
+            (i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id')) && !prevImageSrcs.has((i.currentSrc || i.src || '').split('?')[0])
+          );
+          if (ready.length >= count) dtLog('Imagem gerada detectada.', { prontas: ready.length, mediaId: ready[0].getAttribute('data-media-id') }, 'success');
+          if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
+        } else {
+          const currentTiles = $$(S.videoTile);
+          // O Google Flow insere novos videos no INICIO da galeria (topo/esquerda).
+          // Filtra somente tiles que NAO existiam antes deste clique:
+          const newTiles = currentTiles.filter((t) => !t.hasAttribute('data-dt-old') && !prevTiles.has(t) && !prevFps.has(tileFp(t)));
+          const states = newTiles.map((t) => ({ t, s: tileState(t) }));
+          const bad = states.find((x) => x.s.failed || (!x.s.generating && RX.failure.test(txt(x.t))));
+          if (bad) {
+            const msg = txt(bad.t).replace(/^warning\s*/i, '').slice(0, 220);
+            const code = failCode(msg);
+            dtLog('O Flow recusou este take.', { code, motivo: msg }, 'error');
+            throw err(code, 'O Flow recusou a geração: ' + msg);
+          }
+
+          const now = Date.now();
+          for (const x of states) {
+            if (!x.s.generating && (x.s.badge || x.s.hasImg || x.s.hasVideo)) {
+              if (!readySince.has(x.t)) readySince.set(x.t, now);
+            } else readySince.delete(x.t);
+          }
+          const pending = states.filter((x) => x.s.generating);
+          // Pronto = sem "%"/spinner, com o selo de resolucao (ou imagem) e estavel por alguns segundos.
+          const stable = (x) => readySince.has(x.t) && now - readySince.get(x.t) >= 4000 && (x.s.badge || x.s.hasVideo || now - readySince.get(x.t) >= 15000);
+          const readyTiles = states.filter(stable).map((x) => x.t);
+          // Um tile que acabou de ficar pronto ainda esta "esquentando": espera, para nao capturar so os outros.
+          const warming = states.filter((x) => readySince.has(x.t) && !stable(x));
+          const shape = `${currentTiles.length}/${newTiles.length}/${pending.length}/${readyTiles.length}`;
+          if (shape !== lastShape) {
+            lastShape = shape;
+            dtLog('Tiles depois de gerar.', { total: currentTiles.length, novos: newTiles.length, gerando: pending.length, prontos: readyTiles.length, estados: states.slice(0, 4).map((x) => x.s), segundos: Math.round((now - t0) / 1000) });
+          }
+          if (readyTiles.length >= count && pending.length === 0 && warming.length === 0) {
+            dtLog('Tile gerado detectado.', describeTile(readyTiles[0]), 'success');
+            const out = await captureVideo(job, readyTiles, knownOldUrls);
+            for (const t of readyTiles) {
+              t.setAttribute('data-dt-seen', '1');
+              t.setAttribute('data-dt-old', '1');
+              seenTileKeys.add(tileKey(t));
+              prevTiles.add(t);
+              prevFps.add(tileFp(t));
+            }
+            await closeLayers();
+            return { ...out, costHint: hint };
+          }
+        }
+        if (Date.now() - t0 > limit) throw err('timeout', 'O Flow não terminou a geração no tempo esperado.');
+      }
     } finally {
       if (visInfo) await restoreVisible();
-    }
-    if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
-    dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
-    await sleep(2000);
-
-    const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
-    const t0 = Date.now();
-    let lastShape = '';
-    const readySince = new Map();
-    for (;;) {
-      await sleep(2500);
-      const prob = classifyProblem();
-      if (prob) throw err(prob.code, prob.msg);
-      if (job.kind === 'image') {
-        const fresh = unseen($$(tileSel()));
-        const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
-        if (bad) {
-          const m = txt(bad).replace(/^warning\s*/i, '').slice(0, 180);
-          dtLog('O Flow recusou esta imagem.', { code: failCode(m), motivo: m }, 'error');
-          throw err(failCode(m), 'O Flow recusou a geração: ' + m);
-        }
-        const ready = $$(S.imageTileImg).filter(
-          (i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id')) && !prevImageSrcs.has((i.currentSrc || i.src || '').split('?')[0])
-        );
-        if (ready.length >= count) dtLog('Imagem gerada detectada.', { prontas: ready.length, mediaId: ready[0].getAttribute('data-media-id') }, 'success');
-        if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
-      } else {
-        const currentTiles = $$(S.videoTile);
-        // O Google Flow insere novos videos no INICIO da galeria (topo/esquerda).
-        // Filtra somente tiles que NAO existiam antes deste clique:
-        const newTiles = currentTiles.filter((t) => !t.hasAttribute('data-dt-old') && !prevTiles.has(t) && !prevFps.has(tileFp(t)));
-        const states = newTiles.map((t) => ({ t, s: tileState(t) }));
-        const bad = states.find((x) => x.s.failed || (!x.s.generating && RX.failure.test(txt(x.t))));
-        if (bad) {
-          const msg = txt(bad.t).replace(/^warning\s*/i, '').slice(0, 220);
-          const code = failCode(msg);
-          dtLog('O Flow recusou este take.', { code, motivo: msg }, 'error');
-          throw err(code, 'O Flow recusou a geração: ' + msg);
-        }
-
-        const now = Date.now();
-        for (const x of states) {
-          if (!x.s.generating && (x.s.badge || x.s.hasImg || x.s.hasVideo)) {
-            if (!readySince.has(x.t)) readySince.set(x.t, now);
-          } else readySince.delete(x.t);
-        }
-        const pending = states.filter((x) => x.s.generating);
-        // Pronto = sem "%"/spinner, com o selo de resolucao (ou imagem) e estavel por alguns segundos.
-        const stable = (x) => readySince.has(x.t) && now - readySince.get(x.t) >= 4000 && (x.s.badge || x.s.hasVideo || now - readySince.get(x.t) >= 15000);
-        const readyTiles = states.filter(stable).map((x) => x.t);
-        // Um tile que acabou de ficar pronto ainda esta "esquentando": espera, para nao capturar so os outros.
-        const warming = states.filter((x) => readySince.has(x.t) && !stable(x));
-        const shape = `${currentTiles.length}/${newTiles.length}/${pending.length}/${readyTiles.length}`;
-        if (shape !== lastShape) {
-          lastShape = shape;
-          dtLog('Tiles depois de gerar.', { total: currentTiles.length, novos: newTiles.length, gerando: pending.length, prontos: readyTiles.length, estados: states.slice(0, 4).map((x) => x.s), segundos: Math.round((now - t0) / 1000) });
-        }
-        if (readyTiles.length >= count && pending.length === 0 && warming.length === 0) {
-          dtLog('Tile gerado detectado.', describeTile(readyTiles[0]), 'success');
-          const out = await captureVideo(job, readyTiles, knownOldUrls);
-          for (const t of readyTiles) {
-            t.setAttribute('data-dt-seen', '1');
-            t.setAttribute('data-dt-old', '1');
-            seenTileKeys.add(tileKey(t));
-            prevTiles.add(t);
-            prevFps.add(tileFp(t));
-          }
-          await closeLayers();
-          return { ...out, costHint: hint };
-        }
-      }
-      if (Date.now() - t0 > limit) throw err('timeout', 'O Flow não terminou a geração no tempo esperado.');
     }
   }
 
