@@ -1257,4 +1257,108 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     look: 'widescreen 16:9 meditative cinema, anamorphic depth, warm practical glow against cool atmospheric rain or mist',
     defaults: { takes: 30, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
   },
+  {
+    id: 'pov-historia-ilustrada-longo',
+    niche: 'Histórias',
+    subniche: 'POV "Você..." ilustrado 2D (Longo)',
+    name: 'História POV ilustrada 2D (16:9)',
+    description:
+      'Drama do dia a dia brasileiro narrado em 2ª pessoa ("Você largou a CLT..."): personagem em preto e branco num cenário pintado e colorido, dinheiro em jogo a cada ato e final aberto com palavra para comentar. Longo (YouTube).',
+    mode: 'narracao',
+    length: 'longo',
+    trend: 'viral',
+    fields: [
+      {
+        id: 'tema_historia',
+        label: 'Tema da história',
+        type: 'select',
+        default: 'delivery_casa',
+        options: [
+          { value: 'delivery_casa', label: 'Largar a CLT e abrir um delivery (hambúrguer, marmita) na cozinha de casa' },
+          { value: 'motorista_app', label: 'Comprar um carro financiado para virar motorista de aplicativo' },
+          { value: 'revenda', label: 'Revender roupas ou eletrônicos de casa e crescer sem controle' },
+          { value: 'confeitaria', label: 'Confeitaria caseira que explode de pedidos' },
+          { value: 'black_friday', label: 'Sazonal: dono de lojinha de bairro na semana da Black Friday' },
+          { value: 'natal', label: 'Sazonal: vender panetone e doces de Natal e encarar a corrida de dezembro' },
+          { value: 'volta_aulas', label: 'Sazonal: papelaria de bairro na volta às aulas (janeiro)' },
+          { value: 'carnaval', label: 'Sazonal: barraca de ambulante no Carnaval (fevereiro)' },
+        ],
+      },
+      {
+        id: 'arco',
+        label: 'Arco da história',
+        type: 'select',
+        default: 'sucesso_ameaca',
+        options: [
+          { value: 'sucesso_ameaca', label: 'O sucesso vira a ameaça: o negócio cresce rápido demais e pode quebrar' },
+          { value: 'divida_crescente', label: 'Dívida crescente: cada solução cria um problema maior' },
+          { value: 'virada_do_zero', label: 'Do zero à virada: tudo dá errado e uma decisão muda o jogo' },
+        ],
+      },
+      {
+        id: 'palavra_cta',
+        label: 'Palavra para o público comentar no final',
+        type: 'text',
+        default: 'EU',
+        placeholder: 'Ex.: HAMBÚRGUER, CORAGEM, TOPO',
+      },
+      { id: 'emocao', label: 'Emoção principal', type: 'select', default: 'tensao', options: EMOTIONS },
+    ],
+    brief:
+      'Long-form 16:9 illustrated drama about an ordinary Brazilian worker who bets savings on a small business. Narrated entirely in second person ("Você"), present tense, by one calm confessional off-screen voice. Stakes are always concrete money amounts in reais that escalate act by act, and the success itself becomes the threat. The audience should feel the risk of losing everything and be invited to comment a keyword at the end.',
+    beats: [
+      {
+        fn: 'Hook in media res: the protagonist works alone at night in a small home kitchen, a phone buzzing with orders, and the first line states the exact amount at risk',
+        camera: 'wide establishing shot of the kitchen with slow parallax push-in, steam and warm bulb flicker',
+      },
+      {
+        fn: 'The old life: the daily grind of the salaried job (boss, alarm clock, crowded bus, small paycheck) that makes the dream feel necessary',
+        camera: 'medium shot following the protagonist through the routine, gentle lateral parallax',
+      },
+      {
+        fn: 'The decision: the protagonist spends savings on used equipment or stock and turns part of the home into a workplace, family doubtful',
+        camera: 'close-up on hands counting money, then wide shot of the transformed corner of the house',
+      },
+      {
+        fn: 'First orders: a small win, the first customers arrive by phone and the protagonist delivers with pride',
+        camera: 'over-the-shoulder on the work surface, then tracking shot along the street at dusk',
+      },
+      {
+        fn: 'Growth and excitement: orders multiply, family helps, sleep shrinks, the hero product looks irresistible',
+        camera: 'hyper-appetizing macro close-ups of the product alternating with a fast montage of full order bags',
+      },
+      {
+        fn: 'Cracks appear: a harsh complaint, hidden costs, mistakes and a kitchen too small for the demand',
+        camera: 'low angle on the pile of tasks and bills, slow push-in on the exhausted face',
+      },
+      {
+        fn: 'Overload: more customers than the protagonist can serve, late deliveries and a confrontation with a worried family member',
+        camera: 'tense two-shot across the table, cluttered wide shot with orders piling up',
+      },
+      {
+        fn: 'The big bet: a large loan or investment to open a dedicated spot, the point of no return',
+        camera: 'slow dolly toward a desk with documents under a single lamp, extreme close-up on a hesitating hand',
+      },
+      {
+        fn: 'Peak tension: the night before the leap, success itself may destroy everything the protagonist built',
+        camera: 'empty street or empty new storefront at night, slow pull-back showing how small the protagonist is',
+      },
+      {
+        fn: 'Open ending and loop: a final question to the viewer, the invitation to comment the keyword, and a last line that connects to the opening line',
+        camera: 'locked wide shot of the home kitchen matching the opening frame, light turning off',
+      },
+    ],
+    rules: [
+      'Narrate every take in second person, present tense ("Você acorda...", "Você conta o dinheiro...") with one calm confessional voice; the protagonist never speaks and keeps the mouth closed',
+      'Every person is drawn as a flat grayscale ink figure (white and light gray skin and clothes, thick black outline, simple dot eyes, spiky black hair for the protagonist); all environments, food, objects and skies are richly painted in saturated warm color with weathered textures. Keep this contrast in every take',
+      'Setting is ordinary Brazilian daily life: ceramic-tile kitchens, peeling green cabinets, old fridge, plastic chairs, narrow streets, motorbikes, small shops. Night scenes use warm tungsten light against deep blue windows',
+      'Name a concrete amount in reais aloud in at least every second act (savings, loan, cost, revenue) and make it grow or hurt; amounts are only spoken, never written on screen',
+      'Phones, bags, boxes and documents appear with no readable writing; show orders through phone glow and notification sounds',
+      'Each act raises the stakes over the previous one and the final take stays unresolved on purpose; the last line asks the viewer a direct question and tells them to comment the chosen keyword',
+      'The SEO caption must say this is a fictional dramatized story; the story gives no financial promises or guaranteed results',
+      'Layered foley, no music: sizzle, knife on board, phone pings, scooter engines, fridge hum, distant street noise',
+    ],
+    look: 'hand-painted 2D illustrated drama, monochrome ink characters inside saturated painterly Brazilian interiors, limited animation with parallax, steam and warm light flicker',
+    defaults: { takes: 40, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'ilustrado2d' },
+  },
 ]

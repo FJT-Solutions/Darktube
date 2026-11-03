@@ -55,7 +55,8 @@ export interface FlowTemplate {
   rules?: string[]
   /** Estilo visual padrao do formato, em ingles (ex.: "35mm film grain, noir lighting"). */
   look?: string
-  defaults: { takes: number; seconds: number; aspect: string; model: string; quality: string }
+  /** `realismo`: estilo visual (valor de REALISM) que a tela seleciona ao escolher o template. */
+  defaults: { takes: number; seconds: number; aspect: string; model: string; quality: string; realismo?: string }
 }
 
 export const LANGUAGES: FlowFieldOption[] = [
@@ -90,6 +91,7 @@ export const REALISM: FlowFieldOption[] = [
   { value: 'estilizado', label: 'Estilizado (cores fortes, acabamento limpo)' },
   { value: 'animacao3d', label: 'Animação 3D (estilo filme de animação)' },
   { value: 'massinha', label: 'Massinha / feltro (stop motion)' },
+  { value: 'ilustrado2d', label: 'Ilustração 2D (personagem P&B em cenário pintado)' },
 ]
 
 /** Texto em ingles de cada estilo, para o prompt do Flow (o rotulo em portugues e so para a tela). */
@@ -99,6 +101,8 @@ export const REALISM_PROMPT: Record<string, string> = {
   estilizado: 'stylized cinematic look, bold clean colors, polished finish',
   animacao3d: 'high-end 3D animated film style, expressive characters, soft global illumination',
   massinha: 'handmade claymation and felt stop-motion look, tactile textures, warm light',
+  ilustrado2d:
+    'hand-painted 2D illustrated animation with limited motion (parallax, steam, light flicker); every person is a flat grayscale ink figure (white and gray, thick black outlines, simple dot eyes) placed inside richly painted, saturated, weathered environments, food and props with painterly texture and warm tungsten light',
 }
 
 export const VIDEO_MODELS: FlowFieldOption[] = [

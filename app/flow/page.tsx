@@ -216,6 +216,7 @@ export default function FlowPage() {
     setAspect(t.defaults.aspect)
     setModel(t.defaults.model)
     setQuality(t.defaults.quality)
+    setRealismo(t.defaults.realismo ?? "cinematografico")
   }
 
   const loadProjects = useCallback(async () => {
@@ -770,6 +771,8 @@ function ProjectView({
       const res = await syncSheetsAction(project.id)
       if (res.success && res.project) {
         applyProjectFromSheet(res.project as FlowProject)
+        const errs = Object.entries((res as any).sheetErrors || {})
+        for (const [who, msg] of errs) toast.error((who === "cast" ? "Folha do elenco" : "Folha do personagem") + ": " + String(msg).slice(0, 160) + " Use Refazer para tentar de novo.")
       }
       loadJobs()
     }
