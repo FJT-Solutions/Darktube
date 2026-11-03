@@ -2,7 +2,7 @@
 // O prompt final e montado aqui, e nao pela IA, para garantir sempre o mesmo formato (consistencia
 // de personagem e cenario, camera motivada, audio limpo e nenhum texto na imagem).
 
-import { FlowTemplate, wordLimit, LANGUAGES, EMOTIONS, REALISM, REALISM_PROMPT, MAX_TAKES, TAKE_SECONDS } from './flow-templates'
+import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, MAX_TAKES, TAKE_SECONDS } from './flow-templates'
 
 export type FlowTakeKind = 'dialogo' | 'narracao' | 'ambiente'
 
@@ -60,6 +60,8 @@ export interface FlowScript {
   locations: FlowLocation[]
   takes: FlowTake[]
   seo: FlowSeo
+  /** Voz fixa do narrador (em ingles), repetida em todo take narrado para nao mudar de voz entre takes. */
+  narratorVoice?: string
   castSheetUrl?: string
   castSheetStatus?: 'gerando' | 'aguardando' | 'aprovada'
 }
@@ -89,7 +91,8 @@ export function takeKind(take: FlowTake, mode: FlowTemplate['mode']): FlowTakeKi
 const SCHEMA = `{
   "title": "string",
   "logline": "one sentence",
-  "characters": [{"id": "c1", "name": "string", "description": "fixed visual anchor in English, 25-35 words: apparent age, skin tone, face, exact hair color and cut, build, full outfit with colors and fabrics", "voice": "accent, timbre and delivery in English"}],
+  "characters": [{"id": "c1", "name": "string", "description": "fixed visual anchor in English, 25-35 words, starting with the age range in words (e.g. 'adult woman in her early thirties'): skin tone, face, exact hair color and cut, build (average, athletic, broad or heavyset), full outfit with colors and fabrics", "voice": "accent, timbre and delivery in English"}],
+  "narratorVoice": "only when there is narration: one fixed narrator voice in English (gender, age range, timbre, pacing), used in every narrated take",
   "locations": [{"id": "l1", "name": "string", "description": "full visual description in English: place, time of day, light sources, textures"}],
   "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "sound": "specific foley and ambience in English"}],
   "seo": {"title": "string", "caption": "string", "hook": "engagement question", "hashtags": ["#tag"]}
@@ -97,6 +100,76 @@ const SCHEMA = `{
 
 // Palavras que fazem o modelo de video escrever letras na imagem.
 const TEXT_TRIGGERS = /\b(tiktok|reels?|shorts?|subtitles?|captions?|title card|signs?|signage|billboards?|newspapers?|headlines?|ui|hud|logos?|text|letters|written|typing on screen|phone screen|screen showing)\b/i
+
+// Palavras na descricao de pessoas que fazem o Flow recusar por "conteudo envolvendo menores".
+const MINOR_WORDS = /\b(child(ren)?|kids?|boys?|girls?|teen(age|ager)?s?|minors?|petite|slender|skinny)\b/i
+
+/** Personagem que so existe como voz (narrador, locutor): nao aparece na imagem nem recebe referencia. */
+export function isVoiceOnly(c: FlowCharacter): boolean {
+  return (
+    /^(narrador|narrator|voz|voice|voiceover|locutor)\b/i.test(c.name || '') ||
+    /invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis[ií]vel|voz em off/i.test(c.description || '')
+  )
+}
+
+/** Idioma da fala em ingles ("Brazilian Portuguese, with a natural Brazilian accent"), para o prompt do Flow. */
+export function spokenLanguage(code: string): string {
+  return LANGUAGE_PROMPT[code] ?? languageLabel(code)
+}
+
+const DECADES: Record<number, string> = { 2: 'twenties', 3: 'thirties', 4: 'forties', 5: 'fifties', 6: 'sixties', 7: 'seventies', 8: 'eighties', 9: 'nineties' }
+
+/**
+ * Troca idade em numero ("apparent age 32") por faixa adulta por extenso ("adult in their early thirties"):
+ * deixa claro para o filtro do Flow que a pessoa e adulta. Idades abaixo de 20 ficam como estao.
+ */
+export function adultAge(text: string): string {
+  const words = (n: number) => {
+    const d = DECADES[Math.floor(n / 10)]
+    if (!d || n < 20) return ''
+    return `${n % 10 <= 3 ? 'early' : n % 10 <= 6 ? 'mid' : 'late'} ${d}`
+  }
+  return String(text || '')
+    .replace(/\b(an?)\s+(\d{2})[- ]years?[- ]old\s+(woman|man|person|lady|gentleman)\b/gi, (m, _a, n, who) =>
+      words(Number(n)) ? `an adult ${who} in their ${words(Number(n))}` : m
+    )
+    .replace(/\b(?:apparent(?:ly)?\s+)?aged?\s*:?\s*(?:about|around|approximately|~)?\s*(\d{2})\b(?:\s*(?:years?\s+old|y\/?o))?/gi, (m, n) =>
+      words(Number(n)) ? `adult in their ${words(Number(n))}` : m
+    )
+}
+
+/**
+ * Descricao de pessoa pronta para o filtro de menores do Flow: idade por extenso e sem palavras de crianca ou de corpo
+ * pequeno ("slender build" vira "average build", "girl" vira "woman"). Vale ja na primeira tentativa.
+ */
+export function adultWording(text: string): string {
+  return adultAge(text)
+    .replace(/\b(?:petite|slender|slim|skinny|thin|delicate|small|tiny)\s+(build|frame|figure|body)\b/gi, 'average $1')
+    .replace(/\b(?:young|youthful|teenage|girlish|boyish)\s+/gi, '')
+    .replace(/\bgirls?\b/gi, (m) => (/s$/i.test(m) ? 'women' : 'woman'))
+    .replace(/\bboys?\b/gi, (m) => (/s$/i.test(m) ? 'men' : 'man'))
+}
+
+/** Camera do take sem pontuacao final e sem citar outros takes (cada take e gerado sozinho no Flow). */
+export function cleanCamera(text: string): string {
+  return String(text || '')
+    .replace(/\s*,?\s*\b(?:matching|mirroring|same as|identical to|like|as in)\s+(?:the\s+)?(?:exact\s+)?(?:geometry\s+of\s+)?(?:the\s+)?(?:first|previous|opening|last)?\s*(?:take|scene|shot)\b(?:\s*\d+)?/gi, '')
+    .replace(/[\s.;,]+$/, '')
+    .trim()
+}
+
+/** Estilo visual do take: o estilo escolhido (realismo) e a cara do template, sem textura de pele quando nao ha pessoas. */
+function styleFor(t: FlowTemplate | undefined, params: FlowParams, hasPeople: boolean): string {
+  const realismo = String(params.realismo || '')
+  const realism = REALISM_PROMPT[realismo] || ''
+  // Template estilizado (2D, 3D...) com estilo escolhido: a cara do template repete o mesmo estilo ou contradiz a escolha.
+  const look = t?.look && !(t.defaults.realismo && realismo) ? t.look : ''
+  let s = [realism, look].filter(Boolean).join('; ') || 'cinematic 35mm film look, motivated natural lighting'
+  if (!hasPeople) s = s.replace(/,?\s*(?:natural|realistic)\s+skin\s+(?:texture|detail)/gi, '')
+  return s.replace(/\s+/g, ' ').replace(/^[\s,;]+|[\s,;.]+$/g, '')
+}
+
+const noEnd = (s: string) => String(s || '').trim().replace(/[\s.;,]+$/, '')
 
 export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
   const takes = Number(params.takes) || t.defaults.takes
@@ -110,10 +183,10 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
     mode === 'dialogo'
       ? `Characters speak on screen with lip-sync. Each take has exactly ONE speaker (shot / reverse-shot: never two people talking in the same take) and one line of at most ${limit} words. Set "kind" to "dialogo".`
       : mode === 'narracao'
-        ? `A single off-screen narrator tells the story. On-screen people never speak (mouths closed). Set "kind" to "narracao", "speaker" to "narrator" and write one narration line of at most ${limit} words per take.`
+        ? `A single off-screen narrator tells the story. On-screen people never speak (mouths closed). Set "kind" to "narracao", "speaker" to "narrator" and write one narration line of at most ${limit} words per take. Define "narratorVoice" once.`
         : mode === 'ambiente'
           ? `There is no speech at all. Set "kind" to "ambiente", "speaker" and "line" to "" in every take. Describe rich, specific foley in "sound".`
-          : `Choose per take: "dialogo" (one on-screen speaker, lip-sync, at most ${limit} words), "narracao" (off-screen narrator, at most ${limit} words) or "ambiente" (no speech). Never two speakers in the same take.`
+          : `Choose per take: "dialogo" (one on-screen speaker, lip-sync, at most ${limit} words), "narracao" (off-screen narrator, at most ${limit} words) or "ambiente" (no speech). Never two speakers in the same take. If any take is "narracao", define "narratorVoice" once.`
 
   const beats = t.beats.map((b, i) => `  ${i + 1}. ${b.fn} — camera: ${b.camera}`).join('\n')
   const extra = t.fields
@@ -123,8 +196,14 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
   const emotion = EMOTIONS.find((e) => e.value === params.emocao)?.label
   const realism = REALISM.find((r) => r.value === params.realismo)?.label
   const userScript = String(params.roteiro || '').trim()
+  const part = Number(params.parte) || 1
+  const prevPart = String(params.parteAnterior || '').trim()
+  const series =
+    part > 1 && prevPart
+      ? `\nSeries: this is PART ${part} of a series of short videos. Previous part:\n${prevPart.slice(0, 6000)}\nSeries rules:\n- Reuse the same characters with the same ids, names, descriptions and voices, the same "narratorVoice" and the same locations while the story stays there; add new characters only if the story needs them.\n- Take 1 opens with a one-line recap hook in ${lang} that a new viewer understands, then the story continues exactly where the previous part ended. Do not repeat events already shown.\n- The last take ends on a cliffhanger that sets up part ${part + 1}; its line invites the viewer to the next part.\n- The title keeps the series name and ends with "Parte ${part}" (in ${lang}).\n`
+      : ''
 
-  return `You are a senior screenwriter and director for AI-generated videos (Google Veo). Reply with ONE JSON object and nothing else, matching this schema:
+  return `You are a senior screenwriter and director for AI-generated videos (Google Flow: Veo and Omni video models). Reply with ONE JSON object and nothing else, matching this schema:
 ${SCHEMA}
 
 Structure:
@@ -136,20 +215,27 @@ ${(t.rules || []).map((r) => `- ${r}`).join('\n')}
 Writing rules (avoid generic "AI slop"):
 - Take 1 opens in media res with a visual hook in the first 1.5 seconds; never open with greetings or encyclopedic sentences ("Did you know...").
 - Every take shows ONE concrete physical action tied to its line: a specific object, texture and verb. No vague b-roll.
+- The takes form ONE continuous story in order: each take starts from the exact state the previous one ended (same positions, props, wardrobe, injuries or stains, time of day and weather); lines read as one sequence, never a new topic. A change of location needs a visible reason in the action.
+- Each take is generated on its own, as ONE continuous shot with no cuts: one main action and one camera move. Never refer to other takes ("same as take 1", "continues", "as before"); restate the framing instead.
 - Vary the camera on purpose from take to take (close-up, over-the-shoulder, low angle, tracking...). Use the camera of the scene function.
-- Spoken lines are natural and short, with contractions and pauses; respect the word limit (about 2.3 words per second).
+- Spoken lines are natural and short, with contractions and pauses; respect the word limit (about 2.3 words per second). Write numbers and money in words as they are spoken, never with currency symbols.
 - The last take pays off and, when it fits, its line connects back to the first line so the video can loop.
 - ${modeRules}
 - Character descriptions are fixed anchors of 25-35 words; never change a character's look between takes. Every take names its location id and visible characters.
 - Never describe on-screen writing: no screens with text, signs, newspapers, labels, logos or interfaces.
 - Spoken lines and the SEO block are written in ${lang}. Everything else (descriptions, actions, camera, sound) is in English.
-- Safety: fictional everyday people only (no real or famous people, no look-alikes), no brands or logos, no minors in danger, no medical or financial promises, no hate or humiliation of any group.
+- Safety: fictional everyday people only (no real or famous people, no look-alikes), no brands or logos, no medical or financial promises, no hate or humiliation of any group.
+- Everyone on screen is an adult, with the age range written in words. Never use child or teen words (child, kid, boy, girl, teen, young) or body words such as petite, slender, skinny or tiny: the video platform refuses them. Children's formats use animal, toy or object protagonists.
+- Takes without characters are object-only scenes: do not mention people, faces, skin or ages in them (at most anonymous gloved hands when the action needs them).
+- At most 2 characters visible per take (one speaker and one listener); crowds stay anonymous and out of focus in the background.
+- The action must fit the take length with simple, physically plausible motion: no multi-step choreography, no fast cuts, no transformations of people.
+- No copyrighted characters, franchises, celebrities or brand names; no weapons aimed at people, no blood, no injuries, no nudity or intimacy (the video platform refuses them). Suspense comes from light, sound and expressions.
 - Content guidance: ${t.brief}
 ${t.look ? `- Visual look of the format: ${t.look}\n` : ''}${userScript ? `- The user provided a script: keep its spoken lines verbatim and in the same order, split them across the takes and write the visuals. Do not add lines that are not in it.\n` : ''}
 Project data:
 Template: ${t.name}
 ${emotion ? `Main emotion: ${emotion}\n` : ''}${realism ? `Visual realism: ${realism}\n` : ''}${extra}
-User idea: ${String(params.tema || '').trim() || '(none: propose an original, specific idea)'}${userScript ? `\nUser script:\n${userScript.slice(0, 6000)}` : ''}`
+User idea: ${String(params.tema || '').trim() || '(none: propose an original, specific idea)'}${userScript ? `\nUser script:\n${userScript.slice(0, 6000)}` : ''}${series}`
 }
 
 export function extractJson(text: string): any {
@@ -219,12 +305,14 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
   const seo = raw?.seo || {}
   const castSheetUrl = str(raw?.castSheetUrl, 300)
   const castSheetStatus = parseSheetStatus(raw?.castSheetStatus)
+  const narratorVoice = str(raw?.narratorVoice, 200) || str(raw?.narrator?.voice, 200)
   return {
     title: str(raw?.title, 120) || t.name,
     logline: str(raw?.logline, 300),
     characters,
     locations,
     takes,
+    ...(narratorVoice ? { narratorVoice } : {}),
     seo: {
       title: str(seo.title, 120),
       caption: str(seo.caption, 600),
@@ -260,7 +348,9 @@ export function validateScript(script: FlowScript, t: FlowTemplate, params: Flow
   const locIds = new Set(script.locations.map((l) => l.id))
   for (const c of script.characters) {
     const w = countWords(c.description)
-    if (w < 12) issues.push({ level: lvl('erro'), message: `Character "${c.name}" needs a fixed visual anchor of 25-35 words (has ${w}).` })
+    if (w < 12 && !isVoiceOnly(c)) issues.push({ level: lvl('erro'), message: `Character "${c.name}" needs a fixed visual anchor of 25-35 words (has ${w}).` })
+    const risky = c.description.match(MINOR_WORDS)
+    if (risky) issues.push({ level: lvl('erro'), message: `Character "${c.name}" uses "${risky[0]}"; describe an adult with the age range in words and a neutral build (the video platform refuses it).` })
   }
   for (const k of script.takes) {
     const kind = takeKind(k, t.mode)
@@ -270,6 +360,8 @@ export function validateScript(script: FlowScript, t: FlowTemplate, params: Flow
     if (words > limit) issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} line has ${words} words; the limit for ${k.seconds}s is ${limit}.` })
     if (kind === 'dialogo' && k.speaker && !charIds.has(k.speaker)) issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} speaker "${k.speaker}" is not a defined character.` })
     if (kind === 'dialogo' && k.speaker && !k.characters.includes(k.speaker)) k.characters.push(k.speaker)
+    const onScreen = script.characters.filter((c) => k.characters.includes(c.id) && !isVoiceOnly(c)).length
+    if (onScreen > 2) issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} shows ${onScreen} characters; keep at most 2 visible per take.` })
     if (k.location && locIds.size && !locIds.has(k.location)) issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} uses unknown location "${k.location}".` })
     if (countWords(k.action) < 5) issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} needs one concrete physical action (object, verb, expression).` })
     const visual = `${k.action} ${k.camera || ''}`
@@ -283,6 +375,34 @@ export function validateScript(script: FlowScript, t: FlowTemplate, params: Flow
   return issues
 }
 
+/** Resumo da parte anterior que vai para a IA ao criar a proxima parte (personagens, cenarios e o que aconteceu). */
+export function summarizeForNextPart(script: FlowScript): string {
+  const chars = script.characters.map((c) => `- ${c.id} ${c.name}: ${c.description} (voice: ${c.voice || '-'})`).join('\n')
+  const locs = script.locations.map((l) => `- ${l.id} ${l.name}: ${l.description}`).join('\n')
+  const takes = script.takes.map((k) => `${k.n}. ${clipWords(k.action, 25)}${k.line ? ` | "${k.line}"` : ''}`).join('\n')
+  return `Title: ${script.title}\nLogline: ${script.logline}\n${script.narratorVoice ? `narratorVoice: ${script.narratorVoice}\n` : ''}Characters:\n${chars || '- none'}\nLocations:\n${locs || '- none'}\nWhat happened, take by take:\n${takes}\nThe part ended on take ${script.takes.length}.`
+}
+
+/**
+ * Leva para a nova parte o que ja foi aprovado na anterior: retrato, biblioteca e voz de cada personagem
+ * reaproveitado (mesmo id ou mesmo nome), a folha do elenco quando o elenco e o mesmo e a voz do narrador.
+ */
+export function carryOverPart(prev: FlowScript, next: FlowScript): FlowScript {
+  const key = (s: string) => s.trim().toLowerCase()
+  const characters = next.characters.map((c) => {
+    const old = prev.characters.find((p) => p.id === c.id) ?? prev.characters.find((p) => key(p.name) === key(c.name))
+    if (!old) return c
+    return { ...c, description: old.description, voice: c.voice || old.voice, sheetUrl: old.sheetUrl, sheetStatus: old.sheetStatus, libraryId: old.libraryId }
+  })
+  const sameCast = characters.length === prev.characters.length && characters.every((c) => prev.characters.some((p) => p.id === c.id))
+  return {
+    ...next,
+    characters,
+    narratorVoice: next.narratorVoice || prev.narratorVoice,
+    ...(sameCast && prev.castSheetUrl ? { castSheetUrl: prev.castSheetUrl, castSheetStatus: prev.castSheetStatus } : {}),
+  }
+}
+
 /** Pedido de correcao enviado a IA quando a conferencia encontra erros. */
 export function buildRepairPrompt(script: FlowScript, issues: ScriptIssue[]): string {
   return `Your JSON broke these rules. Fix ONLY these problems, keep everything else identical, and reply with the full corrected JSON object only:
@@ -292,92 +412,196 @@ Current JSON:
 ${JSON.stringify(script)}`
 }
 
-/** Texto que fecha todo prompt: cena limpa, sem texto, sem musica inventada, personagens ficticios. */
-const CLEAN =
-  'Pure cinematography, clean frame: no on-screen text, no subtitles, no captions, no name or age labels, no watermarks, no logos, no UI overlays. Fictional original characters, everyday ordinary people, not based on any real or famous person.'
+/** Ultima linha de todo prompt: o modelo de video costuma escrever legenda quando ha fala. */
+const CLEAN_FRAME = 'Clean frame: no subtitles, captions, on-screen text, logos or watermarks.'
 
-const NEGATIVE =
-  'white background, blank studio backdrop, plain backdrop, floating characters, text overlays, subtitles, captions, name labels, age labels, written names, any text or letters in the image, watermark, logos, background music'
+const NARRATOR_VOICE = 'warm, clear adult narrator voice with steady storytelling pacing'
 
-/** Prompt final de um take no formato de 6 blocos que o Veo entende melhor (direcao em ingles, fala no idioma). */
-export function buildTakePrompt(script: FlowScript, take: FlowTake, params: FlowParams, mode: FlowTemplate['mode']): string {
+/** Referencias que vao anexadas ao take (vem de takeReference). */
+export interface TakeRef {
+  refImageUrl?: string
+  refPrevVideo?: boolean
+  /** Linha avulsa sobre a referencia (formato antigo, anexada no fim do prompt). */
+  promptLine?: string
+  /** 'portrait': retrato de um personagem | 'cast': folha do elenco. */
+  refKind?: 'portrait' | 'cast'
+  /** Personagem do retrato (refKind 'portrait'). */
+  refCharacterId?: string
+}
+
+/**
+ * Prompt final de um take, na ordem que o Veo e o Omni seguem melhor: formato e estilo, camera, quem aparece,
+ * a acao, a fala, o cenario e o som, cada um em uma frase propria. Direcao em ingles, fala no idioma escolhido.
+ * Pessoas, idade e "nao e pessoa real" so aparecem quando ha personagem na cena (em cena so de objetos esse texto
+ * fazia o Flow recusar por politica). A referencia anexada e citada junto do personagem que ela mostra.
+ * `t` aceita o template inteiro (usa a cara visual dele) ou so o modo, como antes.
+ */
+export function buildTakePrompt(
+  script: FlowScript,
+  take: FlowTake,
+  params: FlowParams,
+  t: FlowTemplate | FlowTemplate['mode'],
+  ref?: TakeRef
+): string {
+  const tpl = typeof t === 'string' ? undefined : t
+  const mode = typeof t === 'string' ? t : t.mode
   const total = script.takes.length
   const aspect = String(params.aspect || '9:16')
-  const lang = languageLabel(String(params.idioma || 'pt-BR'))
-  const look = REALISM_PROMPT[String(params.realismo || '')] || 'cinematic 35mm film look, natural skin texture'
+  const lang = spokenLanguage(String(params.idioma || 'pt-BR'))
   const loc = script.locations.find((l) => l.id === take.location) ?? script.locations[0]
-  const visible = script.characters.filter((c) => take.characters.includes(c.id))
+  const visible = script.characters.filter((c) => take.characters.includes(c.id) && !isVoiceOnly(c))
   const speaker = script.characters.find((c) => c.id === take.speaker)
   const kind = takeKind(take, mode)
+  const hasRef = !!ref?.refImageUrl
+  const style = styleFor(tpl, params, visible.length > 0)
 
-  const lines: string[] = []
-  // A primeira linha comeca com "[Scene N of M]": a extensao usa isso para conferir o take no Flow.
-  lines.push(
-    `[Scene ${take.n} of ${total}] ${take.seconds} seconds, ${aspect === '16:9' ? 'horizontal 16:9' : 'vertical 9:16'}. Camera: ${take.camera || 'cinematic framing with motivated, subtle camera movement'}.`
-  )
-  if (visible.length) {
+  // Nivel de compactacao: 0 completo; 1 sem a linha de continuidade e com quem nao fala resumido;
+  // 2 tambem resume cenario e estilo; 3 tambem resume quem fala. So passa de 0 quando o prompt estoura o limite.
+  const compose = (level: number): string => {
+    const lines: string[] = []
+    // A primeira linha comeca com "[Scene N of M]": identifica o take na galeria do Flow.
     lines.push(
-      `[Characters (fictional, original, not based on any real or famous person; keep identical in every scene)]: ${visible
-        .map((c) => `${c.name}, who looks like this: ${c.description}`)
-        .join(' | ')}`
+      `[Scene ${take.n} of ${total}] ${take.seconds}-second ${aspect === '16:9' ? 'horizontal 16:9' : 'vertical 9:16'} video, one continuous shot. Visual style: ${level >= 2 ? clipWords(style, 25) : style}.`
     )
+    lines.push(`Camera: ${cleanCamera(take.camera || '') || 'cinematic framing with one subtle, motivated camera move'}.`)
+    if (visible.length) {
+      const cast =
+        hasRef && ref?.refKind === 'cast'
+          ? `the attached reference image shows the cast from left to right (${script.characters
+              .filter((c) => !isVoiceOnly(c))
+              .map((c) => c.name)
+              .join(', ')}), keep their faces, hair and outfits exactly as in it; `
+          : ''
+      const who = visible
+        .map((c) => {
+          const inRef = hasRef && ref?.refKind === 'portrait' && ref.refCharacterId === c.id
+          const max = level >= 3 ? 18 : level >= 1 && c.id !== take.speaker ? 15 : 0
+          const desc = noEnd(adultWording(c.description))
+          return `${c.name}${inRef ? ' (the person in the attached reference image: same face, hair, skin tone and outfit)' : ''}: ${max ? clipWords(desc, max) : desc}`
+        })
+        .join('; ')
+      lines.push(`Subject (fictional adults, not based on any real or famous person): ${cast}${who}.`)
+    }
+    lines.push(`Action: ${noEnd(take.action)}.`)
+    // O take anterior ancora a continuidade (posicao, objetos, expressao) sem citar "take N", que o modelo nao conhece.
+    const prev = script.takes.find((k) => k.n === take.n - 1)
+    if (prev?.action && level <= 1) lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
+    if (kind === 'dialogo' && take.line) {
+      const name = speaker?.name ?? 'The character'
+      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} says in ${lang}: "${take.line}" Only ${name} speaks, with natural lip-sync.`)
+    } else if (kind === 'narracao' && take.line) {
+      lines.push(
+        `Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: "${take.line}"${visible.length ? ' Nobody on screen speaks; mouths stay closed.' : ''}`
+      )
+    }
+    if (loc) lines.push(`Setting: ${level >= 2 ? clipWords(noEnd(loc.description), 30) : noEnd(loc.description)}.`)
+    lines.push(`Sound: ${noEnd(take.sound || 'subtle natural ambience')}.${kind === 'ambiente' || !take.line ? ' No speech.' : ''} No background music.`)
+    if (hasRef) lines.push('Use the reference image only for identity: ignore its plain backdrop and place everyone inside the setting above.')
+    if (total > 1 && level === 0) lines.push(`Continuity: same ${visible.length ? 'characters, outfits, ' : ''}setting, lighting and color grading as the other scenes of this video.`)
+    lines.push(CLEAN_FRAME)
+    // Simbolos de moeda costumam derrubar a geracao no Flow: escreve por extenso.
+    return lines.join('\n').replace(/R\$\s?([\d.,]+)/g, '$1 reais').replace(/[$€£]/g, ' ')
   }
-  let act = take.action.trim()
-  if (act && !/[.!?]$/.test(act)) act += '.'
-  if (kind === 'dialogo' && take.line) {
-    const who = speaker?.name ?? 'The character'
-    act += ` ${who} says in ${lang}${speaker?.voice ? ` in a ${speaker.voice} voice` : ''}: "${take.line}" Natural lip-sync, only ${who} speaks.`
-  } else if (kind === 'narracao') {
-    act += ' Nobody on screen speaks; mouths stay closed.'
-  }
-  lines.push(`[Action & Dialogue]: ${act}`)
-  if (loc) lines.push(`[Environment & Lighting]: ${loc.description}`)
-  const speech =
-    kind === 'dialogo' && take.line
-      ? 'clear natural voice of the speaker'
-      : kind === 'narracao' && take.line
-        ? `off-screen voiceover narration in ${lang}: "${take.line}"`
-        : 'no speech'
-  lines.push(`[Audio]: native audio, ${speech}; ${take.sound || 'subtle natural ambience'}; no background music.`)
-  if (visible.length) {
-    lines.push('[Background Override]: place the characters inside the environment described above; ignore any plain or white background from reference images.')
-  }
-  lines.push(`[Style & Constraints]: ${look}, consistent lighting and color across scenes. ${CLEAN}`)
-  lines.push(`[Negative Prompt]: ${NEGATIVE}`)
-  // Simbolos de moeda costumam derrubar a geracao no Flow: escreve por extenso.
-  return lines.join('\n').replace(/R\$\s?([\d.,]+)/g, '$1 reais').replace(/[$€£]/g, ' ')
+  let out = compose(0)
+  for (let level = 1; level <= 3 && out.length > MAX_PROMPT_CHARS; level++) out = compose(level)
+  return out
+}
+
+/**
+ * Tamanho maximo do prompt de um take. Prompt longo dilui a acao e o modelo passa a ignorar detalhes; acima disso
+ * o take e compactado sozinho (ver compose em buildTakePrompt), sem o usuario precisar editar nada.
+ */
+export const MAX_PROMPT_CHARS = 2200
+
+/** Primeiras `n` palavras do texto (sem cortar no meio da palavra). */
+function clipWords(text: string, n: number): string {
+  const w = String(text || '').trim().split(/\s+/)
+  return w.length <= n ? w.join(' ') : w.slice(0, n).join(' ').replace(/[\s,;:]+$/, '')
 }
 
 /** Texto completo para baixar ou copiar. */
-export function exportScriptText(script: FlowScript, params: FlowParams, mode: FlowTemplate['mode']): string {
+export function exportScriptText(script: FlowScript, params: FlowParams, t: FlowTemplate | FlowTemplate['mode']): string {
   const out: string[] = [`${script.title}`, script.logline, '']
   for (const k of script.takes) {
     out.push(`===== TAKE ${k.n} (${k.seconds}s)${k.beat ? ` · ${k.beat}` : ''} =====`)
     if (k.line) out.push(`Fala: ${k.line}`)
-    out.push(buildTakePrompt(script, k, params, mode), '')
+    out.push(buildTakePrompt(script, k, params, t, takeReference(script, k, params)), '')
   }
   out.push('===== SEO =====', `Título: ${script.seo.title}`, `Legenda: ${script.seo.caption}`, `Gancho: ${script.seo.hook}`, `Hashtags: ${script.seo.hashtags.join(' ')}`)
   return out.join('\n')
 }
 
+// Realismo de pele e rosto: o que mais aciona o filtro de "pessoa conhecida".
+const PHOTO_WORDS = /,?\s*\b(?:photorealistic|hyper-?realistic|ultra-?realistic|fine natural detail|(?:natural|realistic) skin (?:texture|detail)|sharp detailed facial features)\b/gi
+const ADULTS_NOTE = 'Everyone shown is clearly an adult.'
+
 /**
- * Versao do prompt para nova tentativa apos recusa por politica ("prominent people"): troca SO o estilo
- * (hiper-realismo de pele/rosto e o que mais aciona o filtro) e reforca que os personagens sao ficticios.
- * Personagens, cenario, acao, fala e som ficam identicos, para a cena continuar encaixando com a anterior e a seguinte.
+ * Versao do prompt para nova tentativa apos recusa por politica. Muda so o que o motivo da recusa aponta e mantem
+ * personagens, cenario, acao, fala e som, para a cena continuar encaixando com a anterior e a seguinte.
+ * - "minors": idade em numero vira faixa adulta por extenso, palavras de corpo pequeno saem, e cena sem personagem
+ *   perde todo texto sobre pessoas e idade (prompts antigos tinham isso mesmo em cena so de objetos).
+ * - "prominent people" ou 2a tentativa: tira o realismo de pele e rosto do estilo, mantendo o meio (2D, 3D...).
+ * Sem motivo reconhecido, a 1a tentativa repete o prompt (o filtro do Flow varia de uma vez para outra).
+ * Aplicar de novo no resultado nao muda nada.
  */
-export function softenFlowPrompt(prompt: string): string {
-  const soft = 'cinematic film look, natural soft lighting, consistent lighting and color across scenes; fictional characters only.'
-  return prompt
-    .split('\n')
+export function softenFlowPrompt(prompt: string, reason = '', attempt = 2): string {
+  const minors = /minor|child/i.test(reason)
+  const famous = /prominent|famous|celebrit|public figure|real person/i.test(reason)
+  if (attempt < 2 && !minors && !famous) return prompt
+  const style = famous || attempt >= 2
+  const lines = String(prompt || '').split('\n')
+  const hasPeople = lines.some((l) => l.startsWith('Subject') || l.startsWith('[Characters'))
+  return lines
     .map((l) => {
-      if (l.startsWith('[Global Style & Realism]:')) return `[Global Style & Realism]: ${soft}`
-      if (l.startsWith('[Style & Constraints]:')) return `[Style & Constraints]: ${soft} ${CLEAN}`
-      if (l.startsWith('[Characters (keep identical in every scene)]:')) {
-        return l.replace('[Characters (keep identical in every scene)]:', '[Characters (fictional, original, not based on any real or famous person; keep identical in every scene)]:')
+      let x = l
+      if (style && (x.startsWith('[Scene') || x.startsWith('[Style & Constraints]:'))) {
+        x = x.replace(PHOTO_WORDS, '').replace(/Visual style:\s*[,;]?\s*\./, 'Visual style: cinematic film look, natural soft lighting.')
       }
-      return l
+      if (minors && (x.startsWith('Subject') || x.startsWith('[Characters'))) {
+        x = adultWording(x)
+        if (!x.includes(ADULTS_NOTE)) x = `${x.replace(/\s+$/, '')} ${ADULTS_NOTE}`
+      }
+      if (minors && !hasPeople) {
+        // Formato antigo: o fecho falava de pessoas e idade mesmo em cena sem ninguem.
+        x = x
+          .replace(/\s*Fictional original characters, everyday ordinary people, not based on any real or famous person\./, '')
+          .replace(/no name or age labels, /, '')
+          .replace(/,?\s*(?:natural|realistic) skin (?:texture|detail)/gi, '')
+          .replace(/floating characters, /, '')
+          .replace(/name labels, age labels, written names, /, '')
+      }
+      return x
     })
     .join('\n')
+}
+
+/**
+ * Ultima tentativa automatica depois de recusa por politica: pede a IA do projeto para reescrever so o que pode ter
+ * acionado o filtro, mantendo a cena, a ordem das linhas e as falas palavra por palavra.
+ */
+export function buildPolicyRewritePrompt(prompt: string, reason: string): { system: string; user: string } {
+  const system = `You fix prompts for Google Flow video models (Veo and Omni) that Google's safety filter refused. Reply with ONE JSON object only: {"prompt": "the rewritten prompt"}.
+Rules:
+- Keep the same scene: same lines in the same order with the same labels ("[Scene ...", "Camera:", "Subject", "Action:", "Dialogue:", "Narration:", "Setting:", "Sound:"...), same camera, setting, sound and story beat.
+- Keep every spoken line inside double quotes exactly, word for word.
+- Keep each character's identity anchors (hair, skin tone, outfit) and keep everyone clearly adult.
+- Change only what could trigger the refusal: ages, body descriptions, physical closeness, violence, weapons, injuries, real or famous people, brands, logos, anything that could be read as involving minors.
+- Same length or shorter.`
+  return { system, user: `Refusal reason: ${String(reason || 'policy').slice(0, 300)}\n\nPrompt:\n${prompt}` }
+}
+
+/** Aceita a reescrita da IA so se ela mantiver o formato do take e todas as falas entre aspas. */
+export function acceptPolicyRewrite(original: string, raw: string): string | null {
+  let text = ''
+  try {
+    text = String(extractJson(raw)?.prompt || '').trim()
+  } catch {
+    return null
+  }
+  if (!text.startsWith('[Scene') || text.length > Math.max(2600, original.length * 1.3)) return null
+  const quotes = original.match(/"[^"\n]+"/g) || []
+  if (quotes.some((q) => !text.includes(q))) return null
+  return text
 }
 
 /**
@@ -385,23 +609,27 @@ export function softenFlowPrompt(prompt: string): string {
  * com 2 ou mais, a folha do elenco (ou, sem ela, a folha de quem fala). So folhas aprovadas.
  * Devolve tambem a linha que avisa o modelo no prompt.
  */
-export function takeReference(script: FlowScript, take: FlowTake, params: FlowParams): { refImageUrl?: string; refPrevVideo?: boolean; promptLine?: string } {
-  const out: { refImageUrl?: string; refPrevVideo?: boolean; promptLine?: string } = {}
+export function takeReference(script: FlowScript, take: FlowTake, params: FlowParams): TakeRef {
+  const out: TakeRef = {}
   if (String(params.refImages ?? '1') !== '0') {
-    const isVoiceOnly = (c: FlowCharacter) => /^(narrador|narrator|voz|voice|locutor)\b/i.test(c.name || '') || /invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis[ií]vel/i.test(c.description || '')
     const visible = script.characters.filter((c) => take.characters.includes(c.id) && !isVoiceOnly(c))
     const ok = (c?: FlowCharacter) => (c && c.sheetStatus === 'aprovada' && c.sheetUrl ? c.sheetUrl : undefined)
     if (visible.length === 1 && ok(visible[0])) {
       out.refImageUrl = ok(visible[0])
+      out.refKind = 'portrait'
+      out.refCharacterId = visible[0].id
       out.promptLine = `[Reference Image]: the attached image is the character reference portrait of ${visible[0].name}; keep ${visible[0].name}'s facial features, hair, skin tone and outfit identical to the person in the reference portrait. Ignore its plain background.`
     } else if (visible.length > 1 && script.castSheetStatus === 'aprovada' && script.castSheetUrl) {
       out.refImageUrl = script.castSheetUrl
+      out.refKind = 'cast'
       const order = script.characters.filter((c) => visible.includes(c)).map((c) => c.name).join(', ')
       out.promptLine = `[Reference Image]: the attached image shows the cast from left to right (${script.characters.map((c) => c.name).join(', ')}); in this scene appear ${order}. Keep their faces, hair and outfits exactly as in it. Ignore its plain background and layout.`
     } else if (visible.length > 1) {
       const sp = script.characters.find((c) => c.id === take.speaker)
       if (ok(sp)) {
         out.refImageUrl = ok(sp)
+        out.refKind = 'portrait'
+        out.refCharacterId = sp!.id
         out.promptLine = `[Reference Image]: the attached image is the reference portrait of ${sp!.name}; keep ${sp!.name}'s face, hair and outfit identical to the reference portrait.`
       }
     }

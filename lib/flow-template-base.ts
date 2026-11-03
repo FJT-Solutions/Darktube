@@ -70,6 +70,18 @@ export const LANGUAGES: FlowFieldOption[] = [
   { value: 'it-IT', label: 'Italiano' },
 ]
 
+/** Idioma da fala em ingles, para o prompt do Flow (o rotulo de LANGUAGES e so para a tela). */
+export const LANGUAGE_PROMPT: Record<string, string> = {
+  'pt-BR': 'Brazilian Portuguese, with a natural Brazilian accent',
+  'pt-PT': 'European Portuguese, with a natural Portugal accent',
+  'en-US': 'American English',
+  'es-ES': 'Castilian Spanish, with a natural Spain accent',
+  'es-MX': 'Mexican Spanish, with a natural Mexican accent',
+  'fr-FR': 'French',
+  'de-DE': 'German',
+  'it-IT': 'Italian',
+}
+
 export const EMOTIONS: FlowFieldOption[] = [
   { value: 'empatia', label: 'Empatia' },
   { value: 'tensao', label: 'Tensão' },

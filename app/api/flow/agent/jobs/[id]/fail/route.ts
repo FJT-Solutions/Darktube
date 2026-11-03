@@ -1,9 +1,26 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
 import { addFlowLogs, failFlowJob, MAX_GEN_RETRIES, MAX_POLICY_RETRIES, pauseFlowAgent, requeueAfterGenFailure, requeueAfterPolicy } from '@/lib/flow-jobs';
-import { softenFlowPrompt } from '@/lib/flow-script';
+import { acceptPolicyRewrite, buildPolicyRewritePrompt, softenFlowPrompt } from '@/lib/flow-script';
+import { getFlowProject } from '@/lib/flow-projects';
+import { getUserApiKey } from '@/lib/database';
+import { callFlowLLM, FLOW_PROVIDERS, type FlowProvider } from '@/lib/flow-llm';
 
 export const dynamic = 'force-dynamic';
+
+// Ultima tentativa por politica: a IA do proprio projeto reescreve so o que pode ter acionado o filtro.
+// Sem IA (sem chave, erro ou resposta fora do formato) devolve null e o take segue com a versao suavizada.
+async function rewriteWithLlm(userId: string, projectId: string | null, prompt: string, reason: string): Promise<string | null> {
+  if (!projectId) return null;
+  const project = await getFlowProject(userId, projectId).catch(() => null);
+  const provider = String(project?.provider || '') as FlowProvider;
+  if (!FLOW_PROVIDERS.includes(provider)) return null;
+  const key = await getUserApiKey(userId, provider).catch(() => '');
+  if (!key) return null;
+  const { system, user } = buildPolicyRewritePrompt(prompt, reason);
+  const raw = await callFlowLLM(provider, key, system, user).catch(() => '');
+  return raw ? acceptPolicyRewrite(prompt, raw) : null;
+}
 
 // code: 'verification' (Google pediu verificacao) ou 'rate_limit' (403 / "too fast") registram aviso para o usuario, sem pausar a fila.
 const ALERTS: Record<string, string> = {
@@ -18,12 +35,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = await req.json().catch(() => ({}));
   const code = String(body.code || '');
 
-  // Recusa por politica: a mesma cena volta para a fila sozinha. 1a nova tentativa com o prompt identico (o filtro
-  // do Flow varia de uma vez para outra); 2a com so a linha de estilo suavizada. O conteudo da cena nao muda.
+  // Recusa por politica: a mesma cena volta para a fila sozinha, com o prompt ajustado ao motivo da recusa
+  // (1a e 2a tentativas, ver softenFlowPrompt) e, na 3a, reescrito pela IA do projeto. A cena nao muda.
   if (code === 'policy') {
-    const retry = await requeueAfterPolicy(user.id, id, (prompt, attempt) => (attempt === 1 ? prompt : softenFlowPrompt(prompt)));
+    const reason = String(body.error || '');
+    let byLlm = false;
+    const retry = await requeueAfterPolicy(user.id, id, async (prompt, attempt, job) => {
+      const soft = softenFlowPrompt(prompt, reason, attempt);
+      if (attempt < 3) return soft;
+      const rewritten = await rewriteWithLlm(user.id, job.project_id ?? null, soft, reason);
+      byLlm = !!rewritten;
+      return rewritten || soft;
+    });
     if (retry) {
-      const msg = `O Flow recusou o take ${retry.job.take_index ?? ''} por política; nova tentativa automática ${retry.attempt}/${MAX_POLICY_RETRIES}${retry.attempt === 1 ? ' (mesmo prompt)' : ' (estilo suavizado, mesma cena)'}.`;
+      const same = retry.attempt === 1 && !/minor|child|prominent|famous|celebrit|public figure|real person/i.test(reason);
+      const how = byLlm ? ' (reescrito pela IA do projeto, mesma cena)' : same ? ' (mesmo prompt)' : ' (prompt ajustado ao motivo da recusa, mesma cena)';
+      const msg = `O Flow recusou o take ${retry.job.take_index ?? ''} por política; nova tentativa automática ${retry.attempt}/${MAX_POLICY_RETRIES}${how}.`;
       console.log(`[Flow] ${msg}`);
       await addFlowLogs(user.id, { message: msg, level: 'warn', jobId: id, projectId: retry.job.project_id ?? null }).catch(() => {});
       return NextResponse.json({ success: true, job: retry.job, retried: retry.attempt });

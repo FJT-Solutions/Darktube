@@ -7,6 +7,8 @@ import {
   buildRepairPrompt,
   buildSystemPrompt,
   buildTakePrompt,
+  carryOverPart,
+  summarizeForNextPart,
   takeReference,
   extractJson,
   normalizeScript,
@@ -72,7 +74,7 @@ function cleanParams(raw: Record<string, any>, templateId: string): FlowParams {
   if (!t) throw new Error("Template inválido.")
   const out: FlowParams = {}
   for (const [k, v] of Object.entries(raw || {})) {
-    if (typeof v === "string") out[k] = v.slice(0, k === "roteiro" ? 8000 : 900)
+    if (typeof v === "string") out[k] = v.slice(0, k === "roteiro" || k === "parteAnterior" ? 8000 : 900)
     else if (typeof v === "number" && Number.isFinite(v)) out[k] = v
   }
   const takes = Math.round(Number(out.takes) || t.defaults.takes)
@@ -102,26 +104,58 @@ export async function generateFlowProjectAction(input: { templateId: string; par
     const key = await getUserApiKey(user.id, provider)
     const params = cleanParams(input.params, t.id)
 
-    const system = buildSystemPrompt(t, params)
-    const text = await callFlowLLM(provider, key, system, "Gere o roteiro agora.")
-    let script = normalizeScript(extractJson(text), t, params)
-    // Confere contra as regras do formato; se houver erro, pede uma correcao (uma vez) a mesma IA.
-    let issues = validateScript(script, t, params)
-    if (issues.some((i) => i.level === "erro")) {
-      try {
-        const fixed = await callFlowLLM(provider, key, system, buildRepairPrompt(script, issues.filter((i) => i.level === "erro")))
-        const repaired = normalizeScript(extractJson(fixed), t, params)
-        const after = validateScript(repaired, t, params)
-        if (after.filter((i) => i.level === "erro").length <= issues.filter((i) => i.level === "erro").length) {
-          script = repaired
-          issues = after
-        }
-      } catch {
-        /* fica com a primeira versao; os problemas aparecem como aviso */
-      }
-    }
+    const { script, issues } = await writeFlowScript(provider, key, t, params)
     const project = await createFlowProject({ userId: user.id, templateId: t.id, params, script, provider })
     return { success: true as const, project, issues: issues.map((i) => i.message) }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/**
+ * Pede o roteiro a IA e confere contra as regras do formato (e os limites do Flow); se houver erro, pede correcao
+ * a mesma IA, ate 2 vezes, para o roteiro ja chegar pronto e o usuario nao precisar editar take por take.
+ */
+async function writeFlowScript(provider: FlowProvider, key: string, t: NonNullable<ReturnType<typeof getFlowTemplate>>, params: FlowParams, adjust?: (s: FlowScript) => FlowScript) {
+  const fix = adjust ?? ((s: FlowScript) => s)
+  const system = buildSystemPrompt(t, params)
+  const text = await callFlowLLM(provider, key, system, "Gere o roteiro agora.")
+  let script = fix(normalizeScript(extractJson(text), t, params))
+  let issues = validateScript(script, t, params)
+  for (let round = 0; round < 2 && issues.some((i) => i.level === "erro"); round++) {
+    try {
+      const fixed = await callFlowLLM(provider, key, system, buildRepairPrompt(script, issues.filter((i) => i.level === "erro")))
+      const repaired = fix(normalizeScript(extractJson(fixed), t, params))
+      const after = validateScript(repaired, t, params)
+      if (after.filter((i) => i.level === "erro").length > issues.filter((i) => i.level === "erro").length) break
+      script = repaired
+      issues = after
+    } catch {
+      break /* fica com a versao atual; os problemas aparecem como aviso */
+    }
+  }
+  return { script, issues }
+}
+
+/**
+ * Cria a proxima parte (Parte 2, 3...) de um projeto: mesmo template e configuracoes, a IA continua de onde a parte
+ * anterior parou, e personagens, retratos aprovados e voz do narrador vem junto (sem gerar retrato de novo).
+ */
+export async function createNextPartAction(projectId: string) {
+  try {
+    const user = await requireUser()
+    const prev = await getFlowProject(user.id, projectId)
+    if (!prev) throw new Error("Projeto não encontrado.")
+    const t = getFlowTemplate(prev.template_id)
+    if (!t) throw new Error("Template inválido.")
+    const provider = (FLOW_PROVIDERS.includes(prev.provider as FlowProvider) ? prev.provider : FLOW_PROVIDERS[0]) as FlowProvider
+    const key = await getUserApiKey(user.id, provider)
+    const part = (Number(prev.params.parte) || 1) + 1
+    const params = cleanParams({ ...prev.params, parte: part, parteAnterior: summarizeForNextPart(prev.script), roteiro: "" }, t.id)
+
+    const { script, issues } = await writeFlowScript(provider, key, t, params, (s) => carryOverPart(prev.script, s))
+    const project = await createFlowProject({ userId: user.id, templateId: t.id, params, script, provider })
+    return { success: true as const, project, part, issues: issues.map((i) => i.message) }
   } catch (err) {
     return fail(err)
   }
@@ -237,7 +271,7 @@ export async function queueFlowProjectAction(id: string) {
       const job = await createFlowJob({
         userId: user.id,
         kind: "video",
-        prompt: buildTakePrompt(project.script, take, project.params, t.mode) + (ref.promptLine ? "\n" + ref.promptLine : ""),
+        prompt: buildTakePrompt(project.script, take, project.params, t, ref),
         params: {
           aspectRatio: String(project.params.aspect),
           duration: take.seconds,
@@ -277,7 +311,7 @@ export async function regenerateFinalAction(id: string, takeNumbers: number[]) {
         userId: user.id,
         kind: "video",
         // 720p usa a mesma folha de referencia (o video do take anterior fica so nos rascunhos).
-        prompt: buildTakePrompt(project.script, take, project.params, t.mode) + (finalRef(take).promptLine ? "\n" + finalRef(take).promptLine : ""),
+        prompt: buildTakePrompt(project.script, take, project.params, t, finalRef(take)),
         params: { aspectRatio: String(project.params.aspect), duration: take.seconds, resolution: "720p", model: String(project.params.model), ...(finalRef(take).refImageUrl ? { refImageUrl: finalRef(take).refImageUrl } : {}) },
         projectId: project.id,
         takeIndex: take.n,
@@ -501,7 +535,7 @@ export async function generateCharacterSheetAction(projectId: string, characterI
     const job = await createFlowJob({
       userId: user.id,
       kind: "image",
-      prompt: buildSheetPrompt(c),
+      prompt: buildSheetPrompt(c, String(project.params.realismo || "")),
       params: { aspectRatio: "16:9", model: "Nano Banana Pro", characterId },
       projectId: project.id,
       role: "character_sheet",
@@ -536,7 +570,7 @@ export async function generateCastSheetAction(projectId: string) {
     const job = await createFlowJob({
       userId: user.id,
       kind: "image",
-      prompt: buildCastPrompt(chars),
+      prompt: buildCastPrompt(chars, String(project.params.realismo || "")),
       params: { aspectRatio: "16:9", model: "Nano Banana Pro" },
       projectId: project.id,
       role: "cast_sheet",
@@ -568,7 +602,7 @@ export async function syncSheetsAction(projectId: string) {
 
     for (const c of script.characters) {
       if (c.sheetStatus === "aprovada") continue
-      const expectedPrompt = buildSheetPrompt(c)
+      const expectedPrompt = buildSheetPrompt(c, String(current.params?.realismo || ""))
       const matching = charSheetJobs.filter(
         (j) => (j.params as any)?.characterId === c.id || j.prompt === expectedPrompt
       )
@@ -678,7 +712,7 @@ export async function clearSheetAction(projectId: string, target: string) {
     } else {
       const c = current.script.characters.find((x) => x.id === target)
       if (!c) throw new Error("Personagem não encontrado.")
-      const expectedPrompt = buildSheetPrompt(c)
+      const expectedPrompt = buildSheetPrompt(c, String(current.params?.realismo || ""))
       for (const j of jobs) {
         if (
           j.role === "character_sheet" &&

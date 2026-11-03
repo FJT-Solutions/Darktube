@@ -273,7 +273,7 @@ export async function syncProjectQueuedJobsWithReferences(
       if (!take) continue;
       const isFinal = j.role === 'take_final';
       const ref = takeReference(script, take, isFinal ? { ...(params || {}), refPrevVideo: '0' } : params || {});
-      const newPrompt = buildTakePrompt(script, take, params || {}, t.mode) + (ref.promptLine ? '\n' + ref.promptLine : '');
+      const newPrompt = buildTakePrompt(script, take, params || {}, t, ref);
       const newParams = {
         ...(j.params || {}),
         ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
@@ -478,7 +478,8 @@ export async function requeueAfterGenFailure(userId: string, id: string): Promis
   return res.rows[0] ? { job: res.rows[0], attempt } : null;
 }
 
-export const MAX_POLICY_RETRIES = 2;
+// 1a: mesmo prompt ou ajustado ao motivo; 2a: tambem sem realismo de pele; 3a: reescrito pela IA do projeto.
+export const MAX_POLICY_RETRIES = 3;
 
 /**
  * Recusa por politica do Flow: devolve a MESMA cena para a fila (mantem a ordem dos takes) com o prompt dado,
@@ -487,7 +488,7 @@ export const MAX_POLICY_RETRIES = 2;
 export async function requeueAfterPolicy(
   userId: string,
   id: string,
-  buildPrompt: (prompt: string, attempt: number) => string
+  buildPrompt: (prompt: string, attempt: number, job: FlowJob) => string | Promise<string>
 ): Promise<{ job: FlowJob; attempt: number } | null> {
   await ensureFlowTablesExist();
   const { rows } = await pool.query(
@@ -499,6 +500,7 @@ export async function requeueAfterPolicy(
   const done = Number((job.params as any)?.policyRetries) || 0;
   if (done >= MAX_POLICY_RETRIES) return null;
   const attempt = done + 1;
+  const nextPrompt = (await buildPrompt(job.prompt, attempt, job)) || job.prompt;
   const res = await pool.query(
     `UPDATE public.flow_jobs
         SET status = 'queued', prompt = $3, error_message = NULL, result_url = NULL,
@@ -507,7 +509,7 @@ export async function requeueAfterPolicy(
             deadline_at = NOW() + ($5 || ' minutes')::interval
       WHERE id = $1 AND user_id = $2 AND status = 'running'
       RETURNING *`,
-    [id, userId, buildPrompt(job.prompt, attempt), attempt, String(DEFAULT_DEADLINE_MIN)]
+    [id, userId, nextPrompt, attempt, String(DEFAULT_DEADLINE_MIN)]
   );
   return res.rows[0] ? { job: res.rows[0], attempt } : null;
 }

@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db-client'
-import type { FlowCharacter } from '@/lib/flow-script'
+import { adultAge, type FlowCharacter } from '@/lib/flow-script'
+import { REALISM_PROMPT } from '@/lib/flow-template-base'
 
 export interface FlowLibraryCharacter {
   id: string
@@ -103,14 +104,24 @@ export function isVoiceOnlyCharacter(c: FlowCharacter): boolean {
   )
 }
 
-export function buildSheetPrompt(c: FlowCharacter): string {
-  const desc = (c.description || '').trim().replace(/\.+$/, '')
-  return `cinematic character reference portrait of a fictional original character, not based on any real or famous person: ${desc}. Single subject waist-up medium portrait, facing the camera with a natural expressive gaze, wearing their signature clothing. Clean solid neutral backdrop, cinematic soft studio lighting with gentle key light, shallow depth of field, sharp detailed facial features, realistic skin texture, clear eyes and natural hair. Single person only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark. 16:9`
+// Estilos que nao sao foto: o retrato precisa sair no mesmo traco do video, senao a referencia
+// puxa uma pessoa realista para dentro de um video 2D ou 3D.
+const STYLIZED = ['estilizado', 'animacao3d', 'massinha', 'ilustrado2d', 'stickman2d', 'avatar3d', 'brinquedo3d']
+
+/** Retrato de referencia de um personagem. `realismo`: estilo visual do projeto (valor de REALISM). */
+export function buildSheetPrompt(c: FlowCharacter, realismo = ''): string {
+  const desc = adultAge((c.description || '').trim()).replace(/\.+$/, '')
+  if (STYLIZED.includes(realismo) && REALISM_PROMPT[realismo]) {
+    return `character design reference of a fictional original character, drawn exactly in this visual style: ${REALISM_PROMPT[realismo]}. The character: ${desc}. Single character, waist-up, facing the camera with a natural expression, wearing their signature outfit. Plain light neutral background, even soft lighting. Single character only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark.`
+  }
+  return `cinematic character reference portrait of a fictional original adult character, not based on any real or famous person: ${desc}. Single subject waist-up medium portrait, facing the camera with a natural expressive gaze, wearing their signature clothing. Clean solid neutral backdrop, cinematic soft studio lighting with gentle key light, shallow depth of field, sharp detailed facial features, realistic skin texture, clear eyes and natural hair. Single person only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark.`
 }
 
-export function buildCastPrompt(chars: FlowCharacter[]): string {
+/** Folha do elenco (todos lado a lado). `realismo`: estilo visual do projeto (valor de REALISM). */
+export function buildCastPrompt(chars: FlowCharacter[], realismo = ''): string {
   const list = chars
-    .map((c, idx) => `Character ${idx + 1} (from left to right): ${(c.description || c.name).trim().replace(/\.+$/, '')}`)
+    .map((c, idx) => `Character ${idx + 1} (from left to right): ${adultAge((c.description || c.name).trim()).replace(/\.+$/, '')}`)
     .join('; ')
-  return `Professional cast reference sheet of ${chars.length} fictional original characters, not based on any real or famous person, standing side by side in a single row from left to right in this exact order: ${list}. Full-body standing front view of all characters together, relaxed A-pose, consistent scale, even soft studio lighting, clean neutral plain light-gray background, sharp details, perfect identity consistency. No text, no labels, no names, no numbers, no captions, no watermark. 16:9`.slice(0, 3900)
+  const style = STYLIZED.includes(realismo) && REALISM_PROMPT[realismo] ? ` Drawn exactly in this visual style: ${REALISM_PROMPT[realismo]}.` : ''
+  return `Professional cast reference sheet of ${chars.length} fictional original adult characters, not based on any real or famous person, standing side by side in a single row from left to right in this exact order: ${list}.${style} Full-body standing front view of all characters together, relaxed A-pose, consistent scale, even soft studio lighting, clean neutral plain light-gray background, sharp details, perfect identity consistency. No text, no labels, no names, no numbers, no captions, no watermark.`.slice(0, 3900)
 }

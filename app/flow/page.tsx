@@ -46,13 +46,14 @@ import {
   type FlowField,
   type FlowTemplate,
 } from "@/lib/flow-templates"
-import { buildTakePrompt, countWords, exportScriptText, takeKind, validateScript, type FlowScript, type FlowTake, type FlowTakeKind } from "@/lib/flow-script"
+import { buildTakePrompt, countWords, exportScriptText, takeKind, takeReference, validateScript, type FlowScript, type FlowTake, type FlowTakeKind } from "@/lib/flow-script"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject } from "@/lib/flow-projects"
 import type { FlowLibraryCharacter } from "@/lib/flow-characters"
 import {
   deleteFlowProjectAction,
   generateFlowProjectAction,
+  createNextPartAction,
   createBlankFlowProjectAction,
   checkFlowScriptAction,
   getFlowProjectAction,
@@ -677,6 +678,7 @@ function ProjectView({
   const [script, setScript] = useState<FlowScript>(initial.script)
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [creatingPart, setCreatingPart] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [queueing, setQueueing] = useState(false)
   const [jobs, setJobs] = useState<JobRow[]>([])
@@ -1058,7 +1060,26 @@ function ProjectView({
     })
 
   const speakerName = (id: string) => script.characters.find((c) => c.id === id)?.name ?? (id === "narrator" ? "Narrador" : "")
-  const exportText = () => exportScriptText(script, params, template.mode)
+  const exportText = () => exportScriptText(script, params, template)
+  const part = Number(params.parte) || 1
+
+  // Parte 2, 3...: a IA continua a historia com os mesmos personagens e retratos aprovados; abre o projeto novo.
+  const nextPart = async () => {
+    if (dirty) {
+      toast.error("Salve o roteiro antes de criar a próxima parte.")
+      return
+    }
+    setCreatingPart(true)
+    const res = await createNextPartAction(project.id)
+    setCreatingPart(false)
+    if (!res.success) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(`Parte ${res.part} criada com os mesmos personagens.`)
+    if (res.issues?.length) toast.warning(`Confira o roteiro: ${res.issues.length} ponto(s) fora das regras do formato.`)
+    onChanged(res.project as FlowProject)
+  }
 
   return (
     <div className="space-y-5">
@@ -1079,6 +1100,9 @@ function ProjectView({
           </Button>
           <Button variant="outline" size="sm" onClick={save} disabled={!dirty || saving}>
             {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar
+          </Button>
+          <Button size="sm" onClick={nextPart} disabled={creatingPart} title="A IA continua a história de onde esta parte parou, com os mesmos personagens">
+            {creatingPart ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null} Criar parte {part + 1}
           </Button>
         </div>
       </div>
@@ -1428,7 +1452,7 @@ function ProjectView({
           const kind = takeKind(t, template.mode)
           const over = kind !== "ambiente" && words > limit
           const job = bestJob(t.n)
-          const prompt = buildTakePrompt(script, t, params, template.mode)
+          const prompt = buildTakePrompt(script, t, params, template, takeReference(script, t, params))
           return (
             <Card key={t.n}>
               <CardContent className="space-y-3 p-4">
