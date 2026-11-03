@@ -390,6 +390,10 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
                       AND EXISTS (
                         SELECT 1 FROM jsonb_array_elements(p.script->'characters') AS c
                          WHERE c->>'sheetStatus' IN ('gerando', 'aguardando')
+                           AND NOT (
+                             LOWER(COALESCE(c->>'name', '')) ~ '^(narrador|narrator|voz|voice|locutor)\b'
+                             OR LOWER(COALESCE(c->>'description', '')) ~ '(invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis)'
+                           )
                       )
                     )
                   )

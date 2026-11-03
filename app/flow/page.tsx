@@ -845,6 +845,8 @@ function ProjectView({
     edit((s) => ({ ...s, characters: [...s.characters, { id: "c" + (s.characters.length + 1) + (Date.now() % 1000), name: "Personagem " + (s.characters.length + 1), description: "", voice: "" }] }))
   const setCharacter = (id: string, patch: Partial<FlowScript["characters"][number]>) =>
     edit((s) => ({ ...s, characters: s.characters.map((c) => (c.id === id ? { ...c, ...patch } : c)) }))
+  const removeCharacter = (id: string) =>
+    edit((s) => ({ ...s, characters: s.characters.filter((c) => c.id !== id) }))
   const addLocation = () => edit((s) => ({ ...s, locations: [...s.locations, { id: "l" + (s.locations.length + 1) + (Date.now() % 1000), name: "Local " + (s.locations.length + 1), description: "" }] }))
   const setLocation = (id: string, patch: { name?: string; description?: string }) =>
     edit((s) => ({ ...s, locations: s.locations.map((l) => (l.id === id ? { ...l, ...patch } : l)) }))
@@ -1218,20 +1220,30 @@ function ProjectView({
           </Card>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {script.characters.map((c) => (
+            {script.characters.map((c) => {
+              const isVoiceOnly =
+                /^(narrador|narrator|voz|voice|locutor)\b/i.test(c.name || "") ||
+                /invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis[ií]vel/i.test(c.description || "")
+              return (
               <Card key={c.id}>
                 <CardContent className="space-y-2.5 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <Input value={c.name} onChange={(e) => setCharacter(c.id, { name: e.target.value })} maxLength={60} />
-                    <Badge variant={c.sheetStatus === "aprovada" ? "default" : "outline"} className="shrink-0">
-                      {c.sheetStatus ? (SHEET_STATUS_LABEL[c.sheetStatus] ?? c.sheetStatus) : "Sem folha"}
-                    </Badge>
+                    {isVoiceOnly ? (
+                      <Badge variant="secondary" className="shrink-0 bg-blue-500/10 text-blue-400 border-blue-500/20 text-[11px]">
+                        🎙️ Voz de narração
+                      </Badge>
+                    ) : (
+                      <Badge variant={c.sheetStatus === "aprovada" ? "default" : "outline"} className="shrink-0">
+                        {c.sheetStatus ? (SHEET_STATUS_LABEL[c.sheetStatus] ?? c.sheetStatus) : "Sem retrato"}
+                      </Badge>
+                    )}
                   </div>
 
                   {c.sheetUrl && (
                     <img
                       src={c.sheetUrl}
-                      alt={`Folha de ${c.name}`}
+                      alt={`Retrato de ${c.name}`}
                       className="max-h-40 w-full rounded-md border bg-muted object-contain"
                     />
                   )}
@@ -1265,82 +1277,97 @@ function ProjectView({
                     }}
                   />
 
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      disabled={!!sheetBusy || c.sheetStatus === "gerando"}
-                      onClick={() => handleGenerateCharSheet(c.id)}
-                    >
-                      {sheetBusy === `gen_${c.id}` || c.sheetStatus === "gerando" ? (
-                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Sparkles className="mr-1 h-3.5 w-3.5" />
-                      )}
-                      Gerar folha no Flow
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      disabled={!!sheetBusy}
-                      onClick={() => fileInputRefs.current[c.id]?.click()}
-                    >
-                      {sheetBusy === `up_${c.id}` ? (
-                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Upload className="mr-1 h-3.5 w-3.5" />
-                      )}
-                      Enviar imagem
-                    </Button>
-                    {c.sheetStatus === "aguardando" && (
+                  {!isVoiceOnly ? (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       <Button
                         size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={!!sheetBusy || c.sheetStatus === "gerando"}
+                        onClick={() => handleGenerateCharSheet(c.id)}
+                      >
+                        {sheetBusy === `gen_${c.id}` || c.sheetStatus === "gerando" ? (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-1 h-3.5 w-3.5" />
+                        )}
+                        Gerar retrato no Flow
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="h-8 text-xs"
                         disabled={!!sheetBusy}
-                        onClick={() => handleApproveSheet(c.id)}
+                        onClick={() => fileInputRefs.current[c.id]?.click()}
                       >
-                        <Check className="mr-1 h-3.5 w-3.5" /> Aprovar
+                        {sheetBusy === `up_${c.id}` ? (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="mr-1 h-3.5 w-3.5" />
+                        )}
+                        Enviar imagem
                       </Button>
-                    )}
-                    {(c.sheetUrl || c.sheetStatus) && (
-                      <>
+                      {c.sheetStatus === "aguardando" && (
                         <Button
                           size="sm"
-                          variant="ghost"
                           className="h-8 text-xs"
-                          disabled={!!sheetBusy || c.sheetStatus === "gerando"}
-                          onClick={() => handleGenerateCharSheet(c.id)}
-                        >
-                          <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refazer
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 text-xs text-destructive"
                           disabled={!!sheetBusy}
-                          onClick={() => handleClearSheet(c.id)}
+                          onClick={() => handleApproveSheet(c.id)}
                         >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
+                          <Check className="mr-1 h-3.5 w-3.5" /> Aprovar
                         </Button>
-                      </>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-xs"
-                      disabled={!!sheetBusy}
-                      onClick={() => handleSaveToLibrary(c.id)}
-                    >
-                      {sheetBusy === `lib_save_${c.id}` ? (
-                        <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <BookmarkPlus className="mr-1 h-3.5 w-3.5" />
                       )}
-                      Salvar na biblioteca
-                    </Button>
-                  </div>
+                      {(c.sheetUrl || c.sheetStatus) && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 text-xs"
+                            disabled={!!sheetBusy || c.sheetStatus === "gerando"}
+                            onClick={() => handleGenerateCharSheet(c.id)}
+                          >
+                            <RefreshCw className="mr-1 h-3.5 w-3.5" /> Refazer
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 text-xs text-destructive"
+                            disabled={!!sheetBusy}
+                            onClick={() => handleClearSheet(c.id)}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Remover
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs"
+                        disabled={!!sheetBusy}
+                        onClick={() => handleSaveToLibrary(c.id)}
+                      >
+                        {sheetBusy === `lib_save_${c.id}` ? (
+                          <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <BookmarkPlus className="mr-1 h-3.5 w-3.5" />
+                        )}
+                        Salvar na biblioteca
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
+                      <span className="italic">🎙️ Voz em off (sem corpo físico em cena: não precisa de retrato).</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-destructive"
+                        disabled={!!sheetBusy}
+                        onClick={() => removeCharacter(c.id)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Excluir
+                      </Button>
+                    </div>
+                  )}
 
                   <div className="pt-1">
                     <Select
@@ -1365,7 +1392,7 @@ function ProjectView({
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            )})}
           </div>
         </div>
       )}

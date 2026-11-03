@@ -28,6 +28,7 @@ import {
   buildCastPrompt,
   buildSheetPrompt,
   getLibraryCharacter,
+  isVoiceOnlyCharacter,
   listFlowLibrary,
   saveToLibrary,
 } from "@/lib/flow-characters"
@@ -476,6 +477,7 @@ export async function generateCharacterSheetAction(projectId: string, characterI
     if (!project) throw new Error("Projeto não encontrado.")
     const c = project.script.characters.find((x) => x.id === characterId)
     if (!c) throw new Error("Personagem não encontrado.")
+    if (isVoiceOnlyCharacter(c)) throw new Error("Narradores e vozes off-screen não precisam de imagem de referência.")
     if (!c.description.trim()) throw new Error("Preencha a descrição do personagem antes de gerar a folha.")
 
     await holdProjectTakesForApproval(user.id, project.id)

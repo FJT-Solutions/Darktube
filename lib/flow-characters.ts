@@ -94,9 +94,18 @@ export async function deleteLibraryCharacter(userId: string, id: string): Promis
   return (res.rowCount ?? 0) > 0
 }
 
+export function isVoiceOnlyCharacter(c: FlowCharacter): boolean {
+  const name = String(c.name || '').toLowerCase()
+  const desc = String(c.description || '').toLowerCase()
+  return (
+    /^(narrador|narrator|voz|voice|voiceover|locutor)\b/i.test(name) ||
+    /invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis[ií]vel|voz em off/i.test(desc)
+  )
+}
+
 export function buildSheetPrompt(c: FlowCharacter): string {
   const desc = (c.description || '').trim().replace(/\.+$/, '')
-  return `professional character reference sheet of a fictional original character, not based on any real or famous person: ${desc}. Clean neutral plain light-gray background, technical model turnaround, two horizontal rows; top row four full-body standing views side by side: front, left profile, right profile, back; bottom row three detailed close-up portraits: front, left profile, right profile. Perfect identity consistency, relaxed A-pose, consistent scale, even soft lighting, sharp details. No text, no labels, no names, no numbers, no watermark. 16:9`
+  return `cinematic character reference portrait of a fictional original character, not based on any real or famous person: ${desc}. Single subject waist-up medium portrait, facing the camera with a natural expressive gaze, wearing their signature clothing. Clean solid neutral backdrop, cinematic soft studio lighting with gentle key light, shallow depth of field, sharp detailed facial features, realistic skin texture, clear eyes and natural hair. Single person only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark. 16:9`
 }
 
 export function buildCastPrompt(chars: FlowCharacter[]): string {

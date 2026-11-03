@@ -4,7 +4,7 @@
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
 const FLOW_VERSION = '1.3.17';
-const FLOW_BUILD = '2026-11-03-espera-envio-referencia'; // confirma que a extensao recarregada e a nova
+const FLOW_BUILD = '2026-11-03-retrato-unico-e-retry-rapido'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -380,8 +380,8 @@ async function flowHandleResult(msg) {
       // agente espera 2 min. So na 3a vez seguida vira rascunho, para o usuario ver.
       const n = ((await chrome.storage.local.get(['flow_ui_fail'])).flow_ui_fail || 0) + 1;
       if (n < 3) {
-        await chrome.storage.local.set({ flow_ui_fail: n, flow_hold_until: Date.now() + 120000 });
-        flowLog(`A tela do Flow não estava pronta (${r.error || r.code}). O take volta para a fila; nova tentativa em 2 min (${n}/2).`, { code: r.code }, 'warn', ids);
+        await chrome.storage.local.set({ flow_ui_fail: n, flow_hold_until: Date.now() + 15000 });
+        flowLog(`A tela do Flow não estava pronta (${r.error || r.code}). O take volta para a fila; nova tentativa em instantes (${n}/2).`, { code: r.code }, 'warn', ids);
         try {
           await flowApi(c, `/api/flow/agent/jobs/${msg.jobId}/release`, { method: 'POST' });
         } catch (_) {}

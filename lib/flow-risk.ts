@@ -17,7 +17,7 @@ export const DEFAULT_RISK: RiskSettings = {
   riskMode: false,
   hourlyLimit: 10,
   dailyLimit: 40,
-  minGapSec: 45,
+  minGapSec: 5,
   postsPerDay: 6,
 }
 

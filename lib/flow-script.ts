@@ -388,11 +388,12 @@ export function softenFlowPrompt(prompt: string): string {
 export function takeReference(script: FlowScript, take: FlowTake, params: FlowParams): { refImageUrl?: string; refPrevVideo?: boolean; promptLine?: string } {
   const out: { refImageUrl?: string; refPrevVideo?: boolean; promptLine?: string } = {}
   if (String(params.refImages ?? '1') !== '0') {
-    const visible = script.characters.filter((c) => take.characters.includes(c.id))
+    const isVoiceOnly = (c: FlowCharacter) => /^(narrador|narrator|voz|voice|locutor)\b/i.test(c.name || '') || /invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis[ií]vel/i.test(c.description || '')
+    const visible = script.characters.filter((c) => take.characters.includes(c.id) && !isVoiceOnly(c))
     const ok = (c?: FlowCharacter) => (c && c.sheetStatus === 'aprovada' && c.sheetUrl ? c.sheetUrl : undefined)
     if (visible.length === 1 && ok(visible[0])) {
       out.refImageUrl = ok(visible[0])
-      out.promptLine = `[Reference Image]: the attached image is the character reference sheet of ${visible[0].name}; keep the face, hair, body and outfit exactly as in it. Ignore its plain background and layout.`
+      out.promptLine = `[Reference Image]: the attached image is the character reference portrait of ${visible[0].name}; keep ${visible[0].name}'s facial features, hair, skin tone and outfit identical to the person in the reference portrait. Ignore its plain background.`
     } else if (visible.length > 1 && script.castSheetStatus === 'aprovada' && script.castSheetUrl) {
       out.refImageUrl = script.castSheetUrl
       const order = script.characters.filter((c) => visible.includes(c)).map((c) => c.name).join(', ')
@@ -401,7 +402,7 @@ export function takeReference(script: FlowScript, take: FlowTake, params: FlowPa
       const sp = script.characters.find((c) => c.id === take.speaker)
       if (ok(sp)) {
         out.refImageUrl = ok(sp)
-        out.promptLine = `[Reference Image]: the attached image is the reference sheet of ${sp!.name}; keep ${sp!.name}'s face, hair and outfit exactly as in it.`
+        out.promptLine = `[Reference Image]: the attached image is the reference portrait of ${sp!.name}; keep ${sp!.name}'s face, hair and outfit identical to the reference portrait.`
       }
     }
   }
