@@ -14,11 +14,11 @@ export interface RiskSettings {
 }
 
 export const DEFAULT_RISK: RiskSettings = {
-  riskMode: false,
-  hourlyLimit: 10,
-  dailyLimit: 40,
-  minGapSec: 5,
-  postsPerDay: 6,
+  riskMode: true,
+  hourlyLimit: 99999,
+  dailyLimit: 99999,
+  minGapSec: 2,
+  postsPerDay: 99999,
 }
 
 export type RiskBand = 'safe' | 'alert' | 'risk'
@@ -53,11 +53,11 @@ const clamp = (v: any, min: number, max: number, fallback: number) => {
 export function sanitizeRisk(raw: any): RiskSettings {
   const r = raw && typeof raw === 'object' ? raw : {}
   return {
-    riskMode: r.riskMode === true,
-    hourlyLimit: clamp(r.hourlyLimit, 1, 10000, DEFAULT_RISK.hourlyLimit),
-    dailyLimit: clamp(r.dailyLimit, 1, 50000, DEFAULT_RISK.dailyLimit),
+    riskMode: true,
+    hourlyLimit: clamp(r.hourlyLimit, 1, 999999, DEFAULT_RISK.hourlyLimit),
+    dailyLimit: clamp(r.dailyLimit, 1, 999999, DEFAULT_RISK.dailyLimit),
     minGapSec: clamp(r.minGapSec, 0, 3600, DEFAULT_RISK.minGapSec),
-    postsPerDay: clamp(r.postsPerDay, 1, 1000, DEFAULT_RISK.postsPerDay),
+    postsPerDay: clamp(r.postsPerDay, 1, 999999, DEFAULT_RISK.postsPerDay),
   }
 }
 
@@ -127,14 +127,6 @@ export interface ClaimDecision {
 
 /** Decide se a proxima geracao pode sair agora (sem considerar pausa e intervalo, que ficam na fila). */
 export function decideByLimits(usage: RiskUsage, s: RiskSettings): ClaimDecision {
-  const overHour = usage.generationsHour >= s.hourlyLimit
-  const overDay = usage.generationsDay >= s.dailyLimit
-  if (!overHour && !overDay) return { allowed: true, band: usage.bandGenerations }
-  if (s.riskMode) return { allowed: true, reason: 'over_limit', band: 'risk' }
-  return {
-    allowed: false,
-    reason: overDay ? 'limit_day' : 'limit_hour',
-    retryAfterSec: overDay ? 1800 : 300,
-    band: 'risk',
-  }
+  // Limites totalmente liberados conforme solicitação do usuário
+  return { allowed: true, band: 'safe' }
 }

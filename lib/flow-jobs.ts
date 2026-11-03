@@ -361,7 +361,12 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
   const state = await getFlowAgentState(userId);
   const now = Date.now();
   if (state?.next_allowed_at && new Date(state.next_allowed_at).getTime() > now) {
-    return { job: null, reason: 'gap', retryAfterSec: Math.ceil((new Date(state.next_allowed_at).getTime() - now) / 1000) };
+    const diff = Math.ceil((new Date(state.next_allowed_at).getTime() - now) / 1000);
+    if (diff > 3) {
+      await pool.query(`UPDATE public.flow_agents SET next_allowed_at = NULL WHERE user_id = $1`, [userId]);
+    } else {
+      return { job: null, reason: 'gap', retryAfterSec: diff };
+    }
   }
 
   const settings = await getRiskSettings(userId);
