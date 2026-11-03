@@ -1296,6 +1296,7 @@
     if (await attachByDrop(file)) return 'soltar';
     if (await attachByPaste(file)) return 'colar';
     if ((await uploadToLibrary(file)) && (await attachFromLibrary(file.name.replace(/\.[a-z0-9]+$/i, '')))) return 'biblioteca';
+    await clearDragOverlay();
     return '';
   }
 
@@ -1336,19 +1337,57 @@
   }
 
   // Caminho 1: soltar o arquivo sobre a caixa de prompt (como arrastar do computador).
+  // Area "Drop media / + Add reference" que o Flow abre sobre a pagina quando algo e arrastado para ela.
+  const dropZoneEl = () => {
+    const cand = $$('div, span, button, p, flow-media-upload').filter((e) => {
+      const t = txt(e);
+      // o "+" do botao pode vir como texto de icone ("add Add reference"): so o fim do texto importa
+      return t.length > 0 && t.length < 40 && /(^|\s)add reference$|^drop media$/i.test(t) && vis(e);
+    });
+    // Prefere o container clicavel/maior da area "Add reference" (nao o texto solto).
+    return cand.find((e) => /add reference/i.test(txt(e)) && (e.closest('button, [role=button], [class*=drop], [class*=upload]') || e)) || cand[0] || null;
+  };
+
+  // Desfaz um arrasto que ficou pela metade: sem isso a area de soltar fica por cima e esconde a caixa de prompt.
+  async function clearDragOverlay() {
+    for (let i = 0; i < 3 && dropZoneEl(); i++) {
+      const dt = new DataTransfer();
+      for (const el of [dropZoneEl(), document.body, document.documentElement].filter(Boolean)) {
+        for (const type of ['dragleave', 'dragend']) el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+      }
+      pressEscape();
+      await sleep(500);
+    }
+    return !dropZoneEl();
+  }
+
+  // Caminho 1: arrastar o arquivo para a pagina e SOLTAR na area "Add reference" que o Flow abre (alvo certo do drop).
   async function attachByDrop(file) {
     const box = promptBox();
-    const target = $(S.editor) || box;
-    if (!target) return false;
+    const editor = $(S.editor) || box;
+    if (!editor) return false;
     const before = ingredientChips();
     const dt = new DataTransfer();
     dt.items.add(file);
-    for (const type of ['dragenter', 'dragover', 'drop']) {
-      const ev = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
-      target.dispatchEvent(ev);
+    const fire = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+    // 1) o arrasto entra na pagina: o Flow mostra a area de soltar
+    for (const type of ['dragenter', 'dragover']) {
+      fire(document.body, type);
       await sleep(150);
     }
-    return !!(await until(() => ingredientChips() > before, 45000, 500)); // o Flow processa a imagem antes de mostrar o chip
+    const zone = await until(() => dropZoneEl(), 2500, 150);
+    // 2) solta onde o Flow espera (a area aberta); sem ela, na caixa de prompt
+    const target = zone || editor;
+    dtLog('Anexar soltando o arquivo.', { areaDeSoltar: zone ? snapClean(txt(zone)).slice(0, 30) : null });
+    for (const type of ['dragenter', 'dragover', 'drop']) {
+      fire(target, type);
+      await sleep(150);
+    }
+    const ok = !!(await until(() => ingredientChips() > before, 45000, 500)); // o Flow processa a imagem antes de mostrar o chip
+    // 3) sempre deixa a pagina limpa (a area de soltar nao pode ficar por cima da caixa de prompt)
+    const clean = await clearDragOverlay();
+    if (!clean) dtLog('A área de soltar do Flow ficou aberta.', null, 'warn');
+    return ok;
   }
 
   // Caminho 2: colar a imagem na caixa de prompt.
