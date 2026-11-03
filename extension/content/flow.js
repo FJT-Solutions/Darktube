@@ -742,6 +742,9 @@
   const RES_RX = /\b\d{3,4}p\b/i;
   // Tile que o Flow recusou ("warning Failed This prompt might violate our policies..."): continua dentro do
   // tile pendente, entao sem esta checagem parecia "gerando" para sempre.
+  // Politica ("prominent people") x falha generica e passageira ("failed to generate") x outra.
+  const failCode = (msg) =>
+    /polic|violat|prominent|pessoas|people/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate/i.test(msg) ? 'gen_failed' : 'failed';
   const FAILED_RX = /\bfailed\b|might violate|violate our polic|will be refunded|não foi possível gerar|geração falhou|falhou/i;
   function tileState(tile) {
     const t = txt(tile);
@@ -1638,6 +1641,39 @@
     throw err('capture_failed', 'Não encontrei o arquivo gerado na página.');
   }
 
+  // Pergunta ao segundo plano e nunca fica esperando para sempre: sem resposta em "ms", segue com null.
+  function askBg(msg, ms = 8000) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => {
+        if (!done) {
+          done = true;
+          resolve(v);
+        }
+      };
+      setTimeout(() => finish(null), ms);
+      try {
+        chrome.runtime.sendMessage(msg, (r) => {
+          void chrome.runtime.lastError;
+          finish(r || null);
+        });
+      } catch (_) {
+        finish(null);
+      }
+    });
+  }
+
+  // Traz a aba do Flow para a frente se estiver escondida e espera ela ficar visivel (ate 4 s).
+  async function ensureVisible(forcar) {
+    const resp = await askBg({ type: 'FLOW_ENSURE_VISIBLE', forcar: !!forcar }, 6000);
+    await until(() => document.visibilityState === 'visible', 4000, 250);
+    return resp ? { ...resp, forcar: !!forcar } : { ok: false, forcar: !!forcar };
+  }
+
+  async function restoreVisible() {
+    await askBg({ type: 'FLOW_RESTORE_VISIBLE' }, 6000);
+  }
+
   // Clique real: o segundo plano liga o depurador do navegador na aba por um instante e envia um clique de mouse
   // de verdade (evento confiavel), que o Flow nao distingue do clique de uma pessoa. "ativar" deixa a aba do Flow
   // como a ativa da propria janela durante o clique (e devolve a aba anterior depois).
@@ -1645,23 +1681,14 @@
     const r = el.getBoundingClientRect();
     const x = Math.round(r.left + r.width / 2);
     const y = Math.round(r.top + r.height / 2);
-    const resp = await new Promise((resolve) => {
-      try {
-        chrome.runtime.sendMessage({ type: 'FLOW_TRUSTED_CLICK', x, y, ativar: !!ativar }, (r2) => {
-          void chrome.runtime.lastError;
-          resolve(r2 || null);
-        });
-      } catch (_) {
-        resolve(null);
-      }
-    });
+    const resp = await askBg({ type: 'FLOW_TRUSTED_CLICK', x, y, ativar: !!ativar }, 12000);
     dtLog('Clique real (depurador).', { ...(resp || { ok: false, why: 'sem resposta do segundo plano' }), x, y, ativar: !!ativar });
     return resp;
   }
 
   // Tenta iniciar a geracao por varios caminhos, do mais simples ao mais forte, e para no primeiro que funcionar
   // (cada clique que "pega" cria uma geracao, entao nunca continua depois de um sucesso). Devolve o nome do caminho ou ''.
-  async function clickGenerate(btn, prevImageIds, descBtn) {
+  async function clickGenerate(btn, prevImageIds, descBtn, kind) {
     const tilesBefore = $$(tileSel()).length;
     const started = () =>
       $$(tileSel()).length > tilesBefore ||
@@ -1684,29 +1711,28 @@
       } catch (_) {}
       if (typeof target.click === 'function') target.click();
     };
-    const attempts = [
-      ['clique', () => {
+    const simple = [
+      'clique',
+      () => {
         const b = generateBtnEl() || btn;
         pressAndClick(b);
-      }],
-      ['clique real (depurador)', async () => {
+      },
+    ];
+    const real = [
+      'clique real (depurador)',
+      async () => {
         const b = generateBtnEl() || btn;
         if (b) await trustedClick(b, false);
-      }],
+      },
+    ];
+    const attempts = [
+      // Imagem: o clique feito por codigo e ignorado pelo Flow, entao vai direto ao clique real (sem esperar o simples).
+      ...(kind === 'image' ? [real, simple] : [simple, real]),
       ['clique no mundo da página', async () => {
         const b = generateBtnEl() || btn;
         if (!b) return;
         b.setAttribute('data-dt-gen', '1');
-        const resp = await new Promise((resolve) => {
-          try {
-            chrome.runtime.sendMessage({ type: 'FLOW_MAIN_CLICK', selector: '[data-dt-gen="1"]' }, (r) => {
-              void chrome.runtime.lastError;
-              resolve(r || null);
-            });
-          } catch (_) {
-            resolve(null);
-          }
-        });
+        const resp = await askBg({ type: 'FLOW_MAIN_CLICK', selector: '[data-dt-gen="1"]' }, 8000);
         b.removeAttribute('data-dt-gen');
         dtLog('Clique no mundo da página.', resp);
       }],
@@ -1859,7 +1885,20 @@
     await human(500, 1500);
     // Confirma que a geracao comecou (tile novo, pendente, imagem nova ou a caixa de prompt esvaziou).
     // No modo imagem o clique simples as vezes nao vale: tenta de novo com clique completo (incluindo icone/host) e depois com Enter.
-    const how = await clickGenerate(btn, prevImageIds, descBtn);
+    // O Flow so aceita a geracao com a aba visivel (as falhas "failed to generate" aconteceram com a aba escondida).
+    const vis0 = document.visibilityState;
+    let visInfo = null;
+    if (vis0 !== 'visible') {
+      visInfo = await ensureVisible(false);
+      if (document.visibilityState !== 'visible') visInfo = await ensureVisible(true);
+    }
+    dtLog('Visibilidade da aba na hora de gerar.', { antes: vis0, depois: document.visibilityState, foco: document.hasFocus ? document.hasFocus() : null, ajuste: visInfo });
+    let how = '';
+    try {
+      how = await clickGenerate(btn, prevImageIds, descBtn, job.kind);
+    } finally {
+      if (visInfo) await restoreVisible();
+    }
     if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
     dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
     await sleep(2000);
@@ -1875,7 +1914,11 @@
       if (job.kind === 'image') {
         const fresh = unseen($$(tileSel()));
         const bad = fresh.find((t) => !t.matches(S.pendingTile) && RX.failure.test(txt(t)));
-        if (bad) throw err('failed', 'O Flow recusou a geração: ' + txt(bad).slice(0, 180));
+        if (bad) {
+          const m = txt(bad).replace(/^warning\s*/i, '').slice(0, 180);
+          dtLog('O Flow recusou esta imagem.', { code: failCode(m), motivo: m }, 'error');
+          throw err(failCode(m), 'O Flow recusou a geração: ' + m);
+        }
         const ready = $$(S.imageTileImg).filter(
           (i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id')) && !prevImageSrcs.has((i.currentSrc || i.src || '').split('?')[0])
         );
@@ -1890,7 +1933,7 @@
         const bad = states.find((x) => x.s.failed || (!x.s.generating && RX.failure.test(txt(x.t))));
         if (bad) {
           const msg = txt(bad.t).replace(/^warning\s*/i, '').slice(0, 220);
-          const code = /polic|violat|prominent|pessoas|people/i.test(msg) ? 'policy' : 'failed';
+          const code = failCode(msg);
           dtLog('O Flow recusou este take.', { code, motivo: msg }, 'error');
           throw err(code, 'O Flow recusou a geração: ' + msg);
         }

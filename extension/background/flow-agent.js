@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.14';
-const FLOW_BUILD = '2026-11-03-area-de-soltar'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.15';
+const FLOW_BUILD = '2026-11-03-visivel-e-nova-tentativa'; // aparece no log da VPS: confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -107,6 +107,23 @@ async function flowHeartbeat(c, caps) {
   const cached = caps || (c.flow_caps && c.flow_caps.data);
   if (cached) body.capabilities = cached;
   return flowApi(c, '/api/flow/agent/heartbeat', { method: 'POST', headers: flowJson, body: JSON.stringify(body) });
+}
+
+// Estado guardado por FLOW_ENSURE_VISIBLE para devolver a aba/janela anteriores depois da geracao.
+let flowVisRestore = null;
+let flowVisTimer = null;
+async function flowRestoreVisible() {
+  clearTimeout(flowVisTimer);
+  const r = flowVisRestore;
+  flowVisRestore = null;
+  if (!r) return;
+  try {
+    if (r.wasMinimized) await chrome.windows.update(r.windowId, { state: 'minimized' });
+    if (r.previousTabId) await chrome.tabs.update(r.previousTabId, { active: true });
+    if (r.previousWindowId) await chrome.windows.update(r.previousWindowId, { focused: true });
+  } catch (e) {
+    /* aba ou janela ja fechada */
+  }
 }
 
 // Aba escondida: o Chrome atrasa os timers dela para 1 vez por minuto. Enquanto ha job, acorda a aba a cada 2 s
@@ -249,10 +266,14 @@ async function flowTick() {
     }
 
     // Depois de um problema de tela (menu aberto, painel diferente), espera antes de pegar o proximo take.
-    const hold = (await chrome.storage.local.get(['flow_hold_until'])).flow_hold_until || 0;
+    const holdCfg = await chrome.storage.local.get(['flow_hold_until', 'flow_hold_msg']);
+    const hold = holdCfg.flow_hold_until || 0;
     if (hold > Date.now()) {
-      return void (await flowStatus('aguardando', { msg: `A tela do Flow não estava pronta; nova tentativa em ${Math.ceil((hold - Date.now()) / 1000)} s. Feche menus e janelas abertos no Flow.` }));
+      const wait = Math.ceil((hold - Date.now()) / 1000);
+      const why = holdCfg.flow_hold_msg || 'A tela do Flow não estava pronta. Feche menus e janelas abertos no Flow.';
+      return void (await flowStatus('aguardando', { msg: `${why} Nova tentativa em ${wait} s.` }));
     }
+    if (holdCfg.flow_hold_msg) await chrome.storage.local.remove('flow_hold_msg');
 
     const claim = await flowApi(c, '/api/flow/agent/claim', { method: 'POST' });
     if (!claim || !claim.job) {
@@ -337,6 +358,8 @@ async function flowHandleResult(msg) {
     if (!r.ok) {
       flowLog('Falha na geração: ' + (r.error || 'sem detalhe'), { code: r.code }, 'error', ids);
       await flowFail(c, msg.jobId, r.error || 'Falha na geração.', r.code);
+      // Falha generica do Flow: o servidor devolve o take para a fila; espera alguns minutos antes de pegar de novo.
+      if (r.code === 'gen_failed') await chrome.storage.local.set({ flow_hold_until: Date.now() + 180000, flow_hold_msg: 'O Flow falhou ao gerar; nova tentativa automática em 3 min.' });
       return void (await flowStatus('falhou', { msg: r.error, code: r.code }));
     }
     let blob;
@@ -501,6 +524,58 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (previous) {
           try { await chrome.tabs.update(previous, { active: true }); } catch (e) {}
         }
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_ENSURE_VISIBLE') {
+    // O Flow so aceita a geracao com a aba visivel. Se a aba esta escondida (minimizada, atras de outra aba da janela),
+    // traz a aba para a frente sem roubar o foco do que o usuario esta fazendo (a janela e restaurada se estiver
+    // minimizada e a aba vira a ativa da propria janela). Com "forcar", tambem foca a janela. A situacao anterior e
+    // guardada e devolvida por FLOW_RESTORE_VISIBLE.
+    (async () => {
+      const tabId = sender && sender.tab && sender.tab.id;
+      if (!tabId) return sendResponse({ ok: false, why: 'sem aba' });
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        const win = await chrome.windows.get(tab.windowId);
+        const act = await chrome.tabs.query({ windowId: tab.windowId, active: true });
+        const last = await chrome.windows.getLastFocused().catch(() => null);
+        flowVisRestore = {
+          tabId,
+          windowId: tab.windowId,
+          previousTabId: act[0] && act[0].id !== tabId ? act[0].id : null,
+          previousWindowId: last && last.id !== tab.windowId ? last.id : null,
+          wasMinimized: win.state === 'minimized',
+        };
+        if (win.state === 'minimized') await chrome.windows.update(tab.windowId, { state: 'normal', focused: false });
+        if (!tab.active) await chrome.tabs.update(tabId, { active: true });
+        if (msg.forcar) await chrome.windows.update(tab.windowId, { focused: true });
+        clearTimeout(flowVisTimer);
+        flowVisTimer = setTimeout(() => flowRestoreVisible(), 60000); // rede de seguranca
+        sendResponse({ ok: true, estado: win.state, ativa: tab.active, forcar: !!msg.forcar });
+      } catch (e) {
+        sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 120) });
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_RESTORE_VISIBLE') {
+    flowRestoreVisible().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg.type === 'FLOW_OWN_WINDOW') {
+    // Move a aba do Flow para uma janela propria (pequena, num canto): ela fica visivel sem atrapalhar as outras abas.
+    (async () => {
+      try {
+        const tab = await flowFindTab();
+        if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
+        const tabs = await chrome.tabs.query({ windowId: tab.windowId });
+        if (tabs.length === 1) return sendResponse({ ok: true, ja: true });
+        await chrome.windows.create({ tabId: tab.id, focused: false, width: 560, height: 800, state: 'normal' });
+        sendResponse({ ok: true, ja: false });
+      } catch (e) {
+        sendResponse({ ok: false, error: String((e && e.message) || e).slice(0, 120) });
       }
     })();
     return true;

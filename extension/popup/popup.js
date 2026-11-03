@@ -547,6 +547,19 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+  const ownBtn = document.getElementById('flow-own-window-btn');
+  if (ownBtn) {
+    ownBtn.addEventListener('click', () => {
+      ownBtn.disabled = true;
+      chrome.runtime.sendMessage({ type: 'FLOW_OWN_WINDOW' }, (resp) => {
+        void chrome.runtime.lastError;
+        ownBtn.disabled = false;
+        st.textContent = resp && resp.ok
+          ? (resp.ja ? 'O Flow já está sozinho na janela dele. Deixe-a aberta e sem minimizar.' : 'Flow movido para uma janela própria. Deixe-a aberta e sem minimizar.')
+          : (resp && resp.error) || 'Não consegui mover a aba do Flow.';
+      });
+    });
+  }
   const labBtn = document.getElementById('flow-click-lab-btn');
   if (labBtn) {
     labBtn.addEventListener('click', () => {
