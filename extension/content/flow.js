@@ -171,7 +171,7 @@
 
   const settingsBtnEl = () => {
     const ed = $(S.editor);
-    const box = ed ? ed.closest('flow-prompt-box, form, [class*="prompt"]') || ed.parentElement : null;
+    const box = ed ? ed.closest('flow-prompt-box, flow-base-prompt-box, form, [class*="prompt"]') || ed.parentElement : null;
     if (box) {
       const b = $('button.settings-trigger-button, .settings-trigger-button', box)
         || $$('button', box).find((btn) => /nano banana|veo|omni|\bvideo\b|\bx\d\b|\b\d+s\b/i.test(txt(btn)));
@@ -179,6 +179,37 @@
     }
     return $('button.settings-trigger-button, .settings-trigger-button')
       || $$('button').find((btn) => !btn.closest('header, nav, flow-top-bar') && /nano banana|veo|omni|\bvideo\b|\bx\d\b/i.test(txt(btn)));
+  };
+
+  // Botao de gerar ("->") visivel dentro da caixa de prompt ativa.
+  // No modo imagem o seletor global $(S.generate) pode devolver um botao oculto/inativo fora da caixa atual.
+  const generateBtnEl = () => {
+    const ed = $(S.editor);
+    const box = $('flow-base-prompt-box') || (ed ? ed.closest('flow-prompt-box, flow-base-prompt-box, form, [class*="prompt"]') || ed.parentElement : null);
+    const scopes = box ? [box, document] : [document];
+    for (const root of scopes) {
+      const direct = $$(S.generate, root).find(vis)
+        || $$('flow-generate-icon-button button, button.generate-icon-button, button[type=submit]', root).find(vis);
+      if (direct) return direct;
+    }
+    if (box) {
+      const sb = settingsBtnEl();
+      const byIconOrLabel = $$('button, [role=button]', box).filter(vis).find((b) => {
+        if (b === sb) return false;
+        const icons = $$('mat-icon, i, [class*="icon"]', b).map(txt).join(' ');
+        const label = (b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '') + ' ' + txt(b) + ' ' + icons;
+        return /\b(arrow_forward|arrow_upward|east|send|subdirectory_arrow_left|north_east|generate|create|submit|gerar|criar|enviar)\b/i.test(label);
+      });
+      if (byIconOrLabel) return byIconOrLabel;
+      if (sb && vis(sb)) {
+        const sr = sb.getBoundingClientRect();
+        const rightBtns = $$('button, [role=button]', box)
+          .filter((b) => b !== sb && vis(b) && b.getBoundingClientRect().left >= sr.right - 12)
+          .sort((a, b) => b.getBoundingClientRect().left - a.getBoundingClientRect().left);
+        if (rightBtns[0]) return rightBtns[0];
+      }
+    }
+    return $$(S.generate).find(vis) || $(S.generate);
   };
 
   async function openSettings() {
@@ -340,6 +371,10 @@
       if (i > 0) document.execCommand('insertLineBreak', false); // Enter sozinho enviaria o prompt
       if (lines[i]) document.execCommand('insertText', false, lines[i]);
     }
+    try {
+      ed.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: String(text) }));
+      ed.dispatchEvent(new Event('change', { bubbles: true }));
+    } catch (_) {}
     await human(300, 700);
     const head = String(text).slice(0, 24).replace(/\s+/g, ' ');
     if (!txt($(S.editor)).includes(head.slice(0, 16))) throw err('prompt_not_written', 'O prompt não foi escrito na caixa do Flow.');
@@ -1589,23 +1624,98 @@
     const hint = costHint();
     dtLog('Tiles antes de gerar.', { videoTiles: $$(S.videoTile).length, imageTiles: $$(S.imageTile).length, pendingTiles: $$(S.pendingTile).length, knownUrls: knownOldUrls.size });
 
-    const btn = $(S.generate);
+    const descBtn = (b) => {
+      if (!b) return null;
+      const r = b.getBoundingClientRect ? b.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+      const ic = $('mat-icon, i, svg', b);
+      return {
+        tag: b.tagName.toLowerCase(),
+        type: b.getAttribute('type'),
+        cls: String(b.className || '').slice(0, 70),
+        aria: b.getAttribute('aria-label'),
+        disabled: !!b.disabled || b.getAttribute('aria-disabled') === 'true',
+        vis: vis(b),
+        icon: ic ? txt(ic).slice(0, 25) || ic.tagName.toLowerCase() : null,
+        text: txt(b).slice(0, 30),
+        host: b.parentElement ? b.parentElement.tagName.toLowerCase() : null,
+        rect: `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`,
+      };
+    };
+
+    let btn = generateBtnEl();
     if (!btn) throw err('generate_missing', 'Não achei o botão de gerar.');
-    if (!(await until(() => !btn.disabled, 10000))) throw err('generate_disabled', 'O botão de gerar ficou desabilitado.');
+    if (!(await until(() => {
+      const b = generateBtnEl() || btn;
+      return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true';
+    }, 10000))) {
+      dtLog('Botão de gerar permaneceu desabilitado.', { btn: descBtn(generateBtnEl() || btn), todos: $$(S.generate).map(descBtn) }, 'warn');
+      throw err('generate_disabled', 'O botão de gerar ficou desabilitado.');
+    }
+    btn = generateBtnEl() || btn;
+    dtLog('Botão de gerar localizado.', { escolhido: descBtn(btn), seletoresGenerate: $$(S.generate).map(descBtn) });
     await human(500, 1500);
-    // Confirma que a geracao comecou (tile novo, pendente, ou a caixa de prompt esvaziou). No modo imagem o clique
-    // simples as vezes nao vale: tenta de novo com clique completo e depois com Enter na caixa de prompt.
+    // Confirma que a geracao comecou (tile novo, pendente, imagem nova ou a caixa de prompt esvaziou).
+    // No modo imagem o clique simples as vezes nao vale: tenta de novo com clique completo (incluindo icone/host) e depois com Enter.
     const tilesBefore = $$(tileSel()).length;
     const started = () =>
-      $$(tileSel()).length > tilesBefore || $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) || !txt($(S.editor) || document.createElement('i'));
+      $$(tileSel()).length > tilesBefore ||
+      $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) ||
+      $$(S.imageTileImg).some((i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id'))) ||
+      !txt($(S.editor) || document.createElement('i'));
+    const pressAndClick = (target) => {
+      if (!target) return;
+      try {
+        if (typeof target.focus === 'function') target.focus();
+        const r = target.getBoundingClientRect ? target.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+        const clientX = r.left + r.width / 2;
+        const clientY = r.top + r.height / 2;
+        const mo = { bubbles: true, cancelable: true, view: window, clientX, clientY, button: 0, buttons: 1 };
+        const po = { ...mo, pointerType: 'mouse', isPrimary: true };
+        target.dispatchEvent(new PointerEvent('pointerdown', po));
+        target.dispatchEvent(new MouseEvent('mousedown', mo));
+        target.dispatchEvent(new PointerEvent('pointerup', { ...po, buttons: 0 }));
+        target.dispatchEvent(new MouseEvent('mouseup', { ...mo, buttons: 0 }));
+      } catch (_) {}
+      if (typeof target.click === 'function') target.click();
+    };
     const attempts = [
-      ['clique', () => btn.click()],
-      ['clique completo', () => realClick($(S.generate) || btn)],
+      ['clique', () => {
+        const b = generateBtnEl() || btn;
+        pressAndClick(b);
+      }],
+      ['clique completo', () => {
+        const b = generateBtnEl() || btn;
+        const icon = b && $('mat-icon, svg, span, i', b);
+        const host = b && b.closest('flow-generate-icon-button');
+        if (icon) realClick(icon);
+        realClick(b);
+        if (b && typeof b.click === 'function') b.click();
+        if (host && host !== b) {
+          realClick(host);
+          if (typeof host.click === 'function') host.click();
+        }
+        const form = b && b.closest('form');
+        if (form && typeof form.requestSubmit === 'function') {
+          try { form.requestSubmit(); } catch (_) {}
+        }
+      }],
       ['Enter', () => {
         const ed = $(S.editor);
         if (ed) {
           ed.focus();
-          for (const type of ['keydown', 'keypress', 'keyup']) ed.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+          try {
+            const sel = window.getSelection && window.getSelection();
+            if (sel) {
+              const range = document.createRange();
+              range.selectNodeContents(ed);
+              range.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+          } catch (_) {}
+          for (const type of ['keydown', 'keypress', 'keyup']) {
+            ed.dispatchEvent(new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+          }
         }
       }],
     ];
@@ -1616,7 +1726,12 @@
         how = label;
         break;
       }
-      dtLog(`A geração não começou com ${label}; tentando de outro jeito.`, null, 'warn');
+      const box = promptBox();
+      dtLog(
+        `A geração não começou com ${label}; tentando de outro jeito.`,
+        { btn: descBtn(generateBtnEl() || btn), botoesCaixa: box ? $$('button, [role=button]', box).filter(vis).map(descBtn) : [] },
+        'warn'
+      );
     }
     if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
     dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
@@ -1750,8 +1865,8 @@
       path: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id'),
       selectors: {
         editor: !!$(S.editor),
-        generate: !!$(S.generate),
-        settingsBtn: !!$(S.settingsBtn),
+        generate: !!(generateBtnEl() || $(S.generate)),
+        settingsBtn: !!(settingsBtnEl() || $(S.settingsBtn)),
         agentToggle: !!$(S.agentToggle),
         imageTiles: $$(S.imageTile).length,
         videoTiles: $$(S.videoTile).length,
