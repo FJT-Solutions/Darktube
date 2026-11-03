@@ -31,7 +31,14 @@ import {
   listFlowLibrary,
   saveToLibrary,
 } from "@/lib/flow-characters"
-import { cancelFlowJob, createFlowJob, listFlowJobs, resumeFlowAgent } from "@/lib/flow-jobs"
+import {
+  cancelFlowJob,
+  createFlowJob,
+  holdProjectTakesForApproval,
+  listFlowJobs,
+  resumeFlowAgent,
+  syncProjectQueuedJobsWithReferences,
+} from "@/lib/flow-jobs"
 import { assembleFlowProject } from "@/lib/flow-assemble"
 import { getRiskSettings, getRiskUsage, saveRiskSettings, type RiskSettings } from "@/lib/flow-risk"
 import { getSocialAccounts } from "@/lib/social-accounts"
@@ -471,6 +478,8 @@ export async function generateCharacterSheetAction(projectId: string, characterI
     if (!c) throw new Error("Personagem não encontrado.")
     if (!c.description.trim()) throw new Error("Preencha a descrição do personagem antes de gerar a folha.")
 
+    await holdProjectTakesForApproval(user.id, project.id)
+
     const job = await createFlowJob({
       userId: user.id,
       kind: "image",
@@ -503,6 +512,8 @@ export async function generateCastSheetAction(projectId: string) {
     if (chars.some((c) => !c.description.trim())) {
       throw new Error("Preencha a descrição de todos os personagens antes de gerar a folha do elenco.")
     }
+
+    await holdProjectTakesForApproval(user.id, project.id)
 
     const job = await createFlowJob({
       userId: user.id,
@@ -621,6 +632,7 @@ export async function approveSheetAction(projectId: string, target: string) {
       }
     }
     const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    await syncProjectQueuedJobsWithReferences(user.id, projectId, nextScript, current.params, current.template_id)
     return { success: true as const, project: project ?? { ...current, script: nextScript } }
   } catch (err) {
     return fail(err)
@@ -670,6 +682,7 @@ export async function clearSheetAction(projectId: string, target: string) {
       }
     }
     const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    await syncProjectQueuedJobsWithReferences(user.id, projectId, nextScript, current.params, current.template_id)
     return { success: true as const, project: project ?? { ...current, script: nextScript } }
   } catch (err) {
     return fail(err)
@@ -732,6 +745,7 @@ export async function useLibraryCharacterAction(projectId: string, characterId: 
       }),
     }
     const project = await updateFlowProject(user.id, projectId, { script: nextScript })
+    await syncProjectQueuedJobsWithReferences(user.id, projectId, nextScript, current.params, current.template_id)
     return { success: true as const, project: project ?? { ...current, script: nextScript } }
   } catch (err) {
     return fail(err)

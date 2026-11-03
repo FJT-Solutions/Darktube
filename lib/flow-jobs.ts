@@ -239,6 +239,57 @@ export async function cancelFlowJob(userId: string, id: string): Promise<FlowJob
   return res.rows[0] ?? null;
 }
 
+/** Cancela takes de um projeto que estejam na fila ou rodando para aguardar a aprovação da folha. */
+export async function holdProjectTakesForApproval(userId: string, projectId: string) {
+  await ensureFlowTablesExist();
+  await pool.query(
+    `UPDATE public.flow_jobs
+        SET status = 'draft', error_message = 'Aguardando aprovação da folha de personagem'
+      WHERE user_id = $1 AND project_id = $2 AND status IN ('queued','running') AND role IN ('take','take_final')`,
+    [userId, projectId]
+  );
+}
+
+/** Atualiza prompts e parâmetros dos takes de um projeto na fila quando a folha de personagem é aprovada. */
+export async function syncProjectQueuedJobsWithReferences(
+  userId: string,
+  projectId: string,
+  script: any,
+  params: any,
+  templateId: string
+) {
+  try {
+    const { getFlowTemplate } = await import('@/lib/flow-templates');
+    const { takeReference, buildTakePrompt } = await import('@/lib/flow-script');
+    const t = getFlowTemplate(templateId);
+    if (!t || !script?.takes) return;
+    const { rows: queuedJobs } = await pool.query(
+      `SELECT id, take_index, params, role FROM public.flow_jobs
+        WHERE user_id = $1 AND project_id = $2 AND status IN ('queued', 'draft') AND role IN ('take', 'take_final')`,
+      [userId, projectId]
+    );
+    for (const j of queuedJobs) {
+      const take = script.takes.find((k: any) => k.n === j.take_index);
+      if (!take) continue;
+      const isFinal = j.role === 'take_final';
+      const ref = takeReference(script, take, isFinal ? { ...(params || {}), refPrevVideo: '0' } : params || {});
+      const newPrompt = buildTakePrompt(script, take, params || {}, t.mode) + (ref.promptLine ? '\n' + ref.promptLine : '');
+      const newParams = {
+        ...(j.params || {}),
+        ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
+        ...(ref.refPrevVideo ? { refPrevVideo: true } : {}),
+      };
+      if (!ref.refImageUrl) delete newParams.refImageUrl;
+      await pool.query(
+        `UPDATE public.flow_jobs SET prompt = $3, params = $4 WHERE id = $1 AND user_id = $2`,
+        [j.id, userId, newPrompt, JSON.stringify(newParams)]
+      );
+    }
+  } catch (e) {
+    console.error('[Flow] Erro ao sincronizar referências nos jobs:', e);
+  }
+}
+
 export async function touchFlowAgent(userId: string, info: any = {}) {
   await ensureFlowTablesExist();
   await pool.query(
@@ -325,6 +376,25 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
       WHERE id = (
         SELECT id FROM public.flow_jobs
          WHERE user_id = $1 AND engine = 'flow' AND status = 'queued'
+           -- Trava de segurança: takes só saem da fila se o projeto NÃO tiver folhas aguardando aprovação ou gerando
+           AND (
+             role IN ('character_sheet', 'cast_sheet')
+             OR project_id IS NULL
+             OR NOT EXISTS (
+               SELECT 1 FROM public.flow_projects p
+                WHERE p.id = project_id
+                  AND (
+                    p.script->>'castSheetStatus' IN ('gerando', 'aguardando')
+                    OR (
+                      jsonb_typeof(p.script->'characters') = 'array'
+                      AND EXISTS (
+                        SELECT 1 FROM jsonb_array_elements(p.script->'characters') AS c
+                         WHERE c->>'sheetStatus' IN ('gerando', 'aguardando')
+                      )
+                    )
+                  )
+             )
+           )
          -- Folhas de personagem (curtas e pedidas na hora) passam na frente dos takes; dentro de cada grupo, ordem de chegada.
          ORDER BY (role IN ('character_sheet', 'cast_sheet')) DESC, created_at ASC
          LIMIT 1
