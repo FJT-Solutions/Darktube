@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
-import { addFlowLogs, failFlowJob, MAX_POLICY_RETRIES, pauseFlowAgent, requeueAfterPolicy } from '@/lib/flow-jobs';
+import { addFlowLogs, failFlowJob, MAX_GEN_RETRIES, MAX_POLICY_RETRIES, pauseFlowAgent, requeueAfterGenFailure, requeueAfterPolicy } from '@/lib/flow-jobs';
 import { softenFlowPrompt } from '@/lib/flow-script';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  const error = String(body.error || '') + (code === 'policy' ? ` (recusado também nas ${MAX_POLICY_RETRIES} novas tentativas automáticas)` : '');
+  // Falha generica do Flow: volta para a fila ate 2 vezes (a extensao espera alguns minutos antes de pegar de novo).
+  if (code === 'gen_failed') {
+    const retry = await requeueAfterGenFailure(user.id, id);
+    if (retry) {
+      const msg = `O Flow falhou ao gerar o take ${retry.job.take_index ?? ''} (falha genérica); nova tentativa automática ${retry.attempt}/${MAX_GEN_RETRIES}.`;
+      console.log(`[Flow] ${msg}`);
+      await addFlowLogs(user.id, { message: msg, level: 'warn', jobId: id, projectId: retry.job.project_id ?? null }).catch(() => {});
+      return NextResponse.json({ success: true, job: retry.job, retried: retry.attempt });
+    }
+  }
+
+  const error = String(body.error || '') + (code === 'gen_failed' ? ` (falhou também nas ${MAX_GEN_RETRIES} novas tentativas automáticas)` : '') + (code === 'policy' ? ` (recusado também nas ${MAX_POLICY_RETRIES} novas tentativas automáticas)` : '');
   const job = await failFlowJob(user.id, id, error);
   if (!job) return NextResponse.json({ success: false, error: 'Job não está em execução.' }, { status: 409 });
   const alertMsg = ALERTS[code];

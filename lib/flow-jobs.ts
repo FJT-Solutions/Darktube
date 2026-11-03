@@ -372,6 +372,32 @@ export async function releaseFlowJob(userId: string, id: string): Promise<FlowJo
   return res.rows[0] ?? null;
 }
 
+export const MAX_GEN_RETRIES = 2;
+
+/**
+ * Falha generica do Flow ("Sorry, this video failed to generate"): costuma ser passageira. Devolve a MESMA cena para a
+ * fila (prompt identico) ate MAX_GEN_RETRIES vezes; a espera entre tentativas e feita pela extensao. Null = acabaram.
+ */
+export async function requeueAfterGenFailure(userId: string, id: string): Promise<{ job: FlowJob; attempt: number } | null> {
+  await ensureFlowTablesExist();
+  const { rows } = await pool.query(`SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status = 'running'`, [id, userId]);
+  const job = rows[0] as FlowJob | undefined;
+  if (!job) return null;
+  const done = Number((job.params as any)?.genRetries) || 0;
+  if (done >= MAX_GEN_RETRIES) return null;
+  const attempt = done + 1;
+  const res = await pool.query(
+    `UPDATE public.flow_jobs
+        SET status = 'queued', error_message = NULL, result_url = NULL, claimed_at = NULL, finished_at = NULL,
+            params = params || jsonb_build_object('genRetries', $3::int),
+            deadline_at = NOW() + ($4 || ' minutes')::interval
+      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      RETURNING *`,
+    [id, userId, attempt, String(DEFAULT_DEADLINE_MIN)]
+  );
+  return res.rows[0] ? { job: res.rows[0], attempt } : null;
+}
+
 export const MAX_POLICY_RETRIES = 2;
 
 /**

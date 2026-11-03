@@ -535,6 +535,7 @@ export async function syncSheetsAction(projectId: string) {
 
     const charSheetJobs = jobs.filter((j) => j.role === "character_sheet" && j.status !== "cancelled")
     const generatingChars = script.characters.filter((x) => x.sheetStatus === "gerando")
+    const sheetErrors: Record<string, string> = {}
 
     for (const c of script.characters) {
       if (c.sheetStatus === "aprovada") continue
@@ -545,6 +546,13 @@ export async function syncSheetsAction(projectId: string) {
       let latest = matching[matching.length - 1]
       if (!latest && c.sheetStatus === "gerando" && generatingChars.length === 1) {
         latest = charSheetJobs[charSheetJobs.length - 1]
+      }
+      // A folha deu erro (job em rascunho): destrava o card em vez de deixar "Gerando no Flow..." para sempre.
+      if (latest && latest.status === "draft" && c.sheetStatus === "gerando") {
+        sheetErrors[c.id] = latest.error_message || "O Flow não gerou a folha."
+        c.sheetStatus = c.sheetUrl ? "aguardando" : undefined
+        changed = true
+        continue
       }
       if (!latest || latest.status !== "done" || !latest.result_url) continue
       if (!c.sheetStatus && !c.sheetUrl && latest.finished_at && new Date(latest.finished_at).getTime() < new Date(current.updated_at).getTime()) {
@@ -574,8 +582,19 @@ export async function syncSheetsAction(projectId: string) {
       }
     }
 
+    // O mesmo para a folha do elenco.
+    if (script.castSheetStatus === "gerando") {
+      const castJobs = jobs.filter((j) => j.role === "cast_sheet" && j.status !== "cancelled")
+      const lastCast = castJobs[castJobs.length - 1]
+      if (lastCast && lastCast.status === "draft") {
+        sheetErrors["cast"] = lastCast.error_message || "O Flow não gerou a folha do elenco."
+        script.castSheetStatus = script.castSheetUrl ? "aguardando" : undefined
+        changed = true
+      }
+    }
+
     const project = changed ? (await updateFlowProject(user.id, projectId, { script })) ?? { ...current, script } : current
-    return { success: true as const, project }
+    return { success: true as const, project, sheetErrors }
   } catch (err) {
     return fail(err)
   }
