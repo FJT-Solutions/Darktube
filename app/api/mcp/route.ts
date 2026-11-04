@@ -20,7 +20,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_create_campaign_creative',
-    description: 'Cria um criativo completo para campanhas do X1 / Meta Ads utilizando a esteira nativa do /flow (roteiro, ganchos, prompts de imagem e câmera).',
+    description: 'Renderiza o vídeo final em MP4 do criativo para campanhas do X1 / Meta Ads com download automático para ./midia/criativos/.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -31,15 +31,10 @@ const MCP_TOOLS_MANIFEST = [
           description: 'Ângulo validado de venda do criativo',
           default: 'pao-frigideira',
         },
-        templateId: {
-          type: 'string',
-          description: 'ID do template do /flow (ex: produto-tiktok-shop ou livre)',
-          default: 'produto-tiktok-shop',
-        },
         format: { type: 'string', enum: ['9:16', '1:1', '16:9'], default: '9:16' },
-        takesCount: { type: 'number', default: 4 },
-        benefits: { type: 'string', description: 'Benefícios reais da oferta' },
-        customIdea: { type: 'string', description: 'Roteiro ou ideia personalizada adicional' },
+        isDraft: { type: 'boolean', description: 'Se true, gera preview 360p ultra-rápido (~10s) com folha de contato', default: true },
+        downloadLocal: { type: 'boolean', description: 'Se true, faz download do MP4 para ./midia/criativos/ do projeto', default: true },
+        outputDir: { type: 'string', description: 'Diretório local para salvar o MP4', default: './midia/criativos' },
       },
       required: ['offer'],
     },
