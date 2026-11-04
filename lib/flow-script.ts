@@ -154,6 +154,7 @@ export function adultWording(text: string): string {
 export function cleanCamera(text: string): string {
   return String(text || '')
     .replace(/\s*,?\s*\b(?:matching|mirroring|same as|identical to|like|as in)\s+(?:the\s+)?(?:exact\s+)?(?:geometry\s+of\s+)?(?:the\s+)?(?:first|previous|opening|last)?\s*(?:take|scene|shot)\b(?:\s*\d+)?/gi, '')
+    .replace(/\b(?:slow\s+)?(?:tilt|pan|cut|zoom)\s*(?:-|\s*)?(?:up|away|over|to)\s*(?:the\s+)?(?:chandelier|ceiling|floor|empty\s+wall|roof|lamp)\b/gi, 'medium close-up on character expression')
     .replace(/[\s.;,]+$/, '')
     .trim()
 }
@@ -216,7 +217,9 @@ Writing rules (avoid generic "AI slop"):
 - Take 1 opens in media res with a visual hook in the first 1.5 seconds; never open with greetings or encyclopedic sentences ("Did you know...").
 - Every take shows ONE concrete physical action tied to its line: a specific object, texture and verb. No vague b-roll.
 - Spatial coherence: NEVER place an exterior vehicle, street arrival or outdoor event inside an interior room. If characters see a vehicle or visitor arriving, the action must be looking through a window/doorway, OR switch to an exterior location id. The setting must physically match the action.
-- Camera framing for dialogue: when a character speaks with lip-sync, the camera MUST frame the speaker (close-up, medium shot, or over-the-shoulder). Never use vehicle tracking, wide landscape pans, or whip-pans away from the speaker while dialogue is being delivered.
+- Camera framing for dialogue: when characters speak, use shot / reverse-shot with alternating Over-The-Shoulder (OTS) or medium close-ups. STRICTLY PROHIBIT neutral b-roll: NEVER direct the camera away from the actors to film ceilings, chandeliers, walls, floors, empty furniture, or distant decor during a scene. Every shot must frame the face and expressions of the actors.
+- Eye-line and 4th wall: characters in dramatic scenes must NEVER look directly into the camera lens (no breaking the fourth wall like a vlog or documentary interview). They must always look slightly off-center toward their dialogue partner across the 180-degree axis.
+- Immediate speech delivery: the character starts speaking immediately at the very start of the shot (second 0.1), coupled with an immediate physical micro-action (clenching a fist, stepping closer, holding up an object). Never leave the first 3 seconds silent waiting for speech.
 - Grounded dialogue and conflict (no empty melodrama): dialogue must involve concrete nouns and tangible stakes (e.g. a forged document, a failed business, missing money, a named relative, a hidden key, inheritance debts). Prohibit vague, context-free clichés ("you don't know half of what I know", "this car... it cannot be", "the truth is about to appear", "who are you?"). Each line must logically answer or escalate the previous line with real substance.
 - Temporary props: items like glasses, documents, phones or keys must be handled and released within the action. Never add temporary props to a character's fixed visual description.
 - The takes form ONE continuous story in order: each take starts from the exact state the previous one ended (same positions, props, wardrobe, injuries or stains, time of day and weather); lines read as one sequence, never a new topic. A change of location needs a visible reason in the action.
@@ -492,7 +495,7 @@ export function buildTakePrompt(
     if (prev?.action && level <= 1) lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
     if (kind === 'dialogo' && take.line) {
       const name = speaker?.name ?? 'The character'
-      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} says in ${lang}: ${noEnd(take.line)}. Only ${name} speaks, with natural lip-sync.`)
+      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} speaks right from the start in ${lang}: "${noEnd(take.line)}". Only ${name} speaks, with precise lip-sync, looking at the conversation partner off-center and never looking directly into the camera lens.`)
     } else if (kind === 'narracao' && take.line) {
       lines.push(
         `Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: ${noEnd(take.line)}.${visible.length ? ' Nobody on screen speaks; mouths stay closed.' : ''}`

@@ -73,14 +73,18 @@ export function wordsFromWhisper(json: any): TimedWord[] {
     const end = Number(w?.end)
     if (word && Number.isFinite(start) && Number.isFinite(end) && end >= start) out.push({ start, end, word })
   }
+  // Se a API devolveu words direto no topo (padrao OpenAI verbose_json com timestamp_granularities[]=word):
+  if (Array.isArray(json?.words) && json.words.length > 0) {
+    for (const w of json.words) push(w)
+    return out.sort((a, b) => a.start - b.start)
+  }
+  // Caso venha agrupado por segments:
   const segs: any[] = Array.isArray(json?.segments) ? json.segments : []
   if (segs.some((s) => Array.isArray(s?.words))) {
     for (const s of segs) {
-      if (Number(s?.no_speech_prob ?? 0) > 0.6 || Number(s?.avg_logprob ?? 0) < -1.2) continue
+      if (Number(s?.no_speech_prob ?? 0) > 0.8) continue
       for (const w of s.words || []) push(w)
     }
-  } else {
-    for (const w of Array.isArray(json?.words) ? json.words : []) push(w)
   }
   return out.sort((a, b) => a.start - b.start)
 }
@@ -243,30 +247,47 @@ async function detectVoice(file: string, duration: number) {
   }
 }
 
-// Servidor Whisper proprio (API compativel com a da OpenAI). FLOW_WHISPER_URL=off desliga.
-const whisperUrl = () => process.env.FLOW_WHISPER_URL || 'https://whisper.fjt-solutions.com/v1/audio/transcriptions'
+// Servidor Whisper da OpenAI oficial como padrao definitivo (sem fallback para VPS).
+const OPENAI_WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions'
 
-/** Transcreve o audio com tempo por palavra. Null se nao achar fala; 'down' se o servidor falhar. */
-async function transcribeWhisper(file: string, language?: string): Promise<TimedWord[] | null | 'down'> {
-  const url = whisperUrl()
-  if (url === 'off') return 'down'
+/** Transcreve o audio com tempo por palavra via OpenAI Whisper oficial (whisper-1). */
+async function transcribeWhisper(file: string, language?: string): Promise<TimedWord[] | null> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    console.error('[Flow] OPENAI_API_KEY nao configurada no ambiente para o Whisper da OpenAI.')
+    return null
+  }
   try {
-    // So o audio, mono 16 kHz: arquivo pequeno e e o formato que o Whisper usa por dentro.
+    // So o audio, mono 16 kHz: formato leve aceito nativamente pela OpenAI
     const audio = path.join(path.dirname(file), path.basename(file, path.extname(file)) + '_speech.m4a')
     await run(ffmpegBin(), ['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '64k', audio], { timeout: 120000 })
     const fd = new FormData()
-    fd.append('file', new Blob([fs.readFileSync(audio)], { type: 'audio/mp4' }), 'speech.m4a')
-    fd.append('model', process.env.FLOW_WHISPER_MODEL || 'Systran/faster-whisper-medium')
+    fd.append('file', new Blob([fs.readFileSync(audio)], { type: 'audio/m4a' }), 'speech.m4a')
+    fd.append('model', 'whisper-1')
     fd.append('response_format', 'verbose_json')
     fd.append('timestamp_granularities[]', 'word')
     if (language) fd.append('language', language)
-    const res = await fetch(url, { method: 'POST', body: fd, signal: AbortSignal.timeout(300000) })
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    const words = wordsFromWhisper(await res.json())
+
+    const res = await fetch(OPENAI_WHISPER_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: fd,
+      signal: AbortSignal.timeout(300000),
+    })
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      throw new Error(`HTTP ${res.status}: ${errText.slice(0, 160)}`)
+    }
+
+    const json = await res.json()
+    const words = wordsFromWhisper(json)
     return words.length ? words : null
   } catch (err: any) {
-    console.log(`[Flow] whisper indisponível, usando o texto do roteiro: ${String(err?.message || err).slice(0, 120)}`)
-    return 'down'
+    console.error(`[Flow] Erro no Whisper da OpenAI: ${String(err?.message || err).slice(0, 200)}`)
+    return null
   }
 }
 
@@ -322,31 +343,26 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
-    // Legenda, take por take (o erro de tempo de um take nao contamina os outros):
-    // 1) Whisper com tempo por palavra: mostra o que e falado, quando e falado.
-    // 2) sem Whisper para aquele take, texto do roteiro na janela medida/estimada.
+    // Legenda, take por take: Whisper da OpenAI oficial com tempo exato por palavra (sem fallback cego de ruido).
     const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
     const cues: Cue[] = []
     const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
-    let whisperDown = false
     let at = 0
     for (let i = 0; i < takes.length; i++) {
       const k = takes[i]
       const dur = durations[i]
       if (t.mode !== 'ambiente' && k.line.trim()) {
-        const res = hasAudio[i] && !whisperDown ? await transcribeWhisper(normalized[i], lang) : null
-        if (res === 'down') whisperDown = true // servidor fora: nao espera por ele nos proximos takes
-        const words = Array.isArray(res) ? res : null
-        if (words) {
-          const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur), wordsPerCaption).map((c) => ({ ...c, start: at + c.start, end: at + Math.min(c.end, dur - 0.05) }))
+        const words = hasAudio[i] ? await transcribeWhisper(normalized[i], lang) : null
+        if (words && words.length) {
+          const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur), wordsPerCaption).map((c) => ({
+            ...c,
+            start: at + c.start,
+            end: at + Math.min(c.end, dur - 0.05),
+          }))
           cues.push(...takeCues)
-          console.log(`[Flow] legenda take ${k.n}: whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg), ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
+          console.log(`[Flow] legenda take ${k.n}: OpenAI whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg), ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
         } else {
-          // Janela medida no audio quando possivel; senao estimada pelo tamanho da fala. Nunca o clipe inteiro.
-          const voice = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
-          const win = voice ?? estimateSpeech(k.line, dur)
-          console.log(`[Flow] legenda take ${k.n}: roteiro, ${voice ? 'voz medida' : 'estimada'} ${win.start.toFixed(1)}s-${win.end.toFixed(1)}s de ${dur.toFixed(1)}s (${wordsPerCaption} pal/leg)`)
-          cues.push(...timeChunks(splitCaption(k.line, wordsPerCaption), at + win.start, at + win.end))
+          console.log(`[Flow] take ${k.n}: nenhuma palavra detectada pelo Whisper (sem legenda forçada)`)
         }
       }
       at += dur
