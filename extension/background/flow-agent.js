@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.19';
-const FLOW_BUILD = '2026-11-04-main-click-antibot-recaptcha'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.20';
+const FLOW_BUILD = '2026-11-04-auto-project-entry'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -272,14 +272,16 @@ async function flowTick() {
       if (c.flow_live && hb && hb.queuedCount > 0) {
         flowLog(`Jobs detectados na fila (${hb.queuedCount}). Abrindo Google Flow em segundo plano...`);
         try {
+          const lastProject = (await chrome.storage.local.get(['flow_last_project_url'])).flow_last_project_url;
+          const openUrl = lastProject || 'https://flow.google.com/';
           const win = await chrome.windows.create({
-            url: 'https://flow.google.com/',
+            url: openUrl,
             focused: false,
             state: 'minimized',
           });
           if (win && win.id) {
             await chrome.storage.local.set({ flow_auto_window_id: win.id });
-            await new Promise((r) => setTimeout(r, 4000));
+            await new Promise((r) => setTimeout(r, 5000));
             tab = await flowFindTab();
           }
         } catch (e) {
@@ -291,7 +293,13 @@ async function flowTick() {
         return void (await flowStatus('sem_aba', { msg: 'Abra o Google Flow em uma aba deste Chrome.' }));
       }
     }
-    const ping = await flowAsk(tab.id, { type: 'FLOW_PING' });
+    let ping = await flowAsk(tab.id, { type: 'FLOW_PING' });
+    if (ping && !ping.ready && (ping.path === '/' || ping.path === '')) {
+      flowLog('Flow aberto na página inicial. Entrando em um projeto...');
+      await flowAsk(tab.id, { type: 'FLOW_AUTO_ENTER_PROJECT' });
+      await new Promise((r) => setTimeout(r, 4000));
+      ping = await flowAsk(tab.id, { type: 'FLOW_PING' });
+    }
     if (!ping || !ping.ready) {
       flowLogTick('Aba do Flow sem projeto aberto (caixa de prompt não encontrada).', { ping }, 'warn');
       return void (await flowStatus('sem_projeto', { msg: 'Abra um projeto do Flow (com a caixa de prompt).' }));

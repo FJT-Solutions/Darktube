@@ -2230,13 +2230,47 @@
         .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
       return true;
     }
+    function autoEnterProject() {
+      try {
+        const link = document.querySelector('a[href*="/project/"]');
+        if (link) {
+          link.click();
+          return true;
+        }
+        const candidates = Array.from(document.querySelectorAll('button, [role="button"], a, flow-project-card, .project-card, .mat-mdc-card'));
+        const target = candidates.find((el) => {
+          const t = (el.innerText || el.getAttribute('aria-label') || '').toLowerCase();
+          return (
+            t.includes('novo projeto') ||
+            t.includes('new project') ||
+            t.includes('create') ||
+            t.includes('criar') ||
+            (t.includes('project') && !t.includes('settings'))
+          );
+        });
+        if (target) {
+          target.click();
+          return true;
+        }
+      } catch (_) {}
+      return false;
+    }
+
     if (msg.type === 'FLOW_WAKE') {
       wakeAll();
       sendResponse({ ok: true, busy: running });
       return;
     }
     if (msg.type === 'FLOW_PING') {
+      if (location.pathname.includes('/project/')) {
+        try { chrome.storage.local.set({ flow_last_project_url: location.href }); } catch (_) {}
+      }
       sendResponse({ ok: true, ready: !!$(S.editor), busy: running, path: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') });
+      return;
+    }
+    if (msg.type === 'FLOW_AUTO_ENTER_PROJECT') {
+      const ok = autoEnterProject();
+      sendResponse({ ok });
       return;
     }
     if (msg.type === 'FLOW_SCAN') {

@@ -21,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
 
   const current = await getFlowJob(user.id, id);
-  if (!current || current.status !== 'running') {
+  if (!current || (current.status !== 'running' && current.status !== 'collecting')) {
     return NextResponse.json({ success: false, error: 'Job não está em execução.' }, { status: 409 });
   }
 

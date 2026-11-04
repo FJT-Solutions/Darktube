@@ -421,7 +421,7 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
   await ensureFlowTablesExist();
   await expireStaleJobs(userId);
   const busy = await pool.query(
-    `SELECT 1 FROM public.flow_jobs WHERE user_id = $1 AND status = 'running' LIMIT 1`,
+    `SELECT 1 FROM public.flow_jobs WHERE user_id = $1 AND status IN ('running', 'collecting') LIMIT 1`,
     [userId]
   );
   if (busy.rows.length > 0) return { job: null, reason: 'running' };
@@ -505,7 +505,7 @@ export async function completeFlowJob(userId: string, id: string, resultUrl: str
   await ensureFlowTablesExist();
   const res = await pool.query(
     `UPDATE public.flow_jobs SET status = 'done', result_url = $3, finished_at = NOW(), error_message = NULL
-      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
       RETURNING *`,
     [id, userId, resultUrl]
   );
@@ -519,7 +519,7 @@ export async function releaseFlowJob(userId: string, id: string): Promise<FlowJo
   const res = await pool.query(
     `UPDATE public.flow_jobs SET status = 'queued', claimed_at = NULL, error_message = NULL,
             deadline_at = NOW() + ($3 || ' minutes')::interval
-      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
       RETURNING *`,
     [id, userId, String(DEFAULT_DEADLINE_MIN)]
   );
@@ -534,7 +534,7 @@ export const MAX_GEN_RETRIES = 2;
  */
 export async function requeueAfterGenFailure(userId: string, id: string): Promise<{ job: FlowJob; attempt: number } | null> {
   await ensureFlowTablesExist();
-  const { rows } = await pool.query(`SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status = 'running'`, [id, userId]);
+  const { rows } = await pool.query(`SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')`, [id, userId]);
   const job = rows[0] as FlowJob | undefined;
   if (!job) return null;
   const done = Number((job.params as any)?.genRetries) || 0;
@@ -545,7 +545,7 @@ export async function requeueAfterGenFailure(userId: string, id: string): Promis
         SET status = 'queued', error_message = NULL, result_url = NULL, claimed_at = NULL, finished_at = NULL,
             params = params || jsonb_build_object('genRetries', $3::int),
             deadline_at = NOW() + ($4 || ' minutes')::interval
-      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
       RETURNING *`,
     [id, userId, attempt, String(DEFAULT_DEADLINE_MIN)]
   );
@@ -566,7 +566,7 @@ export async function requeueAfterPolicy(
 ): Promise<{ job: FlowJob; attempt: number } | null> {
   await ensureFlowTablesExist();
   const { rows } = await pool.query(
-    `SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status = 'running'`,
+    `SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')`,
     [id, userId]
   );
   const job = rows[0] as FlowJob | undefined;
@@ -581,7 +581,7 @@ export async function requeueAfterPolicy(
             claimed_at = NULL, finished_at = NULL,
             params = params || jsonb_build_object('policyRetries', $4::int),
             deadline_at = NOW() + ($5 || ' minutes')::interval
-      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
       RETURNING *`,
     [id, userId, nextPrompt, attempt, String(DEFAULT_DEADLINE_MIN)]
   );
@@ -592,7 +592,7 @@ export async function failFlowJob(userId: string, id: string, message: string): 
   await ensureFlowTablesExist();
   const res = await pool.query(
     `UPDATE public.flow_jobs SET status = 'draft', error_message = $3, finished_at = NOW()
-      WHERE id = $1 AND user_id = $2 AND status = 'running'
+      WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
       RETURNING *`,
     [id, userId, (message || 'Falha na geração').slice(0, 500)]
   );
