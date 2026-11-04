@@ -46,7 +46,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'darktube_create_campaign_creative',
-        description: 'Cria um criativo completo para campanhas do X1 / Meta Ads com roteiro, render e download automático.',
+        description: 'Cria um criativo completo para campanhas do X1 / Meta Ads utilizando a esteira nativa do /flow (roteiro, ganchos, prompts de imagem e câmera).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -55,13 +55,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               enum: ['pao-frigideira', 'doce-sem-culpa', 'mosaico-365'],
               description: 'Ângulo validado de venda do criativo',
+              default: 'pao-frigideira',
+            },
+            templateId: {
+              type: 'string',
+              description: 'ID do template do /flow (ex: produto-tiktok-shop ou livre)',
+              default: 'produto-tiktok-shop',
             },
             format: { type: 'string', enum: ['9:16', '1:1', '16:9'], default: '9:16' },
-            isDraft: { type: 'boolean', description: 'Se true, gera preview 360p ultrarrápido (~10s) com folha de contato', default: true },
-            downloadLocal: { type: 'boolean', description: 'Se true, salva o .mp4 na pasta ./midia/criativos/ do repositório', default: true },
-            outputDir: { type: 'string', description: 'Caminho da pasta local de saída', default: './midia/criativos' },
+            takesCount: { type: 'number', default: 4 },
+            benefits: { type: 'string', description: 'Benefícios reais da oferta' },
+            customIdea: { type: 'string', description: 'Roteiro ou ideia personalizada adicional' },
           },
-          required: ['offer', 'angle'],
+          required: ['offer'],
         },
       },
       {

@@ -40,29 +40,29 @@ async function runTest() {
     console.error(`❌ Falha no download de teste:`, downloadResult.error);
   }
 
-  // Teste 3: Geração de dados de campanha para o X1 (Oferta 365 Receitas)
-  console.log('▶ Teste 3: Verificando preset da oferta 365 Receitas (Ângulo: Pão de Frigideira)...');
+  // Teste 3: Geração de criativo nativo pela esteira do /flow (Cenário 2)
+  console.log('▶ Teste 3: Testando esteira nativa do /flow para 365 Receitas (Template: produto-tiktok-shop)...');
   try {
-    // Chamamos a função com isDraft e downloadLocal
     const campaignResult = await createCampaignCreative({
-      offer: '365-receitas',
+      offer: '365 Receitas Sem Açúcar e Sem Glúten',
       angle: 'pao-frigideira',
+      templateId: 'produto-tiktok-shop',
       format: '9:16',
-      isDraft: true,
-      downloadLocal: false, // Não faz o download se o remotion server local não estiver rodando
-    }).catch((err) => {
-      console.log(`ℹ Remotion server local offline no momento do teste (${err.message}). Preset validado com sucesso!`);
-      return null;
+      takesCount: 4,
     });
 
-    if (campaignResult) {
-      console.log(`✅ Criativo gerado com sucesso!`);
-      console.log(`   Título: ${campaignResult.title}`);
-      console.log(`   Copy Headline: ${campaignResult.copy?.headline}`);
-      console.log(`   Video URL: ${campaignResult.videoUrl}`);
+    if (campaignResult && campaignResult.success) {
+      console.log(`✅ Sucesso na geração nativa do /flow!`);
+      console.log(`   Engine: ${campaignResult.engine}`);
+      console.log(`   Template: ${campaignResult.template?.name} (${campaignResult.template?.id})`);
+      console.log(`   Título: ${campaignResult.creative?.title}`);
+      console.log(`   Hook: "${campaignResult.creative?.hook}"`);
+      console.log(`   Takes Gerados: ${campaignResult.creative?.takesCount}`);
+      console.log(`   Take 1 Prompt: ${campaignResult.creative?.takes[0]?.flowGenerationPrompt?.slice(0, 100)}...`);
+      console.log(`   URL no /flow: ${campaignResult.flowUrl}`);
     }
   } catch (err: any) {
-    console.log(`ℹ Nota do teste de render: ${err.message}`);
+    console.error(`❌ Erro no teste do /flow:`, err.message);
   }
 
   console.log('\n====================================================');
