@@ -215,6 +215,10 @@ ${(t.rules || []).map((r) => `- ${r}`).join('\n')}
 Writing rules (avoid generic "AI slop"):
 - Take 1 opens in media res with a visual hook in the first 1.5 seconds; never open with greetings or encyclopedic sentences ("Did you know...").
 - Every take shows ONE concrete physical action tied to its line: a specific object, texture and verb. No vague b-roll.
+- Spatial coherence: NEVER place an exterior vehicle, street arrival or outdoor event inside an interior room. If characters see a vehicle or visitor arriving, the action must be looking through a window/doorway, OR switch to an exterior location id. The setting must physically match the action.
+- Camera framing for dialogue: when a character speaks with lip-sync, the camera MUST frame the speaker (close-up, medium shot, or over-the-shoulder). Never use vehicle tracking, wide landscape pans, or whip-pans away from the speaker while dialogue is being delivered.
+- Grounded dialogue and conflict (no empty melodrama): dialogue must involve concrete nouns and tangible stakes (e.g. a forged document, a failed business, missing money, a named relative, a hidden key, inheritance debts). Prohibit vague, context-free clichés ("you don't know half of what I know", "this car... it cannot be", "the truth is about to appear", "who are you?"). Each line must logically answer or escalate the previous line with real substance.
+- Temporary props: items like glasses, documents, phones or keys must be handled and released within the action. Never add temporary props to a character's fixed visual description.
 - The takes form ONE continuous story in order: each take starts from the exact state the previous one ended (same positions, props, wardrobe, injuries or stains, time of day and weather); lines read as one sequence, never a new topic. A change of location needs a visible reason in the action.
 - Each take is generated on its own, as ONE continuous shot with no cuts: one main action and one camera move. Never refer to other takes ("same as take 1", "continues", "as before"); restate the framing instead.
 - Vary the camera on purpose from take to take (close-up, over-the-shoulder, low angle, tracking...). Use the camera of the scene function.
@@ -488,10 +492,10 @@ export function buildTakePrompt(
     if (prev?.action && level <= 1) lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
     if (kind === 'dialogo' && take.line) {
       const name = speaker?.name ?? 'The character'
-      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} says in ${lang}: "${take.line}" Only ${name} speaks, with natural lip-sync.`)
+      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} says in ${lang}: ${noEnd(take.line)}. Only ${name} speaks, with natural lip-sync.`)
     } else if (kind === 'narracao' && take.line) {
       lines.push(
-        `Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: "${take.line}"${visible.length ? ' Nobody on screen speaks; mouths stay closed.' : ''}`
+        `Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: ${noEnd(take.line)}.${visible.length ? ' Nobody on screen speaks; mouths stay closed.' : ''}`
       )
     }
     if (loc) lines.push(`Setting: ${level >= 2 ? clipWords(noEnd(loc.description), 30) : noEnd(loc.description)}.`)

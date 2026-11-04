@@ -326,13 +326,16 @@ export async function regenerateFinalAction(id: string, takeNumbers: number[]) {
 }
 
 /** Monta o video final em segundo plano. A tela acompanha pelo status do projeto. */
-export async function assembleFlowProjectAction(id: string) {
+export async function assembleFlowProjectAction(id: string, options?: { wordsPerCaption?: number }) {
   try {
     const user = await requireUser()
     const project = await getFlowProject(user.id, id)
     if (!project) throw new Error("Projeto não encontrado.")
     const busy = project.status === "assembling" && Date.now() - new Date(project.updated_at).getTime() < 15 * 60 * 1000
     if (busy) throw new Error("A montagem já está em andamento.")
+    if (options?.wordsPerCaption) {
+      await updateFlowProject(user.id, id, { params: { ...project.params, wordsPerCaption: options.wordsPerCaption } })
+    }
     assembleFlowProject(user.id, id).catch((e) => console.error("[Flow] montagem falhou:", e?.message))
     return { success: true as const }
   } catch (err) {

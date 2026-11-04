@@ -1,8 +1,17 @@
 import { pool } from '@/lib/db-client';
 import { decideByLimits, getRiskSettings, getRiskUsage, type RiskBand } from '@/lib/flow-risk';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { uploadThumbnail } from '@/lib/storage';
+
+const run = promisify(execFile);
+const ffmpegBin = () => process.env.FFMPEG_PATH || 'ffmpeg';
 
 export type FlowJobKind = 'image' | 'video';
-export type FlowJobStatus = 'queued' | 'running' | 'done' | 'draft' | 'cancelled';
+export type FlowJobStatus = 'queued' | 'running' | 'collecting' | 'done' | 'draft' | 'cancelled';
 
 export interface FlowJobParams {
   aspectRatio?: string;
@@ -18,6 +27,11 @@ export interface FlowJobParams {
   refPrevVideo?: boolean;
   /** Preenchido na entrega: video do take anterior. */
   refVideoUrl?: string;
+  /** Preenchido na entrega: ultimo frame (JPEG) do take anterior para continuidade visual. */
+  refPrevFrameUrl?: string;
+  /** Frame inicial (Start Frame) para o take. */
+  firstFrameUrl?: string;
+  wordsPerCaption?: number;
 }
 
 export interface FlowJob {
@@ -114,6 +128,9 @@ function cleanParams(raw: any): FlowJobParams {
   if (typeof raw.characterId === 'string') p.characterId = raw.characterId.slice(0, 40);
   if (typeof raw.refImageUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.refImageUrl)) p.refImageUrl = raw.refImageUrl.slice(0, 200);
   if (raw.refPrevVideo === true) p.refPrevVideo = true;
+  if (typeof raw.refPrevFrameUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.refPrevFrameUrl)) p.refPrevFrameUrl = raw.refPrevFrameUrl.slice(0, 200);
+  if (typeof raw.firstFrameUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.firstFrameUrl)) p.firstFrameUrl = raw.firstFrameUrl.slice(0, 200);
+  if (Number.isFinite(raw.wordsPerCaption)) p.wordsPerCaption = Math.min(Math.max(Math.round(raw.wordsPerCaption), 1), 3);
   return p;
 }
 
@@ -129,12 +146,69 @@ export async function previousTakeVideo(userId: string, projectId: string, takeI
   return rows[0]?.result_url ?? null;
 }
 
+/** Extrai o ultimo frame (JPEG) do video do take anterior para ser usado como imagem de referencia ou start frame no Flow. */
+export async function previousTakeLastFrame(userId: string, projectId: string, takeIndex: number): Promise<string | null> {
+  const cacheName = `flow_lastframe_${projectId}_take_${takeIndex - 1}.jpg`;
+
+  // 1. Verifica se o frame ja foi extraido e salvo em storage_files
+  const cached = await pool.query(
+    `SELECT filename FROM public.storage_files WHERE filename = $1 LIMIT 1`,
+    [cacheName]
+  );
+  if (cached.rows.length > 0) {
+    return `/api/storage/${cacheName}`;
+  }
+
+  // 2. Busca o video do take anterior
+  const prevUrl = await previousTakeVideo(userId, projectId, takeIndex);
+  if (!prevUrl) return null;
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'darktube-frame-'));
+  const tempVideo = path.join(tempDir, 'prev.mp4');
+  const tempFrame = path.join(tempDir, 'lastframe.jpg');
+
+  try {
+    const filenameMatch = prevUrl.match(/\/api\/storage\/([\w.-]+)/);
+    if (filenameMatch) {
+      const fileRow = await pool.query(
+        `SELECT content FROM public.storage_files WHERE filename = $1 LIMIT 1`,
+        [filenameMatch[1]]
+      );
+      if (fileRow.rows[0]?.content) {
+        fs.writeFileSync(tempVideo, fileRow.rows[0].content);
+      }
+    } else if (/^https?:\/\//i.test(prevUrl)) {
+      const res = await fetch(prevUrl);
+      if (!res.ok) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(tempVideo, buf);
+    }
+
+    if (!fs.existsSync(tempVideo) || fs.statSync(tempVideo).size < 1000) return null;
+
+    // Extrai o ultimo frame via FFmpeg (-sseof -0.2 captura o frame imediatamente anterior ao final do video)
+    await run(ffmpegBin(), ['-y', '-sseof', '-0.2', '-i', tempVideo, '-update', '1', '-q:v', '2', tempFrame], { timeout: 30000 });
+
+    if (fs.existsSync(tempFrame) && fs.statSync(tempFrame).size > 100) {
+      const frameBuffer = fs.readFileSync(tempFrame);
+      const url = await uploadThumbnail(frameBuffer, cacheName);
+      return url;
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[Flow] Falha ao extrair ultimo frame do take ${takeIndex - 1}:`, err);
+    return null;
+  } finally {
+    try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) {}
+  }
+}
+
 // Expira o que ficou preso: job rodando há demais e job na fila que passou do prazo viram rascunho.
 async function expireStaleJobs(userId: string) {
   await pool.query(
     `UPDATE public.flow_jobs
         SET status = 'draft', finished_at = NOW(), error_message = 'Tempo de geração excedido'
-      WHERE user_id = $1 AND status = 'running'
+      WHERE user_id = $1 AND status IN ('running', 'collecting')
         AND claimed_at < NOW() - ($2 || ' minutes')::interval`,
     [userId, String(RUNNING_TIMEOUT_MIN)]
   );
@@ -595,4 +669,13 @@ export async function clearFlowLogs(userId: string, projectId?: string) {
   } else {
     await pool.query(`DELETE FROM public.flow_logs WHERE user_id = $1`, [userId]);
   }
+}
+
+export async function countQueuedJobs(userId: string): Promise<number> {
+  await ensureFlowTablesExist();
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM public.flow_jobs WHERE user_id = $1 AND status = 'queued'`,
+    [userId]
+  );
+  return rows[0]?.n ?? 0;
 }

@@ -1806,17 +1806,21 @@
         if (b) await trustedClick(b, false);
       },
     ];
-    const attempts = [
-      // Imagem: o clique feito por codigo e ignorado pelo Flow, entao vai direto ao clique real (sem esperar o simples).
-      ...(kind === 'image' ? [real, simple] : [simple, real]),
-      ['clique no mundo da página', async () => {
+    const mainClick = [
+      'clique no mundo da página',
+      async () => {
         const b = generateBtnEl() || btn;
         if (!b) return;
         b.setAttribute('data-dt-gen', '1');
         const resp = await askBg({ type: 'FLOW_MAIN_CLICK', selector: '[data-dt-gen="1"]' }, 8000);
         b.removeAttribute('data-dt-gen');
         dtLog('Clique no mundo da página.', resp);
-      }],
+      },
+    ];
+    const attempts = [
+      // Imagem: tenta primeiro no mundo da pagina (MAIN world, sem debugger - evita acionar o reCAPTCHA Enterprise),
+      // e so recorre ao clique real (depurador) se o primeiro nao disparar.
+      ...(kind === 'image' ? [mainClick, real, simple] : [simple, mainClick, real]),
       ['clique real com a aba ativa', async () => {
         const b = generateBtnEl() || btn;
         if (b) await trustedClick(b, true);

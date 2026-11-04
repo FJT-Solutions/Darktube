@@ -34,9 +34,18 @@ export function srtTime(sec: number): string {
   return `${p(Math.floor(ms / 3600000))}:${p(Math.floor((ms % 3600000) / 60000))}:${p(Math.floor((ms % 60000) / 1000))},${p(ms % 1000, 3)}`
 }
 
+/** Limpa pontuacao solta, espacos duplicados e une palavras com hifen (ex: "terca -feira" -> "terca-feira"). */
+export function cleanCaptionText(text: string): string {
+  return text
+    .replace(/\s+([.,!?;:…])/g, '$1')
+    .replace(/(\p{L}|\p{N})\s+-\s*(\p{L}|\p{N})/gu, '$1-$2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /** Quebra em ate duas linhas equilibradas (no espaco mais perto do meio), sem deixar palavra solta. */
-export function wrapCaption(text: string, maxChars = 30): string {
-  const t = text.trim().replace(/\s+/g, ' ')
+export function wrapCaption(text: string, maxChars = 32): string {
+  const t = cleanCaptionText(text)
   if (t.length <= maxChars) return t
   const mid = t.length / 2
   let best = -1
@@ -91,22 +100,25 @@ export function tightenWords(words: TimedWord[]): TimedWord[] {
   })
 }
 
-/** Agrupa palavras em frases curtas: quebra apos pontuacao, a cada maxWords palavras ou numa pausa longa. */
-export function cuesFromWords(words: TimedWord[], maxWords = 6, maxGap = 0.7): Cue[] {
+/** Agrupa palavras em frases curtas (1 a 3 palavras): quebra apos pontuacao, a cada maxWords palavras ou numa pausa longa. */
+export function cuesFromWords(words: TimedWord[], maxWords = 2, maxGap = 0.5): Cue[] {
   const cues: Cue[] = []
   let cur: TimedWord[] = []
   const flush = () => {
-    if (cur.length) cues.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cur.map((w) => w.word).join(' ') })
+    if (cur.length) {
+      const raw = cur.map((w) => w.word).join(' ')
+      cues.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cleanCaptionText(raw) })
+    }
     cur = []
   }
   for (const w of words) {
     if (cur.length && w.start - cur[cur.length - 1].end > maxGap) flush()
     cur.push(w)
-    if (cur.length >= maxWords || (cur.length >= 3 && /[.!?;:…]$/.test(w.word))) flush()
+    if (cur.length >= maxWords || /[.!?;:…]$/.test(w.word)) flush()
   }
   flush()
   // Uma folga curta no fim de cada frase, sem invadir a seguinte.
-  return cues.map((c, i) => ({ ...c, end: Math.min(c.end + 0.15, cues[i + 1] ? cues[i + 1].start - 0.02 : c.end + 0.15) }))
+  return cues.map((c, i) => ({ ...c, end: Math.min(c.end + 0.1, cues[i + 1] ? cues[i + 1].start - 0.02 : c.end + 0.1) }))
 }
 
 export function buildSrt(cues: Cue[]): string {
@@ -163,22 +175,23 @@ export function speechWindow(voiced: { start: number; end: number }[], duration:
   return { start: Math.max(0.1, start), end: Math.min(duration - 0.1, end) }
 }
 
-/** Divide a fala em frases curtas (ate maxWords palavras), preferindo quebrar apos pontuacao. */
-export function splitCaption(text: string, maxWords = 6): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  if (words.length <= maxWords + 1) return words.length ? [words.join(' ')] : []
+/** Divide a fala em trechos curtos (1 a 3 palavras), preferindo quebrar apos pontuacao. */
+export function splitCaption(text: string, maxWords = 2): string[] {
+  const cleaned = cleanCaptionText(text)
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  if (!words.length) return []
+  if (words.length <= maxWords) return [cleanCaptionText(words.join(' '))]
   const chunks: string[] = []
   let cur: string[] = []
   for (const w of words) {
     cur.push(w)
-    if ((cur.length >= 3 && /[.!?;:…]$/.test(w)) || cur.length >= maxWords) {
-      chunks.push(cur.join(' '))
+    if (cur.length >= maxWords || /[.!?;:…]$/.test(w)) {
+      chunks.push(cleanCaptionText(cur.join(' ')))
       cur = []
     }
   }
   if (cur.length) {
-    if (chunks.length && cur.length < 3) chunks[chunks.length - 1] += ' ' + cur.join(' ')
-    else chunks.push(cur.join(' '))
+    chunks.push(cleanCaptionText(cur.join(' ')))
   }
   return chunks
 }
@@ -312,6 +325,7 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     // Legenda, take por take (o erro de tempo de um take nao contamina os outros):
     // 1) Whisper com tempo por palavra: mostra o que e falado, quando e falado.
     // 2) sem Whisper para aquele take, texto do roteiro na janela medida/estimada.
+    const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
     const cues: Cue[] = []
     const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
     let whisperDown = false
@@ -324,15 +338,15 @@ export async function assembleFlowProject(userId: string, projectId: string) {
         if (res === 'down') whisperDown = true // servidor fora: nao espera por ele nos proximos takes
         const words = Array.isArray(res) ? res : null
         if (words) {
-          const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur)).map((c) => ({ ...c, start: at + c.start, end: at + Math.min(c.end, dur - 0.05) }))
+          const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur), wordsPerCaption).map((c) => ({ ...c, start: at + c.start, end: at + Math.min(c.end, dur - 0.05) }))
           cues.push(...takeCues)
-          console.log(`[Flow] legenda take ${k.n}: whisper ${words.length} palavras, ${takeCues.length} frases, ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
+          console.log(`[Flow] legenda take ${k.n}: whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg), ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
         } else {
           // Janela medida no audio quando possivel; senao estimada pelo tamanho da fala. Nunca o clipe inteiro.
           const voice = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
           const win = voice ?? estimateSpeech(k.line, dur)
-          console.log(`[Flow] legenda take ${k.n}: roteiro, ${voice ? 'voz medida' : 'estimada'} ${win.start.toFixed(1)}s-${win.end.toFixed(1)}s de ${dur.toFixed(1)}s`)
-          cues.push(...timeChunks(splitCaption(k.line), at + win.start, at + win.end))
+          console.log(`[Flow] legenda take ${k.n}: roteiro, ${voice ? 'voz medida' : 'estimada'} ${win.start.toFixed(1)}s-${win.end.toFixed(1)}s de ${dur.toFixed(1)}s (${wordsPerCaption} pal/leg)`)
+          cues.push(...timeChunks(splitCaption(k.line, wordsPerCaption), at + win.start, at + win.end))
         }
       }
       at += dur
@@ -347,7 +361,8 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     if (srt) fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
     if (burn) {
       fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
-      const style = `FontSize=${vertical ? 16 : 20},Outline=2,Shadow=0,Alignment=2,MarginV=${vertical ? 90 : 40},PrimaryColour=&H00FFFFFF&`
+      // Legenda estilo social media limpa/normal: fonte encorpada (Bold), contorno e sombra suaves, margem segura
+      const style = `Fontname=Arial,Bold=1,FontSize=${vertical ? 24 : 22},Outline=3,Shadow=1.5,Alignment=2,MarginV=${vertical ? 110 : 45},PrimaryColour=&H00FFFFFF&,OutlineColour=&H00000000&,BackColour=&H80000000&`
       const burnedFile = path.join(dir, 'final.mp4')
       try {
         await run(

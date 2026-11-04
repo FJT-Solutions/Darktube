@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
-import { touchFlowAgent, getFlowAgentState } from '@/lib/flow-jobs';
+import { touchFlowAgent, getFlowAgentState, countQueuedJobs } from '@/lib/flow-jobs';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,5 +33,6 @@ export async function POST(req: Request) {
     lastPrinted.set(user.id, { key, at: Date.now() });
     console.log(`[FLOW EXTENSION][INFO] heartbeat user=${String(user.id).slice(0, 8)} versao=${info.version} build=${info.build ?? 'sem-build (extensao antiga)'} modo=${info.mode ?? '-'}`);
   }
-  return NextResponse.json({ success: true });
+  const queuedCount = await countQueuedJobs(user.id);
+  return NextResponse.json({ success: true, queuedCount });
 }

@@ -103,6 +103,7 @@ const KIND_OPTIONS: { value: FlowTakeKind; label: string }[] = [
 const STATUS_LABEL: Record<string, string> = {
   queued: "Na fila",
   running: "Gerando",
+  collecting: "Coletando",
   done: "Pronto",
   draft: "Rascunho",
   cancelled: "Cancelado",
@@ -184,6 +185,7 @@ export default function FlowPage() {
   const [aspect, setAspect] = useState(FLOW_TEMPLATES[0].defaults.aspect)
   const [model, setModel] = useState(FLOW_TEMPLATES[0].defaults.model)
   const [quality, setQuality] = useState(FLOW_TEMPLATES[0].defaults.quality)
+  const [wordsPerCaption, setWordsPerCaption] = useState<number>(() => FLOW_TEMPLATES[0].defaults.wordsPerCaption ?? 2)
 
   const [lengthFilter, setLengthFilter] = useState<"todos" | "curto" | "longo">("todos")
   const [trendFilter, setTrendFilter] = useState<"todos" | "viral" | "atemporal">("todos")
@@ -218,6 +220,7 @@ export default function FlowPage() {
     setModel(t.defaults.model)
     setQuality(t.defaults.quality)
     setRealismo(t.defaults.realismo ?? "cinematografico")
+    setWordsPerCaption(t.defaults.wordsPerCaption ?? (t.trend === "viral" ? 1 : 2))
   }
 
   const loadProjects = useCallback(async () => {
@@ -235,7 +238,7 @@ export default function FlowPage() {
     const res = await generateFlowProjectAction({
       templateId,
       provider,
-      params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality },
+      params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality: model.toLowerCase().includes("omni") ? quality : undefined, wordsPerCaption },
     })
     setGenerating(false)
     if (!res.success) {
@@ -250,7 +253,7 @@ export default function FlowPage() {
 
   const startBlank = async () => {
     setGenerating(true)
-    const res = await createBlankFlowProjectAction({ params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality } })
+    const res = await createBlankFlowProjectAction({ params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality: model.toLowerCase().includes("omni") ? quality : undefined, wordsPerCaption } })
     setGenerating(false)
     if (!res.success) return void toast.error(res.error)
     setProject(res.project as FlowProject)
@@ -386,7 +389,7 @@ export default function FlowPage() {
                 <p className="text-xs text-muted-foreground">Duração total: {takes} takes × {seconds} s = <span className="font-semibold text-foreground">{fmtDuration(takes * seconds)}</span></p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Segundos por take</label>
                   <Select value={String(seconds)} onValueChange={(v) => setSeconds(Number(v))}>
@@ -418,13 +421,26 @@ export default function FlowPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {model.toLowerCase().includes("omni") && (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Qualidade</label>
+                    <Select value={quality} onValueChange={setQuality}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="360p">360p (rascunho)</SelectItem>
+                        <SelectItem value="720p">720p (final)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Qualidade</label>
-                  <Select value={quality} onValueChange={setQuality}>
+                  <label className="text-sm font-medium">Palavras por legenda</label>
+                  <Select value={String(wordsPerCaption)} onValueChange={(v) => setWordsPerCaption(Number(v))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="360p">360p (rascunho)</SelectItem>
-                      <SelectItem value="720p">720p (final)</SelectItem>
+                      <SelectItem value="1">1 palavra (dinâmico)</SelectItem>
+                      <SelectItem value="2">2 palavras (rápido)</SelectItem>
+                      <SelectItem value="3">3 palavras (curto)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1628,7 +1644,7 @@ function ProjectView({
           ) : (
             <div className="space-y-3 rounded-lg border p-3 text-sm">
               <p>
-                Vão para a fila <strong>{script.takes.length} takes</strong> de {String(params.seconds)}s em <strong>{String(params.quality)}</strong>, modelo <strong>{String(params.model)}</strong>.
+                Vão para a fila <strong>{script.takes.length} takes</strong> de {String(params.seconds)}s{String(params.model).toLowerCase().includes("omni") ? ` em ${String(params.quality)}` : ""}, modelo <strong>{String(params.model)}</strong>.
               </p>
               <p className="text-muted-foreground">Isso gasta créditos do seu Flow. Os vídeos só são gerados com a extensão aberta no seu Chrome, logada na conta do Flow.</p>
               <div className="flex gap-2">
@@ -1673,15 +1689,33 @@ function ProjectView({
         <CardContent className="space-y-3 p-4">
           <p className="font-medium">3. Montar o vídeo final</p>
           <p className="text-sm text-muted-foreground">Junta os takes (usando a versão 720p quando existir) e gera a legenda a partir do que é falado: nos vídeos curtos ela é gravada no vídeo; nos longos sai só o arquivo .srt, para ativar no YouTube.</p>
-          <Button
-            disabled={!allDone || status === "assembling" || busy === "asm"}
-            onClick={async () => {
-              if (await run("asm", () => assembleFlowProjectAction(project.id), "Montagem iniciada.")) refreshProject()
-            }}
-          >
-            {status === "assembling" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Hammer className="mr-2 h-4 w-4" />}
-            {status === "assembling" ? "Montando..." : "Montar vídeo final"}
-          </Button>
+          <div className="flex flex-wrap items-end gap-3 pt-1">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Palavras por legenda</label>
+              <Select
+                value={String(project.params?.wordsPerCaption ?? 2)}
+                onValueChange={(v) => {
+                  setProject({ ...project, params: { ...project.params, wordsPerCaption: Number(v) } })
+                }}
+              >
+                <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 palavra (dinâmico)</SelectItem>
+                  <SelectItem value="2">2 palavras (rápido)</SelectItem>
+                  <SelectItem value="3">3 palavras (curto)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              disabled={!allDone || status === "assembling" || busy === "asm"}
+              onClick={async () => {
+                if (await run("asm", () => assembleFlowProjectAction(project.id, { wordsPerCaption: Number(project.params?.wordsPerCaption ?? 2) }), "Montagem iniciada.")) refreshProject()
+              }}
+            >
+              {status === "assembling" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Hammer className="mr-2 h-4 w-4" />}
+              {status === "assembling" ? "Montando..." : "Montar vídeo final"}
+            </Button>
+          </div>
           {!allDone && <p className="text-xs text-muted-foreground">Disponível quando todos os takes estiverem prontos.</p>}
           {status === "assemble_failed" && project.assemble_error && <p className="text-sm text-destructive">{project.assemble_error}</p>}
           {project.final_url && (

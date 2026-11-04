@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.18';
-const FLOW_BUILD = '2026-11-03-falha-de-fala-reenvia'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.19';
+const FLOW_BUILD = '2026-11-04-main-click-antibot-recaptcha'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -266,11 +266,30 @@ async function flowTick() {
       }
     }
 
-    await flowHeartbeat(c);
-    const tab = await flowFindTab();
+    const hb = await flowHeartbeat(c);
+    let tab = await flowFindTab();
     if (!tab) {
-      flowLogTick('Nenhuma aba do Google Flow aberta.', null, 'warn');
-      return void (await flowStatus('sem_aba', { msg: 'Abra o Google Flow em uma aba deste Chrome.' }));
+      if (c.flow_live && hb && hb.queuedCount > 0) {
+        flowLog(`Jobs detectados na fila (${hb.queuedCount}). Abrindo Google Flow em segundo plano...`);
+        try {
+          const win = await chrome.windows.create({
+            url: 'https://flow.google.com/',
+            focused: false,
+            state: 'minimized',
+          });
+          if (win && win.id) {
+            await chrome.storage.local.set({ flow_auto_window_id: win.id });
+            await new Promise((r) => setTimeout(r, 4000));
+            tab = await flowFindTab();
+          }
+        } catch (e) {
+          flowLog('Falha ao abrir janela automática do Flow: ' + (e && e.message), null, 'warn');
+        }
+      }
+      if (!tab) {
+        flowLogTick('Nenhuma aba do Google Flow aberta.', null, 'warn');
+        return void (await flowStatus('sem_aba', { msg: 'Abra o Google Flow em uma aba deste Chrome.' }));
+      }
     }
     const ping = await flowAsk(tab.id, { type: 'FLOW_PING' });
     if (!ping || !ping.ready) {
@@ -315,7 +334,17 @@ async function flowTick() {
       const why = { empty: 'Nada na fila.', paused: 'Pausado pelo darktube.', gap: 'Aguardando o intervalo entre gerações.', limit_hour: 'Limite por hora atingido.', limit_day: 'Limite diário atingido.', running: 'Há um job em andamento.' };
       const reason = claim && claim.reason;
       // Fila vazia de verdade (e nao "em espera"/"limite"): unico momento seguro para o ensaio.
-      if (reason === 'empty') await scanIdle();
+      if (reason === 'empty') {
+        await scanIdle();
+        try {
+          const auto = (await chrome.storage.local.get(['flow_auto_window_id'])).flow_auto_window_id;
+          if (auto) {
+            flowLog('Fila de takes finalizada com sucesso. Fechando janela do Google Flow.');
+            await chrome.windows.remove(auto);
+            await chrome.storage.local.remove(['flow_auto_window_id']);
+          }
+        } catch (_) {}
+      }
       flowLogTick(why[reason] || 'Nada na fila.', { reason });
       return void (await flowStatus('aguardando', { msg: why[reason] || 'Nada na fila.' }));
     }
@@ -397,6 +426,10 @@ async function flowHandleResult(msg) {
       if (r.code === 'gen_failed') await chrome.storage.local.set({ flow_hold_until: Date.now() + 20000, flow_hold_msg: 'O Flow falhou ao gerar; nova tentativa automática em instantes.' });
       return void (await flowStatus('falhou', { msg: r.error, code: r.code }));
     }
+    // Notifica o DarkTube que a geração no Flow terminou e a mídia está sendo coletada
+    try {
+      await flowApi(c, `/api/flow/agent/jobs/${msg.jobId}/collecting`, { method: 'POST' });
+    } catch (_) {}
     let blob;
     if (r.b64) {
       blob = flowB64ToBlob(r.b64, r.mime || '');

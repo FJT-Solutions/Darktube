@@ -56,8 +56,14 @@ export interface FlowTemplate {
   /** Estilo visual padrao do formato, em ingles (ex.: "35mm film grain, noir lighting"). */
   look?: string
   /** `realismo`: estilo visual (valor de REALISM) que a tela seleciona ao escolher o template. */
-  defaults: { takes: number; seconds: number; aspect: string; model: string; quality: string; realismo?: string }
+  defaults: { takes: number; seconds: number; aspect: string; model: string; quality: string; realismo?: string; wordsPerCaption?: 1 | 2 | 3 }
 }
+
+export const WORDS_PER_CAPTION_OPTIONS = [
+  { value: '1', label: '1 palavra (dinâmico)' },
+  { value: '2', label: '2 palavras (rápido)' },
+  { value: '3', label: '3 palavras (curto)' },
+]
 
 export const LANGUAGES: FlowFieldOption[] = [
   { value: 'pt-BR', label: 'Português (Brasil)' },

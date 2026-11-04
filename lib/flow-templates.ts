@@ -50,7 +50,7 @@ export const FLOW_FREE_TEMPLATE: FlowTemplate = {
     { fn: 'Turn or peak moment', camera: 'push-in or dramatic angle' },
     { fn: 'Payoff', camera: 'wide or close-up, as the story needs' },
   ],
-  defaults: { takes: 5, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+  defaults: { takes: 5, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', wordsPerCaption: 2 },
 }
 
 export const FLOW_TEMPLATES: FlowTemplate[] = [FLOW_FREE_TEMPLATE, ...FLOW_TEMPLATE_CATALOG]

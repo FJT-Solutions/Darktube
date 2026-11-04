@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
-import { claimNextFlowJob, touchFlowAgent, getFlowAgentState } from '@/lib/flow-jobs';
+import { claimNextFlowJob, touchFlowAgent, getFlowAgentState, previousTakeLastFrame } from '@/lib/flow-jobs';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +17,16 @@ export async function POST(req: Request) {
 
   const who = String(user.id).slice(0, 8);
   const job: any = result.job;
-  // O video do take anterior NAO vai mais para a extensao: anexado no Flow, o Omni trata o take como edicao daquele
-  // video e falha com "Unable to edit the speech in this video" (3 de 3 tentativas no projeto da Marina).
-  // A continuidade fica pelo prompt ("This shot picks up right after...") e pelo retrato do personagem.
+  // O video bruto (MP4) nao vai para a extensao porque anexado como video faz o Omni tentar
+  // editar a fala daquele video e falhar com "Unable to edit the speech in this video".
+  // Em vez disso, se houver refPrevVideo, extrai e envia o ULTIMO FRAME (JPEG) como imagem de continuidade!
+  if (job?.params?.refPrevVideo && job.project_id && Number(job.take_index) > 1) {
+    const lastFrame = await previousTakeLastFrame(user.id, job.project_id, Number(job.take_index)).catch(() => null);
+    if (lastFrame) {
+      job.params.refPrevFrameUrl = lastFrame;
+      if (!job.params.refImageUrl) job.params.refImageUrl = lastFrame;
+    }
+  }
   if (job?.params?.refVideoUrl) delete job.params.refVideoUrl;
   if (result.job) {
     lastReason.delete(user.id);
