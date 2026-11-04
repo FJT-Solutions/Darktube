@@ -1,11 +1,31 @@
 /**
  * Ferramentas (Tools) do MCP DarkTube para integração com agentes externos (ex: X1).
- * Renderiza o vídeo real em MP4 via Remotion e baixa direto para ./midia/criativos/ do projeto.
+ * Suporta o Pipeline 3 (Híbrido):
+ * - pipeline_mode: 'remotion' -> Renderiza o MP4 real via Remotion Server com timeout de 5 min e baixa para ./midia/criativos/.
+ * - pipeline_mode: 'flow'     -> Cria o projeto no /flow, gera roteiro por IA, enfileira takes para o Google Flow e registra no PostgreSQL.
+ * - pipeline_mode: 'script_only' -> Gera o roteiro estruturado e a copy do Meta Ads sem disparar renders.
  */
 
 import fs from 'fs';
 import path from 'path';
-import { FLOW_TEMPLATES } from '@/lib/flow-templates';
+import { FLOW_TEMPLATES, getFlowTemplate, type FlowTemplate } from '@/lib/flow-templates';
+import { VIDEO_MODELS, TAKE_SECONDS } from '@/lib/flow-template-base';
+import {
+  buildSystemPrompt,
+  buildTakePrompt,
+  takeReference,
+  extractJson,
+  normalizeScript,
+  validateScript,
+  type FlowParams,
+  type FlowScript,
+  type FlowCharacter,
+} from '@/lib/flow-script';
+import { buildSheetPrompt } from '@/lib/flow-characters';
+import { callFlowLLM } from '@/lib/flow-llm';
+import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
+import { createFlowJob } from '@/lib/flow-jobs';
+import { pool } from '@/lib/db-client';
 
 const DARKTUBE_BASE_URL = process.env.DARKTUBE_BASE_URL || 'https://darktube.fjt-solutions.com';
 
@@ -16,18 +36,39 @@ const CANDIDATE_URLS = [
   'http://n8n-remotionservice-ry6eh9:3001',
   process.env.REMOTION_SERVICE_URL?.replace(/\/render\/?$/, ''),
   process.env.REMOTION_SERVER_URL,
-  'http://remotion-service:3001',
   'http://localhost:3001',
   'http://127.0.0.1:3001',
+  'http://remotion-service:3001',
 ].filter(Boolean) as string[];
+
+export type PipelineMode = 'remotion' | 'flow' | 'script_only';
+
+export interface CampaignCharacterInput {
+  name?: string;
+  description?: string;
+  voice?: string;
+  sheetUrl?: string; // Imagem/folha de referência já existente
+  generateSheet?: boolean; // Se true e não houver sheetUrl, gera a folha via IA
+}
 
 export interface CampaignCreativeInput {
   offer: string;
   angle?: 'pao-frigideira' | 'doce-sem-culpa' | 'mosaico-365' | string;
+  pipelineMode?: PipelineMode;
+  templateId?: string;
+  videoModel?: string;
+  secondsPerTake?: number;
+  quality?: string;
   format?: '9:16' | '1:1' | '16:9';
+  takesCount?: number;
+  benefits?: string;
+  customIdea?: string;
+  character?: CampaignCharacterInput;
+  templateParams?: Record<string, string | number>;
   isDraft?: boolean;
   downloadLocal?: boolean;
   outputDir?: string;
+  queueTakes?: boolean;
 }
 
 export interface RenderCreativeInput {
@@ -50,27 +91,50 @@ export interface RenderCreativeInput {
 }
 
 /**
- * 1. Lista todos os 26 templates oficiais disponíveis no DarkTube Flow.
+ * 1. Lista todos os templates oficiais disponíveis no DarkTube Flow com tempos e modelos.
  */
 export async function listFlowTemplates() {
-  return FLOW_TEMPLATES.map((t) => ({
-    id: t.id,
-    name: t.name,
-    description: t.description,
-    niche: t.niche,
-    subniche: t.subniche,
-    length: t.length,
-    trend: t.trend,
-    beats: t.beats,
-    defaults: t.defaults,
-    fields: t.fields.map((f) => ({
-      id: f.id,
-      label: f.label,
-      type: f.type,
-      default: f.default,
-      options: f.options,
-    })),
-  }));
+  return FLOW_TEMPLATES.map((t) => {
+    const takes = t.defaults?.takes || 5;
+    const seconds = t.defaults?.seconds || 6;
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      niche: t.niche,
+      subniche: t.subniche,
+      length: t.length,
+      trend: t.trend,
+      videoModel: t.defaults?.model || 'Omni 1.1 Flash',
+      secondsPerTake: seconds,
+      defaultTakesCount: takes,
+      totalDurationSeconds: takes * seconds,
+      availableModels: VIDEO_MODELS.map((m) => m.value),
+      availableSeconds: TAKE_SECONDS,
+      beats: t.beats,
+      defaults: t.defaults,
+      fields: t.fields.map((f) => ({
+        id: f.id,
+        label: f.label,
+        type: f.type,
+        default: f.default,
+        options: f.options,
+      })),
+    };
+  });
+}
+
+/**
+ * Resolve o usuário padrão no banco do DarkTube para vincular projetos.
+ */
+async function resolveDefaultUserId(): Promise<string> {
+  try {
+    const { rows } = await pool.query('SELECT id FROM public.users ORDER BY created_at ASC LIMIT 1');
+    if (rows && rows.length > 0) return rows[0].id;
+  } catch (err: any) {
+    console.warn('[MCP DarkTube] Não foi possível consultar tabela users:', err.message);
+  }
+  return '00000000-0000-0000-0000-000000000000';
 }
 
 /**
@@ -126,7 +190,7 @@ export async function downloadCreativeToLocal(
 }
 
 /**
- * 3. Renderiza a composição real no Remotion Server (gerando o .mp4 e a folha de contato).
+ * 3. Renderiza a composição real no Remotion Server (com timeout de 5 minutos e pool de candidatos).
  */
 export async function renderCreative(input: RenderCreativeInput) {
   const isVertical = (input.format || 'vertical') === 'vertical';
@@ -162,12 +226,12 @@ export async function renderCreative(input: RenderCreativeInput) {
           composition,
           callbackUrl: `${DARKTUBE_BASE_URL}/api/mcp/callback`,
         }),
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(300000), // 5 minutos para permitir compilação e render do Chromium
       });
 
       if (attempt.ok) {
         res = attempt;
-        console.log(`[MCP DarkTube] Remotion render iniciado com sucesso em ${cleanBase}!`);
+        console.log(`[MCP DarkTube] Remotion render concluído com sucesso em ${cleanBase}!`);
         break;
       } else {
         const text = await attempt.text().catch(() => attempt.statusText);
@@ -212,19 +276,29 @@ export async function renderCreative(input: RenderCreativeInput) {
 }
 
 /**
- * 4. Gera o criativo completo para o X1 (oferta 365 receitas ou personalizada):
- * - Monta as cenas cinematográficas com ganchos e legendas pop.
- * - Renderiza o MP4 via Remotion Server (porta 3001 / remotion-service).
- * - Devolve o link do vídeo .mp4 pronto e faz o download local para ./midia/criativos/.
+ * 4. Pipeline 3 (Híbrido):
+ * - pipelineMode: 'remotion' (Padrão) -> Renderiza na hora o MP4 real com cortes, legendas pop e baixa localmente.
+ * - pipelineMode: 'flow'              -> Cria projeto oficial no /flow, gera prompts e enfileira no Google Flow.
+ * - pipelineMode: 'script_only'       -> Gera o roteiro e copy para o Meta Ads sem disparar renders.
  */
 export async function createCampaignCreative(input: CampaignCreativeInput) {
   const {
     offer,
     angle = 'pao-frigideira',
+    pipelineMode = 'remotion',
+    templateId = 'produto-tiktok-shop',
+    videoModel,
+    secondsPerTake,
+    quality,
     format = '9:16',
+    takesCount,
+    benefits = '',
+    customIdea = '',
+    templateParams = {},
     isDraft = true,
     downloadLocal = true,
     outputDir = './midia/criativos',
+    queueTakes = true,
   } = input;
 
   const presets: Record<string, any> = {
@@ -244,6 +318,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-center',
           transitionIn: 'fade',
           textEffect: 'pop',
+          action: 'Mãos partindo um pãozinho dourado e fofinho recém-saído da frigideira. Vapor quente subindo da massa aerada.',
+          camera: 'macro close-up on hands opening the steaming bread',
+          line: 'Você não precisa cortar o pão quentinho de manhã para desinchar a barriga...',
         },
         {
           index: 1,
@@ -252,6 +329,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-right',
           transitionIn: 'slide-right',
           textEffect: 'pop',
+          action: 'Massa cremosa caindo na frigideira antiaderente untada, dourando rapidamente com bolhas suaves.',
+          camera: 'medium overhead angle of skillet on small stove',
+          line: 'Essa receita leva só 3 ingredientes simples e fica pronta em 5 minutos na frigideira!',
         },
         {
           index: 2,
@@ -260,6 +340,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-left',
           transitionIn: 'fade',
           textEffect: 'pop',
+          action: 'Uma fatia de manteiga derretendo sobre o pão ainda quente no prato rústico.',
+          camera: 'close-up shot on melting butter dripping down bread crust',
+          line: 'É 100% sem glúten, sem açúcar e sem leite. Tão macio que derrete na boca.',
         },
         {
           index: 3,
@@ -268,6 +351,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-center',
           transitionIn: 'slide-up',
           textEffect: 'bounce',
+          action: 'Smartphone na mão exibindo a capa digital das 365 Receitas com botão verde de WhatsApp.',
+          camera: 'medium eye-level shot pointing down towards screen',
+          line: 'Toque no botão abaixo agora e me manda um oi no WhatsApp para receber o livro completo!',
         },
       ],
     },
@@ -287,6 +373,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-center',
           transitionIn: 'fade',
           textEffect: 'pop',
+          action: 'Pedaço generoso de brownie de chocolate escuro e úmido com morangos frescos ao redor.',
+          camera: 'macro push-in on rich dark chocolate brownie texture',
+          line: 'Pare de passar vontade de comer doce achando que vai engordar...',
         },
         {
           index: 1,
@@ -295,6 +384,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-right',
           transitionIn: 'slide-right',
           textEffect: 'pop',
+          action: 'Colher afundando lentamente na textura macia do brownie revelando o centro cremoso.',
+          camera: 'slow tilt-down following dessert spoon cutting the slice',
+          line: 'Esse brownie cremoso de cacau não leva nem um grama de açúcar refinado ou trigo.',
         },
         {
           index: 2,
@@ -303,6 +395,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-left',
           transitionIn: 'fade',
           textEffect: 'pop',
+          action: 'Prato gourmet pronto com calda de cacau 70% brilhante sobre a mesa elegante.',
+          camera: 'steady eye-level close-up with appetizing natural light',
+          line: 'Mata a fissura por doce sem dar pico de glicose e ajuda a manter o foco.',
         },
         {
           index: 3,
@@ -311,6 +406,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-center',
           transitionIn: 'slide-up',
           textEffect: 'bounce',
+          action: 'Apostila aberta na tela do celular com botão verde em destaque.',
+          camera: 'medium shot pointing down towards the CTA link',
+          line: 'Toque em Saiba Mais para ter sobremesas saudáveis todos os dias!',
         },
       ],
     },
@@ -330,6 +428,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-center',
           transitionIn: 'fade',
           textEffect: 'pop',
+          action: 'Mesa farta e colorida com 3 pratos diferentes: salada vibrante, quiche e sobremesa saudável.',
+          camera: 'wide overhead dynamic shot panning over healthy food layout',
+          line: 'Cansada de comer sempre a mesma comida sem graça na dieta?',
         },
         {
           index: 1,
@@ -338,6 +439,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-right',
           transitionIn: 'slide-right',
           textEffect: 'pop',
+          action: 'Páginas do livro de receitas sendo folheadas com fotos de pratos reais apetitosos.',
+          camera: 'close-up tracking hands flipping through recipe handbook',
+          line: 'São 365 receitas completas: café da manhã, almoço, lanche e jantar.',
         },
         {
           index: 2,
@@ -346,6 +450,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-left',
           transitionIn: 'fade',
           textEffect: 'pop',
+          action: 'Mãos preparando uma receita em apenas 10 minutos na bancada da cozinha.',
+          camera: 'quick medium cut showing fast assembly in frying pan',
+          line: 'Tudo com ingredientes simples que você já tem em casa.',
         },
         {
           index: 3,
@@ -354,6 +461,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           animationStyle: 'kenburns-center',
           transitionIn: 'slide-up',
           textEffect: 'bounce',
+          action: 'Apresentação visual da oferta com celular e mensagem do WhatsApp.',
+          camera: 'medium presenter shot pointing to WhatsApp link',
+          line: 'Toque abaixo e receba o material completo com valor promocional!',
         },
       ],
     },
@@ -361,28 +471,247 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
 
   const selectedPreset = presets[angle] || presets['pao-frigideira'];
 
-  console.log(`[MCP DarkTube] Iniciando renderização do vídeo MP4 para oferta=${offer}, angulo=${angle}...`);
+  // ── CAMINHO 1: REMOTION RENDER (Vídeo Real em MP4 entregue na hora) ──
+  if (pipelineMode === 'remotion') {
+    console.log(`[MCP DarkTube] Disparando Pipeline 3 (Remotion MP4) para oferta=${offer}, angulo=${angle}...`);
 
-  const renderResult = await renderCreative({
-    templateId: 'ShortVideo',
-    scenes: selectedPreset.scenes,
-    format: format === '9:16' ? 'vertical' : 'horizontal',
-    isDraft,
-    downloadLocal,
-    outputDir,
-  });
+    const renderResult = await renderCreative({
+      templateId: 'ShortVideo',
+      scenes: selectedPreset.scenes,
+      format: format === '9:16' ? 'vertical' : 'horizontal',
+      isDraft,
+      downloadLocal,
+      outputDir,
+    });
+
+    const totalDuration = selectedPreset.scenes.reduce((sum: number, sc: any) => sum + (sc.durationSeconds || 4), 0);
+
+    return {
+      success: true,
+      pipelineMode: 'remotion',
+      engine: 'Remotion Render Server (:3001)',
+      offer,
+      angle,
+      videoModel: 'Remotion React / Chromium Headless',
+      totalDurationSeconds: totalDuration,
+      scenesCount: selectedPreset.scenes.length,
+      format,
+      title: selectedPreset.title,
+      copyMetaAds: selectedPreset.copy,
+      videoUrl: renderResult.videoUrl,
+      contactSheetUrl: renderResult.contactSheetUrl,
+      isDraft,
+      localFile: renderResult.localFile,
+      status: 'video_delivered',
+    };
+  }
+
+  // ── CAMINHO 2: NATIVO DO /FLOW (Google Flow Takes + Fila + Whisper) ──
+  if (pipelineMode === 'flow') {
+    console.log(`[MCP DarkTube] Disparando Pipeline 3 (Nativo do /flow) para oferta=${offer}...`);
+    const t: FlowTemplate = getFlowTemplate(templateId) || getFlowTemplate('produto-tiktok-shop') || FLOW_TEMPLATES[0];
+
+    const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
+    const resolvedSeconds = secondsPerTake || t.defaults?.seconds || 6;
+    const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.1 Flash';
+    const resolvedQuality = quality || t.defaults?.quality || '360p';
+
+    const params: FlowParams = {
+      tema: `${offer} - ${selectedPreset.title}`,
+      produto: offer,
+      beneficios: benefits || 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos',
+      estilo: angle === 'pao-frigideira' ? 'dor' : 'objecao',
+      roteiro: customIdea || '',
+      idioma: 'pt-BR',
+      realismo: t.defaults?.realismo || 'cinematografico',
+      takes: resolvedTakesCount,
+      seconds: resolvedSeconds,
+      aspect: format === '9:16' ? '9:16' : '16:9',
+      model: resolvedModel,
+      quality: resolvedQuality,
+      ...templateParams,
+    };
+
+    if (templateId === 'receita-viral') {
+      if (!params.prato) params.prato = offer;
+      if (!params.voz) params.voz = 'sem_voz';
+      if (!params.tipo) params.tipo = 'tres_ingredientes';
+      if (!params.cta) params.cta = 'RECEITA';
+    }
+
+    let script: FlowScript | null = null;
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (apiKey) {
+      try {
+        const system = buildSystemPrompt(t, params);
+        const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro de anúncio para "${offer}".`);
+        const json = extractJson(text);
+        if (json && typeof json === 'object') {
+          script = normalizeScript(json, t, params);
+        }
+      } catch (err: any) {
+        console.warn(`[MCP DarkTube] Aviso no LLM do Flow: ${err.message}`);
+      }
+    }
+
+    const fallbackScript: FlowScript = {
+      title: selectedPreset.title,
+      logline: selectedPreset.hook,
+      characters: [{ id: 'c1', name: 'Apresentador', description: 'Pessoa comunicativa em cozinha acolhedora.', voice: 'natural' }],
+      locations: [{ id: 'l1', name: 'Cozinha', description: 'Cozinha iluminada com bancada de madeira.' }],
+      takes: selectedPreset.scenes.map((s: any, idx: number) => ({
+        n: idx + 1,
+        seconds: s.durationSeconds || resolvedSeconds,
+        speaker: 'c1',
+        kind: 'narracao' as const,
+        line: s.line,
+        action: s.action,
+        camera: s.camera,
+        sound: 'ambiente de cozinha',
+        location: 'l1',
+        characters: ['c1'],
+      })),
+      seo: {
+        title: selectedPreset.copy.headline,
+        hook: selectedPreset.hook,
+        caption: selectedPreset.copy.body,
+        hashtags: ['receitasfit', 'semgluten', 'x1'],
+      },
+    };
+
+    const finalScript: FlowScript = script || fallbackScript;
+
+    if (input.character) {
+      const charInput = input.character;
+      const charId = 'c1';
+      const existingCharIndex = finalScript.characters.findIndex((c) => c.id === charId);
+      const newChar: FlowCharacter = {
+        id: charId,
+        name: charInput.name || 'Apresentador',
+        description: charInput.description || 'Pessoa comunicativa e expressiva',
+        voice: charInput.voice || 'natural',
+        sheetUrl: charInput.sheetUrl,
+        sheetStatus: charInput.sheetUrl ? 'aprovada' : (charInput.generateSheet ? 'aguardando' : undefined),
+      };
+
+      if (existingCharIndex >= 0) {
+        finalScript.characters[existingCharIndex] = newChar;
+      } else {
+        finalScript.characters.unshift(newChar);
+      }
+    }
+
+    let savedProject = null;
+    try {
+      const userId = await resolveDefaultUserId();
+      savedProject = await createFlowProject({
+        userId,
+        templateId: t.id,
+        params,
+        script: finalScript,
+        provider: apiKey ? 'openai' : 'preset',
+      });
+
+      if (queueTakes) {
+        // Se pediu para gerar a folha do personagem por IA e ele ainda não tem foto anexada:
+        if (input.character?.generateSheet && !input.character.sheetUrl && finalScript.characters[0]) {
+          const charToGenerate = finalScript.characters[0];
+          const sheetPrompt = buildSheetPrompt(charToGenerate, String(params.realismo || ''));
+          await createFlowJob({
+            userId,
+            kind: 'image',
+            prompt: sheetPrompt,
+            params: { resolution: '360p', model: 'Omni 1.1 Flash' },
+            projectId: savedProject.id,
+            takeIndex: 0,
+            role: 'character_sheet',
+            deadlineMinutes: 720,
+          });
+        }
+
+        for (const take of finalScript.takes) {
+          const ref = takeReference(finalScript, take, params);
+          const prompt = buildTakePrompt(finalScript, take, params, t, ref);
+          await createFlowJob({
+            userId,
+            kind: 'video',
+            prompt,
+            params: {
+              aspectRatio: String(params.aspect),
+              duration: take.seconds || resolvedSeconds,
+              resolution: resolvedQuality,
+              model: resolvedModel,
+              ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
+            },
+            projectId: savedProject.id,
+            takeIndex: take.n,
+            role: 'take',
+            deadlineMinutes: 720,
+          });
+        }
+        await updateFlowProject(userId, savedProject.id, { status: 'queued' });
+      }
+    } catch (dbErr: any) {
+      console.warn(`[MCP DarkTube] Banco de dados: ${dbErr.message}`);
+    }
+
+    const totalDuration = finalScript.takes.reduce((sum, tk) => sum + (tk.seconds || resolvedSeconds), 0);
+
+    return {
+      success: true,
+      pipelineMode: 'flow',
+      engine: 'DarkTube Flow Engine (/flow + Google Flow Queue)',
+      offer,
+      angle,
+      projectId: savedProject?.id || `flow_${Date.now()}`,
+      flowUrl: `${DARKTUBE_BASE_URL}/flow`,
+      videoModel: resolvedModel,
+      secondsPerTake: resolvedSeconds,
+      takesCount: finalScript.takes.length,
+      totalDurationSeconds: totalDuration,
+      aspectRatio: String(params.aspect),
+      quality: resolvedQuality,
+      title: finalScript.title,
+      hook: finalScript.seo?.hook || selectedPreset.hook,
+      copyMetaAds: selectedPreset.copy,
+      character: finalScript.characters[0]
+        ? {
+            name: finalScript.characters[0].name,
+            description: finalScript.characters[0].description,
+            voice: finalScript.characters[0].voice,
+            sheetUrl: finalScript.characters[0].sheetUrl || null,
+            sheetStatus: finalScript.characters[0].sheetStatus || (input.character?.generateSheet ? 'aguardando' : 'nenhuma'),
+          }
+        : undefined,
+      takes: finalScript.takes.map((take) => {
+        const ref = takeReference(finalScript, take, params);
+        return {
+          n: take.n,
+          seconds: take.seconds || resolvedSeconds,
+          line: take.line,
+          action: take.action,
+          prompt: buildTakePrompt(finalScript, take, params, t, ref),
+          referenceImage: ref.refImageUrl || null,
+        };
+      }),
+      status: queueTakes ? 'queued_for_google_flow' : 'created_in_flow',
+    };
+  }
+
+  // ── CAMINHO 3: SCRIPT ONLY (Apenas roteiro e copy) ──
+  const totalDuration = selectedPreset.scenes.reduce((sum: number, sc: any) => sum + (sc.durationSeconds || 4), 0);
 
   return {
     success: true,
-    engine: 'Remotion Render Engine (MP4 Final)',
+    pipelineMode: 'script_only',
     offer,
     angle,
+    totalDurationSeconds: totalDuration,
+    scenesCount: selectedPreset.scenes.length,
     title: selectedPreset.title,
     copyMetaAds: selectedPreset.copy,
-    videoUrl: renderResult.videoUrl,
-    contactSheetUrl: renderResult.contactSheetUrl,
-    isDraft,
-    localFile: renderResult.localFile,
-    status: 'video_ready',
+    scenes: selectedPreset.scenes,
+    status: 'script_ready',
   };
 }
