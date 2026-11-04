@@ -1495,4 +1495,63 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     look: 'clean 3D toy diorama, soft studio lighting, glossy simple shapes, bright colors',
     defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'brinquedo3d' },
   },
+  {
+    id: 'receita-viral',
+    niche: 'Culinária',
+    subniche: 'Receita viral (voz ou sem voz)',
+    name: 'Receita viral (9:16)',
+    description:
+      'Receita em mãos e comida hiper-apetitosa, do ingrediente ao prato pronto, com opção de ASMR sem voz ou narração curta. Ótimo para atrair público para PDF de receitas.',
+    mode: 'narracao',
+    length: 'curto',
+    trend: 'atemporal',
+    fields: [
+      {
+        id: 'voz',
+        label: 'Narração',
+        type: 'select',
+        default: 'sem_voz',
+        options: [
+          { value: 'sem_voz', label: 'Sem voz (ASMR, só sons da cozinha)' },
+          { value: 'com_voz', label: 'Com voz (narração curta por take)' },
+        ],
+      },
+      { id: 'prato', label: 'Prato', type: 'text', default: '', placeholder: 'Ex.: pão de queijo recheado de requeijão' },
+      {
+        id: 'tipo',
+        label: 'Tipo de receita',
+        type: 'select',
+        default: 'tres_ingredientes',
+        options: [
+          { value: 'tres_ingredientes', label: 'Com 3 ingredientes' },
+          { value: 'airfryer', label: 'Na airfryer' },
+          { value: 'marmita_fit', label: 'Marmita fit' },
+          { value: 'doce_natal', label: 'Doce de Natal' },
+          { value: 'sobremesa_pote', label: 'Sobremesa de pote' },
+          { value: 'lanche', label: 'Lanche estilo lanchonete' },
+        ],
+      },
+      { id: 'cta', label: 'Palavra do CTA (para o PDF)', type: 'text', default: 'RECEITA', placeholder: 'Ex.: RECEITA' },
+      { id: 'emocao', label: 'Emoção principal', type: 'select', default: 'alegria', options: EMOTIONS },
+    ],
+    brief:
+      'A 40 to 55 second viral recipe video in a warm home kitchen, shot mostly on hands and food. Show the finished dish as a hook, then ingredients, the key preparation step, one satisfying transformation (cheese pull, cut, syrup pour, crunch) and a final close-up. The voice option is given in the Narração field.',
+    beats: [
+      { fn: 'Hook: the finished dish in a tempting close-up, steam or a first bite or cut', camera: 'macro close-up of the dish with a slow push-in' },
+      { fn: 'Ingredients laid out simply on the counter, only what the recipe needs', camera: 'top-down shot of the counter, hands placing ingredients' },
+      { fn: 'Key preparation step: mixing, shaping or assembling, easy to follow', camera: 'over-the-hands medium close-up' },
+      { fn: 'Cooking step: oven, airfryer, pan or fridge, the food changes color and texture', camera: 'close-up on the food while it cooks' },
+      { fn: 'The satisfying transformation: cheese pull, cut, syrup pour or crunch', camera: 'slow-motion macro on the transformation' },
+      { fn: 'Final plated dish with a call to action; last frame echoes the hook', camera: 'locked close-up of the plated dish, soft rack focus' },
+    ],
+    rules: [
+      'Only hands and food appear, never a face; the kitchen is the same in every take',
+      'If Narração is sem_voz: zero speech and zero music, only crisp close-mic kitchen foley (sizzle, chop, crunch, pour, bubbling)',
+      'If Narração is com_voz: one short, warm spoken line per take, simple and appetizing, ending with the CTA word spoken in the last take; soft kitchen sounds underneath, no music',
+      'No text, numbers, quantities or logos drawn in the image; the recipe details go in the caption added later',
+      'Food must look hyper-appetizing: glossy, steaming, natural warm light, realistic textures',
+    ],
+    look: 'warm home kitchen food cinematography, soft window light, shallow depth of field, rich appetizing colors',
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'hiper' },
+  },
 ]
