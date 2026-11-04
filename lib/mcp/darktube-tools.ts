@@ -10,18 +10,16 @@ import { FLOW_TEMPLATES } from '@/lib/flow-templates';
 const DARKTUBE_BASE_URL = process.env.DARKTUBE_BASE_URL || 'https://darktube.fjt-solutions.com';
 
 /**
- * Resolve a URL do serviço Remotion (Docker interno no Coolify ou local).
+ * URLs candidatas do serviço Remotion (Docker interno no Coolify ou local).
  */
-function getRemotionServerUrl(): string {
-  if (process.env.REMOTION_SERVICE_URL) {
-    return process.env.REMOTION_SERVICE_URL.replace(/\/render\/?$/, '');
-  }
-  if (process.env.REMOTION_SERVER_URL) {
-    return process.env.REMOTION_SERVER_URL;
-  }
-  // No Docker/Coolify da VPS os containers comunicam por 'remotion-service'
-  return process.env.NODE_ENV === 'production' ? 'http://remotion-service:3001' : 'http://127.0.0.1:3001';
-}
+const CANDIDATE_URLS = [
+  'http://n8n-remotionservice-ry6eh9:3001',
+  process.env.REMOTION_SERVICE_URL?.replace(/\/render\/?$/, ''),
+  process.env.REMOTION_SERVER_URL,
+  'http://remotion-service:3001',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+].filter(Boolean) as string[];
 
 export interface CampaignCreativeInput {
   offer: string;
@@ -144,27 +142,45 @@ export async function renderCreative(input: RenderCreativeInput) {
     showWatermark: false,
   };
 
-  const remotionBase = getRemotionServerUrl();
-  const endpoint = input.isDraft
-    ? `${remotionBase}/render-draft`
-    : `${remotionBase}/render`;
+  let res: Response | null = null;
+  let lastError: Error | null = null;
 
-  console.log(`[MCP DarkTube] Disparando render para ${endpoint}...`);
+  for (const base of CANDIDATE_URLS) {
+    const cleanBase = base.replace(/\/+$/, '');
+    const endpoint = input.isDraft
+      ? `${cleanBase}/render-draft`
+      : `${cleanBase}/render`;
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      historyId,
-      templateId,
-      composition,
-      callbackUrl: `${DARKTUBE_BASE_URL}/api/mcp/callback`,
-    }),
-  });
+    try {
+      console.log(`[MCP DarkTube] Tentando Remotion Server em ${endpoint}...`);
+      const attempt = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          historyId,
+          templateId,
+          composition,
+          callbackUrl: `${DARKTUBE_BASE_URL}/api/mcp/callback`,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
 
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => res.statusText);
-    throw new Error(`Falha no Remotion Server (${res.status}): ${errorText}`);
+      if (attempt.ok) {
+        res = attempt;
+        console.log(`[MCP DarkTube] Remotion render iniciado com sucesso em ${cleanBase}!`);
+        break;
+      } else {
+        const text = await attempt.text().catch(() => attempt.statusText);
+        console.warn(`[MCP DarkTube] Candidato ${cleanBase} retornou HTTP ${attempt.status}: ${text}`);
+      }
+    } catch (err: any) {
+      console.warn(`[MCP DarkTube] Falha ao conectar em ${cleanBase}: ${err.message}`);
+      lastError = err;
+    }
+  }
+
+  if (!res) {
+    throw new Error(`Falha ao conectar no Remotion Server: ${lastError?.message || 'Nenhum candidato respondeu'}`);
   }
 
   const result = await res.json();
