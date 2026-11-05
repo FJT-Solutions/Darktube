@@ -1493,7 +1493,16 @@ function ProjectView({
                 </div>
                 {job?.status === "done" && job.result_url && (
                   // Com o video final pronto, os takes so carregam ao dar play: menos videos pesando na pagina.
-                  <video src={job.result_url} controls preload={project.final_url ? "none" : "metadata"} className="max-h-72 rounded-md bg-black" />
+                  <div className="space-y-1.5">
+                    <video src={job.result_url} controls preload={project.final_url ? "none" : "metadata"} className="max-h-72 rounded-md bg-black" />
+                    <a
+                      className="inline-flex items-center gap-1 text-xs text-primary underline"
+                      href={`${job.result_url}${job.result_url.includes("?") ? "&" : "?"}download=1`}
+                      download={`take_${t.n}.mp4`}
+                    >
+                      <Download className="h-3 w-3" /> Baixar take {t.n}
+                    </a>
+                  </div>
                 )}
                 {free && (
                   <div className="grid gap-2 sm:grid-cols-3">
@@ -1722,8 +1731,8 @@ function ProjectView({
             <div className="space-y-2">
               <video src={project.final_url} controls preload="metadata" className="max-h-96 rounded-md bg-black" />
               <div className="flex flex-wrap gap-2 text-sm">
-                <a className="text-primary underline" href={project.final_url} download>Baixar vídeo</a>
-                {project.srt_url && <a className="text-primary underline" href={project.srt_url} download>Baixar legenda (.srt)</a>}
+                <a className="text-primary underline" href={`${project.final_url}${project.final_url.includes('?') ? '&' : '?'}download=1`} download={project.final_url.split('/').pop()}>Baixar vídeo</a>
+                {project.srt_url && <a className="text-primary underline" href={`${project.srt_url}${project.srt_url.includes('?') ? '&' : '?'}download=1`} download={project.srt_url.split('/').pop()}>Baixar legenda (.srt)</a>}
               </div>
               {project.assemble_error && <p className="text-xs text-muted-foreground">{project.assemble_error}</p>}
             </div>

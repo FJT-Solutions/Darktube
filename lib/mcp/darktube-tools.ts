@@ -26,6 +26,7 @@ import { callFlowLLM } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
 import { createFlowJob } from '@/lib/flow-jobs';
 import { assembleFlowProject } from '@/lib/flow-assemble';
+import { getUserApiKey } from '@/lib/database';
 import { pool } from '@/lib/db-client';
 
 const DARKTUBE_BASE_URL = process.env.DARKTUBE_BASE_URL || 'https://darktube.fjt-solutions.com';
@@ -556,7 +557,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     }
 
     let script: FlowScript | null = null;
-    const apiKey = process.env.OPENAI_API_KEY;
+    const defaultUserId = await resolveDefaultUserId().catch(() => '');
+    const userOpenAiKey = defaultUserId ? await getUserApiKey(defaultUserId, 'openai').catch(() => '') : '';
+    const apiKey = userOpenAiKey || process.env.OPENAI_API_KEY;
 
     if (apiKey) {
       try {

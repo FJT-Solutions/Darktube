@@ -14,6 +14,8 @@ export async function GET(
     }
 
     const rangeHeader = request.headers.get('range') || '';
+    const isDownload = request.url.includes('download=1') || request.url.includes('download');
+    const disposition = isDownload ? `attachment; filename="${filename}"` : `inline; filename="${filename}"`;
     const fetchHeaders: Record<string, string> = {};
     if (rangeHeader) fetchHeaders['range'] = rangeHeader;
 
@@ -46,6 +48,7 @@ export async function GET(
         'Content-Type': contentType,
         'Accept-Ranges': 'bytes',
         'Cache-Control': 'public, max-age=86400, immutable',
+        'Content-Disposition': disposition,
       };
 
       if (contentLength) headers['Content-Length'] = contentLength;
@@ -86,6 +89,7 @@ export async function GET(
               'Content-Length': String(chunkSize),
               'Content-Type': contentType,
               'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Disposition': disposition,
             },
           });
         }
@@ -98,6 +102,7 @@ export async function GET(
           'Content-Length': String(totalSize),
           'Accept-Ranges': 'bytes',
           'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Disposition': disposition,
         },
       });
     }

@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.21';
-const FLOW_BUILD = '2026-11-05-ghost-background-fix'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.22';
+const FLOW_BUILD = '2026-11-05-dual-monitor-offscreen-fix'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -277,8 +277,8 @@ async function flowTick() {
           const win = await chrome.windows.create({
             url: openUrl,
             focused: false,
-            left: -3200,
-            top: 0,
+            left: -10000,
+            top: -10000,
             width: 620,
             height: 860,
             state: 'normal',
@@ -685,8 +685,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           await chrome.windows.update(tab.windowId, {
             state: 'normal',
             focused: false,
-            left: -3200,
-            top: 0,
+            left: -10000,
+            top: -10000,
             width: 620,
             height: 860,
           });
@@ -747,7 +747,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (!tab) return sendResponse({ ok: false, error: 'Abra um projeto do Flow primeiro.' });
         const win = await chrome.windows.get(tab.windowId);
         const st = await chrome.storage.local.get(['flow_ghost_active', 'flow_prev_pos']);
-        const isGhost = !!st.flow_ghost_active || (win.left != null && win.left < -1500);
+        const isGhost = !!st.flow_ghost_active || (win.left != null && win.left < -5000) || (win.top != null && win.top < -5000);
 
         if (msg.action === 'show' || (msg.action !== 'hide' && isGhost)) {
           // Trazer de volta para a tela visível
@@ -764,7 +764,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: true, isGhost: false });
         } else {
           // Salvar posição e mover para fora da tela (janela fantasma)
-          if (win.left != null && win.left > -1000) {
+          if (win.left != null && win.left > -4000 && win.top != null && win.top > -4000) {
             await chrome.storage.local.set({ flow_prev_pos: { left: win.left, top: win.top, width: win.width, height: win.height } });
           }
           const tabs = await chrome.tabs.query({ windowId: tab.windowId });
@@ -775,8 +775,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           await chrome.windows.update(targetWinId, {
             state: 'normal',
-            left: -3200,
-            top: 0,
+            left: -10000,
+            top: -10000,
             width: 620,
             height: 860,
             focused: false,

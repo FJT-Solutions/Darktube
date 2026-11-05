@@ -30,6 +30,8 @@ export async function GET(
     }
 
     const rangeHeader = request.headers.get('range');
+    const isDownload = request.url.includes('download=1') || request.url.includes('download');
+    const disposition = isDownload ? `attachment; filename="${filename}"` : `inline; filename="${filename}"`;
 
     // Se ainda não encontrado no banco, verificar se está disponível no storage do Remotion
     if (result.rows.length === 0) {
@@ -55,6 +57,7 @@ export async function GET(
               'Content-Type': contentType,
               'Accept-Ranges': 'bytes',
               'Cache-Control': 'public, max-age=3600, must-revalidate',
+        'Content-Disposition': disposition,
             };
             if (contentLength) headers['Content-Length'] = contentLength;
             if (contentRange) headers['Content-Range'] = contentRange;
@@ -99,6 +102,7 @@ export async function GET(
           'Content-Length': String(chunkSize),
           'Content-Type': contentType,
           'Cache-Control': 'public, max-age=3600, must-revalidate',
+        'Content-Disposition': disposition,
         },
       })
     }
@@ -111,6 +115,7 @@ export async function GET(
         'Content-Length': String(totalSize),
         'Accept-Ranges': 'bytes',
         'Cache-Control': 'public, max-age=3600, must-revalidate',
+        'Content-Disposition': disposition,
       },
     })
   } catch (error: any) {

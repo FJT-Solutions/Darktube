@@ -11,6 +11,7 @@ import { pool } from '@/lib/db-client'
 import { uploadMediaFile } from '@/lib/storage'
 import { getFlowTemplate } from '@/lib/flow-templates'
 import { getFlowProject, setFlowProjectAssembly } from '@/lib/flow-projects'
+import { getUserApiKey } from '@/lib/database'
 import type { FlowJob } from '@/lib/flow-jobs'
 
 const run = promisify(execFile)
@@ -247,14 +248,14 @@ async function detectVoice(file: string, duration: number) {
   }
 }
 
-// Servidor Whisper da OpenAI oficial como padrao definitivo (sem fallback para VPS).
+// Servidor Whisper da OpenAI oficial como padrao definitivo (com fallback procedural de roteiro).
 const OPENAI_WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions'
 
 /** Transcreve o audio com tempo por palavra via OpenAI Whisper oficial (whisper-1). */
-async function transcribeWhisper(file: string, language?: string): Promise<TimedWord[] | null> {
-  const apiKey = process.env.OPENAI_API_KEY
+async function transcribeWhisper(file: string, language?: string, customApiKey?: string): Promise<TimedWord[] | null> {
+  const apiKey = customApiKey || process.env.OPENAI_API_KEY
   if (!apiKey) {
-    console.error('[Flow] OPENAI_API_KEY nao configurada no ambiente para o Whisper da OpenAI.')
+    console.warn('[Flow] OPENAI_API_KEY nao configurada (nem no perfil do usuario nem no ambiente).')
     return null
   }
   try {
@@ -343,7 +344,9 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
-    // Legenda, take por take: Whisper da OpenAI oficial com tempo exato por palavra (sem fallback cego de ruido).
+    // Legenda, take por take: Whisper da OpenAI (chave do usuário ou ambiente) com fallback procedural de roteiro.
+    const userOpenAiKey = await getUserApiKey(userId, 'openai').catch(() => '')
+    const openAiApiKey = userOpenAiKey || process.env.OPENAI_API_KEY || ''
     const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
     const cues: Cue[] = []
     const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
@@ -352,7 +355,7 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       const k = takes[i]
       const dur = durations[i]
       if (t.mode !== 'ambiente' && k.line.trim()) {
-        const words = hasAudio[i] ? await transcribeWhisper(normalized[i], lang) : null
+        const words = hasAudio[i] ? await transcribeWhisper(normalized[i], lang, openAiApiKey) : null
         if (words && words.length) {
           const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur), wordsPerCaption).map((c) => ({
             ...c,
@@ -362,7 +365,21 @@ export async function assembleFlowProject(userId: string, projectId: string) {
           cues.push(...takeCues)
           console.log(`[Flow] legenda take ${k.n}: OpenAI whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg), ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
         } else {
-          console.log(`[Flow] take ${k.n}: nenhuma palavra detectada pelo Whisper (sem legenda forçada)`)
+          // Fallback procedural: gera legendas a partir do texto do roteiro sincronizado com o áudio ou duração
+          const chunks = splitCaption(k.line, wordsPerCaption)
+          if (chunks.length) {
+            const voiceWin = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
+            const win = voiceWin || estimateSpeech(k.line, dur)
+            const fallbackCues = timeChunks(chunks, win.start, win.end).map((c) => ({
+              ...c,
+              start: at + c.start,
+              end: at + Math.min(c.end, dur - 0.05),
+            }))
+            cues.push(...fallbackCues)
+            console.log(`[Flow] legenda take ${k.n} (fallback roteiro): ${chunks.length} frases sincronizadas a partir do roteiro (${win.start.toFixed(1)}s-${win.end.toFixed(1)}s)`)
+          } else {
+            console.log(`[Flow] take ${k.n}: nenhuma legenda gerada`)
+          }
         }
       }
       at += dur
