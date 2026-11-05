@@ -79,6 +79,7 @@ export interface GetCreativeStatusInput {
   assembleIfReady?: boolean;
   downloadLocal?: boolean;
   outputDir?: string;
+  waitForSeconds?: number;
 }
 
 export interface AssembleCreativeInput {
@@ -315,8 +316,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     downloadLocal = true,
     outputDir = './midia/criativos',
     queueTakes = true,
-    waitForSeconds = 0,
+    waitForSeconds: rawWaitForSeconds,
   } = input;
+  const waitForSeconds = rawWaitForSeconds ?? (pipelineMode === 'flow' && queueTakes ? 600 : 0);
 
   const presets: Record<string, any> = {
     'pao-frigideira': {
@@ -780,17 +782,36 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
 /**
  * 5. Consulta o status de um projeto no /flow (takes prontos, erros, folha de personagem e vídeo final montado).
  */
-export async function getCreativeStatus(input: GetCreativeStatusInput) {
-  const { projectId, assembleIfReady = false, downloadLocal = false, outputDir = './midia/criativos' } = input;
+export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<any> {
+  const { projectId: rawProjectId, assembleIfReady = false, downloadLocal = false, outputDir = './midia/criativos', waitForSeconds = 0 } = input;
+
+  if (waitForSeconds > 0) {
+    const startWait = Date.now();
+    const maxMs = waitForSeconds * 1000;
+    while (Date.now() - startWait < maxMs) {
+      const current = await getCreativeStatus({
+        projectId: rawProjectId,
+        assembleIfReady,
+        downloadLocal,
+        outputDir,
+        waitForSeconds: 0,
+      });
+      if (current.finalVideoUrl || (current.progress.failedTakes > 0 && current.progress.inProgressTakes === 0)) {
+        return current;
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
 
   const { rows: projRows } = await pool.query(
-    'SELECT * FROM public.flow_projects WHERE id = $1 LIMIT 1',
-    [projectId]
+    'SELECT * FROM public.flow_projects WHERE id::text = $1 OR id::text LIKE $2 ORDER BY created_at DESC LIMIT 1',
+    [rawProjectId, `${rawProjectId}%`]
   );
   if (!projRows || projRows.length === 0) {
-    throw new Error(`Projeto "${projectId}" não foi encontrado no banco de dados.`);
+    throw new Error(`Projeto "${rawProjectId}" não foi encontrado no banco de dados.`);
   }
   const project = projRows[0];
+  const projectId = String(project.id);
   const userId = project.user_id;
 
   const { rows: jobs } = await pool.query(
@@ -875,9 +896,13 @@ export async function getCreativeStatus(input: GetCreativeStatusInput) {
  * 6. Dispara a montagem de um projeto do /flow via ffmpeg, gerando o MP4 unificado com legendas.
  */
 export async function assembleFlowCreative(input: AssembleCreativeInput) {
-  const { projectId, downloadLocal = true, outputDir = './midia/criativos' } = input;
-  const { rows } = await pool.query('SELECT user_id FROM public.flow_projects WHERE id = $1 LIMIT 1', [projectId]);
-  if (!rows || rows.length === 0) throw new Error(`Projeto "${projectId}" não foi encontrado no banco de dados.`);
+  const { projectId: rawProjectId, downloadLocal = true, outputDir = './midia/criativos' } = input;
+  const { rows } = await pool.query(
+    'SELECT id, user_id FROM public.flow_projects WHERE id::text = $1 OR id::text LIKE $2 ORDER BY created_at DESC LIMIT 1',
+    [rawProjectId, `${rawProjectId}%`]
+  );
+  if (!rows || rows.length === 0) throw new Error(`Projeto "${rawProjectId}" não foi encontrado no banco de dados.`);
+  const projectId = String(rows[0].id);
   const userId = rows[0].user_id;
 
   const asm = await assembleFlowProject(userId, projectId);

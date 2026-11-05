@@ -6,11 +6,6 @@
  *   npx tsx scripts/darktube-mcp.ts
  */
 
-import dotenv from 'dotenv';
-import path from 'path';
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -103,6 +98,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             downloadLocal: { type: 'boolean', description: 'Se true, faz download do MP4 para ./midia/criativos/ do projeto', default: true },
             outputDir: { type: 'string', description: 'Diretório local para salvar o MP4', default: './midia/criativos' },
             queueTakes: { type: 'boolean', description: 'Se true, enfileira takes no Google Flow runner', default: true },
+            waitForSeconds: { type: 'number', description: 'Segundos para aguardar a conclusão e montagem no Flow (600s por padrão; 0 para retorno imediato)', default: 600 },
           },
           required: ['offer'],
         },
@@ -155,10 +151,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            projectId: { type: 'string', description: 'ID do projeto retornado na criação' },
+            projectId: { type: 'string', description: 'ID do projeto retornado na criação (ou prefixo de 8 caracteres)' },
             assembleIfReady: { type: 'boolean', description: 'Se todos os takes estiverem prontos, dispara a montagem automática', default: true },
             downloadLocal: { type: 'boolean', description: 'Se true, baixa o vídeo final e a folha do personagem para a pasta local', default: true },
             outputDir: { type: 'string', description: 'Diretório local para download', default: './midia/criativos' },
+            waitForSeconds: { type: 'number', description: 'Segundos para aguardar até os takes terminarem e montar o vídeo (0 para consulta imediata)', default: 0 },
           },
           required: ['projectId'],
         },
