@@ -4,7 +4,7 @@
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
 const FLOW_VERSION = '1.3.22';
-const FLOW_BUILD = '2026-11-05-dual-monitor-offscreen-fix'; // confirma que a extensao recarregada e a nova
+const FLOW_BUILD = '2026-11-05-auto-ghost-persistent'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -83,7 +83,7 @@ chrome.alarms.onAlarm.addListener((a) => {
 
 async function flowCfg() {
   const c = await chrome.storage.local.get([
-    'darktube_token', 'darktube_api_url', 'flow_enabled', 'flow_live', 'flow_caps', 'flow_current',
+    'darktube_token', 'darktube_api_url', 'flow_enabled', 'flow_live', 'flow_always_ghost', 'flow_caps', 'flow_current',
   ]);
   c.base = (c.darktube_api_url || FLOW_DEFAULT_BASE).replace(/\/+$/, '');
   return c;
@@ -296,6 +296,24 @@ async function flowTick() {
         flowLogTick('Nenhuma aba do Google Flow aberta.', null, 'warn');
         return void (await flowStatus('sem_aba', { msg: 'Abra o Google Flow em uma aba deste Chrome.' }));
       }
+    }
+    if (tab && c.flow_always_ghost !== false) {
+      try {
+        const tabsInWin = await chrome.tabs.query({ windowId: tab.windowId });
+        if (tabsInWin.length > 1) {
+          const ghostWin = await chrome.windows.create({ tabId: tab.id, focused: false, left: -10000, top: -10000, width: 620, height: 860, state: 'normal' });
+          if (ghostWin && ghostWin.id) {
+            await chrome.storage.local.set({ flow_auto_window_id: ghostWin.id, flow_ghost_active: true });
+            tab = { id: tab.id, windowId: ghostWin.id };
+          }
+        } else {
+          const w = await chrome.windows.get(tab.windowId).catch(() => null);
+          if (w && (w.left > -1000 || w.top > -1000)) {
+            await chrome.windows.update(tab.windowId, { left: -10000, top: -10000, width: 620, height: 860, focused: false });
+            await chrome.storage.local.set({ flow_ghost_active: true });
+          }
+        }
+      } catch (_) {}
     }
     let ping = await flowAsk(tab.id, { type: 'FLOW_PING' });
     if (ping && !ping.ready && (ping.path === '/' || ping.path === '')) {
@@ -680,7 +698,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           previousWindowId: last && last.id !== tab.windowId ? last.id : null,
           wasMinimized: win.state === 'minimized',
         };
-        if (win.state === 'minimized') {
+        const c = await flowCfg();
+        if (win.state === 'minimized' || (c.flow_always_ghost !== false && (win.left > -1000 || win.top > -1000))) {
           // Em vez de desminimizar sobre a tela do usuario, move para coordenadas off-screen fantasma
           await chrome.windows.update(tab.windowId, {
             state: 'normal',

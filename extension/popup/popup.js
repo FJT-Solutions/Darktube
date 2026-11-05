@@ -456,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const en = document.getElementById('flow-enabled');
   const live = document.getElementById('flow-live');
   const st = document.getElementById('flow-status');
+  const alwaysGhost = document.getElementById('flow-always-ghost');
   const btn = document.getElementById('flow-scan-btn');
   if (!en || !live || !st || !btn) return;
   const LABEL = {
@@ -494,9 +495,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     render(lastStatus);
   });
-  chrome.storage.local.get(['flow_enabled', 'flow_live', 'flow_status', 'flow_logstat'], (r) => {
+  chrome.storage.local.get(['flow_enabled', 'flow_live', 'flow_always_ghost', 'flow_status', 'flow_logstat'], (r) => {
     en.checked = !!r.flow_enabled;
     live.checked = !!r.flow_live;
+    if (alwaysGhost) alwaysGhost.checked = r.flow_always_ghost !== false;
     renderLog(r.flow_logstat);
     render(r.flow_status);
   });
@@ -509,6 +511,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     chrome.storage.local.set({ flow_live: live.checked });
+  });
+  if (alwaysGhost) {
+    alwaysGhost.addEventListener('change', () => {
+      chrome.storage.local.set({ flow_always_ghost: alwaysGhost.checked });
+      if (alwaysGhost.checked) chrome.runtime.sendMessage({ type: 'FLOW_GHOST_WINDOW', action: 'hide' });
+    });
+  }
+  (() => {
   });
   btn.addEventListener('click', () => {
     btn.disabled = true;
