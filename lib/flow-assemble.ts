@@ -253,9 +253,9 @@ const OPENAI_WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions'
 
 /** Transcreve o audio com tempo por palavra via OpenAI Whisper oficial (whisper-1). */
 async function transcribeWhisper(file: string, language?: string, customApiKey?: string): Promise<TimedWord[] | null> {
-  const apiKey = customApiKey || process.env.OPENAI_API_KEY
+  const apiKey = customApiKey
   if (!apiKey) {
-    console.warn('[Flow] OPENAI_API_KEY nao configurada (nem no perfil do usuario nem no ambiente).')
+    console.warn('[Flow] Chave OpenAI nao encontrada nas Credenciais do usuario (Credenciais > IA > OpenAI).')
     return null
   }
   try {
@@ -344,9 +344,8 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
-    // Legenda, take por take: Whisper da OpenAI (chave do usuário ou ambiente) com fallback procedural de roteiro.
-    const userOpenAiKey = await getUserApiKey(userId, 'openai').catch(() => '')
-    const openAiApiKey = userOpenAiKey || process.env.OPENAI_API_KEY || ''
+    // Legenda, take por take: Whisper da OpenAI (somente a chave salva nas Credenciais do usuário) com fallback procedural de roteiro.
+    const openAiApiKey = (await getUserApiKey(userId, 'openai').catch(() => '')) || ''
     const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
     const cues: Cue[] = []
     const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
