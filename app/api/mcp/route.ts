@@ -181,11 +181,19 @@ export async function POST(req: NextRequest) {
           jsonrpc: '2.0',
           id,
           result: {
-            protocolVersion: '2024-11-05',
+            protocolVersion: params?.protocolVersion || '2024-11-05',
             capabilities: { tools: {} },
             serverInfo: { name: 'darktube-mcp', version: '1.0.0' },
           },
         });
+      }
+
+      if (typeof method === 'string' && method.startsWith('notifications/')) {
+        return new NextResponse(null, { status: 202 });
+      }
+
+      if (method === 'ping') {
+        return NextResponse.json({ jsonrpc: '2.0', id, result: {} });
       }
 
       if (method === 'tools/list') {

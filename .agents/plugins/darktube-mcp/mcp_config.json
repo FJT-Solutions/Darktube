@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "darktube": {
+      "url": "https://darktube.fjt-solutions.com/api/mcp"
+    }
+  }
+}
