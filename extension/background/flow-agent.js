@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.20';
-const FLOW_BUILD = '2026-11-04-auto-project-entry'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.21';
+const FLOW_BUILD = '2026-11-05-ghost-background-fix'; // confirma que a extensao recarregada e a nova
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -277,7 +277,11 @@ async function flowTick() {
           const win = await chrome.windows.create({
             url: openUrl,
             focused: false,
-            state: 'minimized',
+            left: -3200,
+            top: 0,
+            width: 620,
+            height: 860,
+            state: 'normal',
           });
           if (win && win.id) {
             await chrome.storage.local.set({ flow_auto_window_id: win.id });
@@ -676,12 +680,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           previousWindowId: last && last.id !== tab.windowId ? last.id : null,
           wasMinimized: win.state === 'minimized',
         };
-        if (win.state === 'minimized') await chrome.windows.update(tab.windowId, { state: 'normal', focused: false });
+        if (win.state === 'minimized') {
+          // Em vez de desminimizar sobre a tela do usuario, move para coordenadas off-screen fantasma
+          await chrome.windows.update(tab.windowId, {
+            state: 'normal',
+            focused: false,
+            left: -3200,
+            top: 0,
+            width: 620,
+            height: 860,
+          });
+        }
         if (!tab.active) await chrome.tabs.update(tabId, { active: true });
-        if (msg.forcar) await chrome.windows.update(tab.windowId, { focused: true });
+        // NUNCA foca a janela (focused: false) para jamais roubar foco ou sobrepor a tela do usuario
         clearTimeout(flowVisTimer);
         flowVisTimer = setTimeout(() => flowRestoreVisible(), 60000); // rede de seguranca
-        sendResponse({ ok: true, estado: win.state, ativa: tab.active, forcar: !!msg.forcar });
+        sendResponse({ ok: true, estado: win.state, ativa: tab.active, forcar: false });
       } catch (e) {
         sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 120) });
       }

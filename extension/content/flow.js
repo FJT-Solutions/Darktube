@@ -1978,7 +1978,6 @@
     let visInfo = null;
     if (vis0 !== 'visible') {
       visInfo = await ensureVisible(false);
-      if (document.visibilityState !== 'visible') visInfo = await ensureVisible(true);
     }
     dtLog('Visibilidade da aba na hora de gerar.', { antes: vis0, depois: document.visibilityState, foco: document.hasFocus ? document.hasFocus() : null, ajuste: visInfo });
     try {
@@ -2016,12 +2015,26 @@
           // Filtra somente tiles que NAO existiam antes deste clique:
           const newTiles = currentTiles.filter((t) => !t.hasAttribute('data-dt-old') && !prevTiles.has(t) && !prevFps.has(tileFp(t)));
           const states = newTiles.map((t) => ({ t, s: tileState(t) }));
-          const bad = states.find((x) => x.s.failed || (!x.s.generating && RX.failure.test(txt(x.t))));
+          // Procura erro apenas em elementos de erro reais do tile (nao no prompt ou texto geral)
+          const bad = states.find((x) => {
+            if (x.s.failed) return true;
+            if (!x.s.generating && !x.s.hasVideo && !x.s.hasImg) {
+              const errEl = x.t.querySelector('flow-error-tile, .error-tile, .error-message, [role=alert]');
+              if (errEl) return true;
+              const statusEl = x.t.querySelector('.error-title, .error-subtitle, flow-error-tile');
+              if (statusEl && RX.failure.test(txt(statusEl))) return true;
+            }
+            return false;
+          });
           if (bad) {
-            const msg = txt(bad.t).replace(/^warning\s*/i, '').slice(0, 220);
+            const errEl = bad.t.querySelector('flow-error-tile, .error-tile, .error-message') || bad.t;
+            const msg = txt(errEl).replace(/^warning\s*/i, '').slice(0, 220);
             const code = failCode(msg);
             dtLog('O Flow recusou este take.', { code, motivo: msg }, 'error');
             dtLog('Detalhes da recusa.', { rede: netTail(10), avisos: pageToasts(), tile: String(bad.t.outerHTML || '').replace(/[ \t\r\n]+/g, ' ').slice(0, 700), referencias: refState(null) }, 'error');
+            // Marca o tile recusado como visto para nao contaminar o proximo take
+            bad.t.setAttribute('data-dt-old', '1');
+            prevTiles.add(bad.t);
             throw err(code, 'O Flow recusou a geração: ' + msg);
           }
 
@@ -2059,6 +2072,12 @@
         if (Date.now() - t0 > limit) throw err('timeout', 'O Flow não terminou a geração no tempo esperado.');
       }
     } finally {
+      try {
+        $$(S.videoTile).forEach((t) => {
+          t.setAttribute('data-dt-old', '1');
+          prevTiles.add(t);
+        });
+      } catch (_) {}
       if (visInfo) await restoreVisible();
     }
   }

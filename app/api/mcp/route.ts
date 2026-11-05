@@ -5,6 +5,8 @@ import {
   createCampaignCreative,
   renderCreative,
   downloadCreativeToLocal,
+  getCreativeStatus,
+  assembleFlowCreative,
 } from '@/lib/mcp/darktube-tools';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +73,7 @@ const MCP_TOOLS_MANIFEST = [
         downloadLocal: { type: 'boolean', description: 'Se true, faz download do MP4 para ./midia/criativos/ do projeto', default: true },
         outputDir: { type: 'string', description: 'Diretório local para salvar o MP4', default: './midia/criativos' },
         queueTakes: { type: 'boolean', description: 'Se true, enfileira takes no Google Flow runner', default: true },
+        waitForSeconds: { type: 'number', description: 'Segundos para aguardar a conclusão no Flow (0 para retorno imediato)', default: 0 },
       },
       required: ['offer'],
     },
@@ -115,6 +118,33 @@ const MCP_TOOLS_MANIFEST = [
         preferredFileName: { type: 'string' },
       },
       required: ['videoUrl'],
+    },
+  },
+  {
+    name: 'darktube_get_creative_status',
+    description: 'Consulta o status de geração dos takes, imagens de personagem e vídeo final montado de um projeto no /flow.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto retornado na criação' },
+        assembleIfReady: { type: 'boolean', description: 'Se todos os takes estiverem prontos, dispara a montagem automática', default: true },
+        downloadLocal: { type: 'boolean', description: 'Se true, baixa o vídeo final e a folha do personagem para a pasta local', default: true },
+        outputDir: { type: 'string', description: 'Diretório local para download', default: './midia/criativos' },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'darktube_assemble_flow_project',
+    description: 'Dispara a montagem de um projeto do /flow usando ffmpeg, gerando o MP4 final com legendas e áudio.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto no /flow' },
+        downloadLocal: { type: 'boolean', description: 'Se true, baixa o MP4 montado para o disco local', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+      },
+      required: ['projectId'],
     },
   },
 ];
@@ -214,6 +244,12 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_download_creative':
       return await downloadCreativeToLocal(args.videoUrl, args.outputDir, args.preferredFileName);
+
+    case 'darktube_get_creative_status':
+      return await getCreativeStatus(args);
+
+    case 'darktube_assemble_flow_project':
+      return await assembleFlowCreative(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}"`);

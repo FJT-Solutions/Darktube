@@ -18,6 +18,8 @@ import {
   createCampaignCreative,
   renderCreative,
   downloadCreativeToLocal,
+  getCreativeStatus,
+  assembleFlowCreative,
 } from '../lib/mcp/darktube-tools';
 
 const server = new Server(
@@ -142,6 +144,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['videoUrl'],
         },
       },
+      {
+        name: 'darktube_get_creative_status',
+        description: 'Consulta o status de geração dos takes, imagens de personagem e vídeo final montado de um projeto no /flow.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectId: { type: 'string', description: 'ID do projeto retornado na criação' },
+            assembleIfReady: { type: 'boolean', description: 'Se todos os takes estiverem prontos, dispara a montagem automática', default: true },
+            downloadLocal: { type: 'boolean', description: 'Se true, baixa o vídeo final e a folha do personagem para a pasta local', default: true },
+            outputDir: { type: 'string', description: 'Diretório local para download', default: './midia/criativos' },
+          },
+          required: ['projectId'],
+        },
+      },
+      {
+        name: 'darktube_assemble_flow_project',
+        description: 'Dispara a montagem de um projeto do /flow usando ffmpeg, gerando o MP4 final com legendas e áudio.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectId: { type: 'string', description: 'ID do projeto no /flow' },
+            downloadLocal: { type: 'boolean', description: 'Se true, baixa o MP4 montado para o disco local', default: true },
+            outputDir: { type: 'string', default: './midia/criativos' },
+          },
+          required: ['projectId'],
+        },
+      },
     ],
   };
 });
@@ -172,6 +201,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           (args as any).outputDir,
           (args as any).preferredFileName
         );
+        break;
+
+      case 'darktube_get_creative_status':
+        result = await getCreativeStatus(args as any);
+        break;
+
+      case 'darktube_assemble_flow_project':
+        result = await assembleFlowCreative(args as any);
         break;
 
       default:

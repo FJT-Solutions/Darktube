@@ -25,6 +25,7 @@ import { buildSheetPrompt } from '@/lib/flow-characters';
 import { callFlowLLM } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
 import { createFlowJob } from '@/lib/flow-jobs';
+import { assembleFlowProject } from '@/lib/flow-assemble';
 import { pool } from '@/lib/db-client';
 
 const DARKTUBE_BASE_URL = process.env.DARKTUBE_BASE_URL || 'https://darktube.fjt-solutions.com';
@@ -69,6 +70,20 @@ export interface CampaignCreativeInput {
   downloadLocal?: boolean;
   outputDir?: string;
   queueTakes?: boolean;
+  waitForSeconds?: number;
+}
+
+export interface GetCreativeStatusInput {
+  projectId: string;
+  assembleIfReady?: boolean;
+  downloadLocal?: boolean;
+  outputDir?: string;
+}
+
+export interface AssembleCreativeInput {
+  projectId: string;
+  downloadLocal?: boolean;
+  outputDir?: string;
 }
 
 export interface RenderCreativeInput {
@@ -299,6 +314,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     downloadLocal = true,
     outputDir = './midia/criativos',
     queueTakes = true,
+    waitForSeconds = 0,
   } = input;
 
   const presets: Record<string, any> = {
@@ -658,6 +674,48 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
 
     const totalDuration = finalScript.takes.reduce((sum, tk) => sum + (tk.seconds || resolvedSeconds), 0);
 
+    // Se o solicitante pediu para aguardar a conclusão no Flow:
+    if (waitForSeconds > 0 && savedProject?.id && queueTakes) {
+      console.log(`[MCP DarkTube] Aguardando até ${waitForSeconds}s para conclusão dos takes no Google Flow...`);
+      const startWait = Date.now();
+      const maxMs = waitForSeconds * 1000;
+      while (Date.now() - startWait < maxMs) {
+        await new Promise((r) => setTimeout(r, 5000));
+        try {
+          const statusResult = await getCreativeStatus({
+            projectId: savedProject.id,
+            assembleIfReady: true,
+            downloadLocal,
+            outputDir,
+          });
+          if (statusResult.isComplete && statusResult.finalVideoUrl) {
+            return {
+              success: true,
+              pipelineMode: 'flow',
+              engine: 'DarkTube Flow Engine (/flow + Google Flow Queue)',
+              offer,
+              angle,
+              projectId: savedProject.id,
+              flowUrl: `${DARKTUBE_BASE_URL}/flow`,
+              videoModel: resolvedModel,
+              totalDurationSeconds: totalDuration,
+              title: finalScript.title,
+              hook: finalScript.seo?.hook || selectedPreset.hook,
+              copyMetaAds: selectedPreset.copy,
+              character: statusResult.character,
+              finalVideoUrl: statusResult.finalVideoUrl,
+              srtUrl: statusResult.srtUrl,
+              takes: statusResult.takes,
+              localFiles: statusResult.localFiles,
+              status: 'video_delivered',
+            };
+          }
+        } catch (pollErr: any) {
+          console.warn(`[MCP DarkTube] Polling status: ${pollErr.message}`);
+        }
+      }
+    }
+
     return {
       success: true,
       pipelineMode: 'flow',
@@ -713,5 +771,129 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     copyMetaAds: selectedPreset.copy,
     scenes: selectedPreset.scenes,
     status: 'script_ready',
+  };
+}
+
+/**
+ * 5. Consulta o status de um projeto no /flow (takes prontos, erros, folha de personagem e vídeo final montado).
+ */
+export async function getCreativeStatus(input: GetCreativeStatusInput) {
+  const { projectId, assembleIfReady = false, downloadLocal = false, outputDir = './midia/criativos' } = input;
+
+  const { rows: projRows } = await pool.query(
+    'SELECT * FROM public.flow_projects WHERE id = $1 LIMIT 1',
+    [projectId]
+  );
+  if (!projRows || projRows.length === 0) {
+    throw new Error(`Projeto "${projectId}" não foi encontrado no banco de dados.`);
+  }
+  const project = projRows[0];
+  const userId = project.user_id;
+
+  const { rows: jobs } = await pool.query(
+    'SELECT id, take_index, kind, role, status, result_url, error_message, finished_at FROM public.flow_jobs WHERE project_id = $1 ORDER BY take_index ASC NULLS FIRST',
+    [projectId]
+  );
+
+  const charJob = jobs.find((j: any) => j.role === 'character_sheet');
+  const takeJobs = jobs.filter((j: any) => j.role === 'take' || j.kind === 'video');
+
+  const charSheetUrl = charJob?.result_url
+    ? (charJob.result_url.startsWith('http') ? charJob.result_url : `${DARKTUBE_BASE_URL}${charJob.result_url}`)
+    : (project.script?.characters?.[0]?.sheetUrl || null);
+
+  const totalTakes = project.script?.takes?.length || takeJobs.length;
+  const completedTakes = takeJobs.filter((j: any) => j.status === 'done' && j.result_url).length;
+  const failedTakes = takeJobs.filter((j: any) => j.status === 'draft' || j.error_message).length;
+  const inProgressTakes = takeJobs.filter((j: any) => j.status === 'running' || j.status === 'queued' || j.status === 'collecting').length;
+
+  const allTakesDone = totalTakes > 0 && completedTakes === totalTakes;
+
+  let finalUrl = project.final_url
+    ? (project.final_url.startsWith('http') ? project.final_url : `${DARKTUBE_BASE_URL}${project.final_url}`)
+    : null;
+  let srtUrl = project.srt_url
+    ? (project.srt_url.startsWith('http') ? project.srt_url : `${DARKTUBE_BASE_URL}${project.srt_url}`)
+    : null;
+
+  if (allTakesDone && !finalUrl && assembleIfReady) {
+    try {
+      console.log(`[MCP DarkTube] Todos os ${totalTakes} takes prontos! Montando projeto ${projectId}...`);
+      const asmResult = await assembleFlowProject(userId, projectId);
+      finalUrl = asmResult.finalUrl.startsWith('http') ? asmResult.finalUrl : `${DARKTUBE_BASE_URL}${asmResult.finalUrl}`;
+      srtUrl = asmResult.srtUrl ? (asmResult.srtUrl.startsWith('http') ? asmResult.srtUrl : `${DARKTUBE_BASE_URL}${asmResult.srtUrl}`) : null;
+    } catch (asmErr: any) {
+      console.warn(`[MCP DarkTube] Erro na montagem automática: ${asmErr.message}`);
+    }
+  }
+
+  let localFiles: Record<string, any> = {};
+  if (downloadLocal) {
+    if (finalUrl) {
+      localFiles.finalVideo = await downloadCreativeToLocal(finalUrl, outputDir, `flow_final_${projectId}.mp4`);
+    }
+    if (charSheetUrl) {
+      localFiles.characterSheet = await downloadCreativeToLocal(charSheetUrl, outputDir, `character_${projectId}.jpg`);
+    }
+  }
+
+  return {
+    success: true,
+    projectId,
+    title: project.title,
+    status: project.status,
+    isComplete: Boolean(finalUrl) || allTakesDone,
+    progress: {
+      totalTakes,
+      completedTakes,
+      failedTakes,
+      inProgressTakes,
+      percent: totalTakes > 0 ? Math.round((completedTakes / totalTakes) * 100) : 0,
+    },
+    character: {
+      name: project.script?.characters?.[0]?.name || 'Apresentador',
+      sheetUrl: charSheetUrl,
+      status: charJob?.status || (charSheetUrl ? 'done' : 'none'),
+    },
+    finalVideoUrl: finalUrl,
+    srtUrl,
+    takes: takeJobs.map((j: any) => ({
+      takeIndex: j.take_index,
+      kind: j.kind,
+      status: j.status,
+      videoUrl: j.result_url ? (j.result_url.startsWith('http') ? j.result_url : `${DARKTUBE_BASE_URL}${j.result_url}`) : null,
+      error: j.error_message || null,
+    })),
+    localFiles: Object.keys(localFiles).length > 0 ? localFiles : undefined,
+  };
+}
+
+/**
+ * 6. Dispara a montagem de um projeto do /flow via ffmpeg, gerando o MP4 unificado com legendas.
+ */
+export async function assembleFlowCreative(input: AssembleCreativeInput) {
+  const { projectId, downloadLocal = true, outputDir = './midia/criativos' } = input;
+  const { rows } = await pool.query('SELECT user_id FROM public.flow_projects WHERE id = $1 LIMIT 1', [projectId]);
+  if (!rows || rows.length === 0) throw new Error(`Projeto "${projectId}" não foi encontrado no banco de dados.`);
+  const userId = rows[0].user_id;
+
+  const asm = await assembleFlowProject(userId, projectId);
+  const finalUrl = asm.finalUrl.startsWith('http') ? asm.finalUrl : `${DARKTUBE_BASE_URL}${asm.finalUrl}`;
+  const srtUrl = asm.srtUrl ? (asm.srtUrl.startsWith('http') ? asm.srtUrl : `${DARKTUBE_BASE_URL}${asm.srtUrl}`) : null;
+
+  let localFile = null;
+  if (downloadLocal && finalUrl) {
+    localFile = await downloadCreativeToLocal(finalUrl, outputDir, `flow_final_${projectId}.mp4`);
+  }
+
+  return {
+    success: true,
+    projectId,
+    finalUrl,
+    srtUrl,
+    burned: asm.burned,
+    takesCount: asm.takes,
+    durationSeconds: asm.seconds,
+    localFile,
   };
 }
