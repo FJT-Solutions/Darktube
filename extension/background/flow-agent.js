@@ -3,8 +3,10 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.22';
-const FLOW_BUILD = '2026-11-05-auto-ghost-persistent'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.23';
+const FLOW_BUILD = '2026-11-05-stealth-ghost-v2'; // confirma que a extensao recarregada e a nova
+const GHOST_LEFT = -2500;
+const GHOST_TOP = 0;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -118,6 +120,8 @@ async function flowRestoreVisible() {
   flowVisRestore = null;
   if (!r) return;
   try {
+    const c = await flowCfg();
+    if (c.flow_always_ghost !== false) return; // janela fantasma fica no lugar offscreen
     if (r.wasMinimized) await chrome.windows.update(r.windowId, { state: 'minimized' });
     if (r.previousTabId) await chrome.tabs.update(r.previousTabId, { active: true });
     if (r.previousWindowId) await chrome.windows.update(r.previousWindowId, { focused: true });
@@ -277,14 +281,15 @@ async function flowTick() {
           const win = await chrome.windows.create({
             url: openUrl,
             focused: false,
-            left: -10000,
-            top: -10000,
+            left: GHOST_LEFT,
+            top: GHOST_TOP,
             width: 620,
             height: 860,
             state: 'normal',
           });
           if (win && win.id) {
-            await chrome.storage.local.set({ flow_auto_window_id: win.id });
+            await chrome.windows.update(win.id, { left: GHOST_LEFT, top: GHOST_TOP, focused: false }).catch(() => {});
+            await chrome.storage.local.set({ flow_auto_window_id: win.id, flow_ghost_active: true });
             await new Promise((r) => setTimeout(r, 5000));
             tab = await flowFindTab();
           }
@@ -301,15 +306,16 @@ async function flowTick() {
       try {
         const tabsInWin = await chrome.tabs.query({ windowId: tab.windowId });
         if (tabsInWin.length > 1) {
-          const ghostWin = await chrome.windows.create({ tabId: tab.id, focused: false, left: -10000, top: -10000, width: 620, height: 860, state: 'normal' });
+          const ghostWin = await chrome.windows.create({ tabId: tab.id, focused: false, left: GHOST_LEFT, top: GHOST_TOP, width: 620, height: 860, state: 'normal' });
           if (ghostWin && ghostWin.id) {
+            await chrome.windows.update(ghostWin.id, { left: GHOST_LEFT, top: GHOST_TOP, focused: false }).catch(() => {});
             await chrome.storage.local.set({ flow_auto_window_id: ghostWin.id, flow_ghost_active: true });
             tab = { id: tab.id, windowId: ghostWin.id };
           }
         } else {
           const w = await chrome.windows.get(tab.windowId).catch(() => null);
-          if (w && (w.left > -1000 || w.top > -1000)) {
-            await chrome.windows.update(tab.windowId, { left: -10000, top: -10000, width: 620, height: 860, focused: false });
+          if (w && (w.left > -1000 || w.top > -1000 || w.state === 'minimized')) {
+            await chrome.windows.update(tab.windowId, { state: 'normal', left: GHOST_LEFT, top: GHOST_TOP, width: 620, height: 860, focused: false }).catch(() => {});
             await chrome.storage.local.set({ flow_ghost_active: true });
           }
         }
@@ -368,7 +374,7 @@ async function flowTick() {
         await scanIdle();
         try {
           const auto = (await chrome.storage.local.get(['flow_auto_window_id'])).flow_auto_window_id;
-          if (auto) {
+          if (auto && c.flow_always_ghost === false) {
             flowLog('Fila de takes finalizada com sucesso. Fechando janela do Google Flow.');
             await chrome.windows.remove(auto);
             await chrome.storage.local.remove(['flow_auto_window_id']);
@@ -699,18 +705,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           wasMinimized: win.state === 'minimized',
         };
         const c = await flowCfg();
-        if (win.state === 'minimized' || (c.flow_always_ghost !== false && (win.left > -1000 || win.top > -1000))) {
-          // Em vez de desminimizar sobre a tela do usuario, move para coordenadas off-screen fantasma
+        if (c.flow_always_ghost !== false) {
+          // Mantem a janela estavel na coordenada fantasma
           await chrome.windows.update(tab.windowId, {
             state: 'normal',
             focused: false,
-            left: -10000,
-            top: -10000,
+            left: GHOST_LEFT,
+            top: GHOST_TOP,
             width: 620,
             height: 860,
-          });
+          }).catch(() => {});
+        } else if (win.state === 'minimized') {
+          await chrome.windows.update(tab.windowId, {
+            state: 'normal',
+            focused: false,
+          }).catch(() => {});
         }
-        if (!tab.active) await chrome.tabs.update(tabId, { active: true });
+        if (!tab.active) await chrome.tabs.update(tabId, { active: true }).catch(() => {});
         // NUNCA foca a janela (focused: false) para jamais roubar foco ou sobrepor a tela do usuario
         clearTimeout(flowVisTimer);
         flowVisTimer = setTimeout(() => flowRestoreVisible(), 60000); // rede de seguranca

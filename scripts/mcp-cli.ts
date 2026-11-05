@@ -157,6 +157,23 @@ async function run() {
     process.exit(0);
   }
 
+  if (cmd === 'retry-take') {
+    if (!arg1) throw new Error('Informe o projectId');
+    const takeIndex = Number(rest[0]) || 1;
+    const { pool } = await import('../lib/db-client');
+    const { rows } = await pool.query(
+      `UPDATE public.flow_jobs
+          SET status = 'queued', error_message = NULL, result_url = NULL, claimed_at = NULL, finished_at = NULL,
+              params = params - 'policyRetries' - 'genRetries',
+              deadline_at = NOW() + interval '720 minutes'
+        WHERE (project_id::text = $1 OR project_id::text LIKE $2) AND take_index = $3
+        RETURNING id, take_index, status`,
+      [arg1, `${arg1}%`, takeIndex]
+    );
+    console.log(JSON.stringify(rows, null, 2));
+    process.exit(0);
+  }
+
   throw new Error(`Comando desconhecido: ${cmd}`);
 }
 

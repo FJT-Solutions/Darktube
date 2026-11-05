@@ -6,6 +6,13 @@
   if (window.__dtFlowLoaded) return;
   window.__dtFlowLoaded = true;
 
+  try {
+    Object.defineProperty(Document.prototype, 'visibilityState', { get: () => 'visible', configurable: true });
+    Object.defineProperty(Document.prototype, 'hidden', { get: () => false, configurable: true });
+    Object.defineProperty(document, 'visibilityState', { get: () => 'visible', configurable: true });
+    Object.defineProperty(document, 'hidden', { get: () => false, configurable: true });
+  } catch (_) {}
+
   const S = window.DT_FLOW_SEL;
   const RX = window.DT_FLOW_RX;
   // Com a aba em segundo plano o Chrome atrasa os timers para 1 vez por minuto. Durante um job o segundo plano
