@@ -133,6 +133,7 @@ export const REALISM_PROMPT: Record<string, string> = {
 }
 
 export const VIDEO_MODELS: FlowFieldOption[] = [
+  { value: 'Omni 1.2 Flash', label: 'Omni 1.2 Flash' },
   { value: 'Omni 1.1 Flash', label: 'Omni 1.1 Flash' },
   { value: 'Veo 3.1 - Lite', label: 'Veo 3.1 Lite' },
   { value: 'Veo 3.1 - Fast', label: 'Veo 3.1 Fast' },

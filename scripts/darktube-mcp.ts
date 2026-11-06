@@ -62,9 +62,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             templateId: { type: 'string', description: 'ID do template do /flow (ex: receita-viral, produto-tiktok-shop)', default: 'produto-tiktok-shop' },
             videoModel: {
               type: 'string',
-              enum: ['Omni 1.1 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'],
+              enum: ['Omni 1.2 Flash', 'Omni 1.1 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'],
               description: 'Modelo de geração de vídeo por IA no /flow',
-              default: 'Omni 1.1 Flash',
+              default: 'Omni 1.2 Flash',
             },
             secondsPerTake: {
               type: 'number',

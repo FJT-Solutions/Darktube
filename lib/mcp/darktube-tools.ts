@@ -122,7 +122,7 @@ export async function listFlowTemplates() {
       subniche: t.subniche,
       length: t.length,
       trend: t.trend,
-      videoModel: t.defaults?.model || 'Omni 1.1 Flash',
+      videoModel: t.defaults?.model || 'Omni 1.2 Flash',
       secondsPerTake: seconds,
       defaultTakesCount: takes,
       totalDurationSeconds: takes * seconds,
@@ -532,7 +532,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
 
     const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
     const resolvedSeconds = secondsPerTake || t.defaults?.seconds || 6;
-    const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.1 Flash';
+    const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.2 Flash';
     const resolvedQuality = quality || t.defaults?.quality || '360p';
 
     const params: FlowParams = {
@@ -643,7 +643,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
             userId,
             kind: 'image',
             prompt: sheetPrompt,
-            params: { resolution: '360p', model: 'Omni 1.1 Flash' },
+            params: { resolution: '360p', model: 'Omni 1.2 Flash' },
             projectId: savedProject.id,
             takeIndex: 0,
             role: 'character_sheet',
