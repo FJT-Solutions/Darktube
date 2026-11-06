@@ -3,10 +3,10 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.23';
-const FLOW_BUILD = '2026-11-05-stealth-ghost-v2'; // confirma que a extensao recarregada e a nova
-const GHOST_LEFT = -2500;
-const GHOST_TOP = 0;
+const FLOW_VERSION = '1.3.24';
+const FLOW_BUILD = '2026-11-05-stealth-ghost-v3'; // confirma que a extensao recarregada e a nova
+const GHOST_LEFT = -10000;
+const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
@@ -314,7 +314,8 @@ async function flowTick() {
           }
         } else {
           const w = await chrome.windows.get(tab.windowId).catch(() => null);
-          if (w && (w.left > -1000 || w.top > -1000 || w.state === 'minimized')) {
+          const notGhost = w && (Math.abs(w.left - GHOST_LEFT) > 200 || Math.abs(w.top - GHOST_TOP) > 200);
+          if (notGhost && (c.flow_current || (hb && hb.queuedCount > 0))) {
             await chrome.windows.update(tab.windowId, { state: 'normal', left: GHOST_LEFT, top: GHOST_TOP, width: 620, height: 860, focused: false }).catch(() => {});
             await chrome.storage.local.set({ flow_ghost_active: true });
           }
@@ -374,10 +375,10 @@ async function flowTick() {
         await scanIdle();
         try {
           const auto = (await chrome.storage.local.get(['flow_auto_window_id'])).flow_auto_window_id;
-          if (auto && c.flow_always_ghost === false) {
-            flowLog('Fila de takes finalizada com sucesso. Fechando janela do Google Flow.');
-            await chrome.windows.remove(auto);
-            await chrome.storage.local.remove(['flow_auto_window_id']);
+          if (auto) {
+            flowLog('Fila de takes finalizada com sucesso. Fechando janela automática do Google Flow.');
+            await chrome.windows.remove(auto).catch(() => {});
+            await chrome.storage.local.remove(['flow_auto_window_id', 'flow_ghost_active']);
           }
         } catch (_) {}
       }

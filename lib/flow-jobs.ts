@@ -436,7 +436,8 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
   const now = Date.now();
   if (state?.next_allowed_at && new Date(state.next_allowed_at).getTime() > now) {
     const diff = Math.ceil((new Date(state.next_allowed_at).getTime() - now) / 1000);
-    if (diff > 3) {
+    if (diff > 300) {
+      // Anomalia de relógio ou drift antigo (> 5 min): limpa trava órfã
       await pool.query(`UPDATE public.flow_agents SET next_allowed_at = NULL WHERE user_id = $1`, [userId]);
     } else {
       return { job: null, reason: 'gap', retryAfterSec: diff };

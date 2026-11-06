@@ -561,7 +561,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     let script: FlowScript | null = null;
     const defaultUserId = await resolveDefaultUserId().catch(() => '');
     const userOpenAiKey = defaultUserId ? await getUserApiKey(defaultUserId, 'openai').catch(() => '') : '';
-    const apiKey = userOpenAiKey;
+    const apiKey = userOpenAiKey || process.env.OPENAI_API_KEY || '';
 
     if (apiKey) {
       try {

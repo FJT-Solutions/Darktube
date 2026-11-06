@@ -1,4 +1,13 @@
 import { Pool } from 'pg'
+import dotenv from 'dotenv'
+import path from 'path'
+
+if (!process.env.DATABASE_URL && typeof window === 'undefined') {
+  try {
+    dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
+    dotenv.config({ path: path.resolve(process.cwd(), '.env') })
+  } catch (_) {}
+}
 
 const connectionString = process.env.DATABASE_URL
 
