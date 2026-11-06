@@ -52,7 +52,20 @@ import {
   type FlowField,
   type FlowTemplate,
 } from "@/lib/flow-templates"
-import { buildTakePrompt, countWords, exportScriptText, takeKind, takeReference, validateScript, type FlowScript, type FlowTake, type FlowTakeKind } from "@/lib/flow-script"
+import {
+  buildTakePrompt,
+  countWords,
+  exportScriptText,
+  takeKind,
+  takeReference,
+  validateScript,
+  type FlowScript,
+  type FlowTake,
+  type FlowTakeKind,
+  type FlowTransition,
+  type FlowSfx,
+  type FlowMediaType,
+} from "@/lib/flow-script"
 import { FlowCreditSimulator } from "@/components/flow-credit-simulator"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject } from "@/lib/flow-projects"
@@ -106,6 +119,30 @@ const KIND_OPTIONS: { value: FlowTakeKind; label: string }[] = [
   { value: "dialogo", label: "Personagem fala" },
   { value: "narracao", label: "Narrador" },
   { value: "ambiente", label: "Sem fala" },
+]
+
+const TRANSITION_OPTIONS: { value: FlowTransition; label: string; icon: string }[] = [
+  { value: "cut", label: "Corte Seco (Padrão)", icon: "✂️" },
+  { value: "white_flash", label: "White Flash (Impacto)", icon: "⚡" },
+  { value: "zoom_punch", label: "Zoom Punch (Aproximação rápida)", icon: "🔍" },
+  { value: "whip_pan", label: "Whip Pan (Transição chicote)", icon: "🔄" },
+  { value: "crossfade", label: "Crossfade (Dissolvência suave)", icon: "✨" },
+  { value: "glitch", label: "Glitch (Distorção digital)", icon: "👾" },
+]
+
+const SFX_OPTIONS: { value: FlowSfx; label: string; icon: string }[] = [
+  { value: "none", label: "Sem SFX (Silencioso)", icon: "🔇" },
+  { value: "whoosh", label: "Whoosh (Vento/Corte ágil)", icon: "💨" },
+  { value: "camera_click", label: "Flash / Click de Câmera", icon: "📸" },
+  { value: "bass_drop", label: "Bass Drop (Impacto grave)", icon: "💥" },
+  { value: "paper_rustle", label: "Papel / Textura manual", icon: "📄" },
+  { value: "pop", label: "Pop / Bolha", icon: "🫧" },
+]
+
+const MEDIA_TYPE_OPTIONS: { value: FlowMediaType; label: string; icon: string }[] = [
+  { value: "ai_flow", label: "IA Flow (Veo / Omni)", icon: "🤖" },
+  { value: "stock_asset", label: "Acervo Real / Stock", icon: "🌐" },
+  { value: "screenshot", label: "Print / Tela Digital", icon: "📱" },
 ]
 
 const STATUS_LABEL: Record<string, string> = {
@@ -1592,9 +1629,25 @@ function ProjectView({
             <Card key={t.n}>
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">
-                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s{t.model ? ` · ${t.model}` : ""} · {fmtClock(script.takes.slice(0, t.n - 1).reduce((n, k) => n + k.seconds, 0))}–{fmtClock(script.takes.slice(0, t.n).reduce((n, k) => n + k.seconds, 0))}{t.beat ? " · " + t.beat : ""}</span>
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">
+                      Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s{t.model ? ` · ${t.model}` : ""} · {fmtClock(script.takes.slice(0, t.n - 1).reduce((n, k) => n + k.seconds, 0))}–{fmtClock(script.takes.slice(0, t.n).reduce((n, k) => n + k.seconds, 0))}{t.beat ? " · " + t.beat : ""}</span>
+                    </p>
+                    <Badge variant="outline" className="text-[10px] font-normal py-0 h-5 border-primary/30 bg-primary/5">
+                      {TRANSITION_OPTIONS.find((o) => o.value === (t.transition || "cut"))?.icon}{" "}
+                      {TRANSITION_OPTIONS.find((o) => o.value === (t.transition || "cut"))?.label.split(" ")[0]}
+                    </Badge>
+                    {t.sfx && t.sfx !== "none" && (
+                      <Badge variant="outline" className="text-[10px] font-normal py-0 h-5 border-amber-500/30 bg-amber-500/5 text-amber-500">
+                        {SFX_OPTIONS.find((o) => o.value === t.sfx)?.icon} {t.sfx}
+                      </Badge>
+                    )}
+                    {t.mediaType && t.mediaType !== "ai_flow" && (
+                      <Badge variant="outline" className="text-[10px] font-normal py-0 h-5 border-blue-500/30 bg-blue-500/5 text-blue-400">
+                        {t.mediaType === "stock_asset" ? "🌐 Stock" : "📱 Print"}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     {job && (
                       <Badge variant={job.status === "done" ? "default" : "outline"}>
@@ -1685,6 +1738,86 @@ function ProjectView({
                     })}
                   </div>
                 )}
+                {/* Edição Conjugada, Transições e SFX (Remotion) */}
+                <div className="rounded-lg border bg-muted/40 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      🎬 Edição Dinâmica & Pós-Produção Remotion
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">Transição e SFX por take</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-muted-foreground">Transição de corte</label>
+                      <Select
+                        value={t.transition || "cut"}
+                        onValueChange={(v) => setTake(t.n, { transition: v as FlowTransition })}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TRANSITION_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value} className="text-xs">
+                              {o.icon} {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-muted-foreground">Efeito Sonoro (SFX)</label>
+                      <Select
+                        value={t.sfx || "none"}
+                        onValueChange={(v) => setTake(t.n, { sfx: v as FlowSfx })}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SFX_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value} className="text-xs">
+                              {o.icon} {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] text-muted-foreground">Mídia da Cena</label>
+                      <Select
+                        value={t.mediaType || "ai_flow"}
+                        onValueChange={(v) => setTake(t.n, { mediaType: v as FlowMediaType })}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MEDIA_TYPE_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value} className="text-xs">
+                              {o.icon} {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {t.mediaType && t.mediaType !== "ai_flow" && (
+                    <div className="pt-1 space-y-1">
+                      <label className="text-[11px] text-muted-foreground">URL ou Caminho do Arquivo Real / Print</label>
+                      <Input
+                        value={t.assetUrl || ""}
+                        onChange={(e) => setTake(t.n, { assetUrl: e.target.value })}
+                        placeholder="https://... ou caminho do arquivo"
+                        className="h-8 text-xs bg-background"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {job?.status === "draft" && job.error_message && <p className="text-xs text-destructive">{job.error_message}</p>}
                 <details className="text-xs">
                   <summary className="cursor-pointer text-muted-foreground">Prompt do Flow</summary>

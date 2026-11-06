@@ -740,6 +740,10 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           action: take.action,
           prompt: buildTakePrompt(finalScript, take, params, t, ref),
           referenceImage: ref.refImageUrl || null,
+          transition: take.transition || 'cut',
+          sfx: take.sfx || 'none',
+          mediaType: take.mediaType || 'ai_flow',
+          assetUrl: take.assetUrl || null,
         };
       }),
       status: queueTakes ? 'queued_for_google_flow' : 'created_in_flow',
@@ -865,13 +869,20 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     },
     finalVideoUrl: finalUrl,
     srtUrl,
-    takes: takeJobs.map((j: any) => ({
-      takeIndex: j.take_index,
-      kind: j.kind,
-      status: j.status,
-      videoUrl: j.result_url ? (j.result_url.startsWith('http') ? j.result_url : `${DARKTUBE_BASE_URL}${j.result_url}`) : null,
-      error: j.error_message || null,
-    })),
+    takes: takeJobs.map((j: any) => {
+      const takeMeta = project.script?.takes?.find((t: any) => t.n === j.take_index);
+      return {
+        takeIndex: j.take_index,
+        kind: j.kind,
+        status: j.status,
+        videoUrl: j.result_url ? (j.result_url.startsWith('http') ? j.result_url : `${DARKTUBE_BASE_URL}${j.result_url}`) : null,
+        error: j.error_message || null,
+        transition: takeMeta?.transition || 'cut',
+        sfx: takeMeta?.sfx || 'none',
+        mediaType: takeMeta?.mediaType || 'ai_flow',
+        assetUrl: takeMeta?.assetUrl || null,
+      };
+    }),
     localFiles: Object.keys(localFiles).length > 0 ? localFiles : undefined,
   };
 }

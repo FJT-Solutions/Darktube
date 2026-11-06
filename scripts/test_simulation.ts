@@ -78,7 +78,10 @@ const mockScript = {
       line: 'Veja como essa caneta mágica faz a letra do seu filho melhorar em dias!',
       characters: ['c1'],
       action: 'Juliana holds up magic notebook smiling to partner off camera.',
-      sound: 'gentle room ambience'
+      sound: 'gentle room ambience',
+      transition: 'white_flash',
+      sfx: 'whoosh',
+      mediaType: 'ai_flow',
     },
     {
       n: 2,
@@ -87,7 +90,11 @@ const mockScript = {
       line: '', // B-Roll sem pessoas
       characters: [],
       action: 'Macro close up of pen writing cursive strokes into grooved paper.',
-      sound: 'crisp paper scratching sound'
+      sound: 'crisp paper scratching sound',
+      transition: 'zoom_punch',
+      sfx: 'bass_drop',
+      mediaType: 'stock_asset',
+      assetUrl: 'https://images.unsplash.com/photo-example.jpg',
     }
   ],
   seo: { title: 'Caderno Mágico', caption: 'Compre já', hook: 'Seu filho escreve feio?', hashtags: ['#caligrafia'] }
@@ -102,6 +109,18 @@ if (normalized.takes[0].model === 'Veo 3.1 - Quality' && normalized.takes[0].sec
   console.log('  [PASS] Roteiro normalizou duração para 5s e separou Quality no diálogo e Lite no B-roll');
 } else {
   console.error('  [FAIL] Normalização do roteiro falhou');
+  failed++;
+}
+
+console.log('Take 1: transition =', normalized.takes[0].transition, '| sfx =', normalized.takes[0].sfx, '| mediaType =', normalized.takes[0].mediaType);
+console.log('Take 2: transition =', normalized.takes[1].transition, '| sfx =', normalized.takes[1].sfx, '| mediaType =', normalized.takes[1].mediaType, '| assetUrl =', normalized.takes[1].assetUrl);
+
+if (normalized.takes[0].transition === 'white_flash' && normalized.takes[0].sfx === 'whoosh' && normalized.takes[0].mediaType === 'ai_flow' &&
+    normalized.takes[1].transition === 'zoom_punch' && normalized.takes[1].sfx === 'bass_drop' && normalized.takes[1].mediaType === 'stock_asset' &&
+    normalized.takes[1].assetUrl === 'https://images.unsplash.com/photo-example.jpg') {
+  console.log('  [PASS] Transições, SFX e Mídia Acoplada por take validados com 100% de precisão!');
+} else {
+  console.error('  [FAIL] Validação de transições/SFX falhou');
   failed++;
 }
 

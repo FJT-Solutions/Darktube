@@ -6,6 +6,15 @@ import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM,
 
 export type FlowTakeKind = 'dialogo' | 'narracao' | 'ambiente'
 
+export const FLOW_TRANSITIONS = ['cut', 'white_flash', 'whip_pan', 'zoom_punch', 'crossfade', 'glitch'] as const
+export type FlowTransition = (typeof FLOW_TRANSITIONS)[number]
+
+export const FLOW_SFX = ['whoosh', 'camera_click', 'bass_drop', 'paper_rustle', 'pop', 'none'] as const
+export type FlowSfx = (typeof FLOW_SFX)[number]
+
+export const FLOW_MEDIA_TYPES = ['ai_flow', 'stock_asset', 'screenshot'] as const
+export type FlowMediaType = (typeof FLOW_MEDIA_TYPES)[number]
+
 export interface FlowCharacter {
   id: string
   name: string
@@ -46,6 +55,14 @@ export interface FlowTake {
   beat?: string
   /** So no modo Livre: tipo do take (sem isso vale o modo do template). */
   kind?: FlowTakeKind
+  /** Efeito de transição de corte para a próxima cena (compilado pelo Remotion). */
+  transition?: FlowTransition
+  /** Efeito sonoro (SFX) acoplado ao corte. */
+  sfx?: FlowSfx
+  /** Tipo de mídia deste take: IA gerada pelo Flow ou acervo real da internet. */
+  mediaType?: FlowMediaType
+  /** URL ou caminho do asset de acervo real quando mediaType !== 'ai_flow'. */
+  assetUrl?: string
 }
 
 export interface FlowSeo {
@@ -96,7 +113,7 @@ const SCHEMA = `{
   "characters": [{"id": "c1", "name": "string", "description": "fixed visual anchor in English, 25-35 words, starting with the age range in words (e.g. 'adult woman in her early thirties'): skin tone, face, exact hair color and cut, build (average, athletic, broad or heavyset), full outfit with colors and fabrics", "voice": "accent, timbre and delivery in English"}],
   "narratorVoice": "only when there is narration: one fixed narrator voice in English (gender, age range, timbre, pacing), used in every narrated take",
   "locations": [{"id": "l1", "name": "string", "description": "full visual description in English: place, time of day, light sources, textures"}],
-  "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "sound": "specific foley and ambience in English"}],
+  "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "sound": "specific foley and ambience in English", "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch", "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none", "mediaType": "ai_flow | stock_asset"}],
   "seo": {"title": "string", "caption": "string", "hook": "engagement question", "hashtags": ["#tag"]}
 }`
 
@@ -214,6 +231,7 @@ ${SCHEMA}
 Structure:
 - Write exactly ${takes} takes, numbered from 1.
 - Dynamic Take Rhythm: each take specifies its own "seconds" chosen from [${allowedSecs.join(', ')}] based on narrative pacing (valid durations for this model family: ${allowedSecs.join(', ')}s; e.g. shorter takes for punchy hooks/CTA, longer takes for key transformations or dialogue). The overall target duration is approximately ${takes * seconds} seconds total.
+- Dynamic Visual Editing & Transitions: for each take, assign a specific cut transition to the next scene ("cut", "white_flash", "whip_pan", "zoom_punch", "crossfade", "glitch") and an accompanying audio SFX ("whoosh", "camera_click", "bass_drop", "paper_rustle", "pop", "none") to maximize viewer retention in Remotion compilation. Hooks and key twists use white_flash or zoom_punch with whoosh or bass_drop; product/ingredient reveals use camera_click; culinary uses crossfade; dynamic shifts use whip_pan.
 - Scene functions for this format, in order (if there are more takes than functions, treat them as acts and escalate the middle; if fewer, merge neighbours). Put the function in "beat":
 ${beats}
 ${(t.rules || []).map((r) => `- ${r}`).join('\n')}
@@ -313,6 +331,20 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
     const kindRaw = str(k?.kind, 12) as FlowTakeKind
     const kind: FlowTakeKind | undefined = t.mode === 'livre' ? (KINDS.includes(kindRaw) ? kindRaw : 'dialogo') : undefined
     const eff = takeKind({ kind } as FlowTake, t.mode)
+    const rawTransition = str(k?.transition, 30)
+    const transition: FlowTransition = (FLOW_TRANSITIONS as readonly string[]).includes(rawTransition)
+      ? (rawTransition as FlowTransition)
+      : 'cut'
+    const rawSfx = str(k?.sfx, 30)
+    const sfx: FlowSfx = (FLOW_SFX as readonly string[]).includes(rawSfx)
+      ? (rawSfx as FlowSfx)
+      : 'none'
+    const rawMediaType = str(k?.mediaType, 30)
+    const mediaType: FlowMediaType = (FLOW_MEDIA_TYPES as readonly string[]).includes(rawMediaType)
+      ? (rawMediaType as FlowMediaType)
+      : 'ai_flow'
+    const assetUrl = str(k?.assetUrl, 500)
+
     return {
       n: i + 1,
       seconds,
@@ -325,6 +357,10 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       sound: str(k?.sound, 240),
       camera: str(k?.camera, 200),
       beat: str(k?.beat, 160),
+      transition,
+      sfx,
+      mediaType,
+      ...(assetUrl ? { assetUrl } : {}),
       ...(kind ? { kind } : {}),
     }
   })
