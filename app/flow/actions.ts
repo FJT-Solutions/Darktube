@@ -2,7 +2,7 @@
 
 import { getCurrentUser } from "@/lib/auth-helpers"
 import { getUserApiKey } from "@/lib/database"
-import { getFlowTemplate, MAX_TAKES, TAKE_SECONDS } from "@/lib/flow-templates"
+import { getFlowTemplate, MAX_TAKES, TAKE_SECONDS, clampSecondsForModel } from "@/lib/flow-templates"
 import {
   buildRepairPrompt,
   buildSystemPrompt,
@@ -79,10 +79,10 @@ function cleanParams(raw: Record<string, any>, templateId: string): FlowParams {
   }
   const takes = Math.round(Number(out.takes) || t.defaults.takes)
   out.takes = Math.min(Math.max(takes, 1), MAX_TAKES)
-  const seconds = Number(out.seconds) || t.defaults.seconds
-  out.seconds = TAKE_SECONDS.includes(seconds) ? seconds : t.defaults.seconds
-  out.aspect = out.aspect === "16:9" ? "16:9" : "9:16"
   out.model = String(out.model || t.defaults.model).slice(0, 60)
+  const seconds = Number(out.seconds) || t.defaults.seconds
+  out.seconds = clampSecondsForModel(seconds, out.model)
+  out.aspect = out.aspect === "16:9" ? "16:9" : "9:16"
   out.quality = out.quality === "720p" ? "720p" : "360p"
   out.refImages = out.refImages === "0" ? "0" : "1"
   out.refPrevVideo =
@@ -276,7 +276,7 @@ export async function queueFlowProjectAction(id: string) {
           aspectRatio: String(project.params.aspect),
           duration: take.seconds,
           resolution: String(project.params.quality),
-          model: String(project.params.model),
+          model: take.model || String(project.params.model),
           ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
           ...(ref.refPrevVideo ? { refPrevVideo: true } : {}),
         },
@@ -312,7 +312,7 @@ export async function regenerateFinalAction(id: string, takeNumbers: number[]) {
         kind: "video",
         // 720p usa a mesma folha de referencia (o video do take anterior fica so nos rascunhos).
         prompt: buildTakePrompt(project.script, take, project.params, t, finalRef(take)),
-        params: { aspectRatio: String(project.params.aspect), duration: take.seconds, resolution: "720p", model: String(project.params.model), ...(finalRef(take).refImageUrl ? { refImageUrl: finalRef(take).refImageUrl } : {}) },
+        params: { aspectRatio: String(project.params.aspect), duration: take.seconds, resolution: "720p", model: take.model || String(project.params.model), ...(finalRef(take).refImageUrl ? { refImageUrl: finalRef(take).refImageUrl } : {}) },
         projectId: project.id,
         takeIndex: take.n,
         role: "take_final",

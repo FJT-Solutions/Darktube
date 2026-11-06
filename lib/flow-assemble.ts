@@ -229,7 +229,7 @@ export function pickClips(takeNumbers: number[], jobs: Pick<FlowJob, 'take_index
   return { picked, missing }
 }
 
-async function probe(file: string) {
+export async function probe(file: string) {
   try {
     await run(ffmpegBin(), ['-hide_banner', '-i', file], { timeout: 60000 })
     return parseProbe('')
@@ -252,7 +252,7 @@ async function detectVoice(file: string, duration: number) {
 const OPENAI_WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions'
 
 /** Transcreve o audio com tempo por palavra via OpenAI Whisper oficial (whisper-1). */
-async function transcribeWhisper(file: string, language?: string, customApiKey?: string): Promise<TimedWord[] | null> {
+export async function transcribeWhisper(file: string, language?: string, customApiKey?: string): Promise<TimedWord[] | null> {
   const apiKey = customApiKey
   if (!apiKey) {
     console.warn('[Flow] Chave OpenAI nao encontrada nas Credenciais do usuario (Credenciais > IA > OpenAI).')
@@ -324,19 +324,96 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const normalized: string[] = []
     const durations: number[] = []
     const hasAudio: boolean[] = []
-    for (const clip of picked) {
+    const cues: Cue[] = []
+    const openAiApiKey = (await getUserApiKey(userId, 'openai').catch(() => '')) || ''
+    const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
+    const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
+    let at = 0
+
+    for (let i = 0; i < picked.length; i++) {
+      const clip = picked[i]
+      const k = takes.find((t) => t.n === clip.n) ?? takes[i]
       const raw = path.join(dir, `raw_${clip.n}.mp4`)
-      const out = path.join(dir, `norm_${clip.n}.mp4`)
+      const norm = path.join(dir, `norm_${clip.n}.mp4`)
+      const trimmed = path.join(dir, `trimmed_${clip.n}.mp4`)
       fs.writeFileSync(raw, await readStored(clip.url))
       const info = await probe(raw)
       hasAudio.push(info.hasAudio)
       const args = info.hasAudio
-        ? ['-y', '-i', raw, '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '44100', '-ac', '2', out]
-        : ['-y', '-i', raw, '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', '1:a', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', out]
+        ? ['-y', '-i', raw, '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '44100', '-ac', '2', norm]
+        : ['-y', '-i', raw, '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', '1:a', '-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', norm]
       await run(ffmpegBin(), args, { timeout: 300000 })
-      normalized.push(out)
-      const outInfo = await probe(out)
-      durations.push(outInfo.duration || takes.find((k) => k.n === clip.n)?.seconds || 6)
+
+      let clipFile = norm
+      let dur = (await probe(norm)).duration || k?.seconds || 6
+      let trimOffset = 0
+
+      // Corte inteligente de silêncio inicial em takes com fala (elimina o pre-roll ocioso):
+      if (t.mode !== 'ambiente' && k?.line?.trim() && info.hasAudio) {
+        const words = await transcribeWhisper(norm, lang, openAiApiKey)
+        if (words && words.length > 0) {
+          const firstWordStart = words[0].start
+          if (firstWordStart > 0.35) {
+            trimOffset = Math.max(0, firstWordStart - 0.15)
+            console.log(`[Flow] take ${clip.n}: cortando ${trimOffset.toFixed(2)}s de silêncio inicial (voz aos ${firstWordStart.toFixed(2)}s)`)
+            try {
+              await run(ffmpegBin(), ['-y', '-ss', String(trimOffset), '-i', norm, '-c', 'copy', trimmed], { timeout: 120000 })
+              if (fs.existsSync(trimmed) && fs.statSync(trimmed).size > 1000) {
+                clipFile = trimmed
+                dur = Math.max(0.5, dur - trimOffset)
+              } else {
+                trimOffset = 0
+              }
+            } catch {
+              trimOffset = 0
+            }
+          }
+
+          const adjustedWords = words
+            .filter((w) => w.end > trimOffset)
+            .map((w) => ({ ...w, start: Math.max(0, w.start - trimOffset), end: Math.max(0.1, w.end - trimOffset) }))
+            .filter((w) => w.start < dur)
+
+          const takeCues = cuesFromWords(tightenWords(adjustedWords), wordsPerCaption).map((c) => ({
+            ...c,
+            start: at + c.start,
+            end: at + Math.min(c.end, dur - 0.05),
+          }))
+          cues.push(...takeCues)
+          console.log(`[Flow] legenda take ${clip.n}: OpenAI whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg)`)
+        } else {
+          // Fallback procedural com corte de silêncio estimado
+          const voiceWin = await detectVoice(norm, dur)
+          const win = voiceWin || estimateSpeech(k.line, dur)
+          if (win.start > 0.35) {
+            trimOffset = Math.max(0, win.start - 0.15)
+            try {
+              await run(ffmpegBin(), ['-y', '-ss', String(trimOffset), '-i', norm, '-c', 'copy', trimmed], { timeout: 120000 })
+              if (fs.existsSync(trimmed) && fs.statSync(trimmed).size > 1000) {
+                clipFile = trimmed
+                dur = Math.max(0.5, dur - trimOffset)
+              } else {
+                trimOffset = 0
+              }
+            } catch {
+              trimOffset = 0
+            }
+          }
+          const chunks = splitCaption(k.line, wordsPerCaption)
+          if (chunks.length) {
+            const fallbackCues = timeChunks(chunks, Math.max(0, win.start - trimOffset), Math.max(0.2, win.end - trimOffset)).map((c) => ({
+              ...c,
+              start: at + c.start,
+              end: at + Math.min(c.end, dur - 0.05),
+            }))
+            cues.push(...fallbackCues)
+          }
+        }
+      }
+
+      normalized.push(clipFile)
+      durations.push(dur)
+      at += dur
     }
 
     const list = path.join(dir, 'list.txt')
@@ -344,45 +421,6 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
-    // Legenda, take por take: Whisper da OpenAI (somente a chave salva nas Credenciais do usuário) com fallback procedural de roteiro.
-    const openAiApiKey = (await getUserApiKey(userId, 'openai').catch(() => '')) || ''
-    const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
-    const cues: Cue[] = []
-    const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
-    let at = 0
-    for (let i = 0; i < takes.length; i++) {
-      const k = takes[i]
-      const dur = durations[i]
-      if (t.mode !== 'ambiente' && k.line.trim()) {
-        const words = hasAudio[i] ? await transcribeWhisper(normalized[i], lang, openAiApiKey) : null
-        if (words && words.length) {
-          const takeCues = cuesFromWords(tightenWords(words).filter((w) => w.start < dur), wordsPerCaption).map((c) => ({
-            ...c,
-            start: at + c.start,
-            end: at + Math.min(c.end, dur - 0.05),
-          }))
-          cues.push(...takeCues)
-          console.log(`[Flow] legenda take ${k.n}: OpenAI whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg), ${(takeCues[0]?.start - at).toFixed(1)}s-${(takeCues[takeCues.length - 1]?.end - at).toFixed(1)}s`)
-        } else {
-          // Fallback procedural: gera legendas a partir do texto do roteiro sincronizado com o áudio ou duração
-          const chunks = splitCaption(k.line, wordsPerCaption)
-          if (chunks.length) {
-            const voiceWin = hasAudio[i] ? await detectVoice(normalized[i], dur) : null
-            const win = voiceWin || estimateSpeech(k.line, dur)
-            const fallbackCues = timeChunks(chunks, win.start, win.end).map((c) => ({
-              ...c,
-              start: at + c.start,
-              end: at + Math.min(c.end, dur - 0.05),
-            }))
-            cues.push(...fallbackCues)
-            console.log(`[Flow] legenda take ${k.n} (fallback roteiro): ${chunks.length} frases sincronizadas a partir do roteiro (${win.start.toFixed(1)}s-${win.end.toFixed(1)}s)`)
-          } else {
-            console.log(`[Flow] take ${k.n}: nenhuma legenda gerada`)
-          }
-        }
-      }
-      at += dur
-    }
     const srt = buildSrt(cues)
 
     let finalFile = joined
@@ -393,13 +431,14 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     if (srt) fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
     if (burn) {
       fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
-      // Legenda estilo social media limpa/normal: fonte encorpada (Bold), contorno e sombra suaves, margem segura
-      const style = `Fontname=Arial,Bold=1,FontSize=${vertical ? 24 : 22},Outline=3,Shadow=1.5,Alignment=2,MarginV=${vertical ? 110 : 45},PrimaryColour=&H00FFFFFF&,OutlineColour=&H00000000&,BackColour=&H80000000&`
+      // Legenda estilo social media moderna compacta: fonte Montserrat-Bold/The Bold Font, tamanho proporcional, sem tampar o produto
+      const fontsDir = path.join(process.cwd(), 'public', 'fonts').replace(/\\/g, '/')
+      const style = `Fontname=Montserrat-Bold,Bold=1,FontSize=${vertical ? 15 : 13},Outline=2.2,Shadow=1,Alignment=2,MarginV=${vertical ? 75 : 35},PrimaryColour=&H00FFFFFF&,OutlineColour=&H00000000&,BackColour=&H80000000&`
       const burnedFile = path.join(dir, 'final.mp4')
       try {
         await run(
           ffmpegBin(),
-          ['-y', '-i', 'joined.mp4', '-vf', `subtitles=captions.srt:force_style='${style}'`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', 'final.mp4'],
+          ['-y', '-i', 'joined.mp4', '-vf', `subtitles=captions.srt:fontsdir='${fontsDir}':force_style='${style}'`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', 'final.mp4'],
           { timeout: 300000, cwd: dir }
         )
         if (fs.existsSync(burnedFile) && fs.statSync(burnedFile).size > 1000) {

@@ -140,7 +140,53 @@ export const VIDEO_MODELS: FlowFieldOption[] = [
   { value: 'Veo 3.1 - Quality', label: 'Veo 3.1 Quality' },
 ]
 
-export const TAKE_SECONDS = [4, 6, 8, 10]
+export const TAKE_SECONDS = [4, 5, 6, 8, 10]
+
+/**
+ * Duracoes em segundos permitidas nativamente por cada modelo no Google Flow:
+ * - Veo 3.1: suporta exclusivamente 5s ou 8s por geracao.
+ * - Omni (1.1 / 1.2 Flash): suporta 4s, 6s, 8s ou 10s.
+ */
+export function allowedSecondsForModel(model?: string): number[] {
+  const m = String(model || '').toLowerCase()
+  if (m.includes('veo')) {
+    return [5, 8]
+  }
+  return [4, 6, 8, 10]
+}
+
+/**
+ * Valida e ajusta a duração do take para o valor permitido mais próximo do modelo.
+ */
+export function clampSecondsForModel(seconds: number, model?: string): number {
+  const allowed = allowedSecondsForModel(model)
+  if (allowed.includes(seconds)) return seconds
+  return allowed.reduce((prev, curr) => (Math.abs(curr - seconds) < Math.abs(prev - seconds) ? curr : prev), allowed[0])
+}
+
+/**
+ * Resolução inteligente do modelo por take (Arquitetura Híbrida de Custos & Fidelidade):
+ * - Familia Veo: takes com close de pessoas, rostos ou dialogo lip-sync usam o modelo base selecionado
+ *   (Veo 3.1 - Quality / Fast). Takes sem pessoas (b-roll, comida, objetos, cenarios) usam Veo 3.1 - Lite,
+ *   economizando creditos e tempo sem criar inconsistencias esteticas (mesma familia e resolucao 720p).
+ * - Familia Omni: takes com lip-sync de fala usam Omni 1.2 Flash; b-roll e objetos usam Omni 1.1 Flash.
+ */
+export function resolveTakeModel(baseModel: string, hasCharacterOrDialogue: boolean): string {
+  const m = String(baseModel || '')
+  if (m.toLowerCase().includes('veo')) {
+    if (!hasCharacterOrDialogue) {
+      return 'Veo 3.1 - Lite'
+    }
+    return m || 'Veo 3.1 - Fast'
+  }
+  if (m.toLowerCase().includes('omni')) {
+    if (hasCharacterOrDialogue) {
+      return 'Omni 1.2 Flash'
+    }
+    return 'Omni 1.1 Flash'
+  }
+  return m || 'Omni 1.1 Flash'
+}
 
 /** Maximo de takes por projeto (60 x 10 s = 10 min, para os formatos longos). */
 export const MAX_TAKES = 60

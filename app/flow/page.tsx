@@ -40,6 +40,8 @@ import {
   REALISM,
   TAKE_SECONDS,
   VIDEO_MODELS,
+  allowedSecondsForModel,
+  clampSecondsForModel,
   getFlowTemplate,
   templateFieldDefaults,
   wordLimit,
@@ -395,7 +397,7 @@ export default function FlowPage() {
                   <Select value={String(seconds)} onValueChange={(v) => setSeconds(Number(v))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {TAKE_SECONDS.map((s) => <SelectItem key={s} value={String(s)}>{s}s</SelectItem>)}
+                      {allowedSecondsForModel(model).map((s) => <SelectItem key={s} value={String(s)}>{s}s</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {template.mode !== "ambiente" && (
@@ -414,7 +416,13 @@ export default function FlowPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Modelo de vídeo</label>
-                  <Select value={model} onValueChange={setModel}>
+                  <Select
+                    value={model}
+                    onValueChange={(m) => {
+                      setModel(m)
+                      setSeconds((prev) => clampSecondsForModel(prev, m))
+                    }}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {VIDEO_MODELS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
@@ -1474,7 +1482,7 @@ function ProjectView({
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">
-                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s · {fmtClock(script.takes.slice(0, t.n - 1).reduce((n, k) => n + k.seconds, 0))}–{fmtClock(script.takes.slice(0, t.n).reduce((n, k) => n + k.seconds, 0))}{t.beat ? " · " + t.beat : ""}</span>
+                    Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s{t.model ? ` · ${t.model}` : ""} · {fmtClock(script.takes.slice(0, t.n - 1).reduce((n, k) => n + k.seconds, 0))}–{fmtClock(script.takes.slice(0, t.n).reduce((n, k) => n + k.seconds, 0))}{t.beat ? " · " + t.beat : ""}</span>
                   </p>
                   <div className="flex items-center gap-2">
                     {job && (
@@ -1512,7 +1520,7 @@ function ProjectView({
                     </Select>
                     <Select value={String(t.seconds)} onValueChange={(v) => setTake(t.n, { seconds: Number(v) })}>
                       <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                      <SelectContent>{TAKE_SECONDS.map((x) => <SelectItem key={x} value={String(x)}>{x}s</SelectItem>)}</SelectContent>
+                      <SelectContent>{allowedSecondsForModel(t.model || String(params.model)).map((x) => <SelectItem key={x} value={String(x)}>{x}s</SelectItem>)}</SelectContent>
                     </Select>
                     <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => removeTake(t.n)} disabled={script.takes.length <= 1}>Remover take</Button>
                   </div>

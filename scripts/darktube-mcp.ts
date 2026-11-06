@@ -20,6 +20,7 @@ import {
   downloadCreativeToLocal,
   getCreativeStatus,
   assembleFlowCreative,
+  replaceCreativeAudio,
 } from '../lib/mcp/darktube-tools';
 
 const server = new Server(
@@ -173,6 +174,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['projectId'],
         },
       },
+      {
+        name: 'darktube_replace_audio',
+        description: 'Substitui a faixa de áudio de um criativo/vídeo do /flow por um áudio gravado externo (.webm, .mp3, .wav), sincroniza legendas dinâmicas via Whisper e opcionalmente dispara microserviço neural de Lip-Sync no rosto do personagem.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectId: { type: 'string', description: 'ID do projeto no /flow para substituir o áudio e remontar com novas legendas' },
+            videoPathOrUrl: { type: 'string', description: 'Ou caminho/URL do arquivo de vídeo MP4 avulso' },
+            audioPathOrUrl: { type: 'string', description: 'Caminho local ou URL do áudio gravado (.webm, .mp3, .wav)' },
+            lipsync: { type: 'boolean', description: 'Se true, envia para microserviço de Lip-Sync para sincronizar os lábios com IA', default: false },
+            outputDir: { type: 'string', description: 'Diretório de destino', default: './midia/criativos' },
+            filename: { type: 'string', description: 'Nome preferido do arquivo final MP4' },
+          },
+          required: ['audioPathOrUrl'],
+        },
+      },
     ],
   };
 });
@@ -211,6 +228,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'darktube_assemble_flow_project':
         result = await assembleFlowCreative(args as any);
+        break;
+
+      case 'darktube_replace_audio':
+        result = await replaceCreativeAudio(args as any);
         break;
 
       default:

@@ -7,6 +7,7 @@ import {
   downloadCreativeToLocal,
   getCreativeStatus,
   assembleFlowCreative,
+  replaceCreativeAudio,
 } from '@/lib/mcp/darktube-tools';
 
 export const dynamic = 'force-dynamic';
@@ -37,14 +38,14 @@ const MCP_TOOLS_MANIFEST = [
         templateId: { type: 'string', description: 'ID do template do /flow (ex: receita-viral, produto-tiktok-shop)', default: 'produto-tiktok-shop' },
         videoModel: {
           type: 'string',
-          enum: ['Omni 1.1 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'],
+          enum: ['Omni 1.1 Flash', 'Omni 1.2 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'],
           description: 'Modelo de geração de vídeo por IA no /flow',
           default: 'Omni 1.1 Flash',
         },
         secondsPerTake: {
           type: 'number',
-          enum: [4, 6, 8, 10],
-          description: 'Duração em segundos de cada take/cena',
+          enum: [4, 5, 6, 8, 10],
+          description: 'Duração em segundos de cada take/cena (Veo: 5 ou 8s; Omni: 4, 6, 8 ou 10s)',
           default: 6,
         },
         quality: { type: 'string', enum: ['360p', '720p', '1080p'], default: '360p' },
@@ -146,6 +147,22 @@ const MCP_TOOLS_MANIFEST = [
         outputDir: { type: 'string', default: './midia/criativos' },
       },
       required: ['projectId'],
+    },
+  },
+  {
+    name: 'darktube_replace_audio',
+    description: 'Substitui a faixa de áudio de um criativo/vídeo do /flow por um áudio gravado externo (.webm, .mp3, .wav), sincroniza legendas dinâmicas via Whisper e opcionalmente dispara microserviço neural de Lip-Sync no rosto do personagem.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto no /flow para substituir o áudio e remontar com novas legendas' },
+        videoPathOrUrl: { type: 'string', description: 'Ou caminho/URL do arquivo de vídeo MP4 avulso' },
+        audioPathOrUrl: { type: 'string', description: 'Caminho local ou URL do áudio gravado (.webm, .mp3, .wav)' },
+        lipsync: { type: 'boolean', description: 'Se true, envia para microserviço de Lip-Sync para sincronizar os lábios com IA', default: false },
+        outputDir: { type: 'string', description: 'Diretório de destino', default: './midia/criativos' },
+        filename: { type: 'string', description: 'Nome preferido do arquivo final MP4' },
+      },
+      required: ['audioPathOrUrl'],
     },
   },
 ];
@@ -259,6 +276,9 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_assemble_flow_project':
       return await assembleFlowCreative(args);
+
+    case 'darktube_replace_audio':
+      return await replaceCreativeAudio(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}"`);

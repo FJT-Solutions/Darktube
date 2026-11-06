@@ -2,7 +2,7 @@
 // O prompt final e montado aqui, e nao pela IA, para garantir sempre o mesmo formato (consistencia
 // de personagem e cenario, camera motivada, audio limpo e nenhum texto na imagem).
 
-import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, MAX_TAKES, TAKE_SECONDS } from './flow-templates'
+import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, MAX_TAKES, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel, VIDEO_MODELS } from './flow-templates'
 
 export type FlowTakeKind = 'dialogo' | 'narracao' | 'ambiente'
 
@@ -27,6 +27,8 @@ export interface FlowLocation {
 export interface FlowTake {
   n: number
   seconds: number
+  /** Modelo de video especifico deste take (ex: Veo 3.1 - Quality para dialogos, Veo 3.1 - Lite para objetos/b-roll). */
+  model?: string
   /** Id do personagem que fala ("narrator" em narracao, "" em ambiente). */
   speaker: string
   /** Fala no idioma escolhido ("" em ambiente). */
@@ -176,6 +178,8 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
   const takes = Number(params.takes) || t.defaults.takes
   const seconds = Number(params.seconds) || t.defaults.seconds
   const lang = languageLabel(String(params.idioma || 'pt-BR'))
+  const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
+  const allowedSecs = allowedSecondsForModel(baseModel)
   const limit = wordLimit(seconds)
   const freeKind = String(params.tipo || 'misto')
   const mode = t.mode === 'livre' && freeKind !== 'misto' ? (freeKind as FlowTakeKind) : t.mode
@@ -208,7 +212,8 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
 ${SCHEMA}
 
 Structure:
-- Write exactly ${takes} takes, each ${seconds} seconds long, numbered from 1.
+- Write exactly ${takes} takes, numbered from 1.
+- Dynamic Take Rhythm: each take specifies its own "seconds" chosen from [${allowedSecs.join(', ')}] based on narrative pacing (valid durations for this model family: ${allowedSecs.join(', ')}s; e.g. shorter takes for punchy hooks/CTA, longer takes for key transformations or dialogue). The overall target duration is approximately ${takes * seconds} seconds total.
 - Scene functions for this format, in order (if there are more takes than functions, treat them as acts and escalate the middle; if fewer, merge neighbours). Put the function in "beat":
 ${beats}
 ${(t.rules || []).map((r) => `- ${r}`).join('\n')}
@@ -265,6 +270,8 @@ const parseSheetStatus = (v: any): 'gerando' | 'aguardando' | 'aprovada' | undef
 
 /** Normaliza a resposta da IA (ou o roteiro editado) para o formato interno, sem confiar em nada. */
 export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): FlowScript {
+  const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
+  const allowedSecs = allowedSecondsForModel(baseModel)
   const baseSeconds = Number(params.seconds) || t.defaults.seconds
   const characters: FlowCharacter[] = (Array.isArray(raw?.characters) ? raw.characters : [])
     .slice(0, 8)
@@ -292,13 +299,23 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
   const takes: FlowTake[] = (Array.isArray(raw?.takes) ? raw.takes : []).slice(0, MAX_TAKES).map((k: any, i: number) => {
     // No modo Livre cada take pode ter a propria duracao e o proprio tipo.
     const sec = Number(k?.seconds)
-    const seconds = t.mode === 'livre' && TAKE_SECONDS.includes(sec) ? sec : baseSeconds
+    const rawModel = str(k?.model, 40)
+    const validModel = VIDEO_MODELS.some((m) => m.value === rawModel) ? rawModel : undefined
+    const chars = Array.isArray(k?.characters) ? k.characters.map((x: any) => str(x, 20)).filter(Boolean) : []
+    const lineText = str(k?.line, 400)
+    const spk = str(k?.speaker, 20)
+    const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
+    const hasSubject = chars.length > 0 || Boolean(lineText.trim()) || Boolean(spk)
+    const effModel = validModel || resolveTakeModel(baseModel, hasSubject)
+    const allowed = allowedSecondsForModel(effModel)
+    const seconds = allowed.includes(sec) ? sec : clampSecondsForModel(sec || baseSeconds, effModel)
     const kindRaw = str(k?.kind, 12) as FlowTakeKind
     const kind: FlowTakeKind | undefined = t.mode === 'livre' ? (KINDS.includes(kindRaw) ? kindRaw : 'dialogo') : undefined
     const eff = takeKind({ kind } as FlowTake, t.mode)
     return {
       n: i + 1,
       seconds,
+      model: effModel,
       speaker: eff === 'ambiente' ? '' : str(k?.speaker, 20) || (eff === 'narracao' ? 'narrator' : ''),
       line: eff === 'ambiente' ? '' : str(k?.line, 400),
       action: str(k?.action, 600),

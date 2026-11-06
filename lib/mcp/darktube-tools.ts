@@ -9,7 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import { FLOW_TEMPLATES, getFlowTemplate, type FlowTemplate } from '@/lib/flow-templates';
-import { VIDEO_MODELS, TAKE_SECONDS } from '@/lib/flow-template-base';
+import { VIDEO_MODELS, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel } from '@/lib/flow-template-base';
 import {
   buildSystemPrompt,
   buildTakePrompt,
@@ -26,6 +26,7 @@ import { callFlowLLM } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
 import { createFlowJob } from '@/lib/flow-jobs';
 import { assembleFlowProject } from '@/lib/flow-assemble';
+import { replaceVideoAudio, replaceProjectAudio } from '@/lib/flow-audio-replace';
 import { getUserApiKey } from '@/lib/database';
 import { pool } from '@/lib/db-client';
 
@@ -531,8 +532,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     const t: FlowTemplate = getFlowTemplate(templateId) || getFlowTemplate('produto-tiktok-shop') || FLOW_TEMPLATES[0];
 
     const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
-    const resolvedSeconds = secondsPerTake || t.defaults?.seconds || 6;
     const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.2 Flash';
+    const rawSeconds = secondsPerTake || t.defaults?.seconds || 6;
+    const resolvedSeconds = clampSecondsForModel(rawSeconds, resolvedModel);
     const resolvedQuality = quality || t.defaults?.quality || '360p';
 
     const params: FlowParams = {
@@ -643,7 +645,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
               aspectRatio: String(params.aspect),
               duration: take.seconds || resolvedSeconds,
               resolution: resolvedQuality,
-              model: resolvedModel,
+              model: take.model || resolvedModel,
               ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
             },
             projectId: savedProject.id,
@@ -733,6 +735,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
         return {
           n: take.n,
           seconds: take.seconds || resolvedSeconds,
+          model: take.model || resolvedModel,
           line: take.line,
           action: take.action,
           prompt: buildTakePrompt(finalScript, take, params, t, ref),
@@ -905,4 +908,57 @@ export async function assembleFlowCreative(input: AssembleCreativeInput) {
     durationSeconds: asm.seconds,
     localFile,
   };
+}
+
+export interface ReplaceCreativeAudioInput {
+  projectId?: string;
+  videoPathOrUrl?: string;
+  audioPathOrUrl: string;
+  lipsync?: boolean;
+  outputDir?: string;
+  filename?: string;
+}
+
+/**
+ * 7. Substitui o áudio de um criativo ou projeto do /flow por um áudio gravado externo (.webm, .mp3),
+ * gerando legendas sincronizadas via Whisper e suportando microserviço neural de Lip-Sync opcional.
+ */
+export async function replaceCreativeAudio(input: ReplaceCreativeAudioInput) {
+  const { projectId, videoPathOrUrl, audioPathOrUrl, lipsync = false, outputDir = './midia/criativos', filename } = input;
+
+  if (projectId) {
+    const { rows } = await pool.query(
+      'SELECT id, user_id FROM public.flow_projects WHERE id::text = $1 OR id::text LIKE $2 ORDER BY created_at DESC LIMIT 1',
+      [projectId, `${projectId}%`]
+    );
+    if (!rows || rows.length === 0) throw new Error(`Projeto "${projectId}" não foi encontrado no banco de dados.`);
+    const realId = String(rows[0].id);
+    const userId = rows[0].user_id;
+
+    return await replaceProjectAudio({
+      userId,
+      projectId: realId,
+      audioInput: audioPathOrUrl,
+      lipsync,
+      outputDir,
+      filename,
+    });
+  }
+
+  if (!videoPathOrUrl) {
+    throw new Error('É necessário fornecer pelo menos um "projectId" ou "videoPathOrUrl".');
+  }
+
+  const targetDir = path.resolve(process.cwd(), outputDir);
+  fs.mkdirSync(targetDir, { recursive: true });
+  const outName = filename || `audio_replaced_${Date.now()}.mp4`;
+  const outPath = path.join(targetDir, outName);
+
+  return await replaceVideoAudio({
+    videoInput: videoPathOrUrl,
+    audioInput: audioPathOrUrl,
+    outputPath: outPath,
+    lipsync,
+    syncWhisper: true,
+  });
 }
