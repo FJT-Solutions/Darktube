@@ -626,7 +626,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
             userId,
             kind: 'image',
             prompt: sheetPrompt,
-            params: { resolution: '360p', model: 'Omni 1.2 Flash' },
+            params: { aspectRatio: String(params.aspect || '9:16'), model: 'Nano Banana' },
             projectId: savedProject.id,
             takeIndex: 0,
             role: 'character_sheet',

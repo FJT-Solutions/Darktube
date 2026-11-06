@@ -63,7 +63,7 @@ export async function createFlowProject(input: {
 export async function listFlowProjects(userId: string): Promise<Omit<FlowProject, 'script'>[]> {
   await ensureFlowProjectsTable()
   const { rows } = await pool.query(
-    `SELECT id, user_id, template_id, title, params, provider, status, created_at, updated_at
+    `SELECT id, user_id, template_id, title, params, provider, status, final_url, srt_url, created_at, updated_at
        FROM public.flow_projects WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`,
     [userId]
   )

@@ -40,6 +40,31 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const job = await completeFlowJob(user.id, id, url);
   if (!job) return NextResponse.json({ success: false, error: 'Job não está em execução.' }, { status: 409 });
 
+  // Se uma folha de personagem (character_sheet) acabou de ficar pronta para um projeto, vincula sheetUrl,
+  // destrava sheetStatus = 'aprovada' e propaga refImageUrl para os takes que ainda estao na fila.
+  if (job.project_id && job.role === 'character_sheet') {
+    try {
+      const { rows: pRows } = await pool.query(`SELECT script FROM public.flow_projects WHERE id = $1`, [job.project_id]);
+      const sc = pRows[0]?.script;
+      if (sc && Array.isArray(sc.characters) && sc.characters.length > 0) {
+        const idx = typeof job.take_index === 'number' && sc.characters[job.take_index] ? job.take_index : 0;
+        sc.characters[idx] = { ...sc.characters[idx], sheetUrl: url, sheetStatus: 'aprovada' };
+        await pool.query(`UPDATE public.flow_projects SET script = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+          job.project_id,
+          JSON.stringify(sc),
+        ]);
+        await pool.query(
+          `UPDATE public.flow_jobs
+              SET params = jsonb_set(COALESCE(params, '{}'::jsonb), '{refImageUrl}', to_jsonb($2::text), true)
+            WHERE project_id = $1 AND role = 'take' AND status = 'queued'`,
+          [job.project_id, url]
+        );
+      }
+    } catch (sheetErr: any) {
+      console.warn(`[Flow Complete] Falha ao propagar character_sheet aprovada: ${sheetErr.message}`);
+    }
+  }
+
   if (job.project_id) {
     (async () => {
       try {

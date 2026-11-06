@@ -35,9 +35,21 @@ export function srtTime(sec: number): string {
   return `${p(Math.floor(ms / 3600000))}:${p(Math.floor((ms % 3600000) / 60000))}:${p(Math.floor((ms % 60000) / 1000))},${p(ms % 1000, 3)}`
 }
 
-/** Limpa pontuacao solta, espacos duplicados e une palavras com hifen (ex: "terca -feira" -> "terca-feira"). */
+/**
+ * Limpa pontuacao solta, espacos duplicados, une palavras com hifen e aplica a
+ * Regra Zero Simbolos pos-Whisper (converte R$/US$/% que o Whisper ITN abrevia de volta para extenso
+ * e remove simbolos visuais proibidos como $, #, *, @, /, +, =).
+ */
 export function cleanCaptionText(text: string): string {
-  return text
+  return String(text || '')
+    .replace(/R\$\s*(\d+(?:[.,]\d+)?)/gi, '$1 reais')
+    .replace(/\bR\$/gi, 'reais')
+    .replace(/US\$\s*(\d+(?:[.,]\d+)?)/gi, '$1 dólares')
+    .replace(/\bUS\$/gi, 'dólares')
+    .replace(/\$\s*(\d+(?:[.,]\d+)?)/g, '$1')
+    .replace(/(\d+(?:[.,]\d+)?)\s*%/g, '$1 por cento')
+    .replace(/(\S)\s*\+\s*(\S)/g, '$1 mais $2')
+    .replace(/[$€£%#*@&_=+<>|\\/\[\]{}()"“”‘’~^`]/g, ' ')
     .replace(/\s+([.,!?;:…])/g, '$1')
     .replace(/(\p{L}|\p{N})\s+-\s*(\p{L}|\p{N})/gu, '$1-$2')
     .replace(/\s+/g, ' ')

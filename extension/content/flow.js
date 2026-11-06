@@ -1827,11 +1827,10 @@
     const attempts = [
       // Imagem: tenta primeiro no mundo da pagina (MAIN world, sem debugger - evita acionar o reCAPTCHA Enterprise),
       // e so recorre ao clique real (depurador) se o primeiro nao disparar.
-      ...(kind === 'image' ? [mainClick, real, simple] : [simple, mainClick, real]),
-      ['clique real com a aba ativa', async () => {
-        const b = generateBtnEl() || btn;
-        if (b) await trustedClick(b, true);
-      }],
+      // Modos vídeo e imagem: prioriza cliques nativos no mundo DOM e MAIN sem depurador CDP (evita acionar reCAPTCHA Enterprise).
+      simple,
+      mainClick,
+
       ['clique completo', () => {
         const b = generateBtnEl() || btn;
         const icon = b && $('mat-icon, svg, span, i', b);
@@ -1871,7 +1870,8 @@
     let how = '';
     for (const [label, fire] of attempts) {
       await fire();
-      if (await until(started, label === 'clique' ? 10000 : 6000, 400)) {
+      const waitMs = kind === 'image' ? 15000 : (label === 'clique' ? 12000 : 8000);
+      if (await until(started, waitMs, 400)) {
         how = label;
         break;
       }

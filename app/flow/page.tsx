@@ -154,6 +154,21 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelado",
 }
 
+const PROJECT_STATUS_CONFIG: Record<string, { label: string; variant?: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
+  draft: { label: "Rascunho", variant: "outline", className: "text-muted-foreground" },
+  queued: { label: "Na fila do Flow", variant: "secondary", className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  generating: { label: "Gerando takes...", variant: "secondary", className: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse" },
+  assembling: { label: "Montando vídeo...", variant: "secondary", className: "bg-purple-500/10 text-purple-400 border-purple-500/20 animate-pulse" },
+  assembled: { label: "Vídeo pronto", variant: "default", className: "bg-emerald-600 text-white font-medium" },
+  done: { label: "Concluído", variant: "default", className: "bg-emerald-600 text-white font-medium" },
+  scheduled: { label: "Agendado", variant: "secondary", className: "bg-sky-500/10 text-sky-400 border-sky-500/20" },
+  publishing: { label: "Publicando...", variant: "secondary", className: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 animate-pulse" },
+  published: { label: "Publicado", variant: "default", className: "bg-blue-600 text-white" },
+  assemble_failed: { label: "Falha na montagem", variant: "destructive" },
+  publish_failed: { label: "Falha no post", variant: "destructive" },
+  failed: { label: "Falhou", variant: "destructive" },
+}
+
 const SHEET_STATUS_LABEL: Record<string, string> = {
   gerando: "Gerando no Flow...",
   aguardando: "Aguardando aprovação",
@@ -612,12 +627,20 @@ export default function FlowPage() {
           {projects.map((p) => (
             <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <button className="min-w-0 flex-1 text-left" onClick={() => openProject(p.id)}>
-                <p className="truncate font-medium">{p.title || "Sem título"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="truncate font-medium">{p.title || "Sem título"}</p>
+                  {(p as any).final_url && <Badge variant="default" className="bg-emerald-600 text-white text-[10px] h-4 px-1.5 font-semibold">MP4</Badge>}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {getFlowTemplate(p.template_id)?.name ?? p.template_id} · {new Date(p.created_at).toLocaleString("pt-BR")}
                 </p>
               </button>
-              <Badge variant="outline">{p.status === "queued" ? "Na fila do Flow" : "Rascunho"}</Badge>
+              {(() => {
+                const hasVideo = Boolean((p as any).final_url)
+                const effStatus = hasVideo && p.status !== "published" && p.status !== "scheduled" ? "assembled" : p.status
+                const st = PROJECT_STATUS_CONFIG[effStatus] || { label: effStatus, variant: "outline" }
+                return <Badge variant={st.variant} className={st.className}>{st.label}</Badge>
+              })()}
               <Button variant="ghost" size="icon" onClick={() => removeProject(p.id)} aria-label="Apagar projeto">
                 <Trash2 className="h-4 w-4" />
               </Button>
