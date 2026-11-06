@@ -227,6 +227,8 @@ Writing rules (avoid generic "AI slop"):
 - Vary the camera on purpose from take to take (close-up, over-the-shoulder, low angle, tracking...). Use the camera of the scene function.
 - Spoken lines are natural and short, with contractions and pauses; respect the word limit (about 2.3 words per second). Write numbers and money in words as they are spoken, never with currency symbols.
 - The last take pays off and, when it fits, its line connects back to the first line so the video can loop.
+- Strict motion discipline & anti-hallucination: describe ONLY ONE restrained, physically plausible movement per take. NEVER use vague, open-ended or kinetic descriptions ("things move around", "energy swirls", "characters gesture wildly") which cause video diffusion models (Veo/Omni) to hallucinate unprompted object sliding, morphing or extra limbs. Unmoved objects, surfaces, props and cookware must remain strictly stationary and anchored.
+- Negative constraints compliance: never introduce unscripted background people, extra characters, morphing items, floating hands, or unmotivated camera drifting.
 - ${modeRules}
 - Character descriptions are fixed anchors of 25-35 words; never change a character's look between takes. Every take names its location id and visible characters.
 - Never describe on-screen writing: no screens with text, signs, newspapers, labels, logos or interfaces.
@@ -505,6 +507,19 @@ export function buildTakePrompt(
     lines.push(`Sound: ${noEnd(take.sound || 'subtle natural ambience')}.${kind === 'ambiente' || !take.line ? ' No speech.' : ''} No background music.`)
     if (hasRef) lines.push('Use the reference image only for identity: ignore its plain backdrop and place everyone inside the setting above.')
     if (total > 1 && level === 0) lines.push(`Continuity: same ${visible.length ? 'characters, outfits, ' : ''}setting, lighting and color grading as the other scenes of this video.`)
+        if (visible.length > 0) {
+      lines.push(
+        level >= 2
+          ? 'Negative constraints: no unprompted motion, no extra people, no deformed limbs, static background stays stable.'
+          : 'Negative constraints: no unprompted character wandering or sudden erratic gestures, no random extra people or bystanders, no deformed anatomy, no floating or extra fingers, no morphing objects. Static environment and props stay strictly stable and stationary.'
+      )
+    } else {
+      lines.push(
+        level >= 2
+          ? 'Negative constraints: strictly no humans, no faces, no extra people, no warping or sliding objects, static items stay stable.'
+          : 'Negative constraints: strictly no unscripted human figures, no faces, no random extra people, no floating hands. No unprompted object sliding, floating, morphing or warping. All tabletop items, surfaces, cookware and background props remain completely stationary and physically stable.'
+      )
+    }
     lines.push(CLEAN_FRAME)
     // Simbolos de moeda costumam derrubar a geracao no Flow: escreve por extenso.
     return lines.join('\n').replace(/R\$\s?([\d.,]+)/g, '$1 reais').replace(/[$€£]/g, ' ')

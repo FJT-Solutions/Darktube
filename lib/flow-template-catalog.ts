@@ -137,6 +137,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     rules: [
       'No medical claims, no guaranteed miracles, no trademarked brand marks',
       'Keep the physical item clearly visible in action in every single take',
+      'Negative constraints: no random extra bystanders, no deformed hands/fingers, static background and furniture stay completely stable',
       'Capture crisp tactile foley of buttons, latches, or surfaces with no background music',
     ],
     look: 'bright natural window daylight, lived-in home environment, authentic handheld camera feel',
@@ -517,6 +518,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Strictly zero speech, zero whispers, and zero background music',
       'Focus 100% of the audio layer on hyper-crisp close-mic ASMR foley: crystalline crunch, metallic ring, viscous drip',
       'Keep camera locked on a steady macro angle so the material physics command full visual attention',
+      'Negative constraints: strictly no human figures, no faces, no extra floating hands, no deformed tools; the cutting surface stays completely anchored and stationary',
     ],
     look: 'studio macro product cinematography, dark obsidian surface, specular rim lighting, pristine optical refraction',
     defaults: { takes: 4, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
@@ -1546,6 +1548,8 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     ],
     rules: [
       'Only hands and food appear, never a face; the kitchen is the same in every take',
+      'Strict physical stability: static ingredients, bowls, pans and countertop props stay completely stationary; no sliding objects, no morphing food',
+      'No random extra hands or people: at most two hands performing the action in frame',
       'If Narração is sem_voz: zero speech and zero music, only crisp close-mic kitchen foley (sizzle, chop, crunch, pour, bubbling)',
       'If Narração is com_voz: one short, warm spoken line per take, simple and appetizing, ending with the CTA word spoken in the last take; soft kitchen sounds underneath, no music',
       'No text, numbers, quantities or logos drawn in the image; the recipe details go in the caption added later',
