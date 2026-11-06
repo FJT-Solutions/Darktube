@@ -292,7 +292,7 @@ export async function transcribeWhisper(file: string, language?: string, customA
   }
 }
 
-async function readStored(url: string): Promise<Buffer> {
+export async function readStored(url: string): Promise<Buffer> {
   const filename = decodeURIComponent(url.split('/').pop() || '')
   const { rows } = await pool.query(`SELECT content FROM public.storage_files WHERE filename = $1`, [filename])
   if (!rows[0]?.content) throw new Error(`Arquivo não encontrado no armazenamento: ${filename}`)
