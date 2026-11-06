@@ -46,8 +46,8 @@ const veoBroll = resolveTakeModel('Veo 3.1 - Quality', false);
 console.log('Veo Take Diálogo/Pessoa:', veoDialogue, '-> Esperado: Veo 3.1 - Quality');
 console.log('Veo Take Objeto/B-Roll:', veoBroll, '-> Esperado: Veo 3.1 - Lite');
 
-const omniDialogue = resolveTakeModel('Omni 1.1 Flash', true);
-const omniBroll = resolveTakeModel('Omni 1.1 Flash', false);
+const omniDialogue = resolveTakeModel('Omni 1.2 Flash', true);
+const omniBroll = resolveTakeModel('Omni 1.2 Flash', false);
 console.log('Omni Take Diálogo/Pessoa:', omniDialogue, '-> Esperado: Omni 1.2 Flash');
 console.log('Omni Take Objeto/B-Roll:', omniBroll, '-> Esperado: Omni 1.1 Flash');
 

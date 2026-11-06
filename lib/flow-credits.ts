@@ -114,34 +114,36 @@ export function simulateCredits({
   const sec = clampSecondsForModel(Number(secondsPerTake) || 5, model);
   const isVeo = model.toLowerCase().includes('veo');
 
-  // Base costs
-  let costPerVideo = 0;
-  let costPerTakeAvg = 0;
+  // Custo base de referência: 100% dos takes no modelo selecionado
+  const baseTakeCost = getTakeCreditCost(model, sec);
+  const baseCostPerVideo = takes * baseTakeCost;
+  const baseMaxVideos = baseCostPerVideo > 0 ? Math.floor(credits / baseCostPerVideo) : 0;
+
+  let costPerVideo = baseCostPerVideo;
+  let costPerTakeAvg = baseTakeCost;
+  let savingsPercent = 0;
 
   if (isHybrid) {
     // Na arquitetura híbrida: metade dos takes são diálogos/rostos e metade são b-rolls/objetos
     const dialogueTakes = Math.ceil(takes / 2);
     const brollTakes = takes - dialogueTakes;
 
-    const dialogueModel = isVeo ? (model.includes('Fast') ? 'Veo 3.1 - Fast' : 'Veo 3.1 - Quality') : 'Omni 1.2 Flash';
+    // Diálogos usam o modelo selecionado como teto; B-rolls usam o modelo econômico (Lite)
+    const dialogueModel = model;
     const brollModel = isVeo ? 'Veo 3.1 - Lite' : 'Omni 1.1 Flash';
 
     const dialogueCost = getTakeCreditCost(dialogueModel, sec);
     const brollCost = getTakeCreditCost(brollModel, sec);
 
-    costPerVideo = dialogueTakes * dialogueCost + brollTakes * brollCost;
+    // O modo híbrido nunca pode custar mais que o modelo base
+    const rawHybridCost = dialogueTakes * dialogueCost + brollTakes * brollCost;
+    costPerVideo = Math.min(rawHybridCost, baseCostPerVideo);
     costPerTakeAvg = Math.round((costPerVideo / takes) * 10) / 10;
-  } else {
-    const singleTakeCost = getTakeCreditCost(model, sec);
-    costPerVideo = takes * singleTakeCost;
-    costPerTakeAvg = singleTakeCost;
-  }
 
-  // Pure Quality comparison
-  const pureQualityModel = isVeo ? 'Veo 3.1 - Quality' : 'Omni 1.2 Flash';
-  const pureQualityTakeCost = getTakeCreditCost(pureQualityModel, sec);
-  const pureQualityCostPerVideo = takes * pureQualityTakeCost;
-  const pureQualityMaxVideos = pureQualityCostPerVideo > 0 ? Math.floor(credits / pureQualityCostPerVideo) : 0;
+    if (baseCostPerVideo > 0 && costPerVideo < baseCostPerVideo) {
+      savingsPercent = Math.round(((baseCostPerVideo - costPerVideo) / baseCostPerVideo) * 100);
+    }
+  }
 
   const maxVideosPossible = costPerVideo > 0 ? Math.floor(credits / costPerVideo) : 0;
   const remainingCredits = costPerVideo > 0 ? credits % costPerVideo : credits;
@@ -152,12 +154,7 @@ export function simulateCredits({
   const remSec = totalProductionSeconds % 60;
   const formattedProductionTime = mins > 0 ? `${mins}m ${remSec}s` : `${remSec}s`;
 
-  const savingsPercent =
-    pureQualityCostPerVideo > 0
-      ? Math.max(0, Math.round(((pureQualityCostPerVideo - costPerVideo) / pureQualityCostPerVideo) * 100))
-      : 0;
-
-  const extraVideosGained = Math.max(0, maxVideosPossible - pureQualityMaxVideos);
+  const extraVideosGained = Math.max(0, maxVideosPossible - baseMaxVideos);
 
   return {
     userCredits: credits,
@@ -174,8 +171,8 @@ export function simulateCredits({
     totalProductionSeconds,
     formattedProductionTime,
     comparedToPureQuality: {
-      pureQualityCostPerVideo,
-      pureQualityMaxVideos,
+      pureQualityCostPerVideo: baseCostPerVideo,
+      pureQualityMaxVideos: baseMaxVideos,
       extraVideosGained,
     },
   };

@@ -306,7 +306,8 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
     const spk = str(k?.speaker, 20)
     const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
     const hasSubject = chars.length > 0 || Boolean(lineText.trim()) || Boolean(spk)
-    const effModel = validModel || resolveTakeModel(baseModel, hasSubject)
+    const isHybrid = params.isHybrid !== false && params.isHybrid !== 'false'
+    const effModel = isHybrid ? (validModel || resolveTakeModel(baseModel, hasSubject)) : baseModel
     const allowed = allowedSecondsForModel(effModel)
     const seconds = allowed.includes(sec) ? sec : clampSecondsForModel(sec || baseSeconds, effModel)
     const kindRaw = str(k?.kind, 12) as FlowTakeKind

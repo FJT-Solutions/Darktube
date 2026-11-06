@@ -33,7 +33,9 @@ interface FlowCreditSimulatorProps {
   currentModel?: string
   currentSeconds?: number
   currentTakes?: number
-  onApplyConfig?: (model: string, seconds: number, takes: number) => void
+  currentIsHybrid?: boolean
+  onApplyConfig?: (model: string, seconds: number, takes: number, isHybrid?: boolean) => void
+  onClose?: () => void
   className?: string
 }
 
@@ -43,7 +45,9 @@ export function FlowCreditSimulator({
   currentModel = "Veo 3.1 - Quality",
   currentSeconds = 5,
   currentTakes = 4,
+  currentIsHybrid = true,
   onApplyConfig,
+  onClose,
   className,
 }: FlowCreditSimulatorProps) {
   // Saldo real do usuário vindo do backend
@@ -56,7 +60,7 @@ export function FlowCreditSimulator({
   const [simModel, setSimModel] = useState<string>(currentModel)
   const [simSeconds, setSimSeconds] = useState<number>(currentSeconds)
   const [simTakes, setSimTakes] = useState<number>(currentTakes)
-  const [isHybrid, setIsHybrid] = useState<boolean>(true)
+  const [isHybrid, setIsHybrid] = useState<boolean>(currentIsHybrid)
   const [isExpanded, setIsExpanded] = useState<boolean>(true)
 
   // Carrega créditos reais da conta
@@ -158,9 +162,12 @@ export function FlowCreditSimulator({
               variant="ghost"
               size="sm"
               className="h-7 text-xs text-muted-foreground"
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={() => {
+                if (onClose) onClose()
+                else setIsExpanded(!isExpanded)
+              }}
             >
-              {isExpanded ? "Recolher" : "Expandir Simulador"}
+              {onClose ? "Fechar" : isExpanded ? "Recolher" : "Expandir Simulador"}
             </Button>
           </div>
         </div>
@@ -291,7 +298,11 @@ export function FlowCreditSimulator({
             </div>
             <div className="flex items-center gap-2">
               <Badge variant={isHybrid ? "default" : "outline"} className="text-xs">
-                {isHybrid ? `Economia: ~${simResult.hybridSavingsPercent}%` : "100% no Modelo Base"}
+                {isHybrid
+                  ? simResult.hybridSavingsPercent > 0
+                    ? `Economia: ~${simResult.hybridSavingsPercent}%`
+                    : "Menor custo já ativo"
+                  : "100% no Modelo Base"}
               </Badge>
               <Switch checked={isHybrid} onCheckedChange={setIsHybrid} />
             </div>
@@ -343,7 +354,9 @@ export function FlowCreditSimulator({
                 <span className="text-xs text-emerald-600 dark:text-emerald-400">vídeos extras</span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Comparado ao uso de 100% Quality em todos os takes
+                {simResult.hybridSavingsPercent > 0
+                  ? `Economia comparado a rodar 100% em ${simModel}`
+                  : `Modelo base já está no menor custo disponível`}
               </p>
             </div>
           </div>
@@ -373,7 +386,7 @@ export function FlowCreditSimulator({
                 <Button
                   size="sm"
                   className="h-8 text-xs gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs"
-                  onClick={() => onApplyConfig(simModel, simSeconds, simTakes)}
+                  onClick={() => onApplyConfig(simModel, simSeconds, simTakes, isHybrid)}
                 >
                   <ArrowRight className="h-3.5 w-3.5" />
                   Aplicar Configurações no Projeto

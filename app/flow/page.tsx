@@ -24,7 +24,10 @@ import {
   RefreshCw,
   BookmarkPlus,
   Mic,
+  Calculator,
+  Zap,
 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -191,6 +194,8 @@ export default function FlowPage() {
   const [model, setModel] = useState(FLOW_TEMPLATES[0].defaults.model)
   const [quality, setQuality] = useState(FLOW_TEMPLATES[0].defaults.quality)
   const [wordsPerCaption, setWordsPerCaption] = useState<number>(() => FLOW_TEMPLATES[0].defaults.wordsPerCaption ?? 2)
+  const [showSimulator, setShowSimulator] = useState(false)
+  const [isHybrid, setIsHybrid] = useState(true)
 
   const [lengthFilter, setLengthFilter] = useState<"todos" | "curto" | "longo">("todos")
   const [trendFilter, setTrendFilter] = useState<"todos" | "viral" | "atemporal">("todos")
@@ -243,7 +248,7 @@ export default function FlowPage() {
     const res = await generateFlowProjectAction({
       templateId,
       provider,
-      params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality: model.toLowerCase().includes("omni") ? quality : undefined, wordsPerCaption },
+      params: { ...values, idioma, realismo, takes, seconds, aspect, model, isHybrid, quality: model.toLowerCase().includes("omni") ? quality : undefined, wordsPerCaption },
     })
     setGenerating(false)
     if (!res.success) {
@@ -258,7 +263,7 @@ export default function FlowPage() {
 
   const startBlank = async () => {
     setGenerating(true)
-    const res = await createBlankFlowProjectAction({ params: { ...values, idioma, realismo, takes, seconds, aspect, model, quality: model.toLowerCase().includes("omni") ? quality : undefined, wordsPerCaption } })
+    const res = await createBlankFlowProjectAction({ params: { ...values, idioma, realismo, takes, seconds, aspect, model, isHybrid, quality: model.toLowerCase().includes("omni") ? quality : undefined, wordsPerCaption } })
     setGenerating(false)
     if (!res.success) return void toast.error(res.error)
     setProject(res.project as FlowProject)
@@ -294,7 +299,14 @@ export default function FlowPage() {
             <p className="text-sm text-muted-foreground">Roteiro, takes e vídeos pelo Google Flow, com os créditos da sua conta.</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={showSimulator ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowSimulator((s) => !s)}
+          >
+            <Calculator className="mr-1.5 h-4 w-4 text-amber-500" /> Simulador de créditos
+          </Button>
           <Button variant={view === "novo" ? "default" : "outline"} size="sm" onClick={() => setView("novo")}>
             <Sparkles className="mr-1.5 h-4 w-4" /> Novo projeto
           </Button>
@@ -312,6 +324,24 @@ export default function FlowPage() {
       </div>
 
       <SafetyPanel />
+
+      {showSimulator && (
+        <FlowCreditSimulator
+          currentModel={model}
+          currentSeconds={seconds}
+          currentTakes={takes}
+          currentIsHybrid={isHybrid}
+          onClose={() => setShowSimulator(false)}
+          onApplyConfig={(m, s, tk, hybrid) => {
+            setModel(m)
+            setSeconds(s)
+            setTakes(tk)
+            if (typeof hybrid === "boolean") setIsHybrid(hybrid)
+            setShowSimulator(false)
+            toast.success(`Parâmetros aplicados: ${tk} takes de ${s}s no modelo ${m}`)
+          }}
+        />
+      )}
 
       {view === "novo" && (
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
@@ -394,68 +424,117 @@ export default function FlowPage() {
                 <p className="text-xs text-muted-foreground">Duração total: {takes} takes × {seconds} s = <span className="font-semibold text-foreground">{fmtDuration(takes * seconds)}</span></p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Segundos por take</label>
-                  <Select value={String(seconds)} onValueChange={(v) => setSeconds(Number(v))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {allowedSecondsForModel(model).map((s) => <SelectItem key={s} value={String(s)}>{s}s</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {template.mode !== "ambiente" && (
-                    <p className="text-xs text-muted-foreground">Fala: até {wordLimit(seconds)} palavras</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Formato</label>
-                  <Select value={aspect} onValueChange={setAspect}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="9:16">9:16 (vertical)</SelectItem>
-                      <SelectItem value="16:9">16:9 (horizontal)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Modelo de vídeo</label>
-                  <Select
-                    value={model}
-                    onValueChange={(m) => {
-                      setModel(m)
-                      setSeconds((prev) => clampSecondsForModel(prev, m))
-                    }}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {VIDEO_MODELS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {model.toLowerCase().includes("omni") && (
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Qualidade</label>
-                    <Select value={quality} onValueChange={setQuality}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="360p">360p (rascunho)</SelectItem>
-                        <SelectItem value="720p">720p (final)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Palavras por legenda</label>
-                  <Select value={String(wordsPerCaption)} onValueChange={(v) => setWordsPerCaption(Number(v))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 palavra (dinâmico)</SelectItem>
-                      <SelectItem value="2">2 palavras (rápido)</SelectItem>
-                      <SelectItem value="3">3 palavras (curto)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              {/* Condição de presença de fala no template atual */}
+              {(() => {
+                const hasSpeech =
+                  template.mode !== "ambiente" &&
+                  values.voz !== "sem_voz" &&
+                  values.fala !== "sem_fala" &&
+                  values.tipo_fala !== "ambiente" &&
+                  values.narracao !== "sem_voz"
+
+                return (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium">Segundos por take</label>
+                          <span className="text-[10px] text-muted-foreground">Ritmo por cena</span>
+                        </div>
+                        <Select value={String(seconds)} onValueChange={(v) => setSeconds(Number(v))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {allowedSecondsForModel(model).map((s) => (
+                              <SelectItem key={s} value={String(s)}>
+                                {s}s {model.includes("Veo") ? "(Veo)" : "(Omni)"}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {hasSpeech ? (
+                          <p className="text-xs text-muted-foreground">Fala: até {wordLimit(seconds)} palavras por take</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Cena sem fala: ação e ambientação</p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Formato</label>
+                        <Select value={aspect} onValueChange={setAspect}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="9:16">9:16 (vertical)</SelectItem>
+                            <SelectItem value="16:9">16:9 (horizontal)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Modelo de vídeo</label>
+                        <Select
+                          value={model}
+                          onValueChange={(m) => {
+                            setModel(m)
+                            setSeconds((prev) => clampSecondsForModel(prev, m))
+                          }}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {VIDEO_MODELS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {model.toLowerCase().includes("omni") ? (
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Qualidade</label>
+                          <Select value={quality} onValueChange={setQuality}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="360p">360p (rascunho)</SelectItem>
+                              <SelectItem value="720p">720p (final)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
+
+                      {hasSpeech ? (
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Palavras por legenda</label>
+                          <Select value={String(wordsPerCaption)} onValueChange={(v) => setWordsPerCaption(Number(v))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">1 palavra (dinâmico)</SelectItem>
+                              <SelectItem value="2">2 palavras (rápido)</SelectItem>
+                              <SelectItem value="3">3 palavras (curto)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5 opacity-60">
+                          <label className="text-sm font-medium">Palavras por legenda</label>
+                          <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-xs text-muted-foreground">
+                            Sem fala (legendas inativas)
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-emerald-500" />
+                          <span className="text-sm font-medium">Modo Híbrido Inteligente</span>
+                          <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
+                            {isHybrid ? "Economiza até 53% de créditos" : "100% no modelo base"}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Preserva máxima fidelidade nos diálogos e rebaixa automaticamente B-rolls para Lite da mesma família.
+                        </p>
+                      </div>
+                      <Switch checked={isHybrid} onCheckedChange={setIsHybrid} />
+                    </div>
+                  </>
+                )
+              })()}
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">IA do roteiro</label>
@@ -475,18 +554,6 @@ export default function FlowPage() {
                   </Select>
                 )}
               </div>
-
-              <FlowCreditSimulator
-                currentModel={model}
-                currentSeconds={seconds}
-                currentTakes={takes}
-                onApplyConfig={(m, s, tk) => {
-                  setModel(m)
-                  setSeconds(s)
-                  setTakes(tk)
-                  toast.success(`Parâmetros aplicados: ${tk} takes de ${s}s no modelo ${m}`)
-                }}
-              />
 
               <Button onClick={generate} disabled={generating || !provider} className="w-full">
                 {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}

@@ -82,7 +82,9 @@ function cleanParams(raw: Record<string, any>, templateId: string): FlowParams {
   for (const [k, v] of Object.entries(raw || {})) {
     if (typeof v === "string") out[k] = v.slice(0, k === "roteiro" || k === "parteAnterior" ? 8000 : 900)
     else if (typeof v === "number" && Number.isFinite(v)) out[k] = v
+    else if (typeof v === "boolean") out[k] = v
   }
+  out.isHybrid = raw?.isHybrid !== false && raw?.isHybrid !== "false"
   const takes = Math.round(Number(out.takes) || t.defaults.takes)
   out.takes = Math.min(Math.max(takes, 1), MAX_TAKES)
   out.model = String(out.model || t.defaults.model).slice(0, 60)

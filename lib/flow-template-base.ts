@@ -174,12 +174,14 @@ export function clampSecondsForModel(seconds: number, model?: string): number {
 export function resolveTakeModel(baseModel: string, hasCharacterOrDialogue: boolean): string {
   const m = String(baseModel || '')
   if (m.toLowerCase().includes('veo')) {
+    if (m === 'Veo 3.1 - Lite') return 'Veo 3.1 - Lite'
     if (!hasCharacterOrDialogue) {
       return 'Veo 3.1 - Lite'
     }
     return m || 'Veo 3.1 - Fast'
   }
   if (m.toLowerCase().includes('omni')) {
+    if (m === 'Omni 1.1 Flash') return 'Omni 1.1 Flash'
     if (hasCharacterOrDialogue) {
       return 'Omni 1.2 Flash'
     }
