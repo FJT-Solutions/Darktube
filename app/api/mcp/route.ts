@@ -23,7 +23,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_create_campaign_creative',
-    description: 'Pipeline 3 Híbrido: renderiza MP4 via Remotion, ou cria projeto nativo no /flow com IA generativa, ou gera roteiro e copy.',
+    description: 'Pipeline 3 Híbrido: renderiza MP4 via Remotion, ou cria projeto nativo no /flow com IA generativa, ou gera roteiro e copy. IMPORTANTE: O agente deve alinhar com o usuário as preferências de motor (remotion vs flow), modelo de vídeo (Omni 1.1 vs Veo 3.1), duração dos takes (4s, 6s, 8s, 10s) e personagem antes de executar.',
     inputSchema: {
       type: 'object',
       properties: {
