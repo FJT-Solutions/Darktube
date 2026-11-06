@@ -17,7 +17,7 @@ export const DEFAULT_RISK: RiskSettings = {
   riskMode: true,
   hourlyLimit: 99999,
   dailyLimit: 99999,
-  minGapSec: 2,
+  minGapSec: 25,
   postsPerDay: 99999,
 }
 
@@ -56,7 +56,7 @@ export function sanitizeRisk(raw: any): RiskSettings {
     riskMode: true,
     hourlyLimit: clamp(r.hourlyLimit, 1, 999999, DEFAULT_RISK.hourlyLimit),
     dailyLimit: clamp(r.dailyLimit, 1, 999999, DEFAULT_RISK.dailyLimit),
-    minGapSec: clamp(r.minGapSec, 0, 3600, DEFAULT_RISK.minGapSec),
+    minGapSec: clamp(r.minGapSec, 15, 3600, DEFAULT_RISK.minGapSec),
     postsPerDay: clamp(r.postsPerDay, 1, 999999, DEFAULT_RISK.postsPerDay),
   }
 }
