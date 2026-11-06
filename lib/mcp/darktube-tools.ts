@@ -561,47 +561,28 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     let script: FlowScript | null = null;
     const defaultUserId = await resolveDefaultUserId().catch(() => '');
     const userOpenAiKey = defaultUserId ? await getUserApiKey(defaultUserId, 'openai').catch(() => '') : '';
-    const apiKey = userOpenAiKey || process.env.OPENAI_API_KEY || '';
+    const apiKey = userOpenAiKey;
 
-    if (apiKey) {
-      try {
-        const system = buildSystemPrompt(t, params);
-        const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro de anúncio para "${offer}".`);
-        const json = extractJson(text);
-        if (json && typeof json === 'object') {
-          script = normalizeScript(json, t, params);
-        }
-      } catch (err: any) {
-        console.warn(`[MCP DarkTube] Aviso no LLM do Flow: ${err.message}`);
-      }
+    if (!apiKey) {
+      throw new Error('Chave da OpenAI não configurada nas credenciais da conta (public.user_api_keys). Cadastre a chave no painel de credenciais para criar o roteiro.');
     }
 
-    const fallbackScript: FlowScript = {
-      title: selectedPreset.title,
-      logline: selectedPreset.hook,
-      characters: [{ id: 'c1', name: 'Apresentador', description: 'Pessoa comunicativa em cozinha acolhedora.', voice: 'natural' }],
-      locations: [{ id: 'l1', name: 'Cozinha', description: 'Cozinha iluminada com bancada de madeira.' }],
-      takes: selectedPreset.scenes.map((s: any, idx: number) => ({
-        n: idx + 1,
-        seconds: s.durationSeconds || resolvedSeconds,
-        speaker: 'c1',
-        kind: 'narracao' as const,
-        line: s.line,
-        action: s.action,
-        camera: s.camera,
-        sound: 'ambiente de cozinha',
-        location: 'l1',
-        characters: ['c1'],
-      })),
-      seo: {
-        title: selectedPreset.copy.headline,
-        hook: selectedPreset.hook,
-        caption: selectedPreset.copy.body,
-        hashtags: ['receitasfit', 'semgluten', 'x1'],
-      },
-    };
+    try {
+      const system = buildSystemPrompt(t, params);
+      const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro de anúncio para "${offer}".`);
+      const json = extractJson(text);
+      if (json && typeof json === 'object') {
+        script = normalizeScript(json, t, params);
+      }
+    } catch (err: any) {
+      throw new Error(`Falha ao gerar roteiro via OpenAI LLM: ${err.message}`);
+    }
 
-    const finalScript: FlowScript = script || fallbackScript;
+    if (!script) {
+      throw new Error('A IA da OpenAI não retornou um roteiro estruturado válido.');
+    }
+
+    const finalScript: FlowScript = script;
 
     if (input.character) {
       const charInput = input.character;
