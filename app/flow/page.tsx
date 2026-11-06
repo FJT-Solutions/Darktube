@@ -23,6 +23,7 @@ import {
   Upload,
   RefreshCw,
   BookmarkPlus,
+  Mic,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -81,6 +82,7 @@ import {
   useLibraryCharacterAction,
   listFlowLibraryAction,
   saveFlowRefOptionsAction,
+  replaceFlowAudioAction,
 } from "./actions"
 
 type View = "novo" | "projeto" | "projetos"
@@ -217,7 +219,7 @@ export default function FlowPage() {
     setTemplateId(id)
     setValues(templateFieldDefaults(t))
     setTakes(t.defaults.takes)
-    setSeconds(t.defaults.seconds)
+    setSeconds(clampSecondsForModel(t.defaults.seconds, t.defaults.model))
     setAspect(t.defaults.aspect)
     setModel(t.defaults.model)
     setQuality(t.defaults.quality)
@@ -721,6 +723,35 @@ function ProjectView({
   const [sheetBusy, setSheetBusy] = useState("")
   const [library, setLibrary] = useState<FlowLibraryCharacter[]>([])
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const audioInputRef = useRef<HTMLInputElement | null>(null)
+  const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null)
+  const [audioLipsync, setAudioLipsync] = useState<boolean>(false)
+
+  const handleReplaceAudio = async () => {
+    if (!selectedAudioFile || !project.id) return
+    setBusy("audio_replace")
+    try {
+      const fd = new FormData()
+      fd.append("audio", selectedAudioFile)
+      fd.append("lipsync", String(audioLipsync))
+      const res = await replaceFlowAudioAction(project.id, fd)
+      if (!res.success) {
+        toast.error(res.error || "Falha ao processar a substituição de áudio.")
+        return
+      }
+      toast.success(
+        res.lipsyncApplied
+          ? "Nova voz aplicada com Lip-Sync e legendas Whisper gravadas!"
+          : "Nova voz aplicada com legendas Whisper gravadas com sucesso!"
+      )
+      setSelectedAudioFile(null)
+      await refreshProject()
+    } catch (err: any) {
+      toast.error(err?.message || "Erro inesperado ao processar a nova voz.")
+    } finally {
+      setBusy("")
+    }
+  }
 
   const loadJobs = useCallback(async () => {
     try {
@@ -1743,6 +1774,65 @@ function ProjectView({
                 {project.srt_url && <a className="text-primary underline" href={`${project.srt_url}${project.srt_url.includes('?') ? '&' : '?'}download=1`} download={project.srt_url.split('/').pop()}>Baixar legenda (.srt)</a>}
               </div>
               {project.assemble_error && <p className="text-xs text-muted-foreground">{project.assemble_error}</p>}
+            </div>
+          )}
+
+          {(allDone || project.final_url) && (
+            <div className="mt-4 pt-4 border-t border-border/60 space-y-3">
+              <div>
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <Mic className="h-4 w-4 text-primary" /> Substituir Voz por Áudio Externo / Gravação
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Envie um arquivo de áudio (.webm, .mp3, .wav, .m4a). O DarkTube corta o silêncio inicial, remonta sobre os takes limpos e queima as novas legendas Whisper.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={audioInputRef}
+                  type="file"
+                  accept="audio/*,.webm,.mp3,.wav,.m4a"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) setSelectedAudioFile(f)
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => audioInputRef.current?.click()}
+                  disabled={busy === "audio_replace"}
+                >
+                  <Upload className="mr-1.5 h-3.5 w-3.5" />
+                  {selectedAudioFile ? selectedAudioFile.name : "Escolher arquivo de áudio..."}
+                </Button>
+
+                {selectedAudioFile && (
+                  <Button
+                    size="sm"
+                    disabled={busy === "audio_replace"}
+                    onClick={handleReplaceAudio}
+                  >
+                    {busy === "audio_replace" ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    {busy === "audio_replace" ? "Processando Whisper & FFmpeg..." : "Aplicar Nova Voz"}
+                  </Button>
+                )}
+
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={audioLipsync}
+                    onChange={(e) => setAudioLipsync(e.target.checked)}
+                  />
+                  Ativar Lip-Sync neural (LivePortrait)
+                </label>
+              </div>
             </div>
           )}
         </CardContent>

@@ -1,5 +1,8 @@
 "use server"
 
+import fs from "fs"
+import path from "path"
+import os from "os"
 import { getCurrentUser } from "@/lib/auth-helpers"
 import { getUserApiKey } from "@/lib/database"
 import { getFlowTemplate, MAX_TAKES, TAKE_SECONDS, clampSecondsForModel } from "@/lib/flow-templates"
@@ -43,10 +46,12 @@ import {
   syncProjectQueuedJobsWithReferences,
 } from "@/lib/flow-jobs"
 import { assembleFlowProject } from "@/lib/flow-assemble"
+import { replaceProjectAudio } from "@/lib/flow-audio-replace"
 import { getRiskSettings, getRiskUsage, saveRiskSettings, type RiskSettings } from "@/lib/flow-risk"
 import { getSocialAccounts } from "@/lib/social-accounts"
 import { deleteDarkClipPost, saveDarkClipPost, updateDarkClipPostStatus } from "@/lib/database"
 import { isValidVideoUrl, triggerSocialDispatcher } from "@/lib/social-dispatcher"
+import { getUserCredits, setUserCredits, simulateCredits, type SimulationResult } from "@/lib/flow-credits"
 
 async function requireUser() {
   const user = await getCurrentUser()
@@ -338,6 +343,49 @@ export async function assembleFlowProjectAction(id: string, options?: { wordsPer
     }
     assembleFlowProject(user.id, id).catch((e) => console.error("[Flow] montagem falhou:", e?.message))
     return { success: true as const }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Substitui o áudio/voz de um projeto montado por um áudio enviado pelo usuário, remontando sobre takes limpos e queimando novas legendas Whisper. */
+export async function replaceFlowAudioAction(projectId: string, formData: FormData) {
+  try {
+    const user = await requireUser()
+    const file = formData.get("audio") as File | null
+    if (!file) throw new Error("Arquivo de áudio não enviado.")
+
+    const lipsync = formData.get("lipsync") === "true"
+
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    const ext = path.extname(file.name) || ".webm"
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "flow-user-audio-"))
+    const tmpAudioPath = path.join(tmpDir, `input_${Date.now()}${ext}`)
+    fs.writeFileSync(tmpAudioPath, buffer)
+
+    try {
+      const result = await replaceProjectAudio({
+        userId: user.id,
+        projectId,
+        audioInput: tmpAudioPath,
+        lipsync,
+        updateProject: true,
+      })
+
+      return {
+        success: true as const,
+        finalUrl: result.finalUrl,
+        srtUrl: result.srtUrl,
+        burned: result.burned,
+        lipsyncApplied: result.lipsyncApplied,
+      }
+    } finally {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
+    }
   } catch (err) {
     return fail(err)
   }
@@ -848,6 +896,52 @@ export async function saveFlowRefOptionsAction(
     }
     const project = await updateFlowProject(user.id, projectId, { params: nextParams })
     return { success: true as const, project: project ?? { ...current, params: nextParams } }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Obtém o saldo de créditos do usuário logado */
+export async function getUserCreditsAction() {
+  try {
+    const user = await requireUser()
+    const credits = await getUserCredits(user.id)
+    return { success: true as const, credits }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Atualiza o saldo de créditos do usuário logado */
+export async function setUserCreditsAction(credits: number) {
+  try {
+    const user = await requireUser()
+    const updated = await setUserCredits(user.id, credits)
+    return { success: true as const, credits: updated }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Simula quantos vídeos podem ser produzidos com base nos créditos, modelo e segundos por take */
+export async function simulateCreditsAction(input: {
+  credits?: number
+  model: string
+  secondsPerTake: number
+  takesCount: number
+  isHybrid?: boolean
+}) {
+  try {
+    const user = await requireUser()
+    const userCredits = input.credits !== undefined ? input.credits : await getUserCredits(user.id)
+    const result = simulateCredits({
+      userCredits,
+      model: input.model,
+      secondsPerTake: input.secondsPerTake,
+      takesCount: input.takesCount,
+      isHybrid: input.isHybrid !== false,
+    })
+    return { success: true as const, result }
   } catch (err) {
     return fail(err)
   }

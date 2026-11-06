@@ -272,23 +272,27 @@ export async function replaceVideoAudio(options: ReplaceAudioOptions): Promise<R
  * Substitui o áudio de um projeto do /flow remontando a partir dos takes brutos limpos (sem legendas velhas queimadas).
  */
 export async function replaceProjectAudio(options: {
-  userId: string;
+  userId?: string;
   projectId: string;
   audioInput: string;
   takeIndex?: number;
   lipsync?: boolean;
   outputDir?: string;
   filename?: string;
+  updateProject?: boolean;
 }) {
-  const { userId, projectId, audioInput, lipsync = false, outputDir = './midia/criativos' } = options;
+  const { userId, projectId, audioInput, lipsync = false, outputDir = './midia/criativos', updateProject = true } = options;
 
-  // Busca projeto no banco
-  const { rows } = await pool.query(
-    'SELECT id, title, final_url, params, script FROM public.flow_projects WHERE user_id = $1 AND (id::text = $2 OR id::text LIKE $3)',
-    [userId, projectId, `${projectId}%`]
-  );
+  // Busca projeto no banco (aceita ID completo ou prefixo de ID)
+  const querySql = userId
+    ? 'SELECT id, user_id, title, final_url, srt_url, params, script FROM public.flow_projects WHERE user_id = $1 AND (id::text = $2 OR id::text LIKE $3) LIMIT 1'
+    : 'SELECT id, user_id, title, final_url, srt_url, params, script FROM public.flow_projects WHERE (id::text = $1 OR id::text LIKE $2) LIMIT 1';
+  const queryParams = userId ? [userId, projectId, `${projectId}%`] : [projectId, `${projectId}%`];
+
+  const { rows } = await pool.query(querySql, queryParams);
   if (!rows.length) throw new Error(`Projeto ${projectId} não encontrado.`);
   const project = rows[0];
+  const effectiveUserId = project.user_id;
 
   const targetDir = path.resolve(process.cwd(), outputDir);
   fs.mkdirSync(targetDir, { recursive: true });
@@ -300,7 +304,7 @@ export async function replaceProjectAudio(options: {
   // Busca os takes brutos do projeto no banco (sem legendas queimadas)
   const { rows: jobs } = await pool.query(
     `SELECT take_index, role, status, result_url, finished_at FROM public.flow_jobs WHERE user_id = $1 AND project_id = $2`,
-    [userId, project.id]
+    [effectiveUserId, project.id]
   );
 
   const takes = project.script?.takes || [];
@@ -345,15 +349,44 @@ export async function replaceProjectAudio(options: {
       lipsync,
       syncWhisper: true,
       burnSubtitles: true,
-      userId,
+      userId: effectiveUserId,
       language: 'pt',
       wordsPerCaption: Number(project.params?.wordsPerCaption) || 2,
     });
+
+    let finalUrl = project.final_url;
+    let srtUrl = project.srt_url;
+
+    if (updateProject && fs.existsSync(outPath)) {
+      const mp4Buf = fs.readFileSync(outPath);
+      const storageMp4 = `flow_replaced_${project.id}_${Date.now()}.mp4`;
+      finalUrl = await uploadMediaFile(mp4Buf, storageMp4, 'video/mp4');
+
+      if (result.srtPath && fs.existsSync(result.srtPath)) {
+        const srtBuf = fs.readFileSync(result.srtPath);
+        const storageSrt = `flow_replaced_${project.id}_${Date.now()}.srt`;
+        srtUrl = await uploadMediaFile(srtBuf, storageSrt, 'text/plain');
+      }
+
+      await pool.query(
+        `UPDATE public.flow_projects
+            SET status = 'assembled',
+                final_url = $3,
+                srt_url = COALESCE($4, srt_url),
+                assembled_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $1 AND user_id = $2`,
+        [project.id, effectiveUserId, finalUrl, srtUrl]
+      );
+      console.log(`[AudioReplace] flow_projects ${project.id} atualizado com novo final_url: ${finalUrl}`);
+    }
 
     return {
       ...result,
       projectId: project.id,
       title: project.title,
+      finalUrl,
+      srtUrl,
     };
   } finally {
     try {
