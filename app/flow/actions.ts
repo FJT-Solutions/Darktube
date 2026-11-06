@@ -51,7 +51,8 @@ import { getRiskSettings, getRiskUsage, saveRiskSettings, type RiskSettings } fr
 import { getSocialAccounts } from "@/lib/social-accounts"
 import { deleteDarkClipPost, saveDarkClipPost, updateDarkClipPostStatus } from "@/lib/database"
 import { isValidVideoUrl, triggerSocialDispatcher } from "@/lib/social-dispatcher"
-import { getUserCredits, setUserCredits, simulateCredits, type SimulationResult } from "@/lib/flow-credits"
+import { getUserCredits, setUserCredits } from "@/lib/flow-credits-server"
+import { simulateCredits, type SimulationResult } from "@/lib/flow-credits"
 
 async function requireUser() {
   const user = await getCurrentUser()
