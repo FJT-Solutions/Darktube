@@ -50,6 +50,7 @@ import {
   type FlowTemplate,
 } from "@/lib/flow-templates"
 import { buildTakePrompt, countWords, exportScriptText, takeKind, takeReference, validateScript, type FlowScript, type FlowTake, type FlowTakeKind } from "@/lib/flow-script"
+import { FlowCreditSimulator } from "@/components/flow-credit-simulator"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject } from "@/lib/flow-projects"
 import type { FlowLibraryCharacter } from "@/lib/flow-characters"
@@ -474,6 +475,18 @@ export default function FlowPage() {
                   </Select>
                 )}
               </div>
+
+              <FlowCreditSimulator
+                currentModel={model}
+                currentSeconds={seconds}
+                currentTakes={takes}
+                onApplyConfig={(m, s, tk) => {
+                  setModel(m)
+                  setSeconds(s)
+                  setTakes(tk)
+                  toast.success(`Parâmetros aplicados: ${tk} takes de ${s}s no modelo ${m}`)
+                }}
+              />
 
               <Button onClick={generate} disabled={generating || !provider} className="w-full">
                 {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}

@@ -524,11 +524,18 @@ export function buildTakePrompt(
     lines.push(`Sound: ${noEnd(take.sound || 'subtle natural ambience')}.${kind === 'ambiente' || !take.line ? ' No speech.' : ''} No background music.`)
     if (hasRef) lines.push('Use the reference image only for identity: ignore its plain backdrop and place everyone inside the setting above.')
     if (total > 1 && level === 0) lines.push(`Continuity: same ${visible.length ? 'characters, outfits, ' : ''}setting, lighting and color grading as the other scenes of this video.`)
-        if (visible.length > 0) {
+    const hasHandsInAction = /\b(hands?|fingers?|grasp(?:ing|s)?|hold(?:ing|s)?|pour(?:ing|s)?|stir(?:ring|s)?|knead(?:ing|s)?|slic(?:ing|es)?|pull(?:ing|s)?|open(?:ing|s)?|clos(?:ing|es)?|plac(?:ing|es)?|touch(?:ing|es)?)\b/i.test(take.action)
+    if (visible.length > 0) {
       lines.push(
         level >= 2
           ? 'Negative constraints: no unprompted motion, no extra people, no deformed limbs, static background stays stable.'
           : 'Negative constraints: no unprompted character wandering or sudden erratic gestures, no random extra people or bystanders, no deformed anatomy, no floating or extra fingers, no morphing objects. Static environment and props stay strictly stable and stationary.'
+      )
+    } else if (hasHandsInAction) {
+      lines.push(
+        level >= 2
+          ? 'Negative constraints: no telekinesis or autonomous appliance opening, no faces, no floating hands, no extra fingers, no morphing appliances.'
+          : 'Negative constraints: no telekinesis, ghost movement or appliances opening by themselves without a hand firmly grasping the handle; no faces, no full human bodies, no extra bystanders; no disconnected or floating hands, no extra or mutated fingers, no backward-bending joints, no hand-orientation flipping between cuts; appliances and cookware must never morph, change models, or show unprompted digital screen numbers or HUD icons.'
       )
     } else {
       lines.push(

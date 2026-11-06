@@ -124,7 +124,7 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
   }
 
   // If videoUrl is Remotion storage path (/storage/darkclip_....mp4) and not on disk yet, fetch from candidates
-  if (!fs.existsSync(videoArg) && videoUrl.includes('/storage/')) {
+  if (!fs.existsSync(/*turbopackIgnore: true*/ videoArg) && videoUrl.includes('/storage/')) {
     const CANDIDATE_URLS = [
       'http://n8n-remotionservice-ry6eh9:3001',
       process.env.REMOTION_SERVICE_URL?.replace(/\/render$/, ''),
@@ -155,7 +155,7 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
   }
 
   // Fallback: If not exported to local file and is relative URL, format full URL
-  if (!fs.existsSync(videoArg) && !videoArg.startsWith('http')) {
+  if (!fs.existsSync(/*turbopackIgnore: true*/ videoArg) && !videoArg.startsWith('http')) {
     const baseSiteUrl =
       process.env.NEXTAUTH_URL ||
       process.env.NEXT_PUBLIC_SITE_URL ||

@@ -576,7 +576,7 @@ export const VideoCaptureService = {
                     fs.writeFileSync(sessionCookiePath, lines.join('\n'));
                     console.log(`[VideoCaptureService] Usando ${sessionCookies.length} cookies da sessão do usuário (extensão)`);
                     sessionCookieCleanup = () => {
-                        try { if (sessionCookiePath && fs.existsSync(sessionCookiePath)) fs.unlinkSync(sessionCookiePath); } catch {}
+                        try { if (sessionCookiePath && fs.existsSync(/*turbopackIgnore: true*/ sessionCookiePath)) fs.unlinkSync(sessionCookiePath); } catch {}
                     };
                 } catch (ckErr) {
                     console.warn('[VideoCaptureService] Falha ao escrever cookies de sessão:', ckErr);

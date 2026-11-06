@@ -174,12 +174,12 @@ export async function downloadCreativeToLocal(
       path.basename(parsedUrl.pathname) ||
       `criativo_${Date.now()}.mp4`;
 
-    const targetDir = path.resolve(process.cwd(), outputDir);
+    const targetDir = path.resolve(/*turbopackIgnore: true*/ process.cwd(), outputDir);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    const filePath = path.join(targetDir, fileName);
+    const filePath = path.join(/*turbopackIgnore: true*/ targetDir, fileName);
     console.log(`[MCP DarkTube] Baixando vídeo de ${resolvedUrl} para ${filePath}...`);
 
     const res = await fetch(resolvedUrl);
@@ -949,10 +949,10 @@ export async function replaceCreativeAudio(input: ReplaceCreativeAudioInput) {
     throw new Error('É necessário fornecer pelo menos um "projectId" ou "videoPathOrUrl".');
   }
 
-  const targetDir = path.resolve(process.cwd(), outputDir);
+  const targetDir = path.resolve(/*turbopackIgnore: true*/ process.cwd(), outputDir);
   fs.mkdirSync(targetDir, { recursive: true });
   const outName = filename || `audio_replaced_${Date.now()}.mp4`;
-  const outPath = path.join(targetDir, outName);
+  const outPath = path.join(/*turbopackIgnore: true*/ targetDir, outName);
 
   return await replaceVideoAudio({
     videoInput: videoPathOrUrl,

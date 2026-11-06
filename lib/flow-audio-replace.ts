@@ -294,12 +294,12 @@ export async function replaceProjectAudio(options: {
   const project = rows[0];
   const effectiveUserId = project.user_id;
 
-  const targetDir = path.resolve(process.cwd(), outputDir);
+  const targetDir = path.resolve(/*turbopackIgnore: true*/ process.cwd(), outputDir);
   fs.mkdirSync(targetDir, { recursive: true });
 
   const safeTitle = (project.title || 'criativo').toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40);
   const outName = options.filename || `${safeTitle}_voz_substituida.mp4`;
-  const outPath = path.join(targetDir, outName);
+  const outPath = path.join(/*turbopackIgnore: true*/ targetDir, outName);
 
   // Busca os takes brutos do projeto no banco (sem legendas queimadas)
   const { rows: jobs } = await pool.query(

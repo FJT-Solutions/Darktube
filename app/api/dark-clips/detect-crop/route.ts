@@ -163,8 +163,8 @@ export async function POST(req: Request) {
       const filename = candidateMedia.split('/api/storage/')[1]?.split('?')[0];
       try {
         const storageDir = process.env.STORAGE_PATH || path.join(process.cwd(), 'storage');
-        const testPath = path.join(storageDir, filename);
-        if (fs.existsSync(testPath)) {
+        const testPath = path.join(/*turbopackIgnore: true*/ storageDir, filename);
+        if (fs.existsSync(/*turbopackIgnore: true*/ testPath)) {
           resolvedLocalPath = testPath;
         } else {
           // Extrai buffer do PostgreSQL
