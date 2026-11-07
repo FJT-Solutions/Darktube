@@ -5,6 +5,7 @@ import { acceptPolicyRewrite, buildPolicyRewritePrompt, softenFlowPrompt } from 
 import { getFlowProject } from '@/lib/flow-projects';
 import { getUserApiKey } from '@/lib/database';
 import { callFlowLLM, FLOW_PROVIDERS, type FlowProvider } from '@/lib/flow-llm';
+import { classifyFlowFailure, policyReason } from '@/lib/flow-failure';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,13 +34,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!user) return NextResponse.json({ success: false, error: 'Não autenticado.' }, { status: 401 });
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  // Falhas passageiras do Flow que a extensao antiga marca como 'failed' (ex.: "Unable to edit the speech in this
-  // video"): reenviar o mesmo take costuma funcionar, entao entram na nova tentativa automatica.
-  const rawCode = String(body.code || '');
-  const code =
-    rawCode === 'failed' && /failed to generate|something went wrong|try again|unable to (generate|edit)|couldn.t generate|try a different prompt/i.test(String(body.error || '')) && !/polic|violat/i.test(String(body.error || ''))
-      ? 'gen_failed'
-      : rawCode;
+  // A extensao antiga (ou uma tela do Flow em portugues) pode mandar 'failed' para uma recusa por politica ou para uma
+  // falha passageira ("Esta geracao talvez viole nossas politicas", "Unable to edit the speech"): reclassifica pelo
+  // texto, nos dois idiomas, para elas entrarem na nova tentativa automatica em vez de virar rascunho.
+  const code = classifyFlowFailure(String(body.code || ''), String(body.error || ''));
 
   // Recusa por politica: a mesma cena volta para a fila sozinha, com o prompt ajustado ao motivo da recusa
   // (1a e 2a tentativas, ver softenFlowPrompt) e, na 3a, reescrito pela IA do projeto. A cena nao muda.
@@ -54,7 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return rewritten || soft;
     });
     if (retry) {
-      const same = retry.attempt === 1 && !/minor|child|prominent|famous|celebrit|public figure|real person/i.test(reason);
+      const same = retry.attempt === 1 && policyReason(reason) === 'unknown';
       const how = byLlm ? ' (reescrito pela IA do projeto, mesma cena)' : same ? ' (mesmo prompt)' : ' (prompt ajustado ao motivo da recusa, mesma cena)';
       const msg = `O Flow recusou o take ${retry.job.take_index ?? ''} por política; nova tentativa automática ${retry.attempt}/${MAX_POLICY_RETRIES}${how}.`;
       console.log(`[Flow] ${msg}`);

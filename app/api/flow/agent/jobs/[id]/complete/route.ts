@@ -69,10 +69,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     (async () => {
       try {
         const { rows: projJobs } = await pool.query(
-          `SELECT count(*) FILTER (WHERE status = 'done' AND result_url IS NOT NULL)::int AS done_count,
-                  count(*)::int AS total_count
+          // Conta cada take uma vez so (nova tentativa e folha de personagem nao entram): contar jobs fazia a montagem
+          // comecar com 2 dos 4 takes prontos ("Faltam takes prontos: 1, 4").
+          `SELECT count(DISTINCT take_index) FILTER (WHERE status = 'done' AND result_url IS NOT NULL AND role IN ('take', 'take_final'))::int AS done_count,
+                  count(DISTINCT take_index) FILTER (WHERE role IN ('take', 'take_final'))::int AS total_count
              FROM public.flow_jobs
-            WHERE project_id = $1 AND role IN ('take', 'take_final', 'character_sheet')`,
+            WHERE project_id = $1 AND role IN ('take', 'take_final')`,
           [job.project_id]
         );
         const { rows: proj } = await pool.query(

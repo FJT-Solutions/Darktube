@@ -374,7 +374,11 @@
         hasResolution = await maybePickRadio(panel, new RegExp('^\\s*' + esc(p.resolution)));
       }
       if (p.duration) {
-        hasDuration = await maybePickRadio(panel, new RegExp('^\\s*' + Number(p.duration) + 's\\s*$'));
+        hasDuration = await maybePickRadio(panel, new RegExp('^\\s*' + Number(p.duration) + '\\s*s\\b'));
+        if (!hasDuration) {
+          // Sem opcao de duracao igual a pedida (ex.: Omni 1.2 so oferece algumas): o Flow gera com a duracao que estiver ativa.
+          dtLog(`Duração de ${p.duration}s não disponível neste modelo; o take sai com a duração atual do Flow.`, { opcoes: radios(panel).map(rlabel).slice(0, 14) }, 'warn');
+        }
       }
     }
     await maybePickRadio(panel, new RegExp('^\\s*x' + count + '\\s*$'));
@@ -792,7 +796,7 @@
   // tile pendente, entao sem esta checagem parecia "gerando" para sempre.
   // Politica ("prominent people") x falha generica e passageira ("failed to generate") x outra.
   const failCode = (msg) =>
-    /polic|violat|prominent|pessoas|people/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate|unable to edit|try a different prompt/i.test(msg) ? 'gen_failed' : 'failed';
+    /polic|violat|prominent|pessoas|people|polític|viol(e|am|ar|ação)|menores|crian[çc]/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate|unable to edit|try a different prompt|falha ao gerar|algo deu errado|tente novamente|n[ãa]o foi poss[ií]vel (gerar|editar)|tente usar outro comando/i.test(msg) ? 'gen_failed' : 'failed';
   const FAILED_RX = /\bfailed\b|might violate|violate our polic|will be refunded|não foi possível gerar|geração falhou|falhou/i;
   function tileState(tile) {
     const t = txt(tile);
@@ -1522,7 +1526,13 @@
       fire(target, type);
       await sleep(150);
     }
-    const ok = !!(await until(() => ingredientChips() > before, 25000, 500)); // o Flow processa a imagem antes de mostrar o chip
+    let ok = !!(await until(() => ingredientChips() > before, 25000, 500)); // o Flow processa a imagem antes de mostrar o chip
+    // Envio ainda em andamento (tile pendente): espera mais em vez de soltar de novo por "colar", que subia a mesma
+    // imagem duas vezes (nos logs a referencia levava ~40 s por take por causa disso).
+    if (!ok && $$(S.pendingTile).length > 0) {
+      dtLog('O Flow ainda está processando a referência; esperando mais um pouco.', { pendentes: $$(S.pendingTile).length });
+      ok = !!(await until(() => ingredientChips() > before, 25000, 500));
+    }
     // 3) sempre deixa a pagina limpa (a area de soltar nao pode ficar por cima da caixa de prompt)
     const clean = await clearDragOverlay();
     if (!clean) dtLog('A área de soltar do Flow ficou aberta.', null, 'warn');

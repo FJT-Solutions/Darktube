@@ -2,6 +2,7 @@
 // O prompt final e montado aqui, e nao pela IA, para garantir sempre o mesmo formato (consistencia
 // de personagem e cenario, camera motivada, audio limpo e nenhum texto na imagem).
 
+import { policyReason } from './flow-failure'
 import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, MAX_TAKES, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel, VIDEO_MODELS } from './flow-templates'
 
 export type FlowTakeKind = 'dialogo' | 'narracao' | 'ambiente'
@@ -628,8 +629,8 @@ const ADULTS_NOTE = 'Everyone shown is clearly an adult.'
  * Aplicar de novo no resultado nao muda nada.
  */
 export function softenFlowPrompt(prompt: string, reason = '', attempt = 2): string {
-  const minors = /minor|child/i.test(reason)
-  const famous = /prominent|famous|celebrit|public figure|real person/i.test(reason)
+  const minors = policyReason(reason) === 'minors'
+  const famous = policyReason(reason) === 'famous'
   if (attempt < 2 && !minors && !famous) return prompt
   const style = famous || attempt >= 2
   const lines = String(prompt || '').split('\n')
@@ -684,6 +685,10 @@ export function acceptPolicyRewrite(original: string, raw: string): string | nul
   if (!text.startsWith('[Scene') || text.length > Math.max(2600, original.length * 1.3)) return null
   const quotes = original.match(/"[^"\n]+"/g) || []
   if (quotes.some((q) => !text.includes(q))) return null
+  // A fala (Dialogue/Narration) tem que voltar identica, linha inteira: a narracao nao vai entre aspas.
+  const rewritten = text.split('\n').map((l) => l.trim())
+  const spoken = original.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('Dialogue:') || l.startsWith('Narration:'))
+  if (spoken.some((l) => !rewritten.includes(l))) return null
   return text
 }
 

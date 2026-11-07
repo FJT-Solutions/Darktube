@@ -21,7 +21,7 @@ window.DT_FLOW_SEL = {
 
 window.DT_FLOW_RX = {
   // Textos que indicam geracao com erro em um bloco de resultado (usa boundaries e termos reais para nao casar com palavras do prompt como "unusual", "fail", etc.)
-  failure: /\b(failed to generate|something went wrong|try again|unable to generate|couldn't generate|unable to edit|try a different prompt|policy violation|violate our polic|unusual activity|atividade incomum|não foi possível gerar|geração falhou)\b/i,
+  failure: /\b(failed to generate|something went wrong|try again|unable to generate|couldn't generate|unable to edit|try a different prompt|policy violation|violate our polic|unusual activity|atividade incomum|não foi possível gerar|geração falhou|viole nossas pol[ií]ticas|falha ao gerar|algo deu errado)\b/i,
   // Pedido real de verificacao da conta. Nao confunde com o rodape padrao "protected by reCAPTCHA" da conta Google.
   verification: /(unusual activity|atividade incomum|verify your account|verifique sua conta|solve the captcha|resolva o captcha|confirm you are not a robot|confirme que você)/i,
   // Excesso de pedidos: pausa para esfriar.
