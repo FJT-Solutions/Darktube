@@ -69,7 +69,7 @@ const MCP_TOOLS_MANIFEST = [
             generateSheet: { type: 'boolean', description: 'Se true e não tiver sheetUrl, gera a folha via IA primeiro', default: false },
           },
         },
-        templateParams: { type: 'object', description: 'Parâmetros específicos do template selecionado (ex: voz, prato, cta)' },
+        templateParams: { type: 'object', description: 'Parâmetros específicos do template selecionado (ex: voz, prato, cta). CTA animado na montagem (Remotion, so no pipeline flow): ctaTitle (obrigatorio para ativar), ctaSubtitle, ctaAccent (#RRGGBB), ctaPosition (top|center|bottom), ctaStartSec, ctaSeconds. O Flow nao desenha texto no video' },
         isDraft: { type: 'boolean', description: 'Se true, gera preview 360p ultra-rápido (~10s) com folha de contato', default: true },
         downloadLocal: { type: 'boolean', description: 'Se true, faz download do MP4 para ./midia/criativos/ do projeto', default: true },
         outputDir: { type: 'string', description: 'Diretório local para salvar o MP4', default: './midia/criativos' },
