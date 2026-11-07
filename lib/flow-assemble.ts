@@ -478,3 +478,56 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     fs.rmSync(dir, { recursive: true, force: true })
   }
 }
+
+export interface ChromaKeyOptions {
+  color?: string
+  similarity?: number
+  blend?: number
+  scaleW?: number
+  scaleH?: number
+  posX?: string
+  posY?: string
+}
+
+/**
+ * Compõe o Expert (gravado com fundo verde) sobre o B-Roll de fundo usando chromakey nativo do FFmpeg.
+ * Remove a cor verde sólida (#00FF00) com suavização de bordas e posiciona o torso recortado
+ * no terço inferior direito (PiP) sem bordas duras, mantendo o áudio da fala do expert.
+ */
+export async function compositeChromaKeyOverlay(
+  bgVideoPath: string,
+  expertGreenVideoPath: string,
+  outputPath: string,
+  options?: ChromaKeyOptions
+): Promise<string> {
+  const color = options?.color || '0x00FF00'
+  const similarity = options?.similarity ?? 0.15
+  const blend = options?.blend ?? 0.05
+  const scaleW = options?.scaleW ?? 480
+  const scaleH = options?.scaleH ?? 480
+  const posX = options?.posX || 'W-w-20'
+  const posY = options?.posY || 'H-h-40'
+
+  const filter =
+    `[1:v]chromakey=${color}:${similarity}:${blend},scale=${scaleW}:${scaleH}[expert];` +
+    `[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[bg];` +
+    `[bg][expert]overlay=x=${posX}:y=${posY}[out]`
+
+  await run(ffmpegBin(), [
+    '-y',
+    '-i', bgVideoPath,
+    '-i', expertGreenVideoPath,
+    '-filter_complex', filter,
+    '-map', '[out]',
+    '-map', '1:a',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '20',
+    '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac',
+    outputPath
+  ], { timeout: 300000 })
+
+  return outputPath
+}
+

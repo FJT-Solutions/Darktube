@@ -1562,4 +1562,71 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     look: 'warm home kitchen food cinematography, soft window light, shallow depth of field, rich appetizing colors',
     defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'hiper' },
   },
+  {
+    id: 'receita-chromakey-expert',
+    niche: 'Culinária',
+    subniche: 'Receita com Narrador (Chroma Key & B-Roll)',
+    name: 'Receita com Narrador (Chroma Key)',
+    description:
+      'Criativo híbrido de alta conversão: o Expert (Chef ou Nutricionista) é gerado do torso para cima falando sobre fundo verde sólido (#00FF00), recortado nativamente no FFmpeg e sobreposto em Picture-in-Picture sobre fatias dinâmicas de B-Roll culinário.',
+    mode: 'dialogo',
+    length: 'curto',
+    trend: 'viral',
+    fields: [
+      {
+        id: 'perfil_expert',
+        label: 'Perfil do Expert',
+        type: 'select',
+        default: 'chef_mulher',
+        options: [
+          { value: 'chef_mulher', label: 'Chef de cozinha mulher (dolmã branca, calorosa)' },
+          { value: 'nutri_mulher', label: 'Nutricionista mulher (estilo clínico acolhedor)' },
+          { value: 'chef_homem', label: 'Chef de cozinha homem (avental escuro profissional)' },
+          { value: 'nutri_homem', label: 'Nutricionista homem (estilo moderno e didático)' },
+        ],
+      },
+      { id: 'prato', label: 'Prato ou Oferta', type: 'text', default: '365 Receitas Sem Açúcar e Sem Glúten', placeholder: 'Ex.: 365 Receitas Saudáveis' },
+      {
+        id: 'posicao_overlay',
+        label: 'Posição do Narrador',
+        type: 'select',
+        default: 'canto_inferior_direito',
+        options: [
+          { value: 'canto_inferior_direito', label: 'Canto inferior direito (PiP fluído)' },
+          { value: 'canto_inferior_esquerdo', label: 'Canto inferior esquerdo' },
+        ],
+      },
+      { id: 'cta', label: 'Palavra do CTA', type: 'text', default: 'RECEITA', placeholder: 'Ex.: RECEITA' },
+      { id: 'emocao', label: 'Emoção principal', type: 'select', default: 'alegria', options: EMOTIONS },
+    ],
+    brief:
+      'A 32-second high-converting direct-response creative combining a talking head expert (Chef/Nutritionist) shot from the chest up against a pure flat solid green screen studio background (#00FF00), seamlessly composited over fast-paced multi-shot cooking and meal-prep b-roll in post-production via FFmpeg chromakey.',
+    beats: [
+      {
+        fn: 'Hook in first 1.5s: Expert addresses the camera against flat green studio background (#00FF00), breaking the diet struggle myth with expressive hand gestures',
+        camera: 'medium close-up torso shot, centered, eye-level, flat pure green background #00FF00, sharp edges, no shadows',
+      },
+      {
+        fn: 'B-roll showcase: Rapid 3-slice dynamic demonstration of appetizing, practical food prep (slicing, airfryer, pot layer)',
+        camera: 'macro close-up over-the-counter action, glossy sizzling textures, rich lighting',
+      },
+      {
+        fn: 'Proof & Offer bridge: Expert reappears on pure green background (#00FF00), holding digital tablet and presenting the 365 recipes catalog with warmth',
+        camera: 'medium close-up torso shot, centered, eye-level, flat pure green background #00FF00, studio key lighting',
+      },
+      {
+        fn: 'CTA payoff: Final plated dish and meal prep fridge with bold conversion call-to-action to claim access',
+        camera: 'locked macro close-up of delicious plated meal with subtle rack focus to CTA card',
+      },
+    ],
+    rules: [
+      'Takes 1 and 3 (Expert): strictly torso/chest up, facing camera directly, solid uniform green background #00FF00 with zero gradients or cast shadows for clean alpha keying',
+      'Takes 2 and 4 (B-Roll): 100% faceless hands and food only, rapid visual cuts between ingredients and finished plates',
+      'Expert delivery is warm, empathetic and authoritative, addressing viewer pain points without small talk',
+      'All lip-sync lines must match Brazilian Portuguese naturally and concisely',
+      'Zero text or logos rendered inside video pixels; kinetic typography is burned in post-assembly',
+    ],
+    look: 'commercial direct-response lighting, studio key light with clean green-screen back, crisp appetizing colors for b-roll',
+    defaults: { takes: 4, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '720p', realismo: 'hiper' },
+  },
 ]
