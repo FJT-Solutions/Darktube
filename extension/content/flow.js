@@ -1778,11 +1778,16 @@
   // (cada clique que "pega" cria uma geracao, entao nunca continua depois de um sucesso). Devolve o nome do caminho ou ''.
   async function clickGenerate(btn, prevImageIds, descBtn, kind) {
     const tilesBefore = $$(tileSel()).length;
-    const started = () =>
-      $$(tileSel()).length > tilesBefore ||
-      $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) ||
-      $$(S.imageTileImg).some((i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id'))) ||
-      !txt($(S.editor) || document.createElement('i'));
+    const started = () => {
+      const ed = $(S.editor);
+      const editorCleared = ed ? !txt(ed) : false;
+      return (
+        $$(tileSel()).length > tilesBefore ||
+        $$(S.pendingTile).some((t) => !t.closest('[data-dt-old]')) ||
+        $$(S.imageTileImg).some((i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id'))) ||
+        editorCleared
+      );
+    };
     const pressAndClick = (target) => {
       if (!target) return;
       try {
@@ -2010,9 +2015,14 @@
             dtLog('Detalhes da recusa.', { rede: netTail(10), avisos: pageToasts(), tile: String(bad.outerHTML || '').replace(/[ \t\r\n]+/g, ' ').slice(0, 700) }, 'error');
             throw err(failCode(m), 'O Flow recusou a geração: ' + m);
           }
-          const ready = $$(S.imageTileImg).filter(
-            (i) => !i.closest('[data-dt-seen]') && !prevImageIds.has(i.getAttribute('data-media-id')) && !prevImageSrcs.has((i.currentSrc || i.src || '').split('?')[0])
-          );
+          const ready = $$(S.imageTileImg).filter((i) => {
+            if (i.closest('[data-dt-seen]')) return false;
+            const mid = i.getAttribute('data-media-id');
+            if (mid && prevImageIds.has(mid)) return false;
+            const src = (i.currentSrc || i.src || '').split('?')[0];
+            if (src && prevImageSrcs.has(src)) return false;
+            return (i.naturalWidth > 64 || i.clientWidth > 64 || (i.src && !i.src.startsWith('data:')));
+          });
           if (ready.length >= count) dtLog('Imagem gerada detectada.', { prontas: ready.length, mediaId: ready[0].getAttribute('data-media-id') }, 'success');
           if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
         } else {
