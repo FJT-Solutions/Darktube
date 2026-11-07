@@ -1830,9 +1830,16 @@
       },
     ];
     const attempts = [
-      // 1. Prioridade máxima: clique nativo no mundo da página (MAIN world, sem depurador CDP).
-      // Dispara diretamente no Zone.js do Angular e nos elementos internos (mat-icon) sem acionar reCAPTCHA Enterprise.
+      // 1. Tenta clique no mundo da pagina (MAIN world, sem debugger).
       mainClick,
+
+      // 2. Se o Angular ignorar o clique sintetico, usa o clique real nativo com CDP (isTrusted: true).
+      real,
+      ['clique real com a aba ativa', async () => {
+        const b = generateBtnEl() || btn;
+        if (b) await trustedClick(b, true);
+      }],
+
       simple,
 
       ['clique completo', () => {
@@ -1874,7 +1881,9 @@
     let how = '';
     for (const [label, fire] of attempts) {
       await fire();
-      const waitMs = kind === 'image' ? 25000 : (label.includes('mundo') || label === 'clique' ? 18000 : 10000);
+      const waitMs = label.includes('depurador') || label.includes('real')
+        ? 12000
+        : (label.includes('mundo') ? 10000 : 8000);
       if (await until(started, waitMs, 400)) {
         how = label;
         break;
