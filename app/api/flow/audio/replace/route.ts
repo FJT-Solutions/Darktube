@@ -19,12 +19,17 @@ export async function POST(req: Request) {
     let projectId = '';
     let audioInput = '';
     let lipsync = false;
+    let layout: 'expert' | 'split' | 'auto' | undefined;
+    let scriptText = '';
     let tmpDirToClean = '';
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       projectId = String(formData.get('projectId') || '');
       lipsync = formData.get('lipsync') === 'true' || formData.get('lipsync') === '1';
+      const rawLayout = String(formData.get('layout') || '');
+      if (rawLayout === 'expert' || rawLayout === 'split' || rawLayout === 'auto') layout = rawLayout;
+      scriptText = String(formData.get('scriptText') || '');
 
       const file = formData.get('audio') as File | null;
       if (!file) {
@@ -42,6 +47,8 @@ export async function POST(req: Request) {
       projectId = String(body.projectId || '');
       audioInput = String(body.audioUrl || body.audioPath || body.audioInput || '');
       lipsync = Boolean(body.lipsync);
+      if (body.layout === 'expert' || body.layout === 'split' || body.layout === 'auto') layout = body.layout;
+      scriptText = String(body.scriptText || '');
     }
 
     if (!projectId) {
@@ -60,6 +67,8 @@ export async function POST(req: Request) {
         projectId,
         audioInput,
         lipsync,
+        layout,
+        scriptText,
         updateProject: true,
       });
 

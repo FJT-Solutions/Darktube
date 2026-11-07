@@ -86,7 +86,7 @@ export interface FlowScript {
 }
 
 export interface FlowParams {
-  [key: string]: string | number
+  [key: string]: string | number | boolean | undefined
 }
 
 export function languageLabel(code: string): string {

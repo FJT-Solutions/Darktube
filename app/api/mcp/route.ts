@@ -151,7 +151,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_replace_audio',
-    description: 'Substitui a faixa de áudio de um criativo/vídeo do /flow por um áudio gravado externo (.webm, .mp3, .wav), sincroniza legendas dinâmicas via Whisper e opcionalmente dispara microserviço neural de Lip-Sync no rosto do personagem.',
+    description: 'Substitui a faixa de áudio de um criativo/vídeo do /flow aplicando a Tríade do Slot Atômico (início aos 0.14s, anti-buraco, forced alignment e Y adaptativo), com suporte a microserviço neural de Lip-Sync.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -159,6 +159,8 @@ const MCP_TOOLS_MANIFEST = [
         videoPathOrUrl: { type: 'string', description: 'Ou caminho/URL do arquivo de vídeo MP4 avulso' },
         audioPathOrUrl: { type: 'string', description: 'Caminho local ou URL do áudio gravado (.webm, .mp3, .wav)' },
         lipsync: { type: 'boolean', description: 'Se true, envia para microserviço de Lip-Sync para sincronizar os lábios com IA', default: false },
+        layout: { type: 'string', enum: ['expert', 'split', 'auto'], description: 'Posicionamento da Tríade: expert (Y=1520 no terço inferior livre) ou split (Y=960 na divisória central)', default: 'expert' },
+        scriptText: { type: 'string', description: 'Texto oficial do roteiro para Forced Token Alignment (elimina erros ortográficos)' },
         outputDir: { type: 'string', description: 'Diretório de destino', default: './midia/criativos' },
         filename: { type: 'string', description: 'Nome preferido do arquivo final MP4' },
       },

@@ -926,16 +926,18 @@ export interface ReplaceCreativeAudioInput {
   videoPathOrUrl?: string;
   audioPathOrUrl: string;
   lipsync?: boolean;
+  layout?: 'expert' | 'split' | 'auto';
+  scriptText?: string;
   outputDir?: string;
   filename?: string;
 }
 
 /**
  * 7. Substitui o áudio de um criativo ou projeto do /flow por um áudio gravado externo (.webm, .mp3),
- * gerando legendas sincronizadas via Whisper e suportando microserviço neural de Lip-Sync opcional.
+ * aplicando a Tríade do Slot Atômico (início aos 0.14s, anti-buraco, forced alignment e Y adaptativo).
  */
 export async function replaceCreativeAudio(input: ReplaceCreativeAudioInput) {
-  const { projectId, videoPathOrUrl, audioPathOrUrl, lipsync = false, outputDir = './midia/criativos', filename } = input;
+  const { projectId, videoPathOrUrl, audioPathOrUrl, lipsync = false, layout, scriptText, outputDir = './midia/criativos', filename } = input;
 
   if (projectId) {
     const { rows } = await pool.query(
@@ -951,6 +953,8 @@ export async function replaceCreativeAudio(input: ReplaceCreativeAudioInput) {
       projectId: realId,
       audioInput: audioPathOrUrl,
       lipsync,
+      layout,
+      scriptText,
       outputDir,
       filename,
     });
@@ -970,6 +974,8 @@ export async function replaceCreativeAudio(input: ReplaceCreativeAudioInput) {
     audioInput: audioPathOrUrl,
     outputPath: outPath,
     lipsync,
+    layout,
+    scriptText,
     syncWhisper: true,
   });
 }
