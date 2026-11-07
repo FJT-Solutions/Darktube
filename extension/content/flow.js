@@ -1825,11 +1825,10 @@
       },
     ];
     const attempts = [
-      // Imagem: tenta primeiro no mundo da pagina (MAIN world, sem debugger - evita acionar o reCAPTCHA Enterprise),
-      // e so recorre ao clique real (depurador) se o primeiro nao disparar.
-      // Modos vídeo e imagem: prioriza cliques nativos no mundo DOM e MAIN sem depurador CDP (evita acionar reCAPTCHA Enterprise).
-      simple,
+      // 1. Prioridade máxima: clique nativo no mundo da página (MAIN world, sem depurador CDP).
+      // Dispara diretamente no Zone.js do Angular e nos elementos internos (mat-icon) sem acionar reCAPTCHA Enterprise.
       mainClick,
+      simple,
 
       ['clique completo', () => {
         const b = generateBtnEl() || btn;
@@ -1870,7 +1869,7 @@
     let how = '';
     for (const [label, fire] of attempts) {
       await fire();
-      const waitMs = kind === 'image' ? 15000 : (label === 'clique' ? 12000 : 8000);
+      const waitMs = kind === 'image' ? 25000 : (label.includes('mundo') || label === 'clique' ? 18000 : 10000);
       if (await until(started, waitMs, 400)) {
         how = label;
         break;

@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.24';
-const FLOW_BUILD = '2026-11-05-stealth-ghost-v3'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.25';
+const FLOW_BUILD = '2026-11-07-mainclick-anti-timeout-v1'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
@@ -849,6 +849,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             top.dispatchEvent(new PointerEvent('pointerup', { ...po, buttons: 0 }));
             top.dispatchEvent(new MouseEvent('mouseup', { ...mo, buttons: 0 }));
             top.dispatchEvent(new MouseEvent('click', { ...mo, buttons: 0 }));
+            try { if (typeof top.click === 'function') top.click(); } catch (_) {}
+            try { if (btn && btn !== top && typeof btn.click === 'function') btn.click(); } catch (_) {}
+            try { const form = btn && btn.closest('form'); if (form && typeof form.requestSubmit === 'function') form.requestSubmit(); } catch (_) {}
             return { found: true, igualAoBotao: top === btn, dentroDoBotao: btn.contains(top), noCentro: top.tagName.toLowerCase() + '.' + String(top.className || '').slice(0, 60) };
           },
         });
