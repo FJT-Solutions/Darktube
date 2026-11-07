@@ -1321,9 +1321,29 @@
     return new File([bytes], name, { type: r.mime || (/\.mp4$/i.test(name) ? 'video/mp4' : 'image/png') });
   }
 
+  const findPlusButton = () => {
+    const box = promptBox();
+    const scopes = box ? [box, document] : [document];
+    for (const root of scopes) {
+      const b = $$('button', root).find((btn) => {
+        if (!vis(btn)) return false;
+        const aria = btn.getAttribute('aria-label') || '';
+        const t = txt(btn);
+        const icon = $('mat-icon, i', btn)?.textContent?.trim() || '';
+        return (
+          /add ingredients|adicionar elementos|adicionar ingredientes|add elements/i.test(aria) ||
+          (icon === 'add' && !btn.closest('flow-generate-icon-button')) ||
+          /^(add|\+)$/i.test(t)
+        );
+      });
+      if (b) return b;
+    }
+    return null;
+  };
+
   // Envia o arquivo pela biblioteca do menu "+" (mesmo caminho do teste de envio).
   async function uploadToLibrary(file) {
-    const plus = $$('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+    const plus = findPlusButton();
     if (!plus) return false;
     realClick(plus);
     if (!(await until(() => $('flow-add-menu-popover-content'), 6000, 250))) return false;
@@ -1405,6 +1425,9 @@
         dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chips: ingredientChips(), segundos: Math.round((Date.now() - t0) / 1000) }, how ? 'success' : 'warn');
       } catch (e) {
         dtLog('Referência não anexada (' + label + '): ' + String((e && e.message) || e).slice(0, 160), null, 'warn');
+      } finally {
+        await clearDragOverlay();
+        await closeLayers();
       }
     }
   }
@@ -1429,30 +1452,55 @@
 
   // Caminho 1: soltar o arquivo sobre a caixa de prompt (como arrastar do computador).
   // Area "Drop media / + Add reference" que o Flow abre sobre a pagina quando algo e arrastado para ela.
+  // Suporta interface em ingles ("Drop media / Add reference") e portugues ("Soltar mídia / Adicionar referência").
   const dropZoneEl = () => {
-    const cand = $$('div, span, button, p, flow-media-upload').filter((e) => {
+    const cand = $$('div, span, button, p, flow-media-upload, [class*="drop" i], [class*="upload" i]').filter((e) => {
       const t = txt(e);
-      // o "+" do botao pode vir como texto de icone ("add Add reference"): so o fim do texto importa
-      return t.length > 0 && t.length < 40 && /(^|\s)add reference$|^drop media$/i.test(t) && vis(e);
+      return (
+        t.length > 0 &&
+        t.length < 50 &&
+        /(add reference|adicionar refer[eê]ncia|drop media|soltar m[ií]dia)/i.test(t) &&
+        vis(e)
+      );
     });
-    // Prefere o container clicavel/maior da area "Add reference" (nao o texto solto).
-    return cand.find((e) => /add reference/i.test(txt(e)) && (e.closest('button, [role=button], [class*=drop], [class*=upload]') || e)) || cand[0] || null;
+    return (
+      cand.find((e) => /(add reference|adicionar refer[eê]ncia)/i.test(txt(e)) && (e.closest('button, [role=button], [class*=drop i], [class*=upload i]') || e)) ||
+      cand[0] ||
+      null
+    );
   };
 
   // Desfaz um arrasto que ficou pela metade: sem isso a area de soltar fica por cima e esconde a caixa de prompt.
   async function clearDragOverlay() {
-    for (let i = 0; i < 3 && dropZoneEl(); i++) {
+    for (let i = 0; i < 4; i++) {
+      const dz = dropZoneEl();
       const dt = new DataTransfer();
-      for (const el of [dropZoneEl(), document.body, document.documentElement].filter(Boolean)) {
-        for (const type of ['dragleave', 'dragend']) el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const targets = [dz, document.body, document.documentElement, $(S.editor), $('.cdk-overlay-container')].filter(Boolean);
+      for (const el of targets) {
+        for (const type of ['dragleave', 'dragend', 'pointerup', 'mouseup']) {
+          try { el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt })); } catch (_) {}
+        }
       }
       pressEscape();
-      await sleep(500);
+      const closeBtn = $$('button').find((b) => vis(b) && /close|fechar|cancel|cancelar/i.test(b.getAttribute('aria-label') || txt(b)));
+      if (closeBtn && dz && dz.contains(closeBtn)) {
+        try { closeBtn.click(); } catch (_) {}
+      }
+      await sleep(250);
+      if (!dropZoneEl()) break;
+    }
+    if (dropZoneEl()) {
+      const canvas = $('main, flow-canvas, .canvas, [role=main]');
+      if (canvas) {
+        try { canvas.click(); } catch (_) {}
+        pressEscape();
+        await sleep(300);
+      }
     }
     return !dropZoneEl();
   }
 
-  // Caminho 1: arrastar o arquivo para a pagina e SOLTAR na area "Add reference" que o Flow abre (alvo certo do drop).
+  // Caminho 1: arrastar o arquivo para a pagina e SOLTAR na area "Add reference" / "Adicionar referência" que o Flow abre.
   async function attachByDrop(file) {
     const box = promptBox();
     const editor = $(S.editor) || box;
@@ -1474,7 +1522,7 @@
       fire(target, type);
       await sleep(150);
     }
-    const ok = !!(await until(() => ingredientChips() > before, 45000, 500)); // o Flow processa a imagem antes de mostrar o chip
+    const ok = !!(await until(() => ingredientChips() > before, 25000, 500)); // o Flow processa a imagem antes de mostrar o chip
     // 3) sempre deixa a pagina limpa (a area de soltar nao pode ficar por cima da caixa de prompt)
     const clean = await clearDragOverlay();
     if (!clean) dtLog('A área de soltar do Flow ficou aberta.', null, 'warn');
@@ -1496,7 +1544,7 @@
   // Caminho 3: escolher pelo nome na biblioteca do menu "+" (imagem ja enviada antes).
   async function attachFromLibrary(name) {
     const before = ingredientChips();
-    const plus = $$('button').find((b) => vis(b) && /add ingredients/i.test(b.getAttribute('aria-label') || ''));
+    const plus = findPlusButton();
     if (!plus) return false;
     realClick(plus);
     const menu = await until(() => $('flow-add-menu-popover-content'), 6000, 250);
