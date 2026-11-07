@@ -52,8 +52,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return rewritten || soft;
     });
     if (retry) {
-      const same = retry.attempt === 1 && policyReason(reason) === 'unknown';
-      const how = byLlm ? ' (reescrito pela IA do projeto, mesma cena)' : same ? ' (mesmo prompt)' : ' (prompt ajustado ao motivo da recusa, mesma cena)';
+      const how = byLlm ? ' (reescrito pela IA do projeto, mesma cena)' : ' (texto na imagem removido e prompt ajustado, mesma cena)';
       const msg = `O Flow recusou o take ${retry.job.take_index ?? ''} por política; nova tentativa automática ${retry.attempt}/${MAX_POLICY_RETRIES}${how}.`;
       console.log(`[Flow] ${msg}`);
       await addFlowLogs(user.id, { message: msg, level: 'warn', jobId: id, projectId: retry.job.project_id ?? null }).catch(() => {});

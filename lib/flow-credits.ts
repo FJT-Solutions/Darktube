@@ -10,12 +10,11 @@ export interface ModelCreditCost {
 }
 
 /**
- * Tabela oficial de consumo de créditos do Google Flow por modelo e duração:
- * - Omni 1.1 Flash: ~2.5 cred/s (4s: 10 | 6s: 15 | 8s: 20 | 10s: 25)
- * - Omni 1.2 Flash: ~3.75 cred/s (4s: 15 | 6s: 22 | 8s: 30 | 10s: 38)
- * - Veo 3.1 - Lite: ~4 cred/s (5s: 20 | 8s: 32)
- * - Veo 3.1 - Fast: ~7 cred/s (5s: 35 | 8s: 56)
- * - Veo 3.1 - Quality: ~10 cred/s (5s: 50 | 8s: 80)
+ * Consumo de créditos do Google Flow por modelo e duração, em 720p.
+ * MEDIDO na tela do Flow (7 nov 2026): Omni 1.2 Flash, barra de 3 a 15 s: 3s 9 | 4s 12 | 5s 15 | 6s 18 | 7s 21 | 8s 24 |
+ * 9s 27 | 10s 30 | 11s 36 | 12s 42 | 13s 48 | 14s 54 | 15s 60. Omni 1.1 Flash: 10s 15.
+ * ESTIMADO (não conferido): Omni 1.1 nas outras durações (1,5 cred/s) e todos os Veo 3.1. Omni 1.1 e Veo 3.1 saem do Flow em 5 dez.
+ * Valor de 360p ainda não medido.
  */
 export const MODEL_CREDIT_COSTS: Record<string, ModelCreditCost> = {
   'Omni 1.1 Flash': {
@@ -23,16 +22,16 @@ export const MODEL_CREDIT_COSTS: Record<string, ModelCreditCost> = {
     label: 'Omni 1.1 Flash (Rápido / B-Roll)',
     family: 'Omni',
     tier: 'Lite',
-    costPerSecond: 2.5,
-    rates: { 4: 10, 6: 15, 8: 20, 10: 25 },
+    costPerSecond: 1.5,
+    rates: { 10: 15 },
   },
   'Omni 1.2 Flash': {
     model: 'Omni 1.2 Flash',
     label: 'Omni 1.2 Flash (Fala e Lip-Sync)',
     family: 'Omni',
     tier: 'Quality',
-    costPerSecond: 3.75,
-    rates: { 4: 15, 6: 22, 8: 30, 10: 38 },
+    costPerSecond: 3,
+    rates: { 3: 9, 4: 12, 5: 15, 6: 18, 7: 21, 8: 24, 9: 27, 10: 30, 11: 36, 12: 42, 13: 48, 14: 54, 15: 60 },
   },
   'Veo 3.1 - Lite': {
     model: 'Veo 3.1 - Lite',

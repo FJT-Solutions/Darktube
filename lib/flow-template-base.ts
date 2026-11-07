@@ -22,12 +22,29 @@ export interface FlowField {
   help?: string
 }
 
+/**
+ * Presenca de personagem num take:
+ * - 'character': ha uma pessoa com rosto visivel (pode falar com lip-sync se o modo for 'dialogo').
+ * - 'faceless': so maos, objetos, comida, paisagem ou silhuetas; nunca rosto nem lip-sync.
+ */
+export type FlowBeatPresence = 'character' | 'faceless'
+
 /** Funcao narrativa de uma cena (em ingles, vai para a IA do roteiro). */
 export interface FlowBeat {
   /** O que a cena precisa entregar. Ex.: "Hook: in media res humiliation or shocking contradiction". */
   fn: string
   /** Plano e movimento de camera. Ex.: "medium two-shot, subtle handheld". */
   camera: string
+  /**
+   * Opcional. Sem valor, vale o padrao do modo do template (ver `beatPresence`). Em take 'faceless' a fala
+   * e vazia ou narracao fora da tela: o roteiro nao deve gerar "Dialogue/lip-sync" nem pedir rosto.
+   */
+  presence?: FlowBeatPresence
+}
+
+/** Presenca efetiva de um beat: o valor explicito ou o padrao do modo ('dialogo' = personagem, demais = sem rosto). */
+export function beatPresence(mode: FlowProductionMode, beat?: Pick<FlowBeat, 'presence'>): FlowBeatPresence {
+  return beat?.presence ?? (mode === 'dialogo' ? 'character' : 'faceless')
 }
 
 export interface FlowTemplate {
@@ -140,17 +157,40 @@ export const VIDEO_MODELS: FlowFieldOption[] = [
   { value: 'Veo 3.1 - Quality', label: 'Veo 3.1 Quality' },
 ]
 
-export const TAKE_SECONDS = [4, 5, 6, 8, 10]
+export const TAKE_SECONDS = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+
+/** Dia em que o Flow tira o Omni 1.1 e o Veo 3.1 do menu (aviso do proprio Flow: "Disponivel ate 5 de dez."). */
+export const OLD_MODELS_SUNSET = '2026-12-05'
+
+/** Modelo que sobra depois da data acima. */
+export const CURRENT_VIDEO_MODEL = 'Omni 1.2 Flash'
+
+/** Omni 1.1 e Veo 3.1 ja sairam do Flow? Depois disso so existe o Omni 1.2 Flash. */
+export function oldModelsRetired(now: number = Date.now()): boolean {
+  return now >= Date.parse(OLD_MODELS_SUNSET + 'T00:00:00Z')
+}
+
+/** Troca um modelo que ja saiu do Flow pelo atual; antes da data devolve o mesmo modelo. */
+export function effectiveVideoModel(model?: string, now: number = Date.now()): string {
+  const m = String(model || '')
+  if (!m) return m
+  if (oldModelsRetired(now) && /veo|omni 1.1/i.test(m)) return CURRENT_VIDEO_MODEL
+  return m
+}
 
 /**
  * Duracoes em segundos permitidas nativamente por cada modelo no Google Flow:
- * - Veo 3.1: suporta exclusivamente 5s ou 8s por geracao.
- * - Omni (1.1 / 1.2 Flash): suporta 4s, 6s, 8s ou 10s.
+ * - Omni 1.2 Flash: barra de arrastar de 3 a 15 s, de 1 em 1 s (medido na tela do Flow).
+ * - Omni 1.1 Flash: 4s, 6s, 8s ou 10s.
+ * - Veo 3.1: 5s ou 8s por geracao (nao conferido de novo; sai do Flow em 5 de dezembro).
  */
 export function allowedSecondsForModel(model?: string): number[] {
-  const m = String(model || '').toLowerCase()
+  const m = String(effectiveVideoModel(model)).toLowerCase()
   if (m.includes('veo')) {
     return [5, 8]
+  }
+  if (m.includes('omni 1.2')) {
+    return TAKE_SECONDS.slice()
   }
   return [4, 6, 8, 10]
 }
@@ -172,7 +212,7 @@ export function clampSecondsForModel(seconds: number, model?: string): number {
  * - Familia Omni: takes com lip-sync de fala usam Omni 1.2 Flash; b-roll e objetos usam Omni 1.1 Flash.
  */
 export function resolveTakeModel(baseModel: string, hasCharacterOrDialogue: boolean): string {
-  const m = String(baseModel || '')
+  const m = String(effectiveVideoModel(baseModel) || '')
   if (m.toLowerCase().includes('veo')) {
     if (m === 'Veo 3.1 - Lite') return 'Veo 3.1 - Lite'
     if (!hasCharacterOrDialogue) {

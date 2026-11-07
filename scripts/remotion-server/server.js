@@ -70,6 +70,49 @@ app.get('/health', (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// /render-cta: faixa de CTA animada com fundo transparente (WebM VP8 + alfa).
+// Devolve o arquivo; a montagem do Flow sobrepoe no video com FFmpeg.
+// body: { title, subtitle?, accent?, position?, seconds?, width?, height? }
+// ──────────────────────────────────────────────
+let ctaBundlePromise = null;
+app.post('/render-cta', async (req, res) => {
+  const b = req.body || {};
+  const title = String(b.title || '').trim().slice(0, 40);
+  if (!title) return res.status(400).json({ error: 'title é obrigatório' });
+  const fps = 30;
+  const seconds = Math.min(Math.max(Number(b.seconds) || 3, 1), 10);
+  const inputProps = {
+    title,
+    subtitle: String(b.subtitle || '').trim().slice(0, 60),
+    accent: /^#[0-9a-f]{6}$/i.test(String(b.accent || '')) ? b.accent : '#FFC800',
+    position: ['top', 'center', 'bottom'].includes(b.position) ? b.position : 'bottom',
+  };
+  const outFile = path.join(OUTPUT_DIR, `cta_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.webm`);
+  try {
+    if (!ctaBundlePromise) ctaBundlePromise = bundle({ entryPoint: path.join(__dirname, 'remotion', 'cta-entry.tsx') });
+    const serveUrl = await ctaBundlePromise;
+    const chromium = { disableWebSecurity: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--mute-audio'] };
+    const common = { serveUrl, inputProps, browserExecutable: fs.existsSync(CHROME_PATH) ? CHROME_PATH : undefined, chromiumOptions: chromium };
+    const comp = await selectComposition({ ...common, id: 'CtaBanner' });
+    await renderMedia({
+      ...common,
+      composition: { ...comp, durationInFrames: Math.round(seconds * fps), width: Number(b.width) || 1080, height: Number(b.height) || 1920 },
+      outputLocation: outFile,
+      codec: 'vp8',
+      imageFormat: 'png',
+      pixelFormat: 'yuva420p',
+    });
+    res.setHeader('Content-Type', 'video/webm');
+    res.sendFile(outFile, () => fs.unlink(outFile, () => {}));
+  } catch (err) {
+    ctaBundlePromise = null;
+    fs.unlink(outFile, () => {});
+    console.error('[Remotion Service] /render-cta falhou:', err.message);
+    res.status(500).json({ error: String(err.message || err).slice(0, 300) });
+  }
+});
+
+// ──────────────────────────────────────────────
 // REBUNDLE ON-DEMAND (Hot-reload de código Remotion)
 // ──────────────────────────────────────────────
 app.post('/rebundle', async (req, res) => {

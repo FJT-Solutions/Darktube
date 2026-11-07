@@ -240,6 +240,7 @@ ${(t.rules || []).map((r) => `- ${r}`).join('\n')}
 Writing rules (avoid generic "AI slop"):
 - Take 1 opens in media res with a visual hook in the first 1.5 seconds; never open with greetings or encyclopedic sentences ("Did you know...").
 - Every take shows ONE concrete physical action tied to its line: a specific object, texture and verb. No vague b-roll.
+- "line" holds ONLY words that are spoken aloud, never a description of the action ("A hand slices a tomato" belongs in "action"). A take with no speech and no narration gets an empty "line".
 - Spatial coherence: NEVER place an exterior vehicle, street arrival or outdoor event inside an interior room. If characters see a vehicle or visitor arriving, the action must be looking through a window/doorway, OR switch to an exterior location id. The setting must physically match the action.
 - Camera framing for dialogue: when characters speak, use shot / reverse-shot with alternating Over-The-Shoulder (OTS) or medium close-ups. STRICTLY PROHIBIT neutral b-roll: NEVER direct the camera away from the actors to film ceilings, chandeliers, walls, floors, empty furniture, or distant decor during a scene. Every shot must frame the face and expressions of the actors.
 - Eye-line and 4th wall: characters in dramatic scenes must NEVER look directly into the camera lens (no breaking the fourth wall like a vlog or documentary interview). They must always look slightly off-center toward their dialogue partner across the 180-degree axis.
@@ -315,6 +316,12 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       name: str(l?.name, 60) || `Local ${i + 1}`,
       description: str(l?.description, 600),
     }))
+  // A IA as vezes poe a descricao da cena no campo de fala de takes sem personagem; isso vira narracao errada.
+  const looksLikeActionText = (text: string, k: any): boolean => {
+    if (!text.trim() || str(k?.speaker, 20) || (Array.isArray(k?.characters) && k.characters.length > 0)) return false
+    return /^(uma?|o|a|os|as)\s+(m[aã]os?|prato|panela|faca|c[aâ]mera|airfryer|forno)\b/i.test(text.trim()) ||
+      /^(an?|the)\s+(gloved\s+)?(hands?|dish|pan|knife|camera)\b/i.test(text.trim())
+  }
   const takes: FlowTake[] = (Array.isArray(raw?.takes) ? raw.takes : []).slice(0, MAX_TAKES).map((k: any, i: number) => {
     // No modo Livre cada take pode ter a propria duracao e o proprio tipo.
     const sec = Number(k?.seconds)
@@ -351,7 +358,7 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       seconds,
       model: effModel,
       speaker: eff === 'ambiente' ? '' : str(k?.speaker, 20) || (eff === 'narracao' ? 'narrator' : ''),
-      line: eff === 'ambiente' ? '' : str(k?.line, 400),
+      line: eff === 'ambiente' || looksLikeActionText(lineText, k) ? '' : lineText,
       action: str(k?.action, 600),
       location: str(k?.location, 20) || locations[0]?.id || '',
       characters: Array.isArray(k?.characters) ? k.characters.map((x: any) => str(x, 20)).filter(Boolean) : [],
@@ -546,11 +553,16 @@ export function buildTakePrompt(
         .join('; ')
       lines.push(`Subject (fictional adults, not based on any real or famous person): ${cast}${who}.`)
     }
-    lines.push(`Action: ${noEnd(take.action)}.`)
+    lines.push(`Action: ${stripOnScreenText(noEnd(take.action))}.`)
     // O take anterior ancora a continuidade (posicao, objetos, expressao) sem citar "take N", que o modelo nao conhece.
     const prev = script.takes.find((k) => k.n === take.n - 1)
     if (prev?.action && level <= 1) lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
-    if (kind === 'dialogo' && take.line) {
+    // Take sem ninguem na imagem (so maos e comida) nao tem boca para dublar: a fala vira narracao fora da tela, em vez de
+    // "speaks... lip-sync" contra "no faces", que se contradizem.
+    const offscreenLine = kind === 'dialogo' && !!take.line && visible.length === 0
+    if (offscreenLine) {
+      lines.push(`Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: ${noEnd(take.line)}.`)
+    } else if (kind === 'dialogo' && take.line) {
       const name = speaker?.name ?? 'The character'
       lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} speaks right from the start in ${lang}: "${noEnd(take.line)}". Only ${name} speaks, with precise lip-sync, looking at the conversation partner off-center and never looking directly into the camera lens.`)
     } else if (kind === 'narracao' && take.line) {
@@ -560,7 +572,8 @@ export function buildTakePrompt(
     }
     if (loc) lines.push(`Setting: ${level >= 2 ? clipWords(noEnd(loc.description), 30) : noEnd(loc.description)}.`)
     lines.push(`Sound: ${noEnd(take.sound || 'subtle natural ambience')}.${kind === 'ambiente' || !take.line ? ' No speech.' : ''} No background music.`)
-    if (hasRef) lines.push('Use the reference image only for identity: ignore its plain backdrop and place everyone inside the setting above.')
+    if (hasRef && visible.length === 0) lines.push('Use the reference image only for kitchen, props and lighting continuity: do not render any person from it.')
+    else if (hasRef) lines.push('Use the reference image only for identity: ignore its plain backdrop and place everyone inside the setting above.')
     if (total > 1 && level === 0) lines.push(`Continuity: same ${visible.length ? 'characters, outfits, ' : ''}setting, lighting and color grading as the other scenes of this video.`)
     const hasHandsInAction = /\b(hands?|fingers?|grasp(?:ing|s)?|hold(?:ing|s)?|pour(?:ing|s)?|stir(?:ring|s)?|knead(?:ing|s)?|slic(?:ing|es)?|pull(?:ing|s)?|open(?:ing|s)?|clos(?:ing|es)?|plac(?:ing|es)?|touch(?:ing|es)?)\b/i.test(take.action)
     if (visible.length > 0) {
@@ -615,8 +628,20 @@ export function exportScriptText(script: FlowScript, params: FlowParams, t: Flow
   return out.join('\n')
 }
 
+/**
+ * Texto escrito dentro da imagem (cartao, placa, legenda) e o que mais derruba take no filtro do Flow e o modelo ainda
+ * erra a grafia; o texto entra na montagem com FFmpeg. Troca "card with 'RECEITA' in bold" por um cartao liso.
+ */
+export function stripOnScreenText(text: string): string {
+  return String(text || '')
+    .replace(/\b(card|sign|signboard|banner|board|label|poster|screen|tag|note)\s+(?:with|reading|saying|that says|showing|displaying)\s+(?:the (?:words?|text)\s+)?["'“‘][^"'”’\n]{1,60}["'”’](?:\s+(?:in|on)\s+[\w\s-]{0,25}?(?:letters|font|text|bold|print))?/gi, 'blank $1 with no writing')
+    .replace(/\b(?:CTA|call-to-action) (card|sign|banner|board)\b/gi, 'blank plain $1 with no writing')
+    .replace(/,?\s*(?:with\s+)?(?:bold |big |large |glowing |neon )?(?:on-screen |written |printed )?(?:text|words|letters|captions?|subtitles?|logos?|watermarks?) (?:overlay|appearing|reading|saying)[^,.]*/gi, '')
+}
+
 // Realismo de pele e rosto: o que mais aciona o filtro de "pessoa conhecida".
-const PHOTO_WORDS = /,?\s*\b(?:photorealistic|hyper-?realistic|ultra-?realistic|fine natural detail|(?:natural|realistic) skin (?:texture|detail)|sharp detailed facial features)\b/gi
+const PHOTO_STYLE = /photorealistic|hyper-?realistic|ultra-?realistic|realistic (?:lighting|skin)|fine natural detail|natural skin/i
+const PHOTO_WORDS =/,?\s*\b(?:photorealistic|hyper-?realistic|ultra-?realistic|fine natural detail|(?:natural|realistic) skin (?:texture|detail)|sharp detailed facial features)\b/gi
 const ADULTS_NOTE = 'Everyone shown is clearly an adult.'
 
 /**
@@ -631,15 +656,19 @@ const ADULTS_NOTE = 'Everyone shown is clearly an adult.'
 export function softenFlowPrompt(prompt: string, reason = '', attempt = 2): string {
   const minors = policyReason(reason) === 'minors'
   const famous = policyReason(reason) === 'famous'
-  if (attempt < 2 && !minors && !famous) return prompt
+  if (attempt < 2 && !minors && !famous) return stripOnScreenText(prompt)
   const style = famous || attempt >= 2
   const lines = String(prompt || '').split('\n')
   const hasPeople = lines.some((l) => l.startsWith('Subject') || l.startsWith('[Characters'))
   return lines
     .map((l) => {
-      let x = l
-      if (style && (x.startsWith('[Scene') || x.startsWith('[Style & Constraints]:'))) {
-        x = x.replace(PHOTO_WORDS, '').replace(/Visual style:\s*[,;]?\s*\./, 'Visual style: cinematic film look, natural soft lighting.')
+      let x = stripOnScreenText(l)
+      if (style && x.startsWith('[Scene')) {
+        // Estilo com realismo de foto vira o estilo suave inteiro (tirar so as palavras deixava "Visual style:, realistic
+        // lighting."); estilos 2D, 3D e massinha ficam como estao.
+        x = x.replace(/Visual style:(.*)$/, (m, s) => (PHOTO_STYLE.test(s) ? 'Visual style: cinematic film look, natural soft lighting.' : m))
+      } else if (style && x.startsWith('[Style & Constraints]:')) {
+        x = x.replace(PHOTO_WORDS, '')
       }
       if (minors && (x.startsWith('Subject') || x.startsWith('[Characters'))) {
         x = adultWording(x)
@@ -670,6 +699,7 @@ Rules:
 - Keep every spoken line inside double quotes exactly, word for word.
 - Keep each character's identity anchors (hair, skin tone, outfit) and keep everyone clearly adult.
 - Change only what could trigger the refusal: ages, body descriptions, physical closeness, violence, weapons, injuries, real or famous people, brands, logos, anything that could be read as involving minors.
+- Remove any text, words or letters that must appear inside the image (cards, signs, labels, screens): use a plain blank object instead.
 - Same length or shorter.`
   return { system, user: `Refusal reason: ${String(reason || 'policy').slice(0, 300)}\n\nPrompt:\n${prompt}` }
 }

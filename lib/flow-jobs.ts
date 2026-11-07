@@ -123,7 +123,7 @@ function cleanParams(raw: any): FlowJobParams {
   if (ALLOWED_ASPECTS.includes(raw.aspectRatio)) p.aspectRatio = raw.aspectRatio;
   if (ALLOWED_RESOLUTIONS.includes(raw.resolution)) p.resolution = raw.resolution;
   if (typeof raw.model === 'string') p.model = raw.model.slice(0, 60);
-  if (Number.isFinite(raw.duration)) p.duration = Math.min(Math.max(Math.round(raw.duration), 2), 12);
+  if (Number.isFinite(raw.duration)) p.duration = Math.min(Math.max(Math.round(raw.duration), 3), 15);
   if (Number.isFinite(raw.count)) p.count = Math.min(Math.max(Math.round(raw.count), 1), 4);
   if (typeof raw.characterId === 'string') p.characterId = raw.characterId.slice(0, 40);
   if (typeof raw.refImageUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.refImageUrl)) p.refImageUrl = raw.refImageUrl.slice(0, 200);

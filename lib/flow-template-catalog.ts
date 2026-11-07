@@ -59,6 +59,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Disruption: an unexpected witness, key object, or luxury vehicle arrives',
         camera: 'whip-pan tracking shot following the arriving element',
+        presence: 'faceless',
       },
       {
         fn: 'Twist: hidden authority, true ownership, or secret proof is exposed',
@@ -70,7 +71,8 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       },
     ],
     rules: [
-      'Shot / reverse-shot discipline: only one character speaks per take',
+      'Shot / reverse-shot discipline: only one character speaks per take; the spoken line holds only spoken words, never an action description, and faceless takes carry no lip-sync',
+      'No readable text, signs, screens or documents with writing drawn in the scene',
       'Every spoken line carries status conflict or emotional weight; zero small talk',
       'Keep identical wardrobe and facial description across all takes, no background music',
       'End on an unresolved cliffhanger that demands the next episode',
@@ -111,30 +113,37 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       },
     ],
     brief:
-      'Authentic user-generated commerce video with one original presenter. Lead with a frustrating everyday problem or skeptical objection in the first 1.5s, prove performance through a tactile physical test, reveal the clean outcome, and finish with an urgent call to action.',
+      'Authentic user-generated commerce video with one original presenter. Lead with a frustrating everyday problem or skeptical objection in the first 1.5s, prove performance through a tactile physical test, reveal the clean outcome, and finish with a spoken closing recommendation.',
     beats: [
       {
         fn: 'Hook in the first 1.5s: show the messy problem or voice the skeptical objection while holding the item',
         camera: 'handheld selfie close-up with natural home motion',
+        presence: 'character',
       },
       {
         fn: 'Tension and test: put the item through a demanding, hands-on physical test',
         camera: 'macro close-up on hands operating the item in real time',
+        presence: 'faceless',
       },
       {
         fn: 'Turning point: immediate side-by-side contrast showing the problem solved on contact',
         camera: 'steady overhead close-up with crisp focus on the result',
+        presence: 'faceless',
       },
       {
         fn: 'Payoff: highlight a clever secondary detail or durability feature',
         camera: 'medium close-up tilting from the item to the presenter',
+        presence: 'character',
       },
       {
-        fn: 'Call to action and loop bridge: direct spoken recommendation that connects back to the opening problem',
-        camera: 'eye-level medium shot, presenter pointing down toward the basket area',
+        fn: 'Closing recommendation and loop bridge: direct spoken recommendation that connects back to the opening problem (the call-to-action is a banner added in post)',
+        camera: 'eye-level medium shot, presenter nodding at the camera while holding the item',
+        presence: 'character',
       },
     ],
     rules: [
+      'Faceless takes (hands and item only) carry no lip-sync: the line is empty or an off-screen voice; reference images of the presenter are used only for room and lighting continuity there',
+      'No text, signs, price tags, cards or screens drawn in the scene',
       'No medical claims, no guaranteed miracles, no trademarked brand marks',
       'Keep the physical item clearly visible in action in every single take',
       'Negative constraints: no random extra bystanders, no deformed hands/fingers, static background and furniture stay completely stable',
@@ -374,6 +383,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Visual proof: quick cut to the ridiculous physical evidence or coworker causing the issue',
         camera: 'shaky documentary whip-pan to the side action, then snap back',
+        presence: 'faceless',
       },
       {
         fn: 'Twist: an unexpected interruption forces the speaker to react on the spot',
@@ -385,7 +395,8 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       },
     ],
     rules: [
-      'Single speaker lip-sync per take in natural, colloquial spoken phrasing',
+      'Single speaker lip-sync per take in natural, colloquial spoken phrasing; the spoken line holds only spoken words, never an action description, and faceless takes carry no lip-sync',
+      'No readable text, signs, screens or logos drawn in the scene',
       'Contrast hyper-realistic documentary camera work with a comedic or anachronistic premise',
       'Use realistic outdoor wind, room tone, and mic-handling foley with no background music',
     ],
@@ -883,7 +894,8 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     ],
     rules: [
       'Acting delivery must be 100% deadpan, exhausted, and matter-of-fact—never slapstick',
-      'Only one character speaks per take; keep lip-sync lines brief and dry',
+      'Only one character speaks per take; keep lip-sync lines brief and dry, holding only spoken words, never an action description',
+      'No readable text, signs, screens or paperwork with writing drawn in the scene',
       'Use mundane office or hallway foley: fluorescent hum, printer whir, heavy sigh, coffee sip, no music',
     ],
     look: 'flat fluorescent workplace documentary look, handheld crash-zooms, realistic everyday surfaces',
@@ -1544,10 +1556,12 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       { fn: 'Key preparation step: mixing, shaping or assembling, easy to follow', camera: 'over-the-hands medium close-up' },
       { fn: 'Cooking step: oven, airfryer, pan or fridge; an adult hand firmly grasps the handle to slide the basket open/closed; food sizzles and changes texture', camera: 'medium close-up on appliance with hand action, followed by macro close-up on the sizzling food' },
       { fn: 'The satisfying transformation: cheese pull, cut, syrup pour or crunch', camera: 'slow-motion macro on the transformation' },
-      { fn: 'Final plated dish with a call to action; last frame echoes the hook', camera: 'locked close-up of the plated dish, soft rack focus' },
+      { fn: 'Final plated dish; last frame echoes the hook (the call-to-action is a banner added in post, never in the picture)', camera: 'locked close-up of the plated dish, soft rack focus' },
     ],
     rules: [
-      'Only hands and food appear, never a face; the kitchen is the same in every take',
+      'Only hands and food appear, never a face; the kitchen is the same in every take; every take is faceless, so lines are empty or off-screen voice, never lip-sync',
+      'If a reference image shows a person, use it only for kitchen, lighting and color continuity; never render the person',
+      'No card, sign, tablet, phone or screen in the scene',
       'Zero telekinesis: appliances, airfryer baskets, oven doors and lids NEVER open or slide by themselves; every movement requires a visible human hand firmly grasping the handle',
       'Consistent hand orientation: hands must naturally enter from the lower foreground/bottom; never swap sides from right to left or show arms crossing unnaturally',
       'Anatomical integrity: hands have realistic adult anatomy, exactly 5 fingers connected to arms; no severed floating fingers, phantom hands or backward-bending joints',
@@ -1600,31 +1614,39 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       { id: 'emocao', label: 'Emoção principal', type: 'select', default: 'alegria', options: EMOTIONS },
     ],
     brief:
-      'A 32-second high-converting direct-response creative combining a talking head expert (Chef/Nutritionist) shot from the chest up against a pure flat solid green screen studio background (#00FF00), seamlessly composited over fast-paced multi-shot cooking and meal-prep b-roll in post-production via FFmpeg chromakey.',
+      'A 32-second short recipe creative combining a talking head expert (Chef/Nutritionist) shot from the chest up against a pure flat solid green screen studio background (#00FF00), seamlessly composited over fast-paced multi-shot cooking and meal-prep b-roll in post-production via FFmpeg chromakey.',
     beats: [
       {
-        fn: 'Hook in first 1.5s: Expert addresses the camera against flat green studio background (#00FF00), breaking the diet struggle myth with expressive hand gestures',
+        fn: 'Hook in first 1.5s: Expert addresses the camera against flat green studio background (#00FF00), breaking the diet struggle myth, looking straight into the lens with a warm expression, hands empty and relaxed',
         camera: 'medium close-up torso shot, centered, eye-level, flat pure green background #00FF00, sharp edges, no shadows',
+        presence: 'character',
       },
       {
         fn: 'B-roll showcase: Rapid 3-slice dynamic demonstration of appetizing, practical food prep (slicing, airfryer, pot layer)',
         camera: 'macro close-up over-the-counter action, glossy sizzling textures, rich lighting',
+        presence: 'faceless',
       },
       {
-        fn: 'Proof & Offer bridge: Expert reappears on pure green background (#00FF00), holding digital tablet and presenting the 365 recipes catalog with warmth',
+        fn: 'Proof bridge: Expert reappears on pure green background (#00FF00), speaking warmly straight into the lens about the recipe collection, hands empty and relaxed, nothing held or shown',
         camera: 'medium close-up torso shot, centered, eye-level, flat pure green background #00FF00, studio key lighting',
+        presence: 'character',
       },
       {
-        fn: 'CTA payoff: Final plated dish and meal prep fridge with bold conversion call-to-action to claim access',
-        camera: 'locked macro close-up of delicious plated meal with subtle rack focus to CTA card',
+        fn: 'Closing payoff: final plated dish and meal prep fridge, a satisfying last bite-ready frame that echoes the b-roll opening',
+        camera: 'locked macro close-up of the delicious plated meal with a subtle rack focus',
+        presence: 'faceless',
       },
     ],
     rules: [
-      'Takes 1 and 3 (Expert): strictly torso/chest up, facing camera directly, solid uniform green background #00FF00 with zero gradients or cast shadows for clean alpha keying',
-      'Takes 2 and 4 (B-Roll): 100% faceless hands and food only, rapid visual cuts between ingredients and finished plates',
+      'Takes 1 and 3 (Expert): strictly torso/chest up, facing camera directly with eyes on the lens, only speaking to camera, solid uniform green background #00FF00 with zero gradients or cast shadows for clean alpha keying',
+      'Expert takes: hands are empty at all times; no apple, tablet, phone, card, plate, utensil or any other object held or visible, so the last frame of an Expert take never carries an object',
+      'The spoken line holds only the words the Expert says, never a description of an action or scene; if a take has no speech the line stays empty',
+      'The take after an Expert take must not depend on that take\'s last frame: start it as a fresh shot using only the character portrait and kitchen continuity',
+      'Takes 2 and 4 (B-Roll, faceless): hands and food only, rapid visual cuts between ingredients and finished plates; no person, face or lip-sync, and the line is empty or an off-screen voice, never on-camera dialogue',
+      'If a reference image shows the Expert (portrait or last frame), use it only for kitchen, lighting and color continuity in B-roll takes; never render the person there',
       'Expert delivery is warm, empathetic and authoritative, addressing viewer pain points without small talk',
-      'All lip-sync lines must match Brazilian Portuguese naturally and concisely',
-      'Zero text or logos rendered inside video pixels; kinetic typography is burned in post-assembly',
+      'All lip-sync lines (takes 1 and 3 only) must match Brazilian Portuguese naturally and concisely; the CTA word can be spoken by the Expert in take 3',
+      'Zero text, cards, signs, tablets, screens or logos anywhere in the scene; the call-to-action is a banner strip added in post-assembly, never described in the visual prompt',
     ],
     look: 'commercial direct-response lighting, studio key light with clean green-screen back, crisp appetizing colors for b-roll',
     defaults: { takes: 4, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '720p', realismo: 'hiper' },

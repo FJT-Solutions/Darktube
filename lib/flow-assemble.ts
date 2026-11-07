@@ -311,6 +311,42 @@ export async function readStored(url: string): Promise<Buffer> {
   return rows[0].content as Buffer
 }
 
+const REMOTION_URLS = [
+  process.env.REMOTION_SERVER_URL,
+  process.env.REMOTION_SERVICE_URL?.replace(/\/render\/?$/, ''),
+  'http://n8n-remotionservice-ry6eh9:3001',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+].filter(Boolean) as string[]
+
+export type FlowCtaOverlay = { title: string; subtitle?: string; accent?: string; position?: 'top' | 'center' | 'bottom'; startSec?: number; seconds?: number }
+
+/** Renderiza a faixa de CTA no Remotion (WebM com alfa) e sobrepoe no video final. Devolve o novo arquivo, ou null. */
+async function applyCtaOverlay(dir: string, input: string, cta: FlowCtaOverlay, totalSec: number, vertical: boolean): Promise<string | null> {
+  const seconds = Math.min(Math.max(Number(cta.seconds) || 3, 1), 8)
+  // Por padrao entra nos ultimos segundos, onde o CTA conta.
+  const start = Math.max(0, Number.isFinite(Number(cta.startSec)) && cta.startSec !== undefined ? Number(cta.startSec) : totalSec - seconds - 0.5)
+  const body = JSON.stringify({ title: cta.title, subtitle: cta.subtitle, accent: cta.accent, position: cta.position, seconds, width: vertical ? 1080 : 1920, height: vertical ? 1920 : 1080 })
+  let webm: Buffer | null = null
+  for (const base of REMOTION_URLS) {
+    try {
+      const r = await fetch(`${base.replace(/\/$/, '')}/render-cta`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(120000) })
+      if (r.ok) { webm = Buffer.from(await r.arrayBuffer()); break }
+    } catch { /* tenta a proxima URL */ }
+  }
+  if (!webm || webm.length < 1000) return null
+  fs.writeFileSync(path.join(dir, 'cta.webm'), webm)
+  await run(
+    ffmpegBin(),
+    ['-y', '-i', path.basename(input), '-itsoffset', start.toFixed(2), '-c:v', 'libvpx', '-i', 'cta.webm',
+      '-filter_complex', '[0:v][1:v]overlay=eof_action=pass:format=auto,format=yuv420p[v]', '-map', '[v]', '-map', '0:a?',
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'copy', 'final_cta.mp4'],
+    { timeout: 300000, cwd: dir }
+  )
+  const out = path.join(dir, 'final_cta.mp4')
+  return fs.existsSync(out) && fs.statSync(out).size > 1000 ? out : null
+}
+
 export async function assembleFlowProject(userId: string, projectId: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flowasm-'))
   try {
@@ -462,6 +498,29 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       }
     }
 
+    // CTA animado (Remotion, fundo transparente): o Flow nao desenha texto, ele entra aqui, na edicao.
+    let ctaApplied = false
+    const pr = project.params as Record<string, any>
+    const cta: FlowCtaOverlay = {
+      title: String(pr.ctaTitle || '').trim(),
+      subtitle: String(pr.ctaSubtitle || '').trim() || undefined,
+      accent: String(pr.ctaAccent || '').trim() || undefined,
+      position: ['top', 'center', 'bottom'].includes(pr.ctaPosition) ? pr.ctaPosition : undefined,
+      startSec: pr.ctaStartSec !== undefined && pr.ctaStartSec !== '' ? Number(pr.ctaStartSec) : undefined,
+      seconds: pr.ctaSeconds ? Number(pr.ctaSeconds) : undefined,
+    }
+    if (cta.title) {
+      const total = durations.reduce((a, b) => a + b, 0)
+      const out = await applyCtaOverlay(dir, finalFile, cta, total, vertical).catch((err: any) => {
+        console.error(`[Flow] CTA animado não aplicado: ${String(err?.message || err).slice(0, 200)}`)
+        return null
+      })
+      if (out) {
+        finalFile = out
+        ctaApplied = true
+      }
+    }
+
     const finalUrl = await uploadMediaFile(fs.readFileSync(finalFile), `flow_final_${projectId}.mp4`, 'video/mp4')
     const srtUrl = srt ? await uploadMediaFile(Buffer.from(srt, 'utf8'), `flow_final_${projectId}.srt`, 'text/plain') : null
     await setFlowProjectAssembly(userId, projectId, {
@@ -470,7 +529,7 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       srtUrl,
       error: burn && !burned ? 'Legenda não foi gravada no vídeo (ffmpeg sem suporte). O arquivo .srt está disponível.' : null,
     })
-    return { finalUrl, srtUrl, burned, takes: picked.length, seconds: Math.round(durations.reduce((a, b) => a + b, 0)) }
+    return { finalUrl, srtUrl, burned, ctaApplied, takes: picked.length, seconds: Math.round(durations.reduce((a, b) => a + b, 0)) }
   } catch (err: any) {
     await setFlowProjectAssembly(userId, projectId, { status: 'assemble_failed', error: String(err?.message || err).slice(0, 400) }).catch(() => {})
     throw err
