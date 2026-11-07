@@ -458,7 +458,7 @@ export async function publishFlowProjectAction(
       }
     }
 
-    const latestPost = await getLatestFlowPost(user.id, id)
+    const latestPost = await getLatestFlowPost(user.id, id, project.final_url)
     if (latestPost && latestPost.status === "publishing") {
       const postAge = Date.now() - new Date(latestPost.created_at).getTime()
       if (postAge < 5 * 60 * 1000) {
@@ -538,7 +538,7 @@ export async function retryFlowPublishAction(id: string) {
     const user = await requireUser()
     const project = await getFlowProject(user.id, id)
     if (!project) throw new Error("Projeto não encontrado.")
-    const post = await getLatestFlowPost(user.id, id)
+    const post = await getLatestFlowPost(user.id, id, project.final_url)
     if (!post) throw new Error("Nenhuma publicação encontrada para este projeto.")
     if (post.status !== "failed") throw new Error("Só dá para reenviar uma publicação que falhou.")
     const remodel = typeof post.remodel_data === "string" ? JSON.parse(post.remodel_data) : post.remodel_data || {}
@@ -563,7 +563,8 @@ export async function retryFlowPublishAction(id: string) {
 export async function deleteFlowPublishAction(id: string) {
   try {
     const user = await requireUser()
-    const post = await getLatestFlowPost(user.id, id)
+    const project = await getFlowProject(user.id, id)
+    const post = await getLatestFlowPost(user.id, id, project?.final_url)
     if (!post) throw new Error("Nenhuma publicação encontrada para este projeto.")
     if (post.status !== "failed") throw new Error("Só dá para excluir uma publicação que falhou.")
     await deleteDarkClipPost(post.id)

@@ -27,14 +27,21 @@ export async function checkDueScheduledPosts(): Promise<number> {
 
   try {
     // Recupera eventuais posts que ficaram em 'publishing' órfãos há mais de 15 minutos se o processo reiniciou
-    await pool.query(
+    const { rows: recoveredPosts } = await pool.query(
       `UPDATE public.dark_clips_posts
        SET status = 'scheduled',
            error_message = 'Reiniciado automaticamente pelo scheduler após timeout'
        WHERE status = 'publishing'
          AND scheduled_at IS NOT NULL
-         AND scheduled_at < NOW() - INTERVAL '15 minutes'`
+         AND scheduled_at < NOW() - INTERVAL '15 minutes'
+       RETURNING remodel_data`
     );
+    for (const rp of recoveredPosts) {
+      const rData = typeof rp.remodel_data === 'string' ? JSON.parse(rp.remodel_data) : (rp.remodel_data || {});
+      if (rData?.flow_project_id) {
+        await pool.query(`UPDATE public.flow_projects SET status = 'scheduled', updated_at = NOW() WHERE id = $1`, [rData.flow_project_id]).catch(() => {});
+      }
+    }
 
     // 1. Encontra o próximo post agendado com horário atingido e vídeo pronto (LIMIT 1 para despacho estritamente sequencial)
     // Também inclui posts que foram marcados indevidamente como 'rendered' mas possuem scheduled_at vencido
@@ -80,6 +87,13 @@ export async function checkDueScheduledPosts(): Promise<number> {
         ? JSON.parse(post.remodel_data)
         : (post.remodel_data || {});
 
+      if (remodel?.flow_project_id) {
+        await pool.query(
+          `UPDATE public.flow_projects SET status = 'publishing', updated_at = NOW() WHERE id = $1`,
+          [remodel.flow_project_id]
+        ).catch(() => {});
+      }
+
       try {
         await triggerSocialDispatcher({
           post: { ...post, status: 'publishing', target_accounts: targets, remodel_data: remodel },
@@ -103,6 +117,12 @@ export async function checkDueScheduledPosts(): Promise<number> {
            WHERE id = $2`,
           [`Falha no disparo agendado: ${dispatchErr?.message}`, post.id]
         );
+        if (remodel?.flow_project_id) {
+          await pool.query(
+            `UPDATE public.flow_projects SET status = 'publish_failed', updated_at = NOW() WHERE id = $1`,
+            [remodel.flow_project_id]
+          ).catch(() => {});
+        }
       }
     }
   } catch (err: any) {

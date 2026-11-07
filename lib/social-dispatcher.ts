@@ -85,7 +85,12 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
   }
 
   // 3. Resolve caption and hashtags
-  const remodelData = post.remodel_data || {};
+  const remodelData = typeof post.remodel_data === 'string'
+    ? (() => { try { return JSON.parse(post.remodel_data); } catch { return {}; } })()
+    : (post.remodel_data || {});
+  const flowProjectId = typeof remodelData?.flow_project_id === 'string' && remodelData.flow_project_id.trim()
+    ? remodelData.flow_project_id.trim()
+    : null;
   const caption = options.caption || remodelData?.post_caption || remodelData?.caption || post.title || 'Dark Clip';
   const hashtagsArray = options.hashtags || remodelData?.hashtags || [];
   const hashtagsFormatted = Array.isArray(hashtagsArray)
@@ -166,7 +171,7 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
 
   const platformsArg = targetAccounts.join(',');
 
-  // 6. Update post status to 'publishing' in DB
+  // 6. Update post status to 'publishing' in DB (and sync Flow project status if linked)
   try {
     await pool.query(
       `UPDATE public.dark_clips_posts SET
@@ -176,6 +181,12 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
       WHERE id = $2`,
       [videoUrl, post.id]
     );
+    if (flowProjectId) {
+      await pool.query(
+        `UPDATE public.flow_projects SET status = 'publishing', updated_at = NOW() WHERE id = $1`,
+        [flowProjectId]
+      ).catch(() => {});
+    }
   } catch (err: any) {
     logger.warn(`[Social Dispatcher] Erro ao atualizar status para publishing: ${err?.message}`, { context: 'Scheduler' });
   }
@@ -256,6 +267,12 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
              WHERE id = $1 AND status = 'publishing'`,
             [post.id]
           );
+          if (flowProjectId) {
+            await pool.query(
+              `UPDATE public.flow_projects SET status = 'published', updated_at = NOW() WHERE id = $1`,
+              [flowProjectId]
+            ).catch(() => {});
+          }
           logger.info(`[Social Dispatcher] ✅ Post ${post.id} confirmado como 'published' com sucesso!`, { context: 'Scheduler' });
         } catch (dbErr: any) {
           logger.error(`[Social Dispatcher] Erro ao registrar status publicado no DB: ${dbErr?.message}`, { context: 'Scheduler' });
@@ -282,6 +299,12 @@ export async function triggerSocialDispatcher(options: DispatchOptions): Promise
             WHERE id = $2 AND status = 'publishing'`,
             [`Falha no processo de envio: ${errorSnippet.slice(0, 450)}`, post.id]
           );
+          if (flowProjectId) {
+            await pool.query(
+              `UPDATE public.flow_projects SET status = 'publish_failed', updated_at = NOW() WHERE id = $1`,
+              [flowProjectId]
+            ).catch(() => {});
+          }
         } catch (dbErr: any) {
           logger.error(`[Social Dispatcher] Erro ao registrar falha no DB: ${dbErr?.message}`, { context: 'Scheduler' });
         }

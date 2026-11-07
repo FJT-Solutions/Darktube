@@ -68,7 +68,7 @@ import {
 } from "@/lib/flow-script"
 import { FlowCreditSimulator } from "@/components/flow-credit-simulator"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
-import type { FlowProject } from "@/lib/flow-projects"
+import type { FlowProject, FlowPublishInfo } from "@/lib/flow-projects"
 import type { FlowLibraryCharacter } from "@/lib/flow-characters"
 import {
   deleteFlowProjectAction,
@@ -159,14 +159,29 @@ const PROJECT_STATUS_CONFIG: Record<string, { label: string; variant?: "default"
   queued: { label: "Na fila do Flow", variant: "secondary", className: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
   generating: { label: "Gerando takes...", variant: "secondary", className: "bg-amber-500/10 text-amber-500 border-amber-500/20 animate-pulse" },
   assembling: { label: "Montando vídeo...", variant: "secondary", className: "bg-purple-500/10 text-purple-400 border-purple-500/20 animate-pulse" },
-  assembled: { label: "Vídeo pronto", variant: "default", className: "bg-emerald-600 text-white font-medium" },
-  done: { label: "Concluído", variant: "default", className: "bg-emerald-600 text-white font-medium" },
-  scheduled: { label: "Agendado", variant: "secondary", className: "bg-sky-500/10 text-sky-400 border-sky-500/20" },
-  publishing: { label: "Publicando...", variant: "secondary", className: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 animate-pulse" },
-  published: { label: "Publicado", variant: "default", className: "bg-blue-600 text-white" },
+  assembled: { label: "Vídeo pronto", variant: "default", className: "bg-emerald-600 hover:bg-emerald-600 text-white font-medium" },
+  done: { label: "Concluído", variant: "default", className: "bg-emerald-600 hover:bg-emerald-600 text-white font-medium" },
+  scheduled: { label: "Agendado para publicação", variant: "secondary", className: "bg-sky-500/15 text-sky-400 border-sky-500/30 font-medium" },
+  publishing: { label: "Publicando...", variant: "secondary", className: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30 animate-pulse font-medium" },
+  published: { label: "Publicado", variant: "default", className: "bg-blue-600 hover:bg-blue-600 text-white font-medium" },
   assemble_failed: { label: "Falha na montagem", variant: "destructive" },
-  publish_failed: { label: "Falha no post", variant: "destructive" },
+  publish_failed: { label: "Falha na publicação", variant: "destructive" },
   failed: { label: "Falhou", variant: "destructive" },
+}
+
+const PRESERVED_PROJECT_STATUSES = new Set([
+  "published",
+  "scheduled",
+  "publishing",
+  "publish_failed",
+  "assembling",
+  "assemble_failed",
+])
+
+function resolveEffectiveProjectStatus(status: string | undefined, hasVideo: boolean): string {
+  const s = status || "draft"
+  if (hasVideo && !PRESERVED_PROJECT_STATUSES.has(s)) return "assembled"
+  return s
 }
 
 const SHEET_STATUS_LABEL: Record<string, string> = {
@@ -260,6 +275,7 @@ export default function FlowPage() {
   const [generating, setGenerating] = useState(false)
 
   const [project, setProject] = useState<FlowProject | null>(null)
+  const [projectPublish, setProjectPublish] = useState<FlowPublishInfo | null>(null)
   const [projects, setProjects] = useState<ProjectRow[]>([])
 
   useEffect(() => {
@@ -291,6 +307,14 @@ export default function FlowPage() {
     else toast.error(res.error)
   }, [])
 
+  useEffect(() => {
+    if (view !== "projetos") return
+    const timer = setInterval(() => {
+      loadProjects()
+    }, 10000)
+    return () => clearInterval(timer)
+  }, [view, loadProjects])
+
   const generate = async () => {
     if (!provider) {
       toast.error("Salve uma chave de IA em Credenciais primeiro.")
@@ -308,6 +332,7 @@ export default function FlowPage() {
       return
     }
     setProject(res.project as FlowProject)
+    setProjectPublish(null)
     setView("projeto")
     toast.success("Roteiro gerado e salvo.")
     if (res.issues?.length) toast.warning(`Confira o roteiro: ${res.issues.length} ponto(s) fora das regras do formato.`)
@@ -319,6 +344,7 @@ export default function FlowPage() {
     setGenerating(false)
     if (!res.success) return void toast.error(res.error)
     setProject(res.project as FlowProject)
+    setProjectPublish(null)
     setView("projeto")
     toast.success("Projeto em branco criado: escreva cada take.")
   }
@@ -330,6 +356,7 @@ export default function FlowPage() {
       return
     }
     setProject(res.project as FlowProject)
+    setProjectPublish(res.publish ?? null)
     setView("projeto")
   }
 
@@ -624,28 +651,56 @@ export default function FlowPage() {
       {view === "projetos" && (
         <div className="space-y-2">
           {projects.length === 0 && <p className="text-sm text-muted-foreground">Nenhum projeto ainda.</p>}
-          {projects.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-              <button className="min-w-0 flex-1 text-left" onClick={() => openProject(p.id)}>
-                <div className="flex items-center gap-2">
-                  <p className="truncate font-medium">{p.title || "Sem título"}</p>
-                  {(p as any).final_url && <Badge variant="default" className="bg-emerald-600 text-white text-[10px] h-4 px-1.5 font-semibold">MP4</Badge>}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {getFlowTemplate(p.template_id)?.name ?? p.template_id} · {new Date(p.created_at).toLocaleString("pt-BR")}
-                </p>
-              </button>
-              {(() => {
-                const hasVideo = Boolean((p as any).final_url)
-                const effStatus = hasVideo && p.status !== "published" && p.status !== "scheduled" ? "assembled" : p.status
-                const st = PROJECT_STATUS_CONFIG[effStatus] || { label: effStatus, variant: "outline" }
-                return <Badge variant={st.variant} className={st.className}>{st.label}</Badge>
-              })()}
-              <Button variant="ghost" size="icon" onClick={() => removeProject(p.id)} aria-label="Apagar projeto">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+          {projects.map((p) => {
+            const hasVideo = Boolean(p.final_url)
+            const effStatus = resolveEffectiveProjectStatus(p.status, hasVideo)
+            const st = PROJECT_STATUS_CONFIG[effStatus] || { label: effStatus, variant: "outline" as const }
+            const platformsLabel = Array.isArray(p.publish_platforms) && p.publish_platforms.length > 0
+              ? ` (${p.publish_platforms.join(", ")})`
+              : ""
+            return (
+              <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <button className="min-w-0 flex-1 text-left" onClick={() => openProject(p.id)}>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-medium">{p.title || "Sem título"}</p>
+                    {hasVideo && <Badge variant="default" className="bg-emerald-600 text-white text-[10px] h-4 px-1.5 font-semibold shrink-0">MP4</Badge>}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {getFlowTemplate(p.template_id)?.name ?? p.template_id} · Criado em {new Date(p.created_at).toLocaleString("pt-BR")}
+                    {effStatus === "scheduled" && p.scheduled_at && (
+                      <span className="text-sky-400 font-medium">
+                        {" "}· Agendado para {new Date(p.scheduled_at).toLocaleString("pt-BR")}{platformsLabel}
+                      </span>
+                    )}
+                    {effStatus === "published" && (
+                      <span className="text-blue-400 font-medium">
+                        {" "}· Publicado{p.published_at ? ` em ${new Date(p.published_at).toLocaleString("pt-BR")}` : ""}{platformsLabel}
+                      </span>
+                    )}
+                    {effStatus === "publishing" && (
+                      <span className="text-indigo-400 font-medium">
+                        {" "}· Enviando para as redes{platformsLabel}...
+                      </span>
+                    )}
+                    {effStatus === "publish_failed" && p.publish_error && (
+                      <span className="text-destructive">
+                        {" "}· {p.publish_error.slice(0, 90)}
+                      </span>
+                    )}
+                  </p>
+                </button>
+                <Badge variant={st.variant} className={cn("shrink-0", st.className)}>
+                  {effStatus === "scheduled" && <CalendarClock className="mr-1 h-3 w-3" />}
+                  {effStatus === "published" && <Check className="mr-1 h-3 w-3" />}
+                  {effStatus === "publishing" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                  {st.label}
+                </Badge>
+                <Button variant="ghost" size="icon" onClick={() => removeProject(p.id)} aria-label="Apagar projeto">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -653,7 +708,11 @@ export default function FlowPage() {
         <ProjectView
           key={project.id}
           project={project}
-          onBack={() => setView("novo")}
+          initialPublish={projectPublish}
+          onBack={() => {
+            setView("projetos")
+            loadProjects()
+          }}
           onChanged={(p) => setProject(p)}
         />
       )}
@@ -832,10 +891,12 @@ function SafetyPanel() {
 
 function ProjectView({
   project: initial,
+  initialPublish = null,
   onBack,
   onChanged,
 }: {
   project: FlowProject
+  initialPublish?: FlowPublishInfo | null
   onBack: () => void
   onChanged: (p: FlowProject) => void
 }) {
@@ -849,7 +910,7 @@ function ProjectView({
   const [queueing, setQueueing] = useState(false)
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [agentOnline, setAgentOnline] = useState(false)
-  const [publish, setPublish] = useState<{ status: string; error: string | null; publishedAt: string | null } | null>(null)
+  const [publish, setPublish] = useState<FlowPublishInfo | null>(initialPublish)
   const [risk, setRisk] = useState<{ riskMode: boolean; hourlyLimit: number; dailyLimit: number; minGapSec: number } | null>(null)
   const [approved, setApproved] = useState<Set<number>>(new Set())
   const [accounts, setAccounts] = useState<{ id: string; platform: string; name: string }[]>([])
@@ -945,17 +1006,19 @@ function ProjectView({
   }, [project.id, onChanged])
 
   // Consulta rapida (6 s) so enquanto algo anda: take na fila/gerando, montagem ou publicacao.
-  // Parado, consulta a cada 30 s so para o status da extensao.
+  // Projetos agendados consultam a cada 15 s para refletir automaticamente quando o horario de disparo chegar.
   const jobsMoving = jobs.some((j) => j.status === "queued" || j.status === "running")
   const projectMoving = project.status === "assembling" || project.status === "publishing"
+  const projectScheduled = project.status === "scheduled"
   useEffect(() => {
     loadJobs()
+    const intervalMs = jobsMoving || projectMoving ? 6000 : projectScheduled ? 15000 : 30000
     const t = setInterval(() => {
       loadJobs()
-      if (projectMoving) refreshProject()
-    }, jobsMoving || projectMoving ? 6000 : 30000)
+      if (projectMoving || projectScheduled) refreshProject()
+    }, intervalMs)
     return () => clearInterval(t)
-  }, [loadJobs, refreshProject, jobsMoving, projectMoving])
+  }, [loadJobs, refreshProject, jobsMoving, projectMoving, projectScheduled])
 
   // Enquanto houver folha 'gerando', chama syncSheetsAction a cada 8 s.
   const anySheetGenerating =
@@ -1303,10 +1366,34 @@ function ProjectView({
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold">{script.title}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold">{script.title}</h2>
+          {(() => {
+            const effStatus = resolveEffectiveProjectStatus(status, Boolean(project.final_url))
+            const st = PROJECT_STATUS_CONFIG[effStatus] || { label: effStatus, variant: "outline" as const }
+            return (
+              <Badge variant={st.variant} className={st.className}>
+                {effStatus === "scheduled" && <CalendarClock className="mr-1 h-3 w-3" />}
+                {effStatus === "published" && <Check className="mr-1 h-3 w-3" />}
+                {effStatus === "publishing" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                {st.label}
+              </Badge>
+            )
+          })()}
+        </div>
         <p className="text-sm text-muted-foreground">{script.logline}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {template.name} · {script.takes.length} takes · total {fmtDuration(script.takes.reduce((n, k) => n + k.seconds, 0))} · {String(params.model)} · {String(params.quality)}
+          {status === "scheduled" && (publish?.scheduledAt || project.scheduled_at) && (
+            <span className="text-sky-400 font-medium">
+              {" "}· Agendado para {new Date((publish?.scheduledAt || project.scheduled_at) as string).toLocaleString("pt-BR")}
+            </span>
+          )}
+          {status === "published" && (
+            <span className="text-blue-400 font-medium">
+              {" "}· Publicado{(publish?.publishedAt || project.published_at) ? ` em ${new Date((publish?.publishedAt || project.published_at) as string).toLocaleString("pt-BR")}` : ""}
+            </span>
+          )}
         </p>
       </div>
 
@@ -2163,17 +2250,28 @@ function ProjectView({
               )}
             </Button>
             {status === "publishing" && (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                Em publicação nas redes selecionadas... O andamento também aparece em Dark Clips.
+              <p className="flex items-center gap-1.5 text-xs text-indigo-400 font-medium">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
+                Em publicação nas redes selecionadas{publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}... O andamento também aparece em Dark Clips.
               </p>
             )}
             {status === "scheduled" && (
-              <p className="text-xs text-muted-foreground">Agendado. O andamento também aparece em Dark Clips.</p>
+              <p className="flex items-center gap-1.5 text-sm font-medium text-sky-400">
+                <CalendarClock className="h-4 w-4 shrink-0" />
+                Agendado para publicação
+                {(publish?.scheduledAt || project.scheduled_at)
+                  ? ` em ${new Date((publish?.scheduledAt || project.scheduled_at) as string).toLocaleString("pt-BR")}`
+                  : ""}
+                {publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}. O andamento também aparece em Dark Clips.
+              </p>
             )}
             {status === "published" && (
               <p className="text-sm font-medium text-emerald-500">
-                ✓ Publicado com sucesso{publish?.publishedAt ? ` em ${new Date(publish.publishedAt).toLocaleString("pt-BR")}` : ""}.
+                ✓ Publicado com sucesso
+                {(publish?.publishedAt || project.published_at)
+                  ? ` em ${new Date((publish?.publishedAt || project.published_at) as string).toLocaleString("pt-BR")}`
+                  : ""}
+                {publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}.
               </p>
             )}
             {status === "publish_failed" && (
