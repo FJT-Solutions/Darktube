@@ -118,6 +118,43 @@ export async function ensureFlowTablesExist() {
   tablesReady = true;
 }
 
+/**
+ * Normaliza referências para o caminho relativo de storage (/api/storage/nome.ext).
+ * Aceita tanto caminhos relativos (/api/storage/...) quanto URLs absolutas do próprio domínio
+ * ou de qualquer origem (ex: https://darktube.fjt-solutions.com/api/storage/nome.ext).
+ * Se o valor fornecido não for vazio mas não pertencer ao storage (/api/storage/...), lança erro explícito.
+ */
+export function normalizeStorageReference(rawUrl: unknown, fieldName = 'refImageUrl'): string | null {
+  if (rawUrl === undefined || rawUrl === null || rawUrl === '') return null;
+  if (typeof rawUrl !== 'string') {
+    throw new Error(`[Flow] ${fieldName} inválido: tipo esperado string, recebido ${typeof rawUrl}`);
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  // 1. Caminho relativo padrão /api/storage/nome.ext
+  if (/^\/api\/storage\/[\w.-]+$/i.test(trimmed)) {
+    return trimmed.slice(0, 200);
+  }
+
+  // 2. URL absoluta que contenha /api/storage/nome.ext
+  try {
+    const parsed = new URL(trimmed);
+    if (/^\/api\/storage\/[\w.-]+$/i.test(parsed.pathname)) {
+      return parsed.pathname.slice(0, 200);
+    }
+  } catch (_) {
+    // Se não for URL parseável com protocolo, pode ser relativo sem barra inicial
+    if (/^api\/storage\/[\w.-]+$/i.test(trimmed)) {
+      return `/${trimmed}`.slice(0, 200);
+    }
+  }
+
+  throw new Error(
+    `[Flow] ${fieldName} inválido ou não suportado: "${trimmed}". A imagem de referência deve estar no storage interno (/api/storage/nome.ext).`
+  );
+}
+
 function cleanParams(raw: any): FlowJobParams {
   const p: FlowJobParams = {};
   if (!raw || typeof raw !== 'object') return p;
@@ -127,10 +164,19 @@ function cleanParams(raw: any): FlowJobParams {
   if (Number.isFinite(raw.duration)) p.duration = Math.min(Math.max(Math.round(raw.duration), 3), 15);
   if (Number.isFinite(raw.count)) p.count = Math.min(Math.max(Math.round(raw.count), 1), 4);
   if (typeof raw.characterId === 'string') p.characterId = raw.characterId.slice(0, 40);
-  if (typeof raw.refImageUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.refImageUrl)) p.refImageUrl = raw.refImageUrl.slice(0, 200);
+  if (typeof raw.refImageUrl === 'string') {
+    const norm = normalizeStorageReference(raw.refImageUrl, 'refImageUrl');
+    if (norm) p.refImageUrl = norm;
+  }
   if (raw.refPrevVideo === true) p.refPrevVideo = true;
-  if (typeof raw.refPrevFrameUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.refPrevFrameUrl)) p.refPrevFrameUrl = raw.refPrevFrameUrl.slice(0, 200);
-  if (typeof raw.firstFrameUrl === 'string' && /^\/api\/storage\/[\w.-]+$/.test(raw.firstFrameUrl)) p.firstFrameUrl = raw.firstFrameUrl.slice(0, 200);
+  if (typeof raw.refPrevFrameUrl === 'string') {
+    const norm = normalizeStorageReference(raw.refPrevFrameUrl, 'refPrevFrameUrl');
+    if (norm) p.refPrevFrameUrl = norm;
+  }
+  if (typeof raw.firstFrameUrl === 'string') {
+    const norm = normalizeStorageReference(raw.firstFrameUrl, 'firstFrameUrl');
+    if (norm) p.firstFrameUrl = norm;
+  }
   if (Number.isFinite(raw.wordsPerCaption)) p.wordsPerCaption = Math.min(Math.max(Math.round(raw.wordsPerCaption), 1), 3);
   return p;
 }

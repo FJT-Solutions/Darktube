@@ -24,7 +24,7 @@ import {
 import { buildSheetPrompt, isChromaKeyTemplate } from '@/lib/flow-characters';
 import { callFlowLLM } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
-import { createFlowJob, getFlowAgentState } from '@/lib/flow-jobs';
+import { createFlowJob, getFlowAgentState, normalizeStorageReference } from '@/lib/flow-jobs';
 import { assembleFlowProject } from '@/lib/flow-assemble';
 import { replaceVideoAudio, replaceProjectAudio } from '@/lib/flow-audio-replace';
 import { getUserApiKey } from '@/lib/database';
@@ -635,7 +635,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
         name: charInput.name || 'Apresentador',
         description: charInput.description || 'Pessoa comunicativa e expressiva',
         voice: charInput.voice || 'natural',
-        sheetUrl: charInput.sheetUrl,
+        sheetUrl: charInput.sheetUrl ? (normalizeStorageReference(charInput.sheetUrl, 'character.sheetUrl') || undefined) : undefined,
         sheetStatus: charInput.sheetUrl ? 'aprovada' : (charInput.generateSheet ? 'aguardando' : undefined),
       };
 
@@ -686,7 +686,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
               duration: take.seconds || resolvedSeconds,
               resolution: resolvedQuality,
               model: take.model || resolvedModel,
-              ...(ref.refImageUrl ? { refImageUrl: ref.refImageUrl } : {}),
+              ...(ref.refImageUrl ? { refImageUrl: normalizeStorageReference(ref.refImageUrl, 'refImageUrl') } : {}),
             },
             projectId: savedProject.id,
             takeIndex: take.n,
@@ -697,7 +697,8 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
         await updateFlowProject(userId, savedProject.id, { status: 'queued' });
       }
     } catch (dbErr: any) {
-      console.warn(`[MCP DarkTube] Banco de dados: ${dbErr.message}`);
+      console.error(`[MCP DarkTube] Falha ao enfileirar takes/jobs no Flow: ${dbErr.message}`);
+      throw dbErr;
     }
 
     const totalDuration = finalScript.takes.reduce((sum, tk) => sum + (tk.seconds || resolvedSeconds), 0);
@@ -779,7 +780,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
           line: take.line,
           action: take.action,
           prompt: buildTakePrompt(finalScript, take, params, t, ref),
-          referenceImage: ref.refImageUrl || null,
+          referenceImage: ref.refImageUrl ? (normalizeStorageReference(ref.refImageUrl, 'refImageUrl') || null) : null,
           transition: take.transition || 'cut',
           sfx: take.sfx || 'none',
           mediaType: take.mediaType || 'ai_flow',
