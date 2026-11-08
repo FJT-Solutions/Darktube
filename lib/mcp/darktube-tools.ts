@@ -490,6 +490,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
   };
 
   const selectedPreset = presets[angle] || presets['pao-frigideira'];
+  // Os presets sao da oferta "365 receitas". So valem quando o chamador escolheu o angulo; sem ele, o padrao
+  // (pao-frigideira) vazaria titulo, gancho e copy de outra oferta para o criativo.
+  const presetChosen = !!input.angle && !!presets[input.angle];
 
   // ── CAMINHO 1: REMOTION RENDER (Vídeo Real em MP4 entregue na hora) ──
   if (pipelineMode === 'remotion') {
@@ -538,7 +541,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     const resolvedQuality = quality || t.defaults?.quality || '360p';
 
     const params: FlowParams = {
-      tema: `${offer} - ${selectedPreset.title}`,
+      tema: presetChosen ? `${offer} - ${selectedPreset.title}` : offer,
       produto: offer,
       beneficios: benefits || 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos',
       estilo: angle === 'pao-frigideira' ? 'dor' : 'objecao',
@@ -585,6 +588,16 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     }
 
     const finalScript: FlowScript = script;
+
+    // Copy do Meta Ads da oferta pedida: a do preset so entra se o angulo foi escolhido de proposito.
+    const flowCopy = presetChosen
+      ? selectedPreset.copy
+      : {
+          headline: finalScript.seo?.title || finalScript.title || offer,
+          body: [finalScript.seo?.caption, (finalScript.seo?.hashtags || []).join(' ')].filter(Boolean).join('\n\n'),
+          cta: String(templateParams.cta || 'Saiba mais'),
+        };
+    const flowHook = finalScript.seo?.hook || (presetChosen ? selectedPreset.hook : '');
 
     if (input.character) {
       const charInput = input.character;
@@ -688,8 +701,8 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
               videoModel: resolvedModel,
               totalDurationSeconds: totalDuration,
               title: finalScript.title,
-              hook: finalScript.seo?.hook || selectedPreset.hook,
-              copyMetaAds: selectedPreset.copy,
+              hook: flowHook,
+              copyMetaAds: flowCopy,
               character: statusResult.character,
               finalVideoUrl: statusResult.finalVideoUrl,
               srtUrl: statusResult.srtUrl,
@@ -719,8 +732,8 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
       aspectRatio: String(params.aspect),
       quality: resolvedQuality,
       title: finalScript.title,
-      hook: finalScript.seo?.hook || selectedPreset.hook,
-      copyMetaAds: selectedPreset.copy,
+      hook: flowHook,
+      copyMetaAds: flowCopy,
       character: finalScript.characters[0]
         ? {
             name: finalScript.characters[0].name,
@@ -866,7 +879,12 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
       name: project.script?.characters?.[0]?.name || 'Apresentador',
       sheetUrl: charSheetUrl,
       status: charJob?.status || (charSheetUrl ? 'done' : 'none'),
+      error: charJob?.status === 'draft' || charJob?.status === 'cancelled' ? (charJob.error_message || null) : null,
     },
+    // Retrato do personagem falhou: os takes ficam parados (nao gastam credito); o motivo aparece aqui em vez de "na fila 0/N".
+    failureReason: project.status === 'failed'
+      ? (takeJobs.find((j: any) => j.error_message)?.error_message || charJob?.error_message || 'O projeto falhou.')
+      : null,
     finalVideoUrl: finalUrl,
     srtUrl,
     takes: takeJobs.map((j: any) => {

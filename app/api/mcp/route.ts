@@ -16,7 +16,7 @@ export const maxDuration = 900;
 const MCP_TOOLS_MANIFEST = [
   {
     name: 'darktube_list_flow_templates',
-    description: 'Lista todos os templates e formatos disponíveis no DarkTube Flow com seus beats e opções.',
+    description: 'Lista todos os templates e formatos disponíveis no DarkTube Flow com seus beats e opções. Também responde pelo apelido darktube_list_templates.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -261,7 +261,9 @@ export async function POST(req: NextRequest) {
 
 async function executeTool(name: string, args: any) {
   switch (name) {
+    // 'darktube_list_templates' e o nome que os agentes costumam tentar; aceita como apelido do oficial.
     case 'darktube_list_flow_templates':
+    case 'darktube_list_templates':
       return await listFlowTemplates();
 
     case 'darktube_create_campaign_creative':
@@ -283,6 +285,6 @@ async function executeTool(name: string, args: any) {
       return await replaceCreativeAudio(args);
 
     default:
-      throw new Error(`Ferramenta desconhecida: "${name}"`);
+      throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);
   }
 }

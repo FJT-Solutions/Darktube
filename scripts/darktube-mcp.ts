@@ -203,6 +203,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
       case 'darktube_list_flow_templates':
+      case 'darktube_list_templates':
         result = await listFlowTemplates();
         break;
 
