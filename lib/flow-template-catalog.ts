@@ -1586,6 +1586,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     mode: 'dialogo',
     length: 'curto',
     trend: 'viral',
+    lookAtCamera: true,
     fields: [
       {
         id: 'perfil_expert',

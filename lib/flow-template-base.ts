@@ -59,6 +59,8 @@ export interface FlowTemplate {
   length: 'curto' | 'longo'
   /** Viral do momento (2025-2026) ou formato atemporal. */
   trend: 'viral' | 'atemporal'
+  /** Quem fala olha direto para a lente (Expert sobre fundo chroma key). Sem isso o padrao e olhar para o interlocutor, fora do centro. */
+  lookAtCamera?: boolean
   /** Campos exclusivos do template (os comuns vem de COMMON_FIELDS). */
   fields: FlowField[]
   /** Orientacao de conteudo enviada a IA, em ingles curto. */

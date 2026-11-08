@@ -564,7 +564,11 @@ export function buildTakePrompt(
       lines.push(`Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: ${noEnd(take.line)}.`)
     } else if (kind === 'dialogo' && take.line) {
       const name = speaker?.name ?? 'The character'
-      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} speaks right from the start in ${lang}: "${noEnd(take.line)}". Only ${name} speaks, with precise lip-sync, looking at the conversation partner off-center and never looking directly into the camera lens.`)
+      // Expert sobre fundo chroma key fala para a lente; no dialogo comum o olhar vai para o interlocutor, fora do centro.
+      const gaze = tpl?.lookAtCamera || params.olharCamera === true || params.olharCamera === 'true'
+        ? `looking straight into the camera lens from the first frame to the last, eyes locked on the lens, head and body facing forward and still, never turning or glancing away`
+        : `looking at the conversation partner off-center and never looking directly into the camera lens`
+      lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} speaks right from the start in ${lang}: "${noEnd(take.line)}". Only ${name} speaks, with precise lip-sync, ${gaze}.`)
     } else if (kind === 'narracao' && take.line) {
       lines.push(
         `Narration: an off-screen narrator (${noEnd(script.narratorVoice || NARRATOR_VOICE)}) says in ${lang}: ${noEnd(take.line)}.${visible.length ? ' Nobody on screen speaks; mouths stay closed.' : ''}`
