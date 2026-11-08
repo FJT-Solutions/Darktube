@@ -209,7 +209,7 @@ export function clampSecondsForModel(seconds: number, model?: string): number {
  * - Familia Veo: takes com close de pessoas, rostos ou dialogo lip-sync usam o modelo base selecionado
  *   (Veo 3.1 - Quality / Fast). Takes sem pessoas (b-roll, comida, objetos, cenarios) usam Veo 3.1 - Lite,
  *   economizando creditos e tempo sem criar inconsistencias esteticas (mesma familia e resolucao 720p).
- * - Familia Omni: takes com lip-sync de fala usam Omni 1.2 Flash; b-roll e objetos usam Omni 1.1 Flash.
+ * - Familia Omni: takes com lip-sync de fala usam Omni 1.2 Flash; todos os takes usam Omni 1.2 Flash (so um Omni 1.1 escolhido de proposito continua 1.1).
  */
 export function resolveTakeModel(baseModel: string, hasCharacterOrDialogue: boolean): string {
   const m = String(effectiveVideoModel(baseModel) || '')
@@ -222,12 +222,10 @@ export function resolveTakeModel(baseModel: string, hasCharacterOrDialogue: bool
   }
   if (m.toLowerCase().includes('omni')) {
     if (m === 'Omni 1.1 Flash') return 'Omni 1.1 Flash'
-    if (hasCharacterOrDialogue) {
-      return 'Omni 1.2 Flash'
-    }
-    return 'Omni 1.1 Flash'
+    // Omni 1.2 em todos os takes (b-roll incluso): o 1.1 sai do Flow em 5/12 e recusou take com referencia no teste.
+    return 'Omni 1.2 Flash'
   }
-  return m || 'Omni 1.1 Flash'
+  return m || 'Omni 1.2 Flash'
 }
 
 /** Maximo de takes por projeto (60 x 10 s = 10 min, para os formatos longos). */

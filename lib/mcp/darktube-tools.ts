@@ -293,6 +293,72 @@ export async function renderCreative(input: RenderCreativeInput) {
   };
 }
 
+/** Roteiro de IA para a oferta pedida (mesmo caminho do flow): usado pelo flow e pela previa gratuita do script_only. */
+async function generateAiScript(ctx: {
+  offer: string; angle?: string; presetChosen: boolean; presetTitle: string; templateId: string; videoModel?: string;
+  secondsPerTake?: number; quality?: string; format: string; takesCount?: number; benefits: string; customIdea: string;
+  templateParams: Record<string, any>;
+}) {
+  const { offer, angle, presetChosen, presetTitle, templateId, videoModel, secondsPerTake, quality, format, takesCount, benefits, customIdea, templateParams } = ctx;
+  const selectedPreset = { title: presetTitle };
+  const t: FlowTemplate = getFlowTemplate(templateId) || getFlowTemplate('produto-tiktok-shop') || FLOW_TEMPLATES[0];
+
+  const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
+  const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.2 Flash';
+  const rawSeconds = secondsPerTake || t.defaults?.seconds || 6;
+  const resolvedSeconds = clampSecondsForModel(rawSeconds, resolvedModel);
+  const resolvedQuality = quality || t.defaults?.quality || '360p';
+
+  const params: FlowParams = {
+    tema: presetChosen ? `${offer} - ${selectedPreset.title}` : offer,
+    produto: offer,
+    beneficios: benefits || 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos',
+    estilo: angle === 'pao-frigideira' ? 'dor' : 'objecao',
+    roteiro: customIdea || '',
+    idioma: 'pt-BR',
+    realismo: t.defaults?.realismo || 'cinematografico',
+    takes: resolvedTakesCount,
+    seconds: resolvedSeconds,
+    aspect: format === '9:16' ? '9:16' : '16:9',
+    model: resolvedModel,
+    quality: resolvedQuality,
+    ...templateParams,
+  };
+
+  if (templateId === 'receita-viral') {
+    if (!params.prato) params.prato = offer;
+    if (!params.voz) params.voz = 'sem_voz';
+    if (!params.tipo) params.tipo = 'tres_ingredientes';
+    if (!params.cta) params.cta = 'RECEITA';
+  }
+
+  let script: FlowScript | null = null;
+  const defaultUserId = await resolveDefaultUserId().catch(() => '');
+  const userOpenAiKey = defaultUserId ? await getUserApiKey(defaultUserId, 'openai').catch(() => '') : '';
+  const apiKey = userOpenAiKey;
+
+  if (!apiKey) {
+    throw new Error('Chave da OpenAI não configurada nas credenciais da conta (public.user_api_keys). Cadastre a chave no painel de credenciais para criar o roteiro.');
+  }
+
+  try {
+    const system = buildSystemPrompt(t, params);
+    const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro de anúncio para "${offer}".`);
+    const json = extractJson(text);
+    if (json && typeof json === 'object') {
+      script = normalizeScript(json, t, params);
+    }
+  } catch (err: any) {
+    throw new Error(`Falha ao gerar roteiro via OpenAI LLM: ${err.message}`);
+  }
+
+  if (!script) {
+    throw new Error('A IA da OpenAI não retornou um roteiro estruturado válido.');
+  }
+
+  return { t, params, script, apiKey, resolvedTakesCount, resolvedModel, resolvedSeconds, resolvedQuality };
+}
+
 /**
  * 4. Pipeline 3 (Híbrido):
  * - pipelineMode: 'remotion' (Padrão) -> Renderiza na hora o MP4 real com cortes, legendas pop e baixa localmente.
@@ -302,8 +368,8 @@ export async function renderCreative(input: RenderCreativeInput) {
 export async function createCampaignCreative(input: CampaignCreativeInput) {
   const {
     offer,
-    angle = 'pao-frigideira',
-    pipelineMode = 'remotion',
+    angle: rawAngle,
+    pipelineMode: rawMode,
     templateId = 'produto-tiktok-shop',
     videoModel,
     secondsPerTake,
@@ -319,6 +385,10 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
     queueTakes = true,
     waitForSeconds: rawWaitForSeconds,
   } = input;
+  // Sem angulo de preset o criativo e da oferta pedida: o preset de pao nunca vale por padrao. Sem modo, o padrao e a
+  // previa gratuita do roteiro (script_only), nao um render.
+  const angle = rawAngle || 'pao-frigideira';
+  const pipelineMode: PipelineMode = rawMode || 'script_only';
   const waitForSeconds = rawWaitForSeconds ?? (pipelineMode === 'flow' && queueTakes ? 600 : 0);
 
   const presets: Record<string, any> = {
@@ -496,6 +566,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
 
   // ── CAMINHO 1: REMOTION RENDER (Vídeo Real em MP4 entregue na hora) ──
   if (pipelineMode === 'remotion') {
+    if (!presetChosen) {
+      throw new Error(`O modo "remotion" so renderiza os presets prontos (angle: ${Object.keys(presets).join(', ')}). Para a oferta "${offer}" use pipelineMode "flow" (gera os takes) ou "script_only" (roteiro e copy gratis, sem gastar credito).`);
+    }
     console.log(`[MCP DarkTube] Disparando Pipeline 3 (Remotion MP4) para oferta=${offer}, angulo=${angle}...`);
 
     const renderResult = await renderCreative({
@@ -532,61 +605,9 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
   // ── CAMINHO 2: NATIVO DO /FLOW (Google Flow Takes + Fila + Whisper) ──
   if (pipelineMode === 'flow') {
     console.log(`[MCP DarkTube] Disparando Pipeline 3 (Nativo do /flow) para oferta=${offer}...`);
-    const t: FlowTemplate = getFlowTemplate(templateId) || getFlowTemplate('produto-tiktok-shop') || FLOW_TEMPLATES[0];
-
-    const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
-    const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.2 Flash';
-    const rawSeconds = secondsPerTake || t.defaults?.seconds || 6;
-    const resolvedSeconds = clampSecondsForModel(rawSeconds, resolvedModel);
-    const resolvedQuality = quality || t.defaults?.quality || '360p';
-
-    const params: FlowParams = {
-      tema: presetChosen ? `${offer} - ${selectedPreset.title}` : offer,
-      produto: offer,
-      beneficios: benefits || 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos',
-      estilo: angle === 'pao-frigideira' ? 'dor' : 'objecao',
-      roteiro: customIdea || '',
-      idioma: 'pt-BR',
-      realismo: t.defaults?.realismo || 'cinematografico',
-      takes: resolvedTakesCount,
-      seconds: resolvedSeconds,
-      aspect: format === '9:16' ? '9:16' : '16:9',
-      model: resolvedModel,
-      quality: resolvedQuality,
-      ...templateParams,
-    };
-
-    if (templateId === 'receita-viral') {
-      if (!params.prato) params.prato = offer;
-      if (!params.voz) params.voz = 'sem_voz';
-      if (!params.tipo) params.tipo = 'tres_ingredientes';
-      if (!params.cta) params.cta = 'RECEITA';
-    }
-
-    let script: FlowScript | null = null;
-    const defaultUserId = await resolveDefaultUserId().catch(() => '');
-    const userOpenAiKey = defaultUserId ? await getUserApiKey(defaultUserId, 'openai').catch(() => '') : '';
-    const apiKey = userOpenAiKey;
-
-    if (!apiKey) {
-      throw new Error('Chave da OpenAI não configurada nas credenciais da conta (public.user_api_keys). Cadastre a chave no painel de credenciais para criar o roteiro.');
-    }
-
-    try {
-      const system = buildSystemPrompt(t, params);
-      const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro de anúncio para "${offer}".`);
-      const json = extractJson(text);
-      if (json && typeof json === 'object') {
-        script = normalizeScript(json, t, params);
-      }
-    } catch (err: any) {
-      throw new Error(`Falha ao gerar roteiro via OpenAI LLM: ${err.message}`);
-    }
-
-    if (!script) {
-      throw new Error('A IA da OpenAI não retornou um roteiro estruturado válido.');
-    }
-
+    const { t, params, script, apiKey, resolvedTakesCount, resolvedModel, resolvedSeconds, resolvedQuality } = await generateAiScript({
+      offer, angle, presetChosen, presetTitle: selectedPreset.title, templateId, videoModel, secondsPerTake, quality, format, takesCount, benefits, customIdea, templateParams,
+    });
     const finalScript: FlowScript = script;
 
     // Copy do Meta Ads da oferta pedida: a do preset so entra se o angulo foi escolhido de proposito.
@@ -764,6 +785,31 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
   }
 
   // ── CAMINHO 3: SCRIPT ONLY (Apenas roteiro e copy) ──
+  if (!presetChosen) {
+    // Previa gratuita: roteiro, gancho e copy da oferta pedida gerados pela IA, sem criar projeto nem jobs.
+    const { script, params: aiParams } = await generateAiScript({
+      offer, angle: undefined, presetChosen, presetTitle: '', templateId, videoModel, secondsPerTake, quality, format, takesCount, benefits, customIdea, templateParams,
+    });
+    return {
+      success: true,
+      pipelineMode: 'script_only',
+      offer,
+      title: script.seo?.title || script.title || offer,
+      hook: script.seo?.hook || '',
+      copyMetaAds: {
+        headline: script.seo?.title || script.title || offer,
+        body: [script.seo?.caption, (script.seo?.hashtags || []).join(' ')].filter(Boolean).join('\n\n'),
+        cta: String(templateParams.cta || 'Saiba mais'),
+      },
+      model: aiParams.model,
+      secondsPerTake: aiParams.seconds,
+      totalDurationSeconds: script.takes.reduce((sum, k) => sum + (Number(k.seconds) || Number(aiParams.seconds) || 0), 0),
+      takes: script.takes,
+      characters: script.characters,
+      status: 'script_ready',
+      note: 'Previa gratuita (sem projeto e sem creditos). Para gerar os videos use pipelineMode "flow".',
+    };
+  }
   const totalDuration = selectedPreset.scenes.reduce((sum: number, sc: any) => sum + (sc.durationSeconds || 4), 0);
 
   return {

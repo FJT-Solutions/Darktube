@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.29';
-const FLOW_BUILD = '2026-11-08-jobs-orfaos-e-duracao-barra'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.30';
+const FLOW_BUILD = '2026-11-08-barra-indice-recusa-pausa-e-ref-so-personagem'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
@@ -493,6 +493,15 @@ async function flowHandleResult(msg) {
       flowLog('Falha na geração: ' + (r.error || 'sem detalhe'), { code: r.code }, 'error', ids);
       await flowFail(c, msg.jobId, r.error || 'Falha na geração.', r.code);
       // Falha generica do Flow: o servidor devolve o take para a fila; espera alguns minutos antes de pegar de novo.
+      if (r.code === 'unusual') {
+        // Respeita o sinal do Google: pausa a fila uns 10 min e recarrega a aba (como o "refresh" do proprio tile). Sem disfarce.
+        await chrome.storage.local.set({ flow_hold_until: Date.now() + 10 * 60 * 1000, flow_hold_msg: 'O Google sinalizou atividade incomum; a fila pausou para tentar de novo com calma.' });
+        try {
+          const tab = await flowFindTab();
+          if (tab && tab.id) await chrome.tabs.reload(tab.id);
+        } catch (_) {}
+        flowLog('Atividade incomum: fila pausada por 10 min e aba do Flow recarregada.', null, 'warn', ids);
+      }
       if (r.code === 'gen_failed') await chrome.storage.local.set({ flow_hold_until: Date.now() + 20000, flow_hold_msg: 'O Flow falhou ao gerar; nova tentativa automática em instantes.' });
       return void (await flowStatus('falhou', { msg: r.error, code: r.code }));
     }

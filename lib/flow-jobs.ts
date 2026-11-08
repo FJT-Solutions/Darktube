@@ -259,6 +259,44 @@ export async function blockProjectAfterSheetFailure(userId: string, projectId: s
   }).catch(() => {});
 }
 
+/**
+ * Fecha o projeto quando a fila de takes acabou e sobrou take sem gerar: o projeto fica 'failed' (precisa de acao) e o
+ * log lista o motivo de cada take. Antes ele ficava 'queued' para sempre com todos os takes em done ou draft.
+ */
+export async function settleProjectAfterJob(userId: string, projectId: string | null | undefined) {
+  if (!projectId) return;
+  try {
+    await ensureFlowProjectsTable();
+    const { rows } = await pool.query(
+      `SELECT take_index, status, error_message FROM public.flow_jobs
+        WHERE user_id = $1 AND project_id = $2 AND role IN ('take', 'take_final')
+        ORDER BY take_index, created_at`,
+      [userId, projectId]
+    );
+    if (!rows.length || rows.some((r: any) => ['queued', 'running', 'collecting'].includes(r.status))) return;
+    // Estado final de cada take = o do job mais recente dele.
+    const last = new Map<number, any>();
+    for (const r of rows) last.set(r.take_index, r);
+    const bad = [...last.values()].filter((r) => r.status === 'draft');
+    if (!bad.length) return;
+    const res = await pool.query(
+      `UPDATE public.flow_projects SET status = 'failed', updated_at = NOW()
+        WHERE id = $1 AND user_id = $2 AND status IN ('draft', 'queued', 'generating')`,
+      [projectId, userId]
+    );
+    if (res.rowCount) {
+      const why = bad.map((r) => `take ${r.take_index}: ${String(r.error_message || 'sem detalhe').replace(/\s+/g, ' ').slice(0, 120)}`).join(' | ');
+      await addFlowLogs(userId, {
+        message: `Fila do projeto terminou com ${bad.length} de ${last.size} take(s) sem gerar (precisa de ação). ${why}`,
+        level: 'error',
+        projectId,
+      }).catch(() => {});
+    }
+  } catch (e) {
+    console.error('[Flow] Erro ao fechar o status do projeto:', e);
+  }
+}
+
 /** Uma nova folha foi pedida: devolve para a fila os takes que a falha anterior tinha parado e tira o projeto de "falhou". */
 async function releaseBlockedTakes(userId: string, projectId: string) {
   await pool.query(
@@ -378,19 +416,24 @@ export async function getFlowJob(userId: string, id: string): Promise<FlowJob | 
 }
 
 // Reenvio: volta pra fila, podendo trocar o motor (só 'flow' é consumido pelo agente por enquanto).
-export async function retryFlowJob(userId: string, id: string, engine?: string, patchParams?: Partial<FlowJobParams>, prompt?: string): Promise<FlowJob | null> {
+export async function retryFlowJob(userId: string, id: string, engine?: string, patchParams?: Partial<FlowJobParams>, prompt?: string, dropRef = false): Promise<FlowJob | null> {
   await ensureFlowTablesExist();
   const res = await pool.query(
     `UPDATE public.flow_jobs
         SET status = 'queued', engine = COALESCE($3, engine), error_message = NULL, prompt = COALESCE($6, prompt),
-            result_url = NULL, claimed_at = NULL, finished_at = NULL, params = (CASE WHEN $5::jsonb IS NOT NULL THEN params || $5::jsonb ELSE params END) - 'policyRetries',
+            result_url = NULL, claimed_at = NULL, finished_at = NULL, params = (CASE WHEN $5::jsonb IS NOT NULL THEN params || $5::jsonb ELSE params END) - 'policyRetries' - 'unusualRetries' - 'genRetries' - (CASE WHEN $7::boolean THEN 'refImageUrl' ELSE '' END),
             deadline_at = NOW() + ($4 || ' minutes')::interval
       WHERE id = $1 AND user_id = $2 AND status IN ('draft','cancelled','done')
       RETURNING *`,
-    [id, userId, engine ? engine.slice(0, 30) : null, String(DEFAULT_DEADLINE_MIN), patchParams ? JSON.stringify(cleanParams(patchParams)) : null, prompt || null]
+    [id, userId, engine ? engine.slice(0, 30) : null, String(DEFAULT_DEADLINE_MIN), patchParams ? JSON.stringify(cleanParams(patchParams)) : null, prompt || null, dropRef]
   );
   const job: FlowJob | null = res.rows[0] ?? null;
   if (job?.project_id && job.role && SHEET_ROLES.includes(job.role)) await releaseBlockedTakes(userId, job.project_id);
+  else if (job?.project_id) {
+    // Take reenfileirado: o projeto deixa de estar 'failed' (settleProjectAfterJob fecha de novo se falhar).
+    await ensureFlowProjectsTable();
+    await pool.query(`UPDATE public.flow_projects SET status = 'queued', updated_at = NOW() WHERE id = $1 AND user_id = $2 AND status = 'failed'`, [job.project_id, userId]);
+  }
   return job;
 }
 
@@ -606,7 +649,9 @@ export async function completeFlowJob(userId: string, id: string, resultUrl: str
       RETURNING *`,
     [id, userId, resultUrl]
   );
-  return res.rows[0] ?? null;
+  const done: FlowJob | null = res.rows[0] ?? null;
+  if (done?.project_id) await settleProjectAfterJob(userId, done.project_id);
+  return done;
 }
 
 // Falha vira rascunho: o usuário reenvia ao Flow ou escolhe outro motor.
@@ -645,6 +690,29 @@ export async function requeueAfterGenFailure(userId: string, id: string): Promis
       WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
       RETURNING *`,
     [id, userId, attempt, String(DEFAULT_DEADLINE_MIN)]
+  );
+  return res.rows[0] ? { job: res.rows[0], attempt } : null;
+}
+
+export const MAX_UNUSUAL_RETRIES = 2;
+
+/** "Atividade incomum": devolve a MESMA cena (prompt identico) para a fila ate MAX_UNUSUAL_RETRIES vezes. A pausa fica na extensao. */
+export async function requeueAfterUnusual(userId: string, id: string): Promise<{ job: FlowJob; attempt: number } | null> {
+  await ensureFlowTablesExist();
+  const { rows } = await pool.query(`SELECT * FROM public.flow_jobs WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')`, [id, userId]);
+  const job = rows[0] as FlowJob | undefined;
+  if (!job) return null;
+  const done = Number((job.params as any)?.unusualRetries) || 0;
+  if (done >= MAX_UNUSUAL_RETRIES) return null;
+  const attempt = done + 1;
+  const res = await pool.query(
+    `UPDATE public.flow_jobs
+        SET status = 'queued', error_message = NULL, result_url = NULL, claimed_at = NULL, finished_at = NULL,
+            params = params || jsonb_build_object('unusualRetries', $3::int),
+            deadline_at = NOW() + ($4 || ' minutes')::interval
+      WHERE id = $1 AND user_id = $2 AND status IN ('running', 'collecting')
+      RETURNING *`,
+    [id, userId, attempt, String(DEFAULT_DEADLINE_MIN + 15)]
   );
   return res.rows[0] ? { job: res.rows[0], attempt } : null;
 }
@@ -696,6 +764,7 @@ export async function failFlowJob(userId: string, id: string, message: string): 
   const job: FlowJob | null = res.rows[0] ?? null;
   // Folha do personagem sem sucesso: os takes que dependem dela nao podem seguir (ver blockProjectAfterSheetFailure).
   if (job?.project_id && job.role && SHEET_ROLES.includes(job.role)) await blockProjectAfterSheetFailure(userId, job.project_id, job.error_message);
+  else if (job?.project_id) await settleProjectAfterJob(userId, job.project_id);
   return job;
 }
 

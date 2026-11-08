@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
-import { completeFlowJob, getFlowJob } from '@/lib/flow-jobs';
+import { completeFlowJob, getFlowJob, syncProjectQueuedJobsWithReferences } from '@/lib/flow-jobs';
 import { uploadMediaFile } from '@/lib/storage';
 import { pool } from '@/lib/db-client';
 import { assembleFlowProject } from '@/lib/flow-assemble';
@@ -53,12 +53,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           job.project_id,
           JSON.stringify(sc),
         ]);
-        await pool.query(
-          `UPDATE public.flow_jobs
-              SET params = jsonb_set(COALESCE(params, '{}'::jsonb), '{refImageUrl}', to_jsonb($2::text), true)
-            WHERE project_id = $1 AND role = 'take' AND status = 'queued'`,
-          [job.project_id, url]
-        );
+        // So os takes em que o personagem aparece recebem o retrato (b-roll de maos e cenas de objetos seguem sem
+        // referencia: anexa-la custava ~40 s de envio e pode atrair recusa). takeReference decide take a take e o
+        // prompt e reescrito junto, citando a referencia.
+        const { rows: prj } = await pool.query(`SELECT params, template_id FROM public.flow_projects WHERE id = $1`, [job.project_id]);
+        await syncProjectQueuedJobsWithReferences(user.id, String(job.project_id), sc, prj[0]?.params || {}, String(prj[0]?.template_id || ''));
       }
     } catch (sheetErr: any) {
       console.warn(`[Flow Complete] Falha ao propagar character_sheet aprovada: ${sheetErr.message}`);

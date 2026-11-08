@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth-helpers';
 import { getFlowJob, retryFlowJob, cancelFlowJob } from '@/lib/flow-jobs';
 import { getFlowProject } from '@/lib/flow-projects';
 import { getFlowTemplate } from '@/lib/flow-templates';
-import { buildTakePrompt } from '@/lib/flow-script';
+import { buildTakePrompt, takeReference } from '@/lib/flow-script';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,14 +26,25 @@ async function currentTakePrompt(userId: string, jobId: string): Promise<string 
   return project && t && take ? buildTakePrompt(project.script, take, project.params, t.mode) : undefined;
 }
 
+async function takeHasNoRef(userId: string, jobId: string): Promise<boolean> {
+  const job = await getFlowJob(userId, jobId);
+  if (!job?.project_id || job.take_index == null) return false;
+  const project = await getFlowProject(userId, job.project_id);
+  const take = project?.script?.takes?.find((k) => k.n === job.take_index);
+  if (!project || !take) return false;
+  return !takeReference(project.script, take, project.params).refImageUrl;
+}
+
 // action: 'retry' (rascunho/cancelado volta pra fila, opcionalmente em outro motor) | 'cancel'
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ success: false, error: 'Não autenticado.' }, { status: 401 });
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
+  // Take sem personagem na cena (b-roll de maos, objetos): o reenvio tira o retrato que veio anexado por engano.
+  const dropRef = body.action === 'retry' ? await takeHasNoRef(user.id, id).catch(() => false) : false;
   const job = body.action === 'retry'
-    ? await retryFlowJob(user.id, id, body.engine, body.params, await currentTakePrompt(user.id, id).catch(() => undefined))
+    ? await retryFlowJob(user.id, id, body.engine, body.params, await currentTakePrompt(user.id, id).catch(() => undefined), dropRef)
     : body.action === 'cancel'
       ? await cancelFlowJob(user.id, id)
       : null;

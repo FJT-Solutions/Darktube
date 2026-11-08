@@ -78,7 +78,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'End on an unresolved cliffhanger that demands the next episode',
     ],
     look: 'high-drama cinema lighting, warm luxury interiors, 35mm prime lens, shallow depth of field',
-    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'produto-tiktok-shop',
@@ -150,7 +150,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Capture crisp tactile foley of buttons, latches, or surfaces with no background music',
     ],
     look: 'bright natural window daylight, lived-in home environment, authentic handheld camera feel',
-    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'historias-reais',
@@ -206,7 +206,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Final sentence bridges grammatically into the first sentence for a seamless replay loop',
     ],
     look: '35mm archival documentary cinema, natural grain, dramatic practical lighting, deep shadows',
-    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'animais-natureza',
@@ -263,7 +263,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Maintain consistent animal markings, lighting hour, and habitat across all takes',
     ],
     look: 'high-end wildlife documentary cinematography, telephoto compression, golden-hour rim light',
-    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'pov-imersivo',
@@ -331,7 +331,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Include immersive 3D spatial foley: heavy breathing, footsteps on wet stone or mud, close-mic cloth rustle, no background music',
     ],
     look: 'immersive subjective cinema, anamorphic lens flare, practical torch or flashlight beam, visceral atmosphere',
-    defaults: { takes: 5, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'storytime-entrevista-rua',
@@ -401,7 +401,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Use realistic outdoor wind, room tone, and mic-handling foley with no background music',
     ],
     look: 'raw handheld street documentary look, natural overcast or night street lighting, realistic skin detail',
-    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'metafora-visual-minidoc',
@@ -468,7 +468,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Layer crisp micro-foley: glass stress, electric hum, heartbeat pulse, liquid droplets, no background music',
     ],
     look: 'dark studio macro cinematography, dramatic rim lighting, translucent materials, shallow depth of field',
-    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'asmr-fisica-impossivel',
@@ -532,7 +532,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Negative constraints: strictly no human figures, no faces, no extra floating hands, no deformed tools; the cutting surface stays completely anchored and stationary',
     ],
     look: 'studio macro product cinematography, dark obsidian surface, specular rim lighting, pristine optical refraction',
-    defaults: { takes: 4, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 4, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'antes-depois-restauracao',
@@ -598,7 +598,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Show clear physical tools interacting with the surface in the middle takes',
     ],
     look: 'warm artisan workshop lighting, tungsten practical lamps, rich metallic and wood reflections',
-    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'true-crime-misterio',
@@ -655,7 +655,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Layer eerie diegetic sound: rain on glass, ticking clock, magnetic tape hum, footsteps on floorboards, no music',
     ],
     look: 'neo-noir thriller cinematography, 35mm film grain, chiaroscuro shadows, cold rain and tungsten practicals',
-    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'historia-e-se',
@@ -712,7 +712,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Off-screen narration with rich environmental sound effects and zero background music',
     ],
     look: 'epic historical drama cinematography, natural fire and daylight, rich atmospheric smoke and grain',
-    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'infantil-fabula-3d',
@@ -779,7 +779,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Strictly safe, comforting, family-friendly imagery with zero scary or aggressive elements',
     ],
     look: 'high-end 3D animated feature film or handmade felt stop-motion, warm pastel palette, soft global illumination',
-    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'motivacional-estoico',
@@ -836,7 +836,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Use deep atmospheric foley: steady rain, crackling hearth, distant train rails, calm breathing, no music',
     ],
     look: 'arthouse 35mm cinema, moody desaturated palette, heavy film grain, natural chiaroscuro lighting',
-    defaults: { takes: 5, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 5, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'comedia-deadpan',
@@ -899,7 +899,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Use mundane office or hallway foley: fluorescent hum, printer whir, heavy sigh, coffee sip, no music',
     ],
     look: 'flat fluorescent workplace documentary look, handheld crash-zooms, realistic everyday surfaces',
-    defaults: { takes: 4, seconds: 6, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 4, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p' },
   },
 
   // ============================================================================
@@ -960,7 +960,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Use rich environmental soundscapes and mechanical foley in every take with no background music',
     ],
     look: 'widescreen 16:9 prestige streaming documentary look, anamorphic 35mm lenses, natural color grading',
-    defaults: { takes: 24, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 24, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'true-crime-dossie-longo',
@@ -1016,7 +1016,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Sustain suspense across acts with diegetic noir audio layers: rain, footsteps, magnetic tape hum, clock ticks, no music',
     ],
     look: 'widescreen 16:9 neo-noir mystery cinema, cold green-amber palette, subtle 35mm grain, deep shadows',
-    defaults: { takes: 28, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 28, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'compilacao-curiosidades-longo',
@@ -1078,7 +1078,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Off-screen narration paired with crisp environmental and physical foley, no background music',
     ],
     look: 'crisp 16:9 modern science documentary look, high dynamic range, vivid natural colors, macro to wide transitions',
-    defaults: { takes: 20, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 20, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'reconstituicao-historica-longo',
@@ -1135,7 +1135,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Rich period foley: crackling torches, creaking timber, clinking bronze or iron, wind and horses, no music',
     ],
     look: 'epic 16:9 historical cinema, natural firelight and overcast daylight, 35mm film grain, rich earthy materials',
-    defaults: { takes: 26, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 26, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'historia-ninar-longo',
@@ -1202,7 +1202,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Soft comforting foley: gentle rain on leaves, distant crickets, warm hearth crackle, soft breathing, no music',
     ],
     look: 'cozy 16:9 storybook cinema, warm amber lantern light, deep twilight blues, soft bokeh and velvet fabrics',
-    defaults: { takes: 22, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 22, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'meditacao-ambiente-longo',
@@ -1269,7 +1269,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Camera movements must be imperceptibly slow or tripod-locked to induce deep calm',
     ],
     look: 'widescreen 16:9 meditative cinema, anamorphic depth, warm practical glow against cool atmospheric rain or mist',
-    defaults: { takes: 30, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p' },
+    defaults: { takes: 30, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p' },
   },
   {
     id: 'pov-historia-ilustrada-longo',
@@ -1373,7 +1373,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Layered foley, no music: sizzle, knife on board, phone pings, scooter engines, fridge hum, distant street noise',
     ],
     look: 'hand-painted 2D illustrated drama, monochrome ink characters inside saturated painterly Brazilian interiors, limited animation with parallax, steam and warm light flicker',
-    defaults: { takes: 40, seconds: 8, aspect: '16:9', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'ilustrado2d' },
+    defaults: { takes: 40, seconds: 8, aspect: '16:9', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'ilustrado2d' },
   },
   {
     id: 'historia-cartum-stickman',
@@ -1417,7 +1417,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Sound: light cartoon foley (pops, thuds, cloth), crowd murmur, no music',
     ],
     look: 'flat 2D cartoon with simple characters on detailed historical backgrounds, expressive reactions',
-    defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'stickman2d' },
+    defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'stickman2d' },
   },
   {
     id: 'historia-avatar-3d',
@@ -1463,7 +1463,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Sound: wind, sand or crowd ambience, tools, ropes, footsteps; no music',
     ],
     look: 'stylized 3D game-avatar look, bright sunny colors, clean polished render',
-    defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'avatar3d' },
+    defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'avatar3d' },
   },
   {
     id: 'explicador-3d-brinquedo',
@@ -1507,7 +1507,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Sound: soft clicks, pops, water, wind and whoosh effects; no music',
     ],
     look: 'clean 3D toy diorama, soft studio lighting, glossy simple shapes, bright colors',
-    defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'brinquedo3d' },
+    defaults: { takes: 7, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'brinquedo3d' },
   },
   {
     id: 'receita-viral',
@@ -1574,7 +1574,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Food must look hyper-appetizing: glossy, steaming, natural warm light, realistic textures',
     ],
     look: 'warm home kitchen food cinematography, soft window light, shallow depth of field, rich appetizing colors',
-    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.1 Flash', quality: '360p', realismo: 'hiper' },
+    defaults: { takes: 6, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
   },
   {
     id: 'receita-chromakey-expert',

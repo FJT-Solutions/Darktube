@@ -379,22 +379,52 @@
           return { el, isInput, min: num('min', 'aria-valuemin'), max: num('max', 'aria-valuemax'), step: (isInput ? Number(el.step) : 1) || 1 };
         })
         // So uma barra de duracao (poucos segundos): ignora volume, zoom e afins.
-        .find((x) => Number.isFinite(x.min) && Number.isFinite(x.max) && x.min >= 1 && x.max <= 30 && x.max > x.min);
+        .find((x) => Number.isFinite(x.min) && Number.isFinite(x.max) && x.min >= 0 && x.max <= 30 && x.max > x.min);
       if (found) return found;
     }
     return null;
   }
 
+  // Segundos mostrados no resumo do botao de configuracoes ("Video · 720p · 6s"); 0 se nao der para ler.
+  const summarySeconds = () => Number((/(\d{1,2})\s*s/i.exec(txt(settingsBtnEl() || $(S.settingsBtn) || document.createElement('i'))) || [])[1]) || 0;
+
+  async function waitSummary(expected) {
+    for (let i = 0; i < 8; i++) {
+      if (summarySeconds() === expected) return true;
+      await sleep(200);
+    }
+    return summarySeconds() === expected;
+  }
+
   async function setDurationSlider(sl, want) {
-    const target = Math.min(sl.max, Math.max(sl.min, sl.min + Math.floor((want - sl.min) / sl.step) * sl.step));
-    if (sl.isInput) {
+    const clamp = (v) => Math.min(sl.max, Math.max(sl.min, v));
+    const setInput = async (v) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-      setter.call(sl.el, String(target));
+      setter.call(sl.el, String(clamp(v)));
       sl.el.dispatchEvent(new Event('input', { bubbles: true }));
       sl.el.dispatchEvent(new Event('change', { bubbles: true }));
-      await human(250, 600);
-      return Number(sl.el.value) === target ? target : 0;
+      await human(250, 500);
+    };
+    if (sl.isInput) {
+      // O valor da barra pode ser um indice (no Omni 1.2: segundos = valor + 3). Nao fixa o deslocamento:
+      // calibra pela leitura do resumo do botao e ajusta de 1 em 1 ate bater com a pedida.
+      const shown0 = summarySeconds();
+      if (!shown0) return 0;
+      const offset = shown0 - Number(sl.el.value);
+      await setInput(want - offset);
+      for (let i = 0; i < 6; i++) {
+        if (await waitSummary(want)) return want;
+        const shown = summarySeconds();
+        if (!shown) break;
+        const next = Number(sl.el.value) + (want > shown ? 1 : -1) * sl.step;
+        if (next < sl.min || next > sl.max) break;
+        await setInput(next);
+      }
+      // Nao deu para chegar exato: aceita a maior duracao que nao passa da pedida; senao, falha sem gerar.
+      const shown = summarySeconds();
+      return shown && shown <= want ? shown : 0;
     }
+    const target = clamp(sl.min + Math.floor((want - sl.min) / sl.step) * sl.step);
     const cur = () => Number(sl.el.getAttribute('aria-valuenow'));
     sl.el.focus();
     for (let i = 0; i < 40 && cur() !== target; i++) {
@@ -885,7 +915,7 @@
   // tile pendente, entao sem esta checagem parecia "gerando" para sempre.
   // Politica ("prominent people") x falha generica e passageira ("failed to generate") x outra.
   const failCode = (msg) =>
-    /polic|violat|prominent|pessoas|people|polític|viol(e|am|ar|ação)|menores|crian[çc]/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate|unable to edit|try a different prompt|falha ao gerar|algo deu errado|tente novamente|n[ãa]o foi poss[ií]vel (gerar|editar)|tente usar outro comando/i.test(msg) ? 'gen_failed' : 'failed';
+    /atividade incomum|unusual activity|unusual traffic|tr[áa]fego incomum/i.test(msg) ? 'unusual' : /polic|violat|prominent|pessoas|people|polític|viol(e|am|ar|ação)|menores|crian[çc]/i.test(msg) ? 'policy' : /failed to generate|something went wrong|try again|unable to generate|couldn.t generate|unable to edit|try a different prompt|falha ao gerar|algo deu errado|tente novamente|n[ãa]o foi poss[ií]vel (gerar|editar)|tente usar outro comando/i.test(msg) ? 'gen_failed' : 'failed';
   const FAILED_RX = /\bfailed\b|might violate|violate our polic|will be refunded|não foi possível gerar|geração falhou|falhou/i;
   function tileState(tile) {
     const t = txt(tile);
@@ -2025,6 +2055,12 @@
         }
       }],
     ];
+    // Imagem: o clique no mundo da pagina nao iniciou a geracao em 4 de 4 tentativas (a imagem so saiu com o clique
+    // do depurador, 10 s depois). Vai direto ao que funciona e deixa o outro como reserva.
+    if (kind === 'image') {
+      const i = attempts.indexOf(real);
+      if (i > 0) attempts.splice(0, 0, attempts.splice(i, 1)[0]);
+    }
     let how = '';
     for (const [label, fire] of attempts) {
       await fire();

@@ -57,8 +57,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             pipelineMode: {
               type: 'string',
               enum: ['remotion', 'flow', 'script_only'],
-              description: 'Caminho de execução: "remotion" (MP4 procedural imediato), "flow" (projeto nativo no /flow + fila de IA) ou "script_only"',
-              default: 'remotion',
+              description: 'Caminho de execução: "script_only" (padrão: roteiro e copy da oferta pela IA, grátis), "flow" (projeto nativo no /flow + fila de IA) ou "remotion" (MP4 só dos presets prontos: exige angle)',
+              default: 'script_only',
             },
             templateId: { type: 'string', description: 'ID do template do /flow (ex: receita-viral, produto-tiktok-shop)', default: 'produto-tiktok-shop' },
             videoModel: {
@@ -69,15 +69,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             secondsPerTake: {
               type: 'number',
-              enum: [4, 6, 8, 10],
-              description: 'Duração em segundos de cada take/cena',
+              minimum: 3,
+              maximum: 15,
+              description: 'Duração em segundos de cada take/cena (Omni 1.2: 3 a 15 s; Omni 1.1: 4, 6, 8 ou 10; Veo: 5 ou 8). O servidor ajusta ao valor aceito.',
               default: 6,
             },
             quality: { type: 'string', enum: ['360p', '720p', '1080p'], default: '360p' },
             angle: {
               type: 'string',
-              description: 'Ângulo validado de venda do criativo (ex: pao-frigideira, doce-sem-culpa)',
-              default: 'pao-frigideira',
+              description: 'Preset pronto de outra oferta (pao-frigideira, doce-sem-culpa, mosaico-365); só no modo remotion. Sem ele, roteiro e copy vêm da oferta pedida.',
             },
             format: { type: 'string', enum: ['9:16', '1:1', '16:9'], default: '9:16' },
             takesCount: { type: 'number', description: 'Quantidade de takes/cenas a serem gerados', default: 4 },

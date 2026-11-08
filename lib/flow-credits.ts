@@ -63,7 +63,7 @@ export const MODEL_CREDIT_COSTS: Record<string, ModelCreditCost> = {
  * Retorna o custo exato em créditos de um take específico.
  */
 export function getTakeCreditCost(model: string, seconds: number): number {
-  const cfg = MODEL_CREDIT_COSTS[model] || MODEL_CREDIT_COSTS['Omni 1.1 Flash'];
+  const cfg = MODEL_CREDIT_COSTS[model] || MODEL_CREDIT_COSTS['Omni 1.2 Flash'] || MODEL_CREDIT_COSTS['Omni 1.1 Flash'];
   const validSec = clampSecondsForModel(seconds, model);
   if (cfg.rates[validSec]) {
     return cfg.rates[validSec];
@@ -129,7 +129,7 @@ export function simulateCredits({
 
     // Diálogos usam o modelo selecionado como teto; B-rolls usam o modelo econômico (Lite)
     const dialogueModel = model;
-    const brollModel = isVeo ? 'Veo 3.1 - Lite' : 'Omni 1.1 Flash';
+    const brollModel = isVeo ? 'Veo 3.1 - Lite' : model;
 
     const dialogueCost = getTakeCreditCost(dialogueModel, sec);
     const brollCost = getTakeCreditCost(brollModel, sec);

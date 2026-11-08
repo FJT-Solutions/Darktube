@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFlowAgentUser } from '@/lib/flow-auth';
-import { addFlowLogs, failFlowJob, MAX_GEN_RETRIES, MAX_POLICY_RETRIES, pauseFlowAgent, requeueAfterGenFailure, requeueAfterPolicy } from '@/lib/flow-jobs';
+import { addFlowLogs, failFlowJob, MAX_GEN_RETRIES, MAX_POLICY_RETRIES, MAX_UNUSUAL_RETRIES, pauseFlowAgent, requeueAfterGenFailure, requeueAfterPolicy, requeueAfterUnusual } from '@/lib/flow-jobs';
 import { acceptPolicyRewrite, buildPolicyRewritePrompt, softenFlowPrompt } from '@/lib/flow-script';
 import { getFlowProject } from '@/lib/flow-projects';
 import { getUserApiKey } from '@/lib/database';
@@ -60,6 +60,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
+  // "Atividade incomum" (sem cobranca): mesma cena, prompt identico, ate 2 vezes; a extensao pausa a fila e recarrega a aba.
+  // Nao e o prompt que falha, entao nao se suaviza nada. Depois disso vira rascunho com o motivo.
+  if (code === 'unusual') {
+    const retry = await requeueAfterUnusual(user.id, id);
+    if (retry) {
+      const msg = `O Google sinalizou atividade incomum no take ${retry.job.take_index ?? ''}; a fila pausa uns 10 min e a mesma cena tenta de novo (${retry.attempt}/${MAX_UNUSUAL_RETRIES}).`;
+      console.log(`[Flow] ${msg}`);
+      await addFlowLogs(user.id, { message: msg, level: 'warn', jobId: id, projectId: retry.job.project_id ?? null }).catch(() => {});
+      return NextResponse.json({ success: true, job: retry.job, retried: retry.attempt });
+    }
+  }
+
   // Falha generica do Flow: volta para a fila ate 2 vezes (a extensao espera alguns minutos antes de pegar de novo).
   if (code === 'gen_failed') {
     const retry = await requeueAfterGenFailure(user.id, id);
@@ -71,7 +83,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
-  const error = String(body.error || '') + (code === 'gen_failed' ? ` (falhou também nas ${MAX_GEN_RETRIES} novas tentativas automáticas)` : '') + (code === 'policy' ? ` (recusado também nas ${MAX_POLICY_RETRIES} novas tentativas automáticas)` : '');
+  const error = String(body.error || '') + (code === 'gen_failed' ? ` (falhou também nas ${MAX_GEN_RETRIES} novas tentativas automáticas)` : '') + (code === 'policy' ? ` (recusado também nas ${MAX_POLICY_RETRIES} novas tentativas automáticas)` : '') + (code === 'unusual' ? ` (o Google sinalizou atividade incomum também nas ${MAX_UNUSUAL_RETRIES} novas tentativas; tente mais tarde)` : '');
   const job = await failFlowJob(user.id, id, error);
   if (!job) return NextResponse.json({ success: false, error: 'Job não está em execução.' }, { status: 409 });
   const alertMsg = ALERTS[code];

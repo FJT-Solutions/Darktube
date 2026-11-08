@@ -24,7 +24,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_create_campaign_creative',
-    description: 'Pipeline 3 Híbrido: renderiza MP4 via Remotion, ou cria projeto nativo no /flow com IA generativa, ou gera roteiro e copy. IMPORTANTE: O agente deve alinhar com o usuário as preferências de motor (remotion vs flow), modelo de vídeo (Omni 1.1 vs Veo 3.1), duração dos takes (4s, 6s, 8s, 10s) e personagem antes de executar.',
+    description: 'Pipeline 3 Híbrido: renderiza MP4 via Remotion, ou cria projeto nativo no /flow com IA generativa, ou gera roteiro e copy. IMPORTANTE: O agente deve alinhar com o usuário as preferências de motor (remotion vs flow), modelo de vídeo (padrão Omni 1.2 Flash; Omni 1.1 e Veo 3.1 saem do Flow em 05/12), duração dos takes (Omni 1.2: 3 a 15 s; Omni 1.1: 4, 6, 8 ou 10 s; Veo: 5 ou 8 s) e personagem antes de executar.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -32,27 +32,27 @@ const MCP_TOOLS_MANIFEST = [
         pipelineMode: {
           type: 'string',
           enum: ['remotion', 'flow', 'script_only'],
-          description: 'Caminho de execução: "remotion" (MP4 procedural imediato), "flow" (projeto nativo no /flow + fila de IA) ou "script_only"',
-          default: 'remotion',
+          description: 'Caminho de execução: "script_only" (padrão: roteiro, gancho e copy da oferta pela IA, grátis, sem projeto nem créditos), "flow" (projeto nativo no /flow + fila de IA) ou "remotion" (MP4 só dos presets prontos: exige angle)',
+          default: 'script_only',
         },
         templateId: { type: 'string', description: 'ID do template do /flow (ex: receita-viral, produto-tiktok-shop)', default: 'produto-tiktok-shop' },
         videoModel: {
           type: 'string',
           enum: ['Omni 1.1 Flash', 'Omni 1.2 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'],
           description: 'Modelo de geração de vídeo por IA no /flow',
-          default: 'Omni 1.1 Flash',
+          default: 'Omni 1.2 Flash',
         },
         secondsPerTake: {
           type: 'number',
-          enum: [4, 5, 6, 8, 10],
-          description: 'Duração em segundos de cada take/cena (Veo: 5 ou 8s; Omni: 4, 6, 8 ou 10s)',
+          minimum: 3,
+          maximum: 15,
+          description: 'Duração em segundos de cada take/cena. Omni 1.2: 3 a 15 s (barra, de 1 em 1); Omni 1.1: 4, 6, 8 ou 10 s; Veo: 5 ou 8 s. O servidor ajusta ao valor aceito pelo modelo.',
           default: 6,
         },
         quality: { type: 'string', enum: ['360p', '720p', '1080p'], default: '360p' },
         angle: {
           type: 'string',
-          description: 'Ângulo validado de venda do criativo (ex: pao-frigideira, doce-sem-culpa)',
-          default: 'pao-frigideira',
+          description: 'Preset pronto de outra oferta (pao-frigideira, doce-sem-culpa, mosaico-365); só necessário no modo remotion. Sem ele, o roteiro e a copy vêm da oferta pedida.',
         },
         format: { type: 'string', enum: ['9:16', '1:1', '16:9'], default: '9:16' },
         takesCount: { type: 'number', description: 'Quantidade de takes/cenas a serem gerados', default: 4 },

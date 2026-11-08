@@ -196,7 +196,7 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
   const takes = Number(params.takes) || t.defaults.takes
   const seconds = Number(params.seconds) || t.defaults.seconds
   const lang = languageLabel(String(params.idioma || 'pt-BR'))
-  const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
+  const baseModel = String(params.model || t.defaults.model || 'Omni 1.2 Flash')
   const allowedSecs = allowedSecondsForModel(baseModel)
   const limit = wordLimit(seconds)
   const freeKind = String(params.tipo || 'misto')
@@ -290,7 +290,7 @@ const parseSheetStatus = (v: any): 'gerando' | 'aguardando' | 'aprovada' | undef
 
 /** Normaliza a resposta da IA (ou o roteiro editado) para o formato interno, sem confiar em nada. */
 export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): FlowScript {
-  const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
+  const baseModel = String(params.model || t.defaults.model || 'Omni 1.2 Flash')
   const allowedSecs = allowedSecondsForModel(baseModel)
   const baseSeconds = Number(params.seconds) || t.defaults.seconds
   const characters: FlowCharacter[] = (Array.isArray(raw?.characters) ? raw.characters : [])
@@ -330,7 +330,7 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
     const chars = Array.isArray(k?.characters) ? k.characters.map((x: any) => str(x, 20)).filter(Boolean) : []
     const lineText = str(k?.line, 400)
     const spk = str(k?.speaker, 20)
-    const baseModel = String(params.model || t.defaults.model || 'Omni 1.1 Flash')
+    const baseModel = String(params.model || t.defaults.model || 'Omni 1.2 Flash')
     const hasSubject = chars.length > 0 || Boolean(lineText.trim()) || Boolean(spk)
     const isHybrid = params.isHybrid !== false && params.isHybrid !== 'false'
     const effModel = isHybrid ? (validModel || resolveTakeModel(baseModel, hasSubject)) : baseModel
