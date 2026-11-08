@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.31';
-const FLOW_BUILD = '2026-11-08-barra-calibra-pelo-resumo-e-diagnostico'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.33';
+const FLOW_BUILD = '2026-11-08-barra-por-teclado-e-ponteiro'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
@@ -679,6 +679,60 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
         if (previous) {
           try { await chrome.tabs.update(previous, { active: true }); } catch (e) {}
+        }
+      }
+    })();
+    return true;
+  }
+  if (msg.type === 'FLOW_TRUSTED_KEYS' || msg.type === 'FLOW_TRUSTED_DRAG') {
+    // Teclado ou arraste de verdade (confiavel) pelo depurador, para a barra de duracao do Omni 1.2, que ignora
+    // o valor definido por script. O depurador fica ligado so durante a acao.
+    (async () => {
+      const tabId = sender && sender.tab && sender.tab.id;
+      if (!tabId || !chrome.debugger) return sendResponse({ ok: false, why: 'sem aba ou sem permissão debugger' });
+      const target = { tabId };
+      const send = (method, params) =>
+        new Promise((resolve, reject) =>
+          chrome.debugger.sendCommand(target, method, params || {}, (r) => (chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve(r)))
+        );
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      let attached = false;
+      try {
+        await new Promise((resolve, reject) => chrome.debugger.attach(target, '1.3', () => (chrome.runtime.lastError ? reject(new Error(chrome.runtime.lastError.message)) : resolve())));
+        attached = true;
+        try { await send('Emulation.setFocusEmulationEnabled', { enabled: true }); } catch (e) { /* opcional */ }
+        if (msg.type === 'FLOW_TRUSTED_KEYS') {
+          const key = msg.key === 'ArrowLeft' ? 'ArrowLeft' : 'ArrowRight';
+          const vk = key === 'ArrowLeft' ? 37 : 39;
+          const n = Math.min(Math.max(Number(msg.count) || 1, 1), 14);
+          for (let i = 0; i < n; i++) {
+            await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+            await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+            await wait(90);
+          }
+        } else {
+          const x1 = Number(msg.x1) || 0;
+          const x2 = Number(msg.x2) || 0;
+          const y = Number(msg.y) || 0;
+          await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x1, y, button: 'none', buttons: 0 });
+          await wait(120);
+          await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x1, y, button: 'left', buttons: 1, clickCount: 1 });
+          await wait(100);
+          const steps = 8;
+          for (let i = 1; i <= steps; i++) {
+            await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: Math.round(x1 + ((x2 - x1) * i) / steps), y, button: 'left', buttons: 1 });
+            await wait(40);
+          }
+          await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x2, y, button: 'left', buttons: 0, clickCount: 1 });
+        }
+        await wait(300);
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({ ok: false, why: String((e && e.message) || e).slice(0, 140) });
+      } finally {
+        if (attached) {
+          await wait(300);
+          try { chrome.debugger.detach(target, () => void chrome.runtime.lastError); } catch (e) {}
         }
       }
     })();

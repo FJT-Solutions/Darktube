@@ -356,6 +356,12 @@ async function generateAiScript(ctx: {
     throw new Error('A IA da OpenAI não retornou um roteiro estruturado válido.');
   }
 
+  // Duracao pedida de forma explicita: todos os takes saem com ela. O roteiro da IA devolve 5, 7 e 8 s por cima do
+  // pedido, e a barra de duracao do Flow nem sempre aceita o ajuste. Sem pedido, vale a duracao de cada take do roteiro.
+  if (secondsPerTake) {
+    for (const k of script.takes) k.seconds = resolvedSeconds;
+  }
+
   return { t, params, script, apiKey, resolvedTakesCount, resolvedModel, resolvedSeconds, resolvedQuality };
 }
 

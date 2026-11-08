@@ -407,28 +407,90 @@
     };
     if (sl.isInput) {
       // O valor da barra pode ser um indice (no Omni 1.2: segundos = valor + 3). Nao fixa o deslocamento:
-      // calibra pela leitura do resumo do botao e ajusta de 1 em 1 ate bater com a pedida.
+      // calibra pela leitura do resumo do botao. O valor so conta quando o resumo muda (o componente do Flow
+      // desfaz o que so mexe no DOM). Metodos, nesta ordem: valor nativo + eventos, teclado e ponteiro (depurador).
       const shown0 = summarySeconds();
       const v0 = Number(sl.el.value);
       if (!shown0) return 0;
+      if (shown0 === want) return want;
       const offset = shown0 - v0;
+      const report = (metodo, extra, ok) =>
+        dtLog(ok ? `Barra de duração: ${metodo}, resumo ${summarySeconds()}s` : `Barra de duração: ${metodo} não funcionou.`, { pedida: want, resumoAntes: shown0, valorAntes: v0, deslocamento: offset, valorAgora: sl.el.value, resumoAgora: summarySeconds(), ...extra }, ok ? 'success' : 'warn');
+
+      // 1. valor nativo + eventos input/change
       await setInput(want - offset);
-      let applied = await waitSummary(want);
-      let moved = summarySeconds() !== shown0;
-      // O resumo so acompanha a barra se mudou: se ficou parado, nao da para ajustar por ele (ajustar no escuro
-      // empurraria a barra para qualquer lado). Nesse caso confia na calibracao e a conferencia final, depois de
-      // fechar o painel, aprova ou barra o take.
-      for (let i = 0; i < 6 && !applied && moved; i++) {
-        const shown = summarySeconds();
-        const next = Number(sl.el.value) + (want > shown ? 1 : -1) * sl.step;
-        if (next < sl.min || next > sl.max) break;
-        await setInput(next);
-        applied = await waitSummary(want);
+      if (await waitSummary(want)) {
+        report('valor nativo', {}, true);
+        return want;
       }
+      if (summarySeconds() !== shown0) {
+        // Acompanhou a barra, mas errou: ajusta de 1 em 1.
+        for (let i = 0; i < 6; i++) {
+          const shown = summarySeconds();
+          const next = Number(sl.el.value) + (want > shown ? 1 : -1) * sl.step;
+          if (next < sl.min || next > sl.max) break;
+          await setInput(next);
+          if (await waitSummary(want)) {
+            report('valor nativo com ajuste', { ajustes: i + 1 }, true);
+            return want;
+          }
+        }
+        report('valor nativo', {}, false);
+        const shown = summarySeconds();
+        return shown && shown <= want ? shown : 0;
+      }
+      report('valor nativo', {}, false);
+
+      // 2. teclado de verdade (depurador): foca a barra e manda ArrowRight/ArrowLeft, conferindo o resumo.
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(sl.el, String(v0));
+      let keysSent = 0;
+      for (let i = 0; i < 3; i++) {
+        const delta = want - summarySeconds();
+        if (!delta) break;
+        try { sl.el.focus(); } catch (_) {}
+        const n = Math.min(Math.abs(delta), 14);
+        const resp = await askBg({ type: 'FLOW_TRUSTED_KEYS', key: delta > 0 ? 'ArrowRight' : 'ArrowLeft', count: n }, 15000);
+        keysSent += n;
+        if (!resp || !resp.ok) {
+          dtLog('Teclado (depurador) não rodou.', resp || { why: 'sem resposta do segundo plano' }, 'warn');
+          break;
+        }
+        if (await waitSummary(want)) {
+          report('teclado', { teclas: keysSent }, true);
+          return want;
+        }
+      }
+      report('teclado', { teclas: keysSent }, false);
+
+      // 3. ponteiro de verdade (depurador): arrasta o marcador ate a posicao proporcional da trilha.
+      let box = sl.el.getBoundingClientRect();
+      for (let up = sl.el.parentElement, n = 0; box.width < 60 && up && n < 4; up = up.parentElement, n++) box = up.getBoundingClientRect();
+      if (box.width >= 60) {
+        const span = sl.max - sl.min || 1;
+        const inset = 8;
+        const xOf = (v) => Math.round(box.left + inset + ((v - sl.min) / span) * (box.width - 2 * inset));
+        const y = Math.round(box.top + box.height / 2);
+        let curVal = Math.min(sl.max, Math.max(sl.min, Number(sl.el.value) || v0));
+        let tgtVal = want - offset;
+        for (let i = 0; i < 3; i++) {
+          const resp = await askBg({ type: 'FLOW_TRUSTED_DRAG', x1: xOf(curVal), y, x2: xOf(tgtVal) }, 15000);
+          if (!resp || !resp.ok) {
+            dtLog('Arraste (depurador) não rodou.', resp || { why: 'sem resposta do segundo plano' }, 'warn');
+            break;
+          }
+          if (await waitSummary(want)) {
+            report('ponteiro', { arrastes: i + 1, de: xOf(curVal), ate: xOf(tgtVal) }, true);
+            return want;
+          }
+          const shown = summarySeconds();
+          if (!shown) break;
+          // Corrige pelo erro lido e tenta de novo a partir de onde o marcador parou.
+          curVal = tgtVal;
+          tgtVal = tgtVal + (want - shown);
+        }
+      }
+      report('ponteiro', {}, false);
       const shown = summarySeconds();
-      dtLog('Barra de duração (Omni): calibragem.', { pedida: want, resumoAntes: shown0, valorAntes: v0, deslocamento: offset, valorAgora: sl.el.value, resumoAgora: shown, resumoAcompanhou: moved }, applied ? 'info' : 'warn');
-      if (applied) return want;
-      if (!moved) return Number(sl.el.value) + offset === want ? want : 0;
       return shown && shown <= want ? shown : 0;
     }
     const target = clamp(sl.min + Math.floor((want - sl.min) / sl.step) * sl.step);
@@ -1014,8 +1076,75 @@
     return src.split('?')[0].split('=')[0];
   }
 
-  // Possiveis URLs do video do tile: o que a pagina ja pediu com o codigo do poster (ex.: ...=mm,18,15),
-  // midia de video pedida depois do clique e, por fim, sufixos de formato conhecidos do Google.
+  const HIGH_RES_SUFFIXES = ['=m22', '=mm,22,15', '=mm,22', '=m37'];
+  const LOW_RES_SUFFIXES = ['=mm,18,15', '=m18', '=mm,18', '=m36'];
+
+  function isLowResUrl(u) {
+    return /=(?:mm,18(?:,15)?|m18|m36|mm,36)\b/i.test(String(u || '')) || /[?&]itag=(?:18|36)\b/i.test(String(u || ''));
+  }
+
+  function isHighResUrl(u) {
+    return /=(?:m22|mm,22(?:,15)?|m37|mm,37)\b/i.test(String(u || '')) || /[?&]itag=(?:22|37)\b/i.test(String(u || ''));
+  }
+
+  // Le a resolucao real (videoWidth e videoHeight) de um blob de video usando um elemento <video> temporario.
+  function readVideoDimensions(blob) {
+    return new Promise((resolve) => {
+      if (!blob || !(blob instanceof Blob)) return resolve(null);
+      let url = '';
+      try {
+        url = URL.createObjectURL(blob);
+      } catch (_) {
+        return resolve(null);
+      }
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      v.muted = true;
+      v.playsInline = true;
+      let done = false;
+      const cleanup = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        try {
+          v.removeAttribute('src');
+          v.load();
+        } catch (_) {}
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 5000);
+      v.onloadedmetadata = () => {
+        const w = v.videoWidth || 0;
+        const h = v.videoHeight || 0;
+        cleanup();
+        resolve(w && h ? { width: w, height: h } : null);
+      };
+      v.onerror = () => {
+        cleanup();
+        resolve(null);
+      };
+      v.src = url;
+    });
+  }
+
+  // Resolucao pedida para o take (720, 1080 ou 360). Padrao: 720p.
+  function desiredResolution(job) {
+    const raw = (job && job.params && (job.params.resolution || job.params.quality)) || (job && (job.resolution || job.quality)) || '';
+    const m = /(\d{3,4})p?/i.exec(String(raw));
+    if (m) return Number(m[1]);
+    const summary = txt(settingsBtnEl() || $(S.settingsBtn));
+    const sm = /\b(1080|720|360)p\b/i.exec(summary);
+    if (sm) return Number(sm[1]);
+    return 720;
+  }
+
+  // Possiveis URLs do video do tile:
+  // 1) Palpites de maior resolucao (=m22 e similares) primeiro
+  // 2) Midias da timeline do navegador
+  // 3) Palpites de menor resolucao (=mm,18,15 e =m18) por ultimo
   function videoUrlCandidates(base, sinceMs) {
     const out = [];
     const seen = new Set();
@@ -1029,15 +1158,39 @@
     try {
       entries = performance.getEntriesByType('resource').slice().reverse();
     } catch (_) {}
+
+    const timelinePosterHd = [];
+    const timelinePosterOther = [];
+    const timelinePosterSd = [];
     if (base) {
       for (const e of entries) {
-        if (e.initiatorType !== 'img' && e.name.startsWith(base) && e.name.length > base.length) add(e.name, 'timeline-poster');
+        if (e.initiatorType !== 'img' && e.name.startsWith(base) && e.name.length > base.length) {
+          if (isHighResUrl(e.name)) timelinePosterHd.push(e.name);
+          else if (isLowResUrl(e.name)) timelinePosterSd.push(e.name);
+          else timelinePosterOther.push(e.name);
+        }
       }
     }
-    for (const u of mediaFromTimeline(sinceMs)) add(u, 'timeline-midia');
+
+    const timelineMidia = mediaFromTimeline(sinceMs);
+    const timelineMidiaHd = timelineMidia.filter((u) => !isLowResUrl(u));
+    const timelineMidiaSd = timelineMidia.filter((u) => isLowResUrl(u));
+
+    // 1) Alta resolucao primeiro: palpites =m22 e correlatos
     if (base) {
-      for (const suf of ['=mm,18,15', '=m18', '=m22']) add(base + suf, 'palpite');
+      for (const suf of HIGH_RES_SUFFIXES) add(base + suf, 'palpite-hd');
     }
+    for (const u of timelinePosterHd) add(u, 'timeline-poster-hd');
+    for (const u of timelineMidiaHd) add(u, 'timeline-midia');
+    for (const u of timelinePosterOther) add(u, 'timeline-poster');
+
+    // 2) Baixa resolucao por ultimo: fallback se os de alta falharem
+    if (base) {
+      for (const suf of LOW_RES_SUFFIXES) add(base + suf, 'palpite-sd');
+    }
+    for (const u of timelinePosterSd) add(u, 'timeline-poster-sd');
+    for (const u of timelineMidiaSd) add(u, 'timeline-midia-sd');
+
     return out;
   }
 
@@ -1070,6 +1223,50 @@
       }
       return { why: viaBg && viaBg.why ? 'segundo plano: ' + viaBg.why : String((e && e.message) || e).slice(0, 60) };
     }
+  }
+
+  // Testa uma lista de candidatos em ordem, conferindo a resolucao pedida:
+  // - le videoWidth e videoHeight do arquivo baixado e registra no log ("Mídia de vídeo lida: 720x1280")
+  // - se for menor que a resolucao pedida e houver outro candidato, tenta o proximo
+  // - se nenhum candidato bater a resolucao pedida, aceita o menor como fallback em vez de falhar
+  async function probeCandidates(candidatesList, wantRes, contextLabel) {
+    let fallbackSmaller = null;
+    for (let i = 0; i < candidatesList.length; i++) {
+      const c = candidatesList[i];
+      const r = await probeVideoUrl(c.url);
+      if (!r.blob) {
+        dtLog('URL descartada (' + contextLabel + ').', { de: c.from, url: snapClean(snapUrl(c.url)), motivo: r.why }, 'info');
+        continue;
+      }
+      const dims = await readVideoDimensions(r.blob);
+      const dimsLabel = dims ? dims.width + 'x' + dims.height : null;
+      if (dimsLabel) {
+        dtLog('Mídia de vídeo lida: ' + dimsLabel, { de: c.from, url: snapClean(snapUrl(c.url)), bytes: r.blob.size, largura: dims.width, altura: dims.height, contexto: contextLabel }, 'success');
+      } else {
+        dtLog('Mídia de vídeo lida (' + contextLabel + ').', { de: c.from, url: snapClean(snapUrl(c.url)), bytes: r.blob.size }, 'success');
+      }
+
+      const actualRes = dims ? Math.min(dims.width, dims.height) : 0;
+      const isSmaller = wantRes > 0 && actualRes > 0 && actualRes < wantRes;
+      const hasNext = i + 1 < candidatesList.length;
+
+      if (isSmaller && hasNext) {
+        dtLog('Resolução ' + actualRes + 'p menor que a pedida (' + wantRes + 'p); testando próximo candidato.', { atual: dimsLabel, pedida: wantRes + 'p', restantes: candidatesList.length - i - 1 }, 'warn');
+        if (!fallbackSmaller) {
+          fallbackSmaller = { blob: r.blob, mime: r.blob.type || 'video/mp4', dims: dimsLabel, from: c.from, url: c.url };
+        }
+        continue;
+      }
+
+      return { blob: r.blob, mime: r.blob.type || 'video/mp4', dims: dimsLabel };
+    }
+
+    if (fallbackSmaller) {
+      dtLog('Nenhum candidato em ' + wantRes + 'p disponível; aceitando variante menor (' + fallbackSmaller.dims + ').', { de: fallbackSmaller.from, url: snapClean(snapUrl(fallbackSmaller.url)) }, 'warn');
+      return { blob: fallbackSmaller.blob, mime: fallbackSmaller.mime, dims: fallbackSmaller.dims };
+    }
+
+    return null;
   }
 
   // Diagnostico: abre o menu "Download media" do visualizador, registra as opcoes e fecha com Escape.
@@ -1173,7 +1370,16 @@
         dtLog('O arquivo lido não é um vídeo (provavelmente a miniatura). Descartado.', { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'error');
         throw err('not_video', 'O arquivo encontrado não é um vídeo.');
       }
-      dtLog('Mídia lida pela página com sucesso.', { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'success');
+      if (kind === 'video') {
+        const dims = await readVideoDimensions(blob);
+        if (dims) {
+          dtLog('Mídia de vídeo lida: ' + dims.width + 'x' + dims.height, { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'success');
+        } else {
+          dtLog('Mídia lida pela página com sucesso.', { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'success');
+        }
+      } else {
+        dtLog('Mídia lida pela página com sucesso.', { url: shortUrl(src), bytes: blob.size, type: blob.type }, 'success');
+      }
       return { ok: true, kind, mime: blob.type, b64: await blobToB64(blob) };
     } catch (e) {
       if (e && (e.code === 'too_big' || e.code === 'not_video')) throw e;
@@ -1802,6 +2008,7 @@
   // Captura do video: abre o visualizador de cada candidato (do mais novo para o mais antigo),
   // confere o prompt, le o <video> e fecha pelo botao Done.
   async function captureVideo(job, candidates, knownOldUrls) {
+    const wantRes = desiredResolution(job);
     const list = candidates.slice(0, 4);
     let snappedGallery = false;
     let snappedViewer = false;
@@ -1814,24 +2021,30 @@
       } catch (_) {}
       await sleep(400);
 
-      // Se o proprio tile ja traz o <video> com fonte, usa direto.
+      // Se o proprio tile ja traz o <video> com fonte, usa direto (a menos que seja de baixa resolucao e pedimos 720p).
       const direct = getVideoSourceFromTile(tile, knownOldUrls);
+      const thumbBase = tileThumbBase(tile);
       if (direct) {
-        dtLog('Vídeo encontrado dentro do próprio tile.', { url: shortUrl(direct) });
-        return fetchMedia('video', direct);
+        if (isLowResUrl(direct) && wantRes >= 720 && thumbBase) {
+          dtLog('Vídeo do próprio tile é de baixa resolução; tentando palpite de alta resolução primeiro.', { url: shortUrl(direct) });
+        } else {
+          try {
+            dtLog('Vídeo encontrado dentro do próprio tile.', { url: shortUrl(direct) });
+            const directMedia = await fetchMedia('video', direct);
+            return directMedia;
+          } catch (e) {
+            dtLog('Falha ao ler vídeo do próprio tile; seguindo com candidatos.', { erro: String((e && e.message) || e) }, 'warn');
+          }
+        }
       }
 
-      const thumbBase = tileThumbBase(tile);
-      // Primeiro tenta o arquivo direto, sem abrir a tela de edicao: so URLs ligadas ao poster DESTE tile
-      // (a midia solta da timeline pode ser de outro take, entao fica de fora).
+      // Primeiro tenta o arquivo direto, sem abrir a tela de edicao: so URLs ligadas ao poster DESTE tile.
+      // Testa variantes de alta resolucao (=m22 e similares) primeiro e so cai para =mm,18,15 se falharem.
       const pre = videoUrlCandidates(thumbBase, Infinity);
       if (pre.length) {
-        dtLog('Testando o arquivo direto, sem abrir o visualizador.', { candidatos: pre.map((c) => ({ de: c.from, url: snapClean(snapUrl(c.url)) })) });
-        for (const c of pre.slice(0, 6)) {
-          const r = await probeVideoUrl(c.url);
-          dtLog(r.blob ? 'Mídia de vídeo lida (direto).' : 'URL descartada (direto).', { de: c.from, url: snapClean(snapUrl(c.url)), motivo: r.why, bytes: r.blob ? r.blob.size : undefined }, r.blob ? 'success' : 'info');
-          if (r.blob) return { ok: true, kind: 'video', mime: r.blob.type || 'video/mp4', b64: await blobToB64(r.blob) };
-        }
+        dtLog('Testando o arquivo direto, sem abrir o visualizador.', { candidatos: pre.map((c) => ({ de: c.from, url: snapClean(snapUrl(c.url)) })), resolucaoPedida: wantRes + 'p' });
+        const resDirect = await probeCandidates(pre.slice(0, 10), wantRes, 'direto');
+        if (resDirect) return { ok: true, kind: 'video', mime: resDirect.mime, b64: await blobToB64(resDirect.blob) };
       }
 
       const clickedAt = performance.now();
@@ -1861,13 +2074,10 @@
           await closeViewer();
           continue;
         }
-        for (const c of cands.slice(0, 8)) {
-          const r = await probeVideoUrl(c.url);
-          dtLog(r.blob ? 'Mídia de vídeo lida.' : 'URL descartada.', { de: c.from, url: snapClean(snapUrl(c.url)), motivo: r.why, bytes: r.blob ? r.blob.size : undefined }, r.blob ? 'success' : 'info');
-          if (r.blob) {
-            await closeViewer();
-            return { ok: true, kind: 'video', mime: r.blob.type || 'video/mp4', b64: await blobToB64(r.blob) };
-          }
+        const resViewer = await probeCandidates(cands.slice(0, 12), wantRes, 'visualizador');
+        if (resViewer) {
+          await closeViewer();
+          return { ok: true, kind: 'video', mime: resViewer.mime, b64: await blobToB64(resViewer.blob) };
         }
         if (!snappedMenu) {
           snappedMenu = true;
@@ -1900,7 +2110,19 @@
         }
       }
       try {
-        const out = await fetchMedia('video', src);
+        let videoSrc = src;
+        if (wantRes >= 720 && isLowResUrl(videoSrc)) {
+          const upgradedSrc = videoSrc.replace(/=(?:mm,18(?:,15)?|m18)\b/, '=m22');
+          if (upgradedSrc !== videoSrc) {
+            dtLog('Tentando versão 720p do vídeo do visualizador.', { antes: shortUrl(videoSrc), depois: shortUrl(upgradedSrc) });
+            try {
+              const upOut = await fetchMedia('video', upgradedSrc);
+              await closeViewer();
+              return upOut;
+            } catch (_) {}
+          }
+        }
+        const out = await fetchMedia('video', videoSrc);
         await closeViewer();
         return out;
       } catch (e) {
