@@ -180,6 +180,10 @@ export async function updateFlowProject(
 
 export async function deleteFlowProject(userId: string, id: string): Promise<boolean> {
   await ensureFlowProjectsTable()
+  // Cancela primeiro: flow_jobs.project_id nao tem FK, e job ativo de projeto apagado seria gerado (e cobrado) do mesmo jeito.
+  // Import dinamico porque flow-jobs ja importa este arquivo.
+  const { cancelProjectJobs } = await import('@/lib/flow-jobs')
+  await cancelProjectJobs(userId, id, 'Projeto apagado')
   const res = await pool.query(`DELETE FROM public.flow_projects WHERE id = $1 AND user_id = $2`, [id, userId])
   return (res.rowCount ?? 0) > 0
 }

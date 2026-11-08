@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { uploadThumbnail } from '@/lib/storage';
+import { ensureFlowProjectsTable } from '@/lib/flow-projects';
 
 const run = promisify(execFile);
 const ffmpegBin = () => process.env.FFMPEG_PATH || 'ffmpeg';
@@ -203,21 +204,109 @@ export async function previousTakeLastFrame(userId: string, projectId: string, t
   }
 }
 
+const SHEET_ROLES = ['character_sheet', 'cast_sheet'];
+/** Prefixo do motivo dos takes parados por falha da folha: e por ele que o reenvio da folha os devolve para a fila. */
+const BLOCKED_PREFIX = 'Bloqueado: ';
+
 // Expira o que ficou preso: job rodando há demais e job na fila que passou do prazo viram rascunho.
 async function expireStaleJobs(userId: string) {
-  await pool.query(
-    `UPDATE public.flow_jobs
-        SET status = 'draft', finished_at = NOW(), error_message = 'Tempo de geração excedido'
-      WHERE user_id = $1 AND status IN ('running', 'collecting')
-        AND claimed_at < NOW() - ($2 || ' minutes')::interval`,
-    [userId, String(RUNNING_TIMEOUT_MIN)]
+  const expired = [
+    ...(await pool.query(
+      `UPDATE public.flow_jobs
+          SET status = 'draft', finished_at = NOW(), error_message = 'Tempo de geração excedido'
+        WHERE user_id = $1 AND status IN ('running', 'collecting')
+          AND claimed_at < NOW() - ($2 || ' minutes')::interval
+        RETURNING role, project_id, error_message`,
+      [userId, String(RUNNING_TIMEOUT_MIN)]
+    )).rows,
+    ...(await pool.query(
+      `UPDATE public.flow_jobs
+          SET status = 'draft', finished_at = NOW(), error_message = 'Prazo expirou sem o computador ficar online'
+        WHERE user_id = $1 AND status = 'queued' AND deadline_at IS NOT NULL AND deadline_at < NOW()
+        RETURNING role, project_id, error_message`,
+      [userId]
+    )).rows,
+  ];
+  for (const j of expired) {
+    if (j.project_id && SHEET_ROLES.includes(j.role)) await blockProjectAfterSheetFailure(userId, j.project_id, j.error_message);
+  }
+}
+
+/**
+ * A folha de personagem falhou de vez: os takes do projeto que ainda esperam na fila nao podem gerar sem a referencia
+ * (sairiam com uma pessoa diferente a cada take e gastariam credito). Viram rascunho com o motivo e o projeto vai para
+ * "falhou", para a tela e o MCP mostrarem o que houve em vez de "na fila 0/N" parado.
+ */
+export async function blockProjectAfterSheetFailure(userId: string, projectId: string, reason?: string | null) {
+  await ensureFlowTablesExist();
+  const why = String(reason || 'sem detalhe').replace(/\s+/g, ' ').slice(0, 200);
+  const msg = `${BLOCKED_PREFIX}o retrato do personagem falhou (${why}). Gere o retrato de novo e reenvie os takes.`;
+  const { rowCount } = await pool.query(
+    `UPDATE public.flow_jobs SET status = 'draft', finished_at = NOW(), error_message = $3
+      WHERE user_id = $1 AND project_id = $2 AND status = 'queued' AND role IN ('take', 'take_final')`,
+    [userId, projectId, msg]
   );
+  await ensureFlowProjectsTable();
+  await pool.query(
+    `UPDATE public.flow_projects SET status = 'failed', updated_at = NOW()
+      WHERE id = $1 AND user_id = $2 AND status IN ('draft', 'queued', 'generating')`,
+    [projectId, userId]
+  );
+  await addFlowLogs(userId, {
+    message: `O retrato do personagem falhou (${why}); ${rowCount ?? 0} take(s) do projeto ficaram parados para não gastar crédito sem a referência.`,
+    level: 'error',
+    projectId,
+  }).catch(() => {});
+}
+
+/** Uma nova folha foi pedida: devolve para a fila os takes que a falha anterior tinha parado e tira o projeto de "falhou". */
+async function releaseBlockedTakes(userId: string, projectId: string) {
   await pool.query(
     `UPDATE public.flow_jobs
-        SET status = 'draft', finished_at = NOW(), error_message = 'Prazo expirou sem o computador ficar online'
-      WHERE user_id = $1 AND status = 'queued' AND deadline_at IS NOT NULL AND deadline_at < NOW()`,
+        SET status = 'queued', error_message = NULL, finished_at = NULL, claimed_at = NULL,
+            deadline_at = NOW() + ($3 || ' minutes')::interval
+      WHERE user_id = $1 AND project_id = $2 AND status = 'draft' AND error_message LIKE $4`,
+    [userId, projectId, String(DEFAULT_DEADLINE_MIN), `${BLOCKED_PREFIX}%`]
+  );
+  await ensureFlowProjectsTable();
+  await pool.query(`UPDATE public.flow_projects SET status = 'queued', updated_at = NOW() WHERE id = $1 AND user_id = $2 AND status = 'failed'`, [projectId, userId]);
+}
+
+/** Cancela os jobs ainda ativos de um projeto (usado ao apagar o projeto, para nao sobrarem orfaos na fila). */
+export async function cancelProjectJobs(userId: string, projectId: string, reason = 'Projeto apagado'): Promise<number> {
+  await ensureFlowTablesExist();
+  const res = await pool.query(
+    `UPDATE public.flow_jobs SET status = 'cancelled', finished_at = NOW(), error_message = $3
+      WHERE user_id = $1 AND project_id = $2 AND status IN ('queued', 'running', 'collecting')`,
+    [userId, projectId, reason]
+  );
+  return res.rowCount ?? 0;
+}
+
+/**
+ * Cancela jobs ativos cujo projeto nao existe mais (apagado antes desta limpeza existir, ou por outro caminho).
+ * Roda no claim, no heartbeat e na checagem da extensao, entao os orfaos que ja estao no banco somem sozinhos.
+ */
+export async function cancelOrphanJobs(userId: string): Promise<number> {
+  await ensureFlowTablesExist();
+  await ensureFlowProjectsTable();
+  const res = await pool.query(
+    `UPDATE public.flow_jobs j SET status = 'cancelled', finished_at = NOW(), error_message = 'Projeto apagado'
+      WHERE j.user_id = $1 AND j.project_id IS NOT NULL AND j.status IN ('queued', 'running', 'collecting')
+        AND NOT EXISTS (SELECT 1 FROM public.flow_projects p WHERE p.id = j.project_id)`,
     [userId]
   );
+  if (res.rowCount) console.log(`[Flow] ${res.rowCount} job(s) de projeto apagado cancelado(s) na fila.`);
+  return res.rowCount ?? 0;
+}
+
+/** A extensao pergunta antes de clicar em gerar (e durante a espera): o job ainda vale a pena? */
+export async function getFlowJobLiveness(userId: string, id: string): Promise<{ alive: boolean; status: string | null; reason?: string }> {
+  await cancelOrphanJobs(userId);
+  const job = await getFlowJob(userId, id);
+  if (!job) return { alive: false, status: null, reason: 'Job não existe mais.' };
+  if (job.status === 'running' || job.status === 'collecting') return { alive: true, status: job.status };
+  return { alive: false, status: job.status, reason: job.error_message || `Job ${job.status}.` };
 }
 
 export async function createFlowJob(input: {
@@ -263,6 +352,7 @@ export async function createFlowJob(input: {
       String(minutes),
     ]
   );
+  if (input.projectId && input.role && SHEET_ROLES.includes(input.role)) await releaseBlockedTakes(input.userId, input.projectId);
   return res.rows[0];
 }
 
@@ -299,7 +389,9 @@ export async function retryFlowJob(userId: string, id: string, engine?: string, 
       RETURNING *`,
     [id, userId, engine ? engine.slice(0, 30) : null, String(DEFAULT_DEADLINE_MIN), patchParams ? JSON.stringify(cleanParams(patchParams)) : null, prompt || null]
   );
-  return res.rows[0] ?? null;
+  const job: FlowJob | null = res.rows[0] ?? null;
+  if (job?.project_id && job.role && SHEET_ROLES.includes(job.role)) await releaseBlockedTakes(userId, job.project_id);
+  return job;
 }
 
 export async function cancelFlowJob(userId: string, id: string): Promise<FlowJob | null> {
@@ -420,6 +512,8 @@ export async function resumeFlowAgent(userId: string) {
 export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
   await ensureFlowTablesExist();
   await expireStaleJobs(userId);
+  // Antes de olhar a fila: job de projeto apagado nunca e entregue (e um orfao "rodando" nao trava a fila).
+  await cancelOrphanJobs(userId);
   const busy = await pool.query(
     `SELECT 1 FROM public.flow_jobs WHERE user_id = $1 AND status IN ('running', 'collecting') LIMIT 1`,
     [userId]
@@ -456,6 +550,8 @@ export async function claimNextFlowJob(userId: string): Promise<ClaimResult> {
       WHERE id = (
         SELECT id FROM public.flow_jobs
          WHERE user_id = $1 AND engine = 'flow' AND status = 'queued'
+           -- Projeto apagado: o job nao sai da fila (cancelOrphanJobs ja o cancelou; isto cobre a corrida entre as duas consultas)
+           AND (project_id IS NULL OR EXISTS (SELECT 1 FROM public.flow_projects px WHERE px.id = flow_jobs.project_id))
            -- Trava de segurança: takes só saem da fila se o projeto NÃO tiver folhas aguardando aprovação ou gerando
            AND (
              role IN ('character_sheet', 'cast_sheet')
@@ -597,7 +693,10 @@ export async function failFlowJob(userId: string, id: string, message: string): 
       RETURNING *`,
     [id, userId, (message || 'Falha na geração').slice(0, 500)]
   );
-  return res.rows[0] ?? null;
+  const job: FlowJob | null = res.rows[0] ?? null;
+  // Folha do personagem sem sucesso: os takes que dependem dela nao podem seguir (ver blockProjectAfterSheetFailure).
+  if (job?.project_id && job.role && SHEET_ROLES.includes(job.role)) await blockProjectAfterSheetFailure(userId, job.project_id, job.error_message);
+  return job;
 }
 
 // ---------- logs da extensao (aparecem em tempo real no painel do Flow) ----------
@@ -674,6 +773,8 @@ export async function clearFlowLogs(userId: string, projectId?: string) {
 
 export async function countQueuedJobs(userId: string): Promise<number> {
   await ensureFlowTablesExist();
+  // O heartbeat decide se a extensao abre o Flow: orfaos de projeto apagado nao contam.
+  await cancelOrphanJobs(userId);
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS n FROM public.flow_jobs WHERE user_id = $1 AND status = 'queued'`,
     [userId]

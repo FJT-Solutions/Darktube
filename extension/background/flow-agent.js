@@ -3,14 +3,15 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.28';
-const FLOW_BUILD = '2026-11-07-recusa-ptbr-e-duracao'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.29';
+const FLOW_BUILD = '2026-11-08-jobs-orfaos-e-duracao-barra'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
 const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
 const FLOW_ALARM = 'flow-tick';
-const FLOW_JOB_TIMEOUT_MS = 15 * 60 * 1000;
+// Vigia por tipo: a pagina tem o proprio limite (imagem 3 min, video 9 min) e o vigia so cobre a pagina travada, entao fica logo acima.
+const FLOW_JOB_TIMEOUT_MS = { image: 5 * 60 * 1000, video: 11 * 60 * 1000 };
 const FLOW_SCAN_EVERY_MS = 20 * 60 * 1000;
 const FLOW_DEFAULT_BASE = 'https://darktube.fjt-solutions.com';
 
@@ -193,6 +194,31 @@ async function flowFail(c, jobId, error, code) {
   }
 }
 
+// Pergunta ao darktube se o job em andamento ainda vale. Null = sem resposta (rede); so um "nao vale" explicito aborta.
+async function flowJobAlive(c, jobId) {
+  try {
+    const r = await flowApi(c, `/api/flow/agent/jobs/${jobId}`, { method: 'GET' });
+    if (r && r.success && typeof r.alive === 'boolean') return r;
+  } catch (e) {
+    /* sem rede: segue como estava */
+  }
+  return null;
+}
+
+// Job em andamento cancelado (ou de projeto apagado): avisa a aba para parar e libera a fila. True se abortou.
+async function flowAbortIfDead(c) {
+  const cur = c.flow_current;
+  if (!cur) return false;
+  const live = await flowJobAlive(c, cur.jobId);
+  // done/draft logo apos o envio: e a propria extensao fechando o job (corrida com este vigia), nao um cancelamento.
+  if (!live || live.alive || live.status === 'done' || live.status === 'draft') return false;
+  flowLog('O job em andamento foi cancelado (ou o projeto foi apagado); a extensão parou e liberou a fila.', { status: live.status, motivo: live.reason }, 'warn', cur);
+  const t = cur.tabId ? { id: cur.tabId } : await flowFindTab();
+  if (t) await flowAsk(t.id, { type: 'FLOW_ABORT', jobId: cur.jobId });
+  await chrome.storage.local.remove('flow_current');
+  return true;
+}
+
 async function flowFindTab() {
   const tabs = await chrome.tabs.query({ url: 'https://flow.google.com/*' });
   return tabs.find((t) => /\/project\//.test(t.url || '')) || tabs[0] || null;
@@ -243,7 +269,9 @@ async function flowTick() {
 
     // Vigia: um job que ficou sem resposta da pagina por muito tempo.
     if (c.flow_current) {
-      if (Date.now() - c.flow_current.startedAt > FLOW_JOB_TIMEOUT_MS) {
+      // Cancelado, projeto apagado ou devolvido a fila pelo servidor: nao espera nem gasta credito com um job sem dono.
+      if (await flowAbortIfDead(c)) return void (await flowStatus('aguardando', { msg: 'Job cancelado; fila liberada.' }));
+      if (Date.now() - c.flow_current.startedAt > (FLOW_JOB_TIMEOUT_MS[c.flow_current.kind] || FLOW_JOB_TIMEOUT_MS.video)) {
         flowLog('Vigia: a aba do Flow não respondeu a tempo.', null, 'error', c.flow_current);
         await flowFail(c, c.flow_current.jobId, 'A aba do Flow não respondeu a tempo.', 'timeout');
         await chrome.storage.local.remove('flow_current');
@@ -441,6 +469,11 @@ async function flowHandleResult(msg) {
   const r = msg.result || {};
   const ids = { jobId: msg.jobId, projectId: cur.projectId };
   try {
+    if (!r.ok && r.code === 'cancelled') {
+      // A pagina parou porque o job foi cancelado ou o projeto apagado: nada a devolver ao servidor.
+      flowLog('Job cancelado; nada foi gerado.', null, 'warn', ids);
+      return void (await flowStatus('aguardando', { msg: 'Job cancelado; fila liberada.' }));
+    }
     if (!r.ok && FLOW_UI_CODES.includes(r.code)) {
       // Problema de tela (menu/janela aberta, painel em outro estado): nao queima o take. Ele volta para a fila e o
       // agente espera 2 min. So na 3a vez seguida vira rascunho, para o usuario ver.
@@ -506,6 +539,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg.type !== 'string') return;
   if (msg.type === 'FLOW_JOB_RESULT') {
     flowHandleResult(msg).finally(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg.type === 'FLOW_JOB_ALIVE') {
+    // A pagina confere antes de clicar em gerar e durante a espera. A rede passa por aqui (a pagina nao fala com o darktube).
+    (async () => {
+      const c = await flowCfg();
+      const live = c.darktube_token ? await flowJobAlive(c, String(msg.jobId || '')) : null;
+      sendResponse(live ? { ok: true, alive: live.alive, status: live.status, reason: live.reason } : { ok: false });
+    })();
     return true;
   }
   if (msg.type === 'FLOW_LOG') {

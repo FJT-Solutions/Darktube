@@ -91,6 +91,8 @@
 
   // Log para o painel do darktube (o background guarda e envia em lote).
   let curJob = null;
+  // Job que o segundo plano mandou abortar (cancelado ou projeto apagado). Conferido nas esperas e antes de gerar.
+  let abortJobId = null;
   const shortUrl = (u) => String(u || '').slice(0, 200);
   function dtLog(message, data = null, level = 'info') {
     try {
@@ -111,6 +113,17 @@
       );
     } catch (_) {
       /* extensao recarregada: sem para quem logar */
+    }
+  }
+
+  // Para o job se ele foi cancelado ou o projeto apagado. Sem resposta do servidor segue (rede ruim nao trava o take);
+  // so um "nao esta mais valendo" explicito aborta. O aviso do segundo plano (abortJobId) vale mesmo sem rede.
+  async function assertJobAlive(job, quando) {
+    if (abortJobId && abortJobId === job.id) throw err('cancelled', 'Job cancelado ou projeto apagado.');
+    const r = await askBg({ type: 'FLOW_JOB_ALIVE', jobId: job.id }, 6000);
+    if (r && r.alive === false) {
+      dtLog(`Job cancelado ou projeto apagado (${quando}); abortando sem gerar.`, { status: r.status || null, motivo: r.reason || null }, 'warn');
+      throw err('cancelled', 'Job cancelado ou projeto apagado.');
     }
   }
 
@@ -348,6 +361,75 @@
     return true;
   }
 
+  // ---------- duracao do take ----------
+  // Omni 1.1 e Veo mostram a duracao como radios ("4s", "6s"...); o Omni 1.2 usa uma barra de arrastar (3 a 15 s).
+  // Em qualquer caso escolhe a maior duracao aceita que NAO passe da pedida (a menor, se todas passam).
+  const durationRadios = (panel) =>
+    radios(panel)
+      .map((r) => ({ r, s: Number((/^\s*(\d{1,2})\s*s\b/i.exec(rlabel(r)) || [])[1]) }))
+      .filter((x) => x.s > 0);
+
+  function durationSlider(panel) {
+    const roots = [panel, ...$$('.cdk-overlay-pane')].filter(Boolean);
+    for (const root of roots) {
+      const found = $$('input[type=range], [role=slider]', root)
+        .map((el) => {
+          const isInput = el.tagName === 'INPUT';
+          const num = (a, b) => Number(isInput ? el[a] : el.getAttribute(b));
+          return { el, isInput, min: num('min', 'aria-valuemin'), max: num('max', 'aria-valuemax'), step: (isInput ? Number(el.step) : 1) || 1 };
+        })
+        // So uma barra de duracao (poucos segundos): ignora volume, zoom e afins.
+        .find((x) => Number.isFinite(x.min) && Number.isFinite(x.max) && x.min >= 1 && x.max <= 30 && x.max > x.min);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  async function setDurationSlider(sl, want) {
+    const target = Math.min(sl.max, Math.max(sl.min, sl.min + Math.floor((want - sl.min) / sl.step) * sl.step));
+    if (sl.isInput) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      setter.call(sl.el, String(target));
+      sl.el.dispatchEvent(new Event('input', { bubbles: true }));
+      sl.el.dispatchEvent(new Event('change', { bubbles: true }));
+      await human(250, 600);
+      return Number(sl.el.value) === target ? target : 0;
+    }
+    const cur = () => Number(sl.el.getAttribute('aria-valuenow'));
+    sl.el.focus();
+    for (let i = 0; i < 40 && cur() !== target; i++) {
+      const key = cur() < target ? 'ArrowRight' : 'ArrowLeft';
+      const code = key === 'ArrowRight' ? 39 : 37;
+      for (const type of ['keydown', 'keyup']) {
+        sl.el.dispatchEvent(new KeyboardEvent(type, { key, code: key, keyCode: code, which: code, bubbles: true, cancelable: true }));
+      }
+      await sleep(60);
+    }
+    await human(200, 450);
+    return cur() === target ? target : 0;
+  }
+
+  /** Devolve os segundos aplicados, ou 0 se nao achou onde ajustar a duracao (ou o ajuste nao pegou). */
+  async function pickDuration(panel, want) {
+    const rad = durationRadios(panel);
+    if (rad.length) {
+      const sec = rad.map((x) => x.s).sort((a, b) => a - b);
+      const s = sec.filter((v) => v <= want).pop() || sec[0];
+      const x = rad.find((y) => y.s === s);
+      if (!isOn(x.r)) {
+        x.r.click();
+        await human(250, 650);
+      }
+      if (s !== want) dtLog(`Duração de ${want}s não existe neste modelo; usando ${s}s (a maior sem passar da pedida).`, { opcoes: sec }, 'warn');
+      return s;
+    }
+    const sl = durationSlider(panel);
+    if (!sl) return 0;
+    const applied = await setDurationSlider(sl, want);
+    dtLog(applied ? `Duração ajustada na barra do modelo: ${applied}s.` : 'A barra de duração não aceitou o valor.', { pedida: want, min: sl.min, max: sl.max, passo: sl.step, tipo: sl.isInput ? 'input' : 'aria' }, applied ? 'info' : 'warn');
+    return applied;
+  }
+
   async function configure(job) {
     const p = job.params || {};
     const count = Math.min(Math.max(Number(p.count) || 1, 1), 4);
@@ -366,7 +448,7 @@
     if (p.aspectRatio) await maybePickRadio(panel, new RegExp('^\\s*' + esc(p.aspectRatio) + '\\s*$'));
 
     let hasResolution = false;
-    let hasDuration = false;
+    let appliedDuration = 0;
     if (job.kind === 'video') {
       // Modelos como Omni 1.1 Flash tem opcoes de resolucao (360p, 720p).
       // Modelos como Veo 3.1 (Lite, Fast, Quality) possuem resolucao e duracao unicas/fixas (sem radio no modal).
@@ -374,10 +456,12 @@
         hasResolution = await maybePickRadio(panel, new RegExp('^\\s*' + esc(p.resolution)));
       }
       if (p.duration) {
-        hasDuration = await maybePickRadio(panel, new RegExp('^\\s*' + Number(p.duration) + '\\s*s\\b'));
-        if (!hasDuration) {
-          // Sem opcao de duracao igual a pedida (ex.: Omni 1.2 so oferece algumas): o Flow gera com a duracao que estiver ativa.
-          dtLog(`Duração de ${p.duration}s não disponível neste modelo; o take sai com a duração atual do Flow.`, { opcoes: radios(panel).map(rlabel).slice(0, 14) }, 'warn');
+        appliedDuration = await pickDuration(panel, Number(p.duration));
+        if (!appliedDuration) {
+          dtLog(`Não achei onde ajustar a duração (${p.duration}s) neste modelo.`, {
+            opcoes: radios(panel).map(rlabel).slice(0, 14),
+            barras: $$('input[type=range], [role=slider]', panel).slice(0, 4).map((e) => ({ tag: e.tagName.toLowerCase(), role: e.getAttribute('role'), min: e.min || e.getAttribute('aria-valuemin'), max: e.max || e.getAttribute('aria-valuemax'), valor: e.value || e.getAttribute('aria-valuenow') })),
+          }, 'warn');
         }
       }
     }
@@ -389,7 +473,12 @@
     const need = [];
     if (job.kind === 'video') {
       if (p.resolution && hasResolution) need.push(p.resolution);
-      if (p.duration && hasDuration) need.push(p.duration + 's');
+      if (appliedDuration) need.push(appliedDuration + 's');
+      // Sem como ajustar e o Flow esta com duracao MAIOR que a pedida: gerar assim custa mais e foge do criativo.
+      const shown = Number((/(\d{1,2})\s*s\b/i.exec(summary) || [])[1]);
+      if (p.duration && !appliedDuration && shown > Number(p.duration)) {
+        throw err('duration_unset', `Não consegui ajustar a duração: pedida ${p.duration}s e o Flow está em ${shown}s ("${summary}"). O take não foi gerado para não gastar crédito.`);
+      }
     }
     const miss = need.filter((n) => !summary.includes(n));
     if (miss.length) throw err('config_mismatch', `As configurações não foram aplicadas (aparece "${summary}").`);
@@ -2059,18 +2148,28 @@
     }
     dtLog('Visibilidade da aba na hora de gerar.', { antes: vis0, depois: document.visibilityState, foco: document.hasFocus ? document.hasFocus() : null, ajuste: visInfo });
     try {
+      // Ultima conferencia antes do clique: depois dele a geracao ja foi cobrada.
+      await assertJobAlive(job, 'antes de clicar em gerar');
       const how = await clickGenerate(btn, prevImageIds, descBtn, job.kind);
       if (!how) throw err('generate_disabled', 'O Flow não começou a gerar depois de clicar em gerar.');
       dtLog('Botão de gerar clicado.', { creditsHint: hint, como: how });
       await sleep(2000);
       dtLog('Rede do Flow logo após o clique.', { chamadas: netTail(6) });
 
-      const limit = job.kind === 'video' ? 12 * 60 * 1000 : 4 * 60 * 1000;
+      // Menos que os 15 min do vigia do segundo plano: este erro (com o motivo) tem que sair antes dele.
+      const limit = job.kind === 'video' ? 9 * 60 * 1000 : 3 * 60 * 1000;
       const t0 = Date.now();
       let lastShape = '';
+      let lastAliveCheck = Date.now();
       const readySince = new Map();
       for (;;) {
         await sleep(2500);
+        // Cancelado ou projeto apagado durante a espera: para de esperar (a fila nao fica presa num take sem dono).
+        if (abortJobId === job.id) throw err('cancelled', 'Job cancelado ou projeto apagado.');
+        if (Date.now() - lastAliveCheck > 20000) {
+          lastAliveCheck = Date.now();
+          await assertJobAlive(job, 'durante a geração');
+        }
         const prob = classifyProblem();
         if (prob) throw err(prob.code, prob.msg);
         if (job.kind === 'image') {
@@ -2167,8 +2266,10 @@
 
   async function runJob(job) {
     curJob = job;
+    abortJobId = null;
     try {
       dtLog('Job iniciado na aba do Flow.', { kind: job.kind, take: job.take_index, params: job.params });
+      await assertJobAlive(job, 'antes de começar');
       await closeViewer(); // um visualizador esquecido aberto esconderia a galeria e a caixa de prompt
       // Menu "+" (biblioteca de midia) ou outro popover aberto pelo usuario cobre o painel de ajustes.
       for (let i = 0; i < 4 && $('flow-add-menu-popover-content, .cdk-overlay-pane .flow-menu-panel'); i++) {
@@ -2368,6 +2469,13 @@
         try { chrome.storage.local.set({ flow_last_project_url: location.href }); } catch (_) {}
       }
       sendResponse({ ok: true, ready: !!$(S.editor), busy: running, path: location.pathname.replace(/[0-9a-f-]{20,}/gi, ':id') });
+      return;
+    }
+    if (msg.type === 'FLOW_ABORT') {
+      // O segundo plano viu o job cancelado (ou o projeto apagado). So vale para o job que esta rodando agora.
+      if (running && curJob && curJob.id === msg.jobId) abortJobId = msg.jobId;
+      wakeAll();
+      sendResponse({ ok: true, aborting: abortJobId === msg.jobId });
       return;
     }
     if (msg.type === 'FLOW_AUTO_ENTER_PROJECT') {
