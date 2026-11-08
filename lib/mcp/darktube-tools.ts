@@ -21,10 +21,10 @@ import {
   type FlowScript,
   type FlowCharacter,
 } from '@/lib/flow-script';
-import { buildSheetPrompt } from '@/lib/flow-characters';
+import { buildSheetPrompt, isChromaKeyTemplate } from '@/lib/flow-characters';
 import { callFlowLLM } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
-import { createFlowJob } from '@/lib/flow-jobs';
+import { createFlowJob, getFlowAgentState } from '@/lib/flow-jobs';
 import { assembleFlowProject } from '@/lib/flow-assemble';
 import { replaceVideoAudio, replaceProjectAudio } from '@/lib/flow-audio-replace';
 import { getUserApiKey } from '@/lib/database';
@@ -655,7 +655,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
         // Se pediu para gerar a folha do personagem por IA e ele ainda não tem foto anexada:
         if (input.character?.generateSheet && !input.character.sheetUrl && finalScript.characters[0]) {
           const charToGenerate = finalScript.characters[0];
-          const sheetPrompt = buildSheetPrompt(charToGenerate, String(params.realismo || ''));
+          const sheetPrompt = buildSheetPrompt(charToGenerate, String(params.realismo || ''), isChromaKeyTemplate(t.id));
           await createFlowJob({
             userId,
             kind: 'image',
@@ -826,6 +826,38 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
   };
 }
 
+const mask = (v: unknown) =>
+  String(v ?? '')
+    .replace(/https?:\/\/\S+/gi, '[link]')
+    .replace(/\/api\/storage\/\S+/gi, '[arquivo]')
+    .replace(/(eyJ[\w-]{10,}|sk-[\w-]{10,}|Bearer\s+\S+)/g, '[segredo]')
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+
+async function readExtensionDiagnostics(userId: string, projectId: string, jobIds: string[]) {
+  try {
+    const state: any = await getFlowAgentState(userId);
+    const { rows } = await pool.query(
+      `SELECT created_at, level, message FROM public.flow_logs
+        WHERE user_id = $1 AND (project_id = $2 OR job_id::text = ANY($3::text[]))
+        ORDER BY created_at DESC LIMIT 30`,
+      [userId, projectId, jobIds]
+    );
+    const lastSeen = state?.last_seen ? new Date(state.last_seen) : null;
+    return {
+      version: state?.info?.version || null,
+      build: state?.info?.build || null,
+      mode: state?.info?.mode || null,
+      lastHeartbeat: lastSeen ? lastSeen.toISOString() : null,
+      secondsSinceHeartbeat: lastSeen ? Math.round((Date.now() - lastSeen.getTime()) / 1000) : null,
+      pausedReason: state?.pause_reason ? mask(state.pause_reason) : null,
+      logs: rows.reverse().map((r: any) => ({ at: new Date(r.created_at).toISOString(), level: r.level, message: mask(r.message) })),
+    };
+  } catch (e: any) {
+    return { error: 'Não foi possível ler o diagnóstico da extensão.' };
+  }
+}
+
 /**
  * 5. Consulta o status de um projeto no /flow (takes prontos, erros, folha de personagem e vídeo final montado).
  */
@@ -908,11 +940,16 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     }
   }
 
+  // So leitura, para acompanhar sem acesso a VPS: ultimo sinal da extensao e as ultimas linhas do log dos jobs do projeto.
+  // Sem cookie, token, URL nem os dados anexos do log; so a mensagem (com links e segredos mascarados).
+  const extension = await readExtensionDiagnostics(userId, projectId, jobs.map((j: any) => String(j.id)));
+
   return {
     success: true,
     projectId,
     title: project.title,
     status: project.status,
+    extension,
     isComplete: Boolean(finalUrl) || allTakesDone,
     progress: {
       totalTakes,

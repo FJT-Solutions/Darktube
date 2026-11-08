@@ -113,11 +113,19 @@ function wantsGreenBackdrop(description: string): boolean {
   return /#00ff00|chroma\s*-?key|green[\s-]*screen|(solid|pure|flat)[^.]{0,30}green|green[^.]{0,20}(background|backdrop)|fundo\s+verde/i.test(description)
 }
 
-/** Retrato de referencia de um personagem. `realismo`: estilo visual do projeto (valor de REALISM). */
-export function buildSheetPrompt(c: FlowCharacter, realismo = ''): string {
+/** Template de chroma key (o expert e gravado em fundo verde e recortado na montagem)? */
+export function isChromaKeyTemplate(templateId?: string | null): boolean {
+  return /chroma/i.test(String(templateId || ''))
+}
+
+/**
+ * Retrato de referencia de um personagem. `realismo`: estilo visual do projeto (valor de REALISM).
+ * `chromaKey`: o template e de chroma key; o fundo sai verde puro mesmo que a descricao do personagem nao peca.
+ */
+export function buildSheetPrompt(c: FlowCharacter, realismo = '', chromaKey = false): string {
   const desc = adultAge((c.description || '').trim()).replace(/\.+$/, '')
   // O fundo do sufixo padrao ("neutro") contradiria o pedido de fundo verde e quebraria o recorte do chroma key.
-  const green = wantsGreenBackdrop(desc)
+  const green = chromaKey || wantsGreenBackdrop(desc)
   const backdrop = green
     ? 'Solid pure flat green chroma-key backdrop (#00FF00), perfectly uniform with no gradient, no shadows and no green spill on the subject, even soft lighting'
     : 'Clean solid neutral backdrop'

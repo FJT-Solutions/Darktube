@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.30';
-const FLOW_BUILD = '2026-11-08-barra-indice-recusa-pausa-e-ref-so-personagem'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.31';
+const FLOW_BUILD = '2026-11-08-barra-calibra-pelo-resumo-e-diagnostico'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.

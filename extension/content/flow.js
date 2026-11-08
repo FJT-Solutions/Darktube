@@ -409,19 +409,26 @@
       // O valor da barra pode ser um indice (no Omni 1.2: segundos = valor + 3). Nao fixa o deslocamento:
       // calibra pela leitura do resumo do botao e ajusta de 1 em 1 ate bater com a pedida.
       const shown0 = summarySeconds();
+      const v0 = Number(sl.el.value);
       if (!shown0) return 0;
-      const offset = shown0 - Number(sl.el.value);
+      const offset = shown0 - v0;
       await setInput(want - offset);
-      for (let i = 0; i < 6; i++) {
-        if (await waitSummary(want)) return want;
+      let applied = await waitSummary(want);
+      let moved = summarySeconds() !== shown0;
+      // O resumo so acompanha a barra se mudou: se ficou parado, nao da para ajustar por ele (ajustar no escuro
+      // empurraria a barra para qualquer lado). Nesse caso confia na calibracao e a conferencia final, depois de
+      // fechar o painel, aprova ou barra o take.
+      for (let i = 0; i < 6 && !applied && moved; i++) {
         const shown = summarySeconds();
-        if (!shown) break;
         const next = Number(sl.el.value) + (want > shown ? 1 : -1) * sl.step;
         if (next < sl.min || next > sl.max) break;
         await setInput(next);
+        applied = await waitSummary(want);
       }
-      // Nao deu para chegar exato: aceita a maior duracao que nao passa da pedida; senao, falha sem gerar.
       const shown = summarySeconds();
+      dtLog('Barra de duração (Omni): calibragem.', { pedida: want, resumoAntes: shown0, valorAntes: v0, deslocamento: offset, valorAgora: sl.el.value, resumoAgora: shown, resumoAcompanhou: moved }, applied ? 'info' : 'warn');
+      if (applied) return want;
+      if (!moved) return Number(sl.el.value) + offset === want ? want : 0;
       return shown && shown <= want ? shown : 0;
     }
     const target = clamp(sl.min + Math.floor((want - sl.min) / sl.step) * sl.step);

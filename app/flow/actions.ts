@@ -32,6 +32,7 @@ import {
 import {
   buildCastPrompt,
   buildSheetPrompt,
+  isChromaKeyTemplate,
   getLibraryCharacter,
   isVoiceOnlyCharacter,
   listFlowLibrary,
@@ -590,7 +591,7 @@ export async function generateCharacterSheetAction(projectId: string, characterI
     const job = await createFlowJob({
       userId: user.id,
       kind: "image",
-      prompt: buildSheetPrompt(c, String(project.params.realismo || "")),
+      prompt: buildSheetPrompt(c, String(project.params.realismo || ""), isChromaKeyTemplate(project.template_id)),
       params: { aspectRatio: "16:9", model: "Nano Banana Pro", characterId },
       projectId: project.id,
       role: "character_sheet",
@@ -657,7 +658,7 @@ export async function syncSheetsAction(projectId: string) {
 
     for (const c of script.characters) {
       if (c.sheetStatus === "aprovada") continue
-      const expectedPrompt = buildSheetPrompt(c, String(current.params?.realismo || ""))
+      const expectedPrompt = buildSheetPrompt(c, String(current.params?.realismo || ""), isChromaKeyTemplate(current.template_id))
       const matching = charSheetJobs.filter(
         (j) => (j.params as any)?.characterId === c.id || j.prompt === expectedPrompt
       )
@@ -767,7 +768,7 @@ export async function clearSheetAction(projectId: string, target: string) {
     } else {
       const c = current.script.characters.find((x) => x.id === target)
       if (!c) throw new Error("Personagem não encontrado.")
-      const expectedPrompt = buildSheetPrompt(c, String(current.params?.realismo || ""))
+      const expectedPrompt = buildSheetPrompt(c, String(current.params?.realismo || ""), isChromaKeyTemplate(current.template_id))
       for (const j of jobs) {
         if (
           j.role === "character_sheet" &&
