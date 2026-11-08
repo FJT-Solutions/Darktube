@@ -566,7 +566,7 @@ export function buildTakePrompt(
       const name = speaker?.name ?? 'The character'
       // Expert sobre fundo chroma key fala para a lente; no dialogo comum o olhar vai para o interlocutor, fora do centro.
       const gaze = tpl?.lookAtCamera || params.olharCamera === true || params.olharCamera === 'true'
-        ? `looking straight into the camera lens from the first frame to the last, eyes locked on the lens, head and body facing forward and still, never turning or glancing away`
+        ? `looking straight into the camera lens from the first frame to the last, eyes locked on the lens, never turning away or glancing aside; relaxed and natural, not stiff: the torso sways very gently forward, back and side to side by only a few centimeters, shoulders loose, small slight head tilts and nods, a lively relaxed face with natural blinking and soft eyebrow and smile movement, no big body movement and always centered in frame`
         : `looking at the conversation partner off-center and never looking directly into the camera lens`
       lines.push(`Dialogue: ${name}${speaker?.voice ? ` (voice: ${noEnd(speaker.voice)})` : ''} speaks right from the start in ${lang}: "${noEnd(take.line)}". Only ${name} speaks, with precise lip-sync, ${gaze}.`)
     } else if (kind === 'narracao' && take.line) {

@@ -3,8 +3,8 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.33';
-const FLOW_BUILD = '2026-11-08-barra-por-teclado-e-ponteiro'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.34';
+const FLOW_BUILD = '2026-11-08-calibrar-duracao-slider-omni'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.

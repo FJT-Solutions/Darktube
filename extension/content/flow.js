@@ -385,59 +385,90 @@
     return null;
   }
 
-  // Segundos mostrados no resumo do botao de configuracoes ("Video · 720p · 6s"); 0 se nao der para ler.
-  const summarySeconds = () => Number((/(\d{1,2})\s*s/i.exec(txt(settingsBtnEl() || $(S.settingsBtn) || document.createElement('i'))) || [])[1]) || 0;
+    // Segundos mostrados no resumo do botao de configuracoes ("Video · 720p · 6s") ou no painel do Flow; 0 se nao der para ler.
+  const summarySeconds = (panel = null, sl = null) => {
+    // 1. Resumo do botão principal de configurações (usa \b para casar com "8s" no fim da string)
+    const btn = settingsBtnEl() || $(S.settingsBtn);
+    if (btn) {
+      const m = /(\d{1,2})\s*s\b/i.exec(txt(btn));
+      if (m) return Number(m[1]);
+    }
+    // 2. Indicadores do slider no painel quando aberto
+    if (sl && sl.el) {
+      const aria = sl.el.getAttribute('aria-valuetext') || '';
+      const mAria = /(\d{1,2})\s*s\b/i.exec(aria);
+      if (mAria) return Number(mAria[1]);
+    }
+    const p = panel || panelEl();
+    if (p) {
+      const ind = $('.mdc-slider__value-indicator-text, .mat-mdc-slider-value-indicator, [class*="value-indicator"]', p);
+      if (ind) {
+        const m = /(\d{1,2})\s*s\b/i.exec(txt(ind)) || /(\d{1,2})\b/.exec(txt(ind));
+        if (m) {
+          const val = Number(m[1]);
+          if (val >= 3 && val <= 30) return val;
+        }
+      }
+    }
+    return 0;
+  };
 
-  async function waitSummary(expected) {
-    for (let i = 0; i < 8; i++) {
-      if (summarySeconds() === expected) return true;
+  async function waitSummary(expected, panel = null, sl = null) {
+    for (let i = 0; i < 10; i++) {
+      if (summarySeconds(panel, sl) === expected) return true;
+      if (sl && sl.isInput) {
+        const offset = sl.offset != null ? sl.offset : (sl.min === 0 && sl.max <= 15 ? 3 : 0);
+        if (Number(sl.el.value) + offset === expected && summarySeconds(panel, sl) === expected) return true;
+      }
       await sleep(200);
     }
-    return summarySeconds() === expected;
+    return summarySeconds(panel, sl) === expected;
   }
 
-  async function setDurationSlider(sl, want) {
+  async function setDurationSlider(sl, want, panel = null) {
     const clamp = (v) => Math.min(sl.max, Math.max(sl.min, v));
     const setInput = async (v) => {
+      const targetVal = String(clamp(v));
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-      setter.call(sl.el, String(clamp(v)));
-      sl.el.dispatchEvent(new Event('input', { bubbles: true }));
-      sl.el.dispatchEvent(new Event('change', { bubbles: true }));
+      setter.call(sl.el, targetVal);
+      sl.el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true, composed: true }));
+      sl.el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true, composed: true }));
       await human(250, 500);
     };
     if (sl.isInput) {
-      // O valor da barra pode ser um indice (no Omni 1.2: segundos = valor + 3). Nao fixa o deslocamento:
-      // calibra pela leitura do resumo do botao. O valor so conta quando o resumo muda (o componente do Flow
-      // desfaz o que so mexe no DOM). Metodos, nesta ordem: valor nativo + eventos, teclado e ponteiro (depurador).
-      const shown0 = summarySeconds();
+      // O valor da barra pode ser um indice (no Omni 1.2: segundos = valor + 3, onde min=0 e max=12).
+      // Calibra dinamicamente pela leitura do resumo do botao ou fallback calibrado (offset=3).
+      const shown0 = summarySeconds(panel, sl);
       const v0 = Number(sl.el.value);
-      if (!shown0) return 0;
       if (shown0 === want) return want;
-      const offset = shown0 - v0;
+      // Se conseguir ler shown0 calcula a diferenca real; senao assume a calibracao padrao do Omni (offset 3) ou 0
+      const offset = shown0 > 0 ? (shown0 - v0) : (sl.min === 0 && sl.max <= 15 ? 3 : (sl.min >= 3 ? 0 : 3));
+      sl.offset = offset;
       const report = (metodo, extra, ok) =>
-        dtLog(ok ? `Barra de duração: ${metodo}, resumo ${summarySeconds()}s` : `Barra de duração: ${metodo} não funcionou.`, { pedida: want, resumoAntes: shown0, valorAntes: v0, deslocamento: offset, valorAgora: sl.el.value, resumoAgora: summarySeconds(), ...extra }, ok ? 'success' : 'warn');
+        dtLog(ok ? `Barra de duração: ${metodo}, resumo ${summarySeconds(panel, sl)}s` : `Barra de duração: ${metodo} não funcionou.`, { pedida: want, resumoAntes: shown0, valorAntes: v0, deslocamento: offset, valorAgora: sl.el.value, resumoAgora: summarySeconds(panel, sl), ...extra }, ok ? 'success' : 'warn');
 
       // 1. valor nativo + eventos input/change
       await setInput(want - offset);
-      if (await waitSummary(want)) {
+      if (await waitSummary(want, panel, sl)) {
         report('valor nativo', {}, true);
         return want;
       }
-      if (summarySeconds() !== shown0) {
+      const curShown = summarySeconds(panel, sl);
+      if (curShown && curShown !== shown0) {
         // Acompanhou a barra, mas errou: ajusta de 1 em 1.
         for (let i = 0; i < 6; i++) {
-          const shown = summarySeconds();
+          const shown = summarySeconds(panel, sl);
           const next = Number(sl.el.value) + (want > shown ? 1 : -1) * sl.step;
           if (next < sl.min || next > sl.max) break;
           await setInput(next);
-          if (await waitSummary(want)) {
+          if (await waitSummary(want, panel, sl)) {
             report('valor nativo com ajuste', { ajustes: i + 1 }, true);
             return want;
           }
         }
         report('valor nativo', {}, false);
-        const shown = summarySeconds();
-        return shown && shown <= want ? shown : 0;
+        const shown = summarySeconds(panel, sl);
+        if (shown && shown <= want) return shown;
       }
       report('valor nativo', {}, false);
 
@@ -445,17 +476,32 @@
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(sl.el, String(v0));
       let keysSent = 0;
       for (let i = 0; i < 3; i++) {
-        const delta = want - summarySeconds();
+        const curSec = summarySeconds(panel, sl) || (Number(sl.el.value) + offset);
+        const delta = want - curSec;
         if (!delta) break;
-        try { sl.el.focus(); } catch (_) {}
+        try {
+          sl.el.focus();
+          sl.el.click();
+        } catch (_) {}
         const n = Math.min(Math.abs(delta), 14);
-        const resp = await askBg({ type: 'FLOW_TRUSTED_KEYS', key: delta > 0 ? 'ArrowRight' : 'ArrowLeft', count: n }, 15000);
+        const key = delta > 0 ? 'ArrowRight' : 'ArrowLeft';
+        const vk = key === 'ArrowLeft' ? 37 : 39;
+
+        // Dispara keydown/keyup sintetico diretamente no elemento antes
+        for (let k = 0; k < n; k++) {
+          for (const type of ['keydown', 'keyup']) {
+            sl.el.dispatchEvent(new KeyboardEvent(type, { key, code: key, keyCode: vk, which: vk, bubbles: true, cancelable: true, composed: true }));
+          }
+        }
+
+        // Envia teclas reais via depurador CDP
+        const resp = await askBg({ type: 'FLOW_TRUSTED_KEYS', key, count: n }, 15000);
         keysSent += n;
         if (!resp || !resp.ok) {
           dtLog('Teclado (depurador) não rodou.', resp || { why: 'sem resposta do segundo plano' }, 'warn');
           break;
         }
-        if (await waitSummary(want)) {
+        if (await waitSummary(want, panel, sl)) {
           report('teclado', { teclas: keysSent }, true);
           return want;
         }
@@ -478,11 +524,11 @@
             dtLog('Arraste (depurador) não rodou.', resp || { why: 'sem resposta do segundo plano' }, 'warn');
             break;
           }
-          if (await waitSummary(want)) {
+          if (await waitSummary(want, panel, sl)) {
             report('ponteiro', { arrastes: i + 1, de: xOf(curVal), ate: xOf(tgtVal) }, true);
             return want;
           }
-          const shown = summarySeconds();
+          const shown = summarySeconds(panel, sl);
           if (!shown) break;
           // Corrige pelo erro lido e tenta de novo a partir de onde o marcador parou.
           curVal = tgtVal;
@@ -490,8 +536,8 @@
         }
       }
       report('ponteiro', {}, false);
-      const shown = summarySeconds();
-      return shown && shown <= want ? shown : 0;
+      const shown = summarySeconds(panel, sl);
+      return shown && shown <= want ? shown : (Number(sl.el.value) + offset <= want ? Number(sl.el.value) + offset : 0);
     }
     const target = clamp(sl.min + Math.floor((want - sl.min) / sl.step) * sl.step);
     const cur = () => Number(sl.el.getAttribute('aria-valuenow'));
@@ -524,7 +570,7 @@
     }
     const sl = durationSlider(panel);
     if (!sl) return 0;
-    const applied = await setDurationSlider(sl, want);
+    const applied = await setDurationSlider(sl, want, panel);
     dtLog(applied ? `Duração ajustada na barra do modelo: ${applied}s.` : 'A barra de duração não aceitou o valor.', { pedida: want, min: sl.min, max: sl.max, passo: sl.step, tipo: sl.isInput ? 'input' : 'aria' }, applied ? 'info' : 'warn');
     return applied;
   }
@@ -568,11 +614,17 @@
     await closeSettings();
 
     // Confere o resumo mostrado no botao apenas para opcoes que realmente existiam no painel deste modelo
-    const summary = txt(settingsBtnEl() || $(S.settingsBtn));
+    let summary = txt(settingsBtnEl() || $(S.settingsBtn));
     const need = [];
     if (job.kind === 'video') {
       if (p.resolution && hasResolution) need.push(p.resolution);
       if (appliedDuration) need.push(appliedDuration + 's');
+    }
+    for (let i = 0; i < 5 && need.some((n) => !summary.includes(n)); i++) {
+      await sleep(200);
+      summary = txt(settingsBtnEl() || $(S.settingsBtn));
+    }
+    if (job.kind === 'video') {
       // Sem como ajustar e o Flow esta com duracao MAIOR que a pedida: gerar assim custa mais e foge do criativo.
       const shown = Number((/(\d{1,2})\s*s\b/i.exec(summary) || [])[1]);
       if (p.duration && !appliedDuration && shown > Number(p.duration)) {

@@ -1640,6 +1640,7 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     ],
     rules: [
       'Takes 1 and 3 (Expert): strictly torso/chest up, facing camera directly with eyes on the lens, only speaking to camera, solid uniform green background #00FF00 with zero gradients or cast shadows for clean alpha keying',
+      'Expert takes: relaxed, natural body language, never rigid: very gentle torso sway forward, back and side to side by only a few centimeters, loose shoulders, small slight head tilts and nods, and a lively, relaxed face (natural blinking, soft eyebrow and smile movement) while the eyes stay on the lens and the frame stays centered; no large body movement, no leaning out of frame',
       'Expert takes: hands are empty at all times; no apple, tablet, phone, card, plate, utensil or any other object held or visible, so the last frame of an Expert take never carries an object',
       'The spoken line holds only the words the Expert says, never a description of an action or scene; if a take has no speech the line stays empty',
       'The take after an Expert take must not depend on that take\'s last frame: start it as a fresh shot using only the character portrait and kitchen continuity',
