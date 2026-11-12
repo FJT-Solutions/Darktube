@@ -1682,11 +1682,11 @@ export default function DarkClipsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20">
-      <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-6">
+    <div className="min-h-screen bg-background text-foreground pb-20 w-full min-w-0 max-w-full overflow-x-hidden">
+      <div className="max-w-[1600px] w-full min-w-0 mx-auto p-3 sm:p-4 md:p-8 space-y-6 overflow-hidden">
 
         {/* ── Top Header ── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-5 min-w-0">
           <div className="flex items-center gap-3.5">
             <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/20 text-white">
               <Sparkles className="h-6 w-6" />
@@ -1707,12 +1707,12 @@ export default function DarkClipsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <a href="/api/extension/download" download="dark-clips-extension.zip">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full md:w-auto">
+            <a href="/api/extension/download" download="dark-clips-extension.zip" className="flex-1 sm:flex-initial">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs gap-1.5 h-9 font-bold"
+                className="w-full sm:w-auto border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs gap-1.5 h-9 font-bold justify-center"
               >
                 <Download className="h-3.5 w-3.5" />
                 Baixar Extensão (.ZIP)
@@ -1724,7 +1724,7 @@ export default function DarkClipsPage() {
               size="sm"
               onClick={() => handleQuickSavePreset()}
               disabled={savingPreset}
-              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs gap-1.5 h-9 font-bold"
+              className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs gap-1.5 h-9 font-bold flex-1 sm:flex-initial justify-center"
             >
               {savingPreset ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               Salvar Layout 💾
@@ -1734,7 +1734,7 @@ export default function DarkClipsPage() {
               size="sm"
               onClick={() => handleRender()}
               disabled={isRendering || !selectedClip}
-              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-9 shadow-md shadow-red-600/20"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs gap-1.5 h-9 shadow-md shadow-red-600/20 w-full sm:w-auto justify-center"
             >
               {isRendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Film className="h-3.5 w-3.5" />}
               {isRendering ? "Renderizando MP4..." : "Renderizar Vídeo"}
@@ -1744,13 +1744,13 @@ export default function DarkClipsPage() {
         </div>
 
         {/* ── Main Tab Navigation: Layouts vs Criação ── */}
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-6">
-          <TabsList className="bg-secondary/20 p-1 border border-border/50 rounded-xl grid grid-cols-2 max-w-md">
-            <TabsTrigger value="modeler" className="gap-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-6 min-w-0 max-w-full">
+          <TabsList className="bg-secondary/20 p-1 border border-border/50 rounded-xl grid grid-cols-2 w-full max-w-md min-h-10">
+            <TabsTrigger value="modeler" className="gap-1.5 sm:gap-2 text-[11px] sm:text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold truncate">
               <Sliders className="h-3.5 w-3.5" />
               🎨 Layout & Templates 9:16
             </TabsTrigger>
-            <TabsTrigger value="creation" className="gap-2 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">
+            <TabsTrigger value="creation" className="gap-1.5 sm:gap-2 text-[11px] sm:text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold truncate">
               <Video className="h-3.5 w-3.5" />
               🎬 Criação & Clipes ({clips.length})
             </TabsTrigger>
@@ -1759,7 +1759,7 @@ export default function DarkClipsPage() {
           {/* ══════════════════════════════════════════════════════════
               ABA 1: MODELADOR VISUAL DE LAYOUT & TEMPLATES 9:16
           ══════════════════════════════════════════════════════════ */}
-          <TabsContent value="modeler" className="space-y-6">
+          <TabsContent value="modeler" className="space-y-6 min-w-0 max-w-full">
             
             {/* Top Toolbar: Layout Selector & Quick Management */}
             <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-card border border-border/60 shadow-sm">
@@ -1769,7 +1769,7 @@ export default function DarkClipsPage() {
                   <span className="text-xs font-bold text-foreground">Modelo de Layout Ativo:</span>
                 </div>
                 
-                <div className="w-[200px] sm:w-[260px]">
+                <div className="w-full sm:w-[240px] md:w-[260px] min-w-0">
                   <Select
                     value={activePreset?.id || ""}
                     onValueChange={(val) => {
@@ -1998,9 +1998,9 @@ export default function DarkClipsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start min-w-0 max-w-full">
                     {/* Left Column: Granular Controls (7 cols) */}
-                    <div className="lg:col-span-7 space-y-6">
+                    <div className="lg:col-span-7 space-y-6 min-w-0 max-w-full">
                       {/* Edit Mode Top Banner */}
                       <div className="p-3.5 rounded-xl border border-primary/40 bg-primary/10 flex flex-wrap items-center justify-between gap-2 shadow-sm">
                         <div className="flex items-center gap-2">
@@ -4373,7 +4373,7 @@ export default function DarkClipsPage() {
               </div>
 
               {/* ── Right Column: Sticky 9:16 Canvas Live Preview (5 cols) ── */}
-              <div className="lg:col-span-5 lg:sticky lg:top-6 self-start space-y-2">
+              <div className="lg:col-span-5 lg:sticky lg:top-6 self-start space-y-2 min-w-0 max-w-full">
                 <Card className="border-border shadow-2xl overflow-hidden bg-card flex flex-col">
                   <CardHeader className="p-3 px-4 border-b border-border/40 shrink-0">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -4493,7 +4493,7 @@ export default function DarkClipsPage() {
           {/* ══════════════════════════════════════════════════════════
               ABA 2: CRIAÇÃO & PRODUÇÃO DOS CLIPES (COM AGENDAMENTO)
           ══════════════════════════════════════════════════════════ */}
-          <TabsContent value="creation" className="space-y-6">
+          <TabsContent value="creation" className="space-y-6 min-w-0 max-w-full">
             
             {/* Top Active Layout Banner */}
             <div className="p-4 rounded-xl bg-gradient-to-r from-red-950/30 via-secondary/20 to-card border border-red-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
@@ -4523,10 +4523,10 @@ export default function DarkClipsPage() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start min-w-0 max-w-full">
               
               {/* ── Left Column: Importador, Upload & Extensão (4 cols) ── */}
-              <div className="lg:col-span-4 space-y-6">
+              <div className="lg:col-span-4 space-y-6 min-w-0 max-w-full">
                 
                 {/* 1. Direct Video Upload Card */}
                 <Card className="border-primary/40 bg-gradient-to-br from-primary/5 to-card shadow-sm">
@@ -4680,7 +4680,7 @@ export default function DarkClipsPage() {
               </div>
 
               {/* ── Center & Right Column: Clipes Minerados & Estúdio de Produção (8 cols) ── */}
-              <div className="lg:col-span-8 space-y-6">
+              <div className="lg:col-span-8 space-y-6 min-w-0 max-w-full">
                 
                 {/* 1. Biblioteca de Clipes Minerados */}
                 <div className="space-y-4">

@@ -1,6 +1,5 @@
 "use client"
 
-
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { getAllProfilesAction, updateUserRoleAction, updateUserStatusAction, deleteUserAction, resendAccessAction } from "@/app/actions"
@@ -162,43 +161,43 @@ export default function AdminUsersPage() {
                 onMenuToggle={toggleSidebar}
             />
             
-            <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+            <div className="flex-1 overflow-y-auto p-3 xs:p-4 lg:p-6">
                 <div className="mx-auto max-w-6xl space-y-6">
                     {/* Stats & Search */}
-                    <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                        <div className="flex gap-4">
-                            <Card className="p-4 bg-card/50 backdrop-blur-sm border-primary/10">
-                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total de Membros</p>
-                                <p className="text-2xl font-bold">{users.length}</p>
+                    <div className="flex flex-col md:flex-row gap-3 sm:gap-4 items-stretch md:items-center justify-between">
+                        <div className="flex gap-2 sm:gap-4">
+                            <Card className="p-3 sm:p-4 bg-card/50 backdrop-blur-sm border-primary/10 flex-1 sm:flex-none min-w-[120px]">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Total de Membros</p>
+                                <p className="text-xl sm:text-2xl font-bold mt-0.5">{users.length}</p>
                             </Card>
-                            <Card className="p-4 bg-card/50 backdrop-blur-sm border-primary/10">
-                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Ativos</p>
-                                <p className="text-2xl font-bold text-green-500">{users.filter(u => u.status === 'approved').length}</p>
+                            <Card className="p-3 sm:p-4 bg-card/50 backdrop-blur-sm border-primary/10 flex-1 sm:flex-none min-w-[120px]">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Ativos</p>
+                                <p className="text-xl sm:text-2xl font-bold text-green-500 mt-0.5">{users.filter(u => u.status === 'approved').length}</p>
                             </Card>
                         </div>
                         
                         <div className="relative w-full md:w-72">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <input 
-                                type="text"
+                                type="text" 
                                 placeholder="Buscar membro..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 bg-secondary/30 border border-border/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                className="w-full pl-10 pr-4 py-2 bg-secondary/30 border border-border/50 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 h-10"
                             />
                         </div>
                     </div>
 
                     <Card className="border-primary/10 bg-card/50 backdrop-blur-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm border-collapse">
+                        <div className="overflow-x-auto scroll-touch">
+                            <table className="w-full text-left text-sm border-collapse min-w-[640px]">
                                 <thead>
                                     <tr className="border-b border-border/50 bg-secondary/20">
-                                        <th className="px-6 py-4 font-semibold text-muted-foreground">Usuário</th>
-                                        <th className="px-6 py-4 font-semibold text-muted-foreground">Cargo</th>
-                                        <th className="px-6 py-4 font-semibold text-muted-foreground">Status do Perfil</th>
-                                        <th className="px-6 py-4 font-semibold text-muted-foreground">Registro / Senha</th>
-                                        <th className="px-6 py-4 font-semibold text-right text-muted-foreground">Ações Gerais</th>
+                                        <th className="px-4 sm:px-6 py-3.5 font-semibold text-muted-foreground text-xs">Usuário</th>
+                                        <th className="px-4 sm:px-6 py-3.5 font-semibold text-muted-foreground text-xs">Cargo</th>
+                                        <th className="px-4 sm:px-6 py-3.5 font-semibold text-muted-foreground text-xs">Status</th>
+                                        <th className="px-4 sm:px-6 py-3.5 font-semibold text-muted-foreground text-xs text-center">Registro</th>
+                                        <th className="px-4 sm:px-6 py-3.5 font-semibold text-right text-muted-foreground text-xs">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -211,35 +210,35 @@ export default function AdminUsersPage() {
                                     ) : (
                                         filteredUsers.map((user) => (
                                             <tr key={user.id} className="border-b border-border/20 hover:bg-primary/5 transition-colors">
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 sm:px-6 py-3.5">
                                                     <div className="flex items-center gap-3">
-                                                        <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                                                        <div className="h-9 w-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
                                                             {user.full_name?.charAt(0).toUpperCase() || user.email.charAt(0).toUpperCase()}
                                                         </div>
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-medium text-foreground">{user.full_name || "Sem nome"}</span>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="font-medium text-foreground text-xs sm:text-sm truncate">{user.full_name || "Sem nome"}</span>
                                                                 {user.isAuthOnly && (
                                                                     <Badge variant="outline" className="text-[9px] h-4 border-yellow-500/50 text-yellow-500 bg-yellow-500/5">
-                                                                        Resíduo / Remanescente
+                                                                        Resíduo
                                                                     </Badge>
                                                                 )}
                                                             </div>
-                                                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                                                            <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">
-                                                    <Badge variant={user.role === 'admin' ? "default" : "secondary"} className="gap-1.5 font-medium">
+                                                <td className="px-4 sm:px-6 py-3.5">
+                                                    <Badge variant={user.role === 'admin' ? "default" : "secondary"} className="gap-1.5 font-medium text-xs">
                                                         {user.role === 'admin' ? <Shield className="h-3 w-3" /> : <User className="h-3 w-3" />}
                                                         {user.role === 'admin' ? 'Administrador' : 'Membro'}
                                                     </Badge>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 sm:px-6 py-3.5">
                                                     <Badge 
                                                         variant="outline" 
                                                         className={cn(
-                                                            "font-medium",
+                                                            "font-medium text-xs",
                                                             user.status === 'approved' && "border-green-500/30 text-green-500 bg-green-500/5",
                                                             user.status === 'blocked' && "border-destructive/30 text-destructive bg-destructive/5",
                                                             user.status === 'pending' && "border-yellow-500/30 text-yellow-500 bg-yellow-500/5"
@@ -248,10 +247,10 @@ export default function AdminUsersPage() {
                                                         {user.status === 'approved' ? 'Aprovado' : user.status === 'blocked' ? 'Arquivado' : 'Pendente'}
                                                     </Badge>
                                                 </td>
-                                                <td className="px-6 py-4 text-center">
+                                                <td className="px-4 sm:px-6 py-3.5 text-center">
                                                     <div className="flex flex-col items-center gap-1.5">
                                                         <Badge variant="outline" className={cn(
-                                                            "font-medium gap-1.5 shrink-0",
+                                                            "font-medium gap-1.5 shrink-0 text-xs",
                                                             user.isRegistered ? "border-blue-500/30 text-blue-500 bg-blue-500/5" : "border-yellow-500/30 text-yellow-500 bg-yellow-500/5"
                                                         )}>
                                                             {user.isRegistered ? <UserCheck className="h-3 w-3" /> : <UserX className="h-3 w-3" />}
@@ -280,8 +279,8 @@ export default function AdminUsersPage() {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
+                                                <td className="px-4 sm:px-6 py-3.5 text-right">
+                                                    <div className="flex items-center justify-end gap-1.5">
                                                         <Button 
                                                             variant="ghost" 
                                                             size="icon" 
@@ -324,7 +323,7 @@ export default function AdminUsersPage() {
                         </div>
                     </Card>
                     
-                    <div className="flex items-start gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10">
+                    <div className="flex items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-xl bg-primary/5 border border-primary/10">
                         <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                         <div className="text-xs text-muted-foreground space-y-1">
                             <p className="font-semibold text-primary">Informações do Administrador:</p>

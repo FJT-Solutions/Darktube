@@ -262,15 +262,15 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
   }, [dragging, activeLayer, dragStartY, dragStartX, dragInitialValX, dragInitialValY, onUpdateHeaderPadding, onUpdateHeadline, onUpdateVideoPlacement, onUpdateWatermark, onUpdateFooter, onUpdateArrows, onUpdateArrowItem, effectiveArrowsList]);
 
   return (
-    <div className="flex flex-col items-center gap-1 w-full mx-auto select-none overflow-hidden">
+    <div className="flex flex-col items-center gap-1.5 w-full min-w-0 max-w-full mx-auto select-none overflow-hidden">
       {/* ── Top Stage Info Bar ── */}
-      <div className="w-full flex items-center justify-between px-1 min-h-[16px] shrink-0">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-[9px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1 py-0 px-1.5 h-4">
+      <div className="w-full flex flex-wrap items-center justify-between gap-1 px-1 min-h-[16px] shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <Badge variant="outline" className="text-[9px] font-bold border-red-500/40 bg-red-500/10 text-red-400 gap-1 py-0 px-1.5 h-4 shrink-0">
             <Smartphone className="h-2.5 w-2.5" /> 9:16 Live
           </Badge>
           {activeLayer !== 'none' && (
-            <span className="text-[9px] font-semibold text-zinc-300 animate-fadeIn truncate max-w-[200px]">
+            <span className="text-[9px] font-semibold text-zinc-300 animate-fadeIn truncate max-w-[180px] sm:max-w-[220px]">
               <strong className="text-primary font-bold">
                 {activeLayer === 'header'
                   ? `Cabeçalho (${headerPadding}px)`
@@ -293,7 +293,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
           <button
             type="button"
             onClick={onToggleFullscreen}
-            className="text-zinc-400 hover:text-white transition-colors p-0.5 rounded hover:bg-zinc-800 flex items-center gap-1 text-[10px]"
+            className="text-zinc-400 hover:text-white transition-colors p-0.5 rounded hover:bg-zinc-800 flex items-center gap-1 text-[10px] shrink-0"
             title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia (Fullscreen)"}
           >
             {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
@@ -302,13 +302,15 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
         )}
       </div>
 
-      {/* ── Pure WYSIWYG 9:16 Artboard Stage (Auto-Fitting Viewport) ── */}
+      {/* ── Pure WYSIWYG 9:16 Artboard Stage (Auto-Fitting Viewport without Overflow) ── */}
       <div
         ref={containerRef}
         style={{
-          height: isFullscreen ? 'min(calc(100vh - 8rem), 850px)' : 'min(calc(100vh - 10rem), 540px)',
-          maxHeight: isFullscreen ? 'min(calc(100vh - 8rem), 850px)' : 'min(calc(100vh - 10rem), 540px)',
-          aspectRatio: '9/16',
+          width: isFullscreen
+            ? 'min(calc((100dvh - 8rem) * 0.5625), 478px, 100%)'
+            : 'min(calc((100dvh - 13rem) * 0.5625), 315px, 100%)',
+          aspectRatio: '9 / 16',
+          height: 'auto',
           maxWidth: '100%',
         }}
         className="rounded-[18px] overflow-hidden shadow-2xl border-2 border-zinc-800/90 bg-black relative cursor-default group shrink-0 transition-all duration-150"
@@ -845,7 +847,7 @@ export const DarkClipsPreviewPlayer: React.FC<DarkClipsPreviewPlayerProps> = ({
 
       {/* Stage Hint Footer */}
       {!isFullscreen && (
-        <p className="text-[10px] text-zinc-500 text-center font-medium leading-tight shrink-0">
+        <p className="text-[10px] text-zinc-500 text-center font-medium leading-tight shrink-0 px-2">
           💡 <strong>Editor Visual:</strong> Arraste os elementos no Canvas para reposicionar.
         </p>
       )}

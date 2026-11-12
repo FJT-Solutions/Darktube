@@ -367,38 +367,52 @@ export default function FlowPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+    <div className="mx-auto max-w-7xl space-y-6 p-3 xs:p-4 sm:p-6 overflow-x-hidden min-w-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/50 pb-4 min-w-0">
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
             <Film className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-xl font-semibold">Flow</h1>
-            <p className="text-sm text-muted-foreground">Roteiro, takes e vídeos pelo Google Flow, com os créditos da sua conta.</p>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Flow</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Roteiro, takes e vídeos pelo Google Flow, com os créditos da sua conta.
+            </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <Button
             variant={showSimulator ? "default" : "outline"}
             size="sm"
+            className="h-9 text-xs font-semibold flex-1 sm:flex-initial"
             onClick={() => setShowSimulator((s) => !s)}
           >
-            <Calculator className="mr-1.5 h-4 w-4 text-amber-500" /> Simulador de créditos
+            <Calculator className="mr-1.5 h-4 w-4 text-amber-500 shrink-0" />
+            <span>Simulador de créditos</span>
           </Button>
-          <Button variant={view === "novo" ? "default" : "outline"} size="sm" onClick={() => setView("novo")}>
-            <Sparkles className="mr-1.5 h-4 w-4" /> Novo projeto
-          </Button>
-          <Button
-            variant={view === "projetos" ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              setView("projetos")
-              loadProjects()
-            }}
-          >
-            <FolderOpen className="mr-1.5 h-4 w-4" /> Meus projetos
-          </Button>
+          <div className="flex items-center gap-1.5 bg-secondary/30 p-1 rounded-lg border border-border/50 w-full sm:w-auto">
+            <Button
+              variant={view === "novo" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs font-semibold flex-1 sm:flex-initial px-2.5 sm:px-3 justify-center"
+              onClick={() => setView("novo")}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+              <span>Novo projeto</span>
+            </Button>
+            <Button
+              variant={view === "projetos" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs font-semibold flex-1 sm:flex-initial px-2.5 sm:px-3 justify-center"
+              onClick={() => {
+                setView("projetos")
+                loadProjects()
+              }}
+            >
+              <FolderOpen className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+              <span>Meus projetos</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -423,70 +437,80 @@ export default function FlowPage() {
       )}
 
       {view === "novo" && (
-        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Templates</p>
-            <div className="flex flex-wrap gap-1">
-              {(["todos", "curto", "longo"] as const).map((v) => (
-                <Button key={v} size="sm" variant={lengthFilter === v ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setLengthFilter(v)}>
-                  {v === "todos" ? "Todos" : v === "curto" ? "Curtos" : "Longos"}
-                </Button>
-              ))}
-              {(["todos", "viral", "atemporal"] as const).map((v) => (
-                <Button key={"t" + v} size="sm" variant={trendFilter === v ? "default" : "outline"} className="h-7 px-2 text-xs" onClick={() => setTrendFilter(v)}>
-                  {v === "todos" ? "Qualquer" : v === "viral" ? "Virais" : "Atemporais"}
-                </Button>
-              ))}
+        <div className="grid gap-5 lg:grid-cols-[300px_1fr] xl:grid-cols-[320px_1fr] items-start min-w-0">
+          <div className="space-y-3 min-w-0">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Templates ({shownTemplates.length})</p>
             </div>
-            <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
+            <div className="space-y-1.5 rounded-xl border bg-card p-2.5">
+              <div className="grid grid-cols-3 gap-1">
+                {(["todos", "curto", "longo"] as const).map((v) => (
+                  <Button key={v} size="sm" variant={lengthFilter === v ? "default" : "outline"} className="h-7 px-2 text-[11px] font-semibold" onClick={() => setLengthFilter(v)}>
+                    {v === "todos" ? "Todos" : v === "curto" ? "Curtos" : "Longos"}
+                  </Button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(["todos", "viral", "atemporal"] as const).map((v) => (
+                  <Button key={"t" + v} size="sm" variant={trendFilter === v ? "default" : "outline"} className="h-7 px-2 text-[11px] font-semibold" onClick={() => setTrendFilter(v)}>
+                    {v === "todos" ? "Qualquer" : v === "viral" ? "Virais" : "Atemporais"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="max-h-[420px] lg:max-h-[72vh] space-y-2 overflow-y-auto pr-1">
             {shownTemplates.map((t) => (
               <button
                 key={t.id}
                 onClick={() => pickTemplate(t.id)}
                 className={cn(
-                  "w-full rounded-lg border p-3 text-left transition-colors",
-                  t.id === templateId ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                  "w-full rounded-xl border p-3 text-left transition-all min-w-0 overflow-hidden",
+                  t.id === templateId ? "border-primary bg-primary/5 ring-1 ring-primary/30 shadow-xs" : "bg-card hover:bg-muted/50"
                 )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{t.name}</span>
-                  <Badge variant="outline">{MODE_LABEL[t.mode] ?? t.mode}</Badge>
+                <div className="flex items-start justify-between gap-2 min-w-0">
+                  <span className="font-semibold text-sm leading-snug break-words min-w-0">{t.name}</span>
+                  <Badge variant="outline" className="shrink-0 text-[10px]">{MODE_LABEL[t.mode] ?? t.mode}</Badge>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{t.niche} · {t.subniche}</p>
-                <div className="mt-1 flex gap-1">
+                <p className="mt-1 text-xs text-muted-foreground truncate">{t.niche} · {t.subniche}</p>
+                <div className="mt-2 flex flex-wrap gap-1">
                   <Badge variant="secondary" className="text-[10px]">{t.length === "longo" ? "Longo" : "Curto"}</Badge>
                   <Badge variant="secondary" className="text-[10px]">{t.trend === "viral" ? "Viral" : "Atemporal"}</Badge>
                   <Badge variant="secondary" className="text-[10px]">{t.defaults.takes} × {t.defaults.seconds} s ≈ {fmtDuration(t.defaults.takes * t.defaults.seconds)}</Badge>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed line-clamp-2">{t.description}</p>
               </button>
             ))}
             </div>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{template.name}</CardTitle>
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="p-4 sm:p-6 pb-3 border-b border-border/40">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base sm:text-lg">{template.name}</CardTitle>
+                <Badge variant="outline" className="text-xs">{MODE_LABEL[template.mode] ?? template.mode}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">{template.description}</p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 sm:p-6 space-y-5 min-w-0">
               {[...COMMON_FIELDS, ...template.fields].map((f) => (
                 <FieldInput key={f.id} field={f} value={values[f.id] ?? ""} onChange={(v) => setValues((s) => ({ ...s, [f.id]: v }))} />
               ))}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Idioma da fala e do texto</label>
+                <div className="space-y-1.5 min-w-0">
+                  <label className="text-sm font-medium block">Idioma da fala e do texto</label>
                   <Select value={idioma} onValueChange={setIdioma}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {LANGUAGES.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Estilo visual</label>
+                <div className="space-y-1.5 min-w-0">
+                  <label className="text-sm font-medium block">Estilo visual</label>
                   <Select value={realismo} onValueChange={setRealismo}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {REALISM.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
                     </SelectContent>
@@ -494,10 +518,10 @@ export default function FlowPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2 rounded-xl border bg-muted/20 p-3.5">
+                <div className="flex items-center justify-between gap-2">
                   <label className="text-sm font-medium">Quantidade de takes</label>
-                  <span className="text-sm font-semibold">{takes}</span>
+                  <Badge variant="secondary" className="font-mono text-xs font-bold">{takes} takes</Badge>
                 </div>
                 <Slider min={1} max={MAX_TAKES} step={1} value={[takes]} onValueChange={(v) => setTakes(v[0])} />
                 <p className="text-xs text-muted-foreground">Duração total: {takes} takes × {seconds} s = <span className="font-semibold text-foreground">{fmtDuration(takes * seconds)}</span></p>
@@ -514,14 +538,14 @@ export default function FlowPage() {
 
                 return (
                   <>
-                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-sm font-medium">Segundos por take</label>
-                          <span className="text-[10px] text-muted-foreground">Ritmo por cena</span>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <label className="text-sm font-medium truncate">Segundos por take</label>
+                          <span className="text-[10px] text-muted-foreground shrink-0">Ritmo por cena</span>
                         </div>
                         <Select value={String(seconds)} onValueChange={(v) => setSeconds(Number(v))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {allowedSecondsForModel(model).map((s) => (
                               <SelectItem key={s} value={String(s)}>
@@ -536,18 +560,18 @@ export default function FlowPage() {
                           <p className="text-xs text-muted-foreground">Cena sem fala: ação e ambientação</p>
                         )}
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Formato</label>
+                      <div className="space-y-1.5 min-w-0">
+                        <label className="text-sm font-medium block">Formato</label>
                         <Select value={aspect} onValueChange={setAspect}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="9:16">9:16 (vertical)</SelectItem>
                             <SelectItem value="16:9">16:9 (horizontal)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Modelo de vídeo</label>
+                      <div className="space-y-1.5 min-w-0">
+                        <label className="text-sm font-medium block">Modelo de vídeo</label>
                         <Select
                           value={model}
                           onValueChange={(m) => {
@@ -555,17 +579,17 @@ export default function FlowPage() {
                             setSeconds((prev) => clampSecondsForModel(prev, m))
                           }}
                         >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {VIDEO_MODELS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
                       {model.toLowerCase().includes("omni") ? (
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Qualidade</label>
+                        <div className="space-y-1.5 min-w-0">
+                          <label className="text-sm font-medium block">Qualidade</label>
                           <Select value={quality} onValueChange={setQuality}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="360p">360p (rascunho)</SelectItem>
                               <SelectItem value="720p">720p (final)</SelectItem>
@@ -575,10 +599,10 @@ export default function FlowPage() {
                       ) : null}
 
                       {hasSpeech ? (
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Palavras por legenda</label>
+                        <div className="space-y-1.5 min-w-0">
+                          <label className="text-sm font-medium block">Palavras por legenda</label>
                           <Select value={String(wordsPerCaption)} onValueChange={(v) => setWordsPerCaption(Number(v))}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="1">1 palavra (dinâmico)</SelectItem>
                               <SelectItem value="2">2 palavras (rápido)</SelectItem>
@@ -587,19 +611,19 @@ export default function FlowPage() {
                           </Select>
                         </div>
                       ) : (
-                        <div className="space-y-1.5 opacity-60">
-                          <label className="text-sm font-medium">Palavras por legenda</label>
-                          <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-xs text-muted-foreground">
+                        <div className="space-y-1.5 opacity-60 min-w-0">
+                          <label className="text-sm font-medium block">Palavras por legenda</label>
+                          <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 text-xs text-muted-foreground truncate">
                             Sem fala (legendas inativas)
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-emerald-500" />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Zap className="h-4 w-4 text-emerald-500 shrink-0" />
                           <span className="text-sm font-medium">Modo Híbrido Inteligente</span>
                           <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/40">
                             {isHybrid ? "Economiza até 53% de créditos" : "100% no modelo base"}
@@ -609,14 +633,16 @@ export default function FlowPage() {
                           Preserva máxima fidelidade nos diálogos e rebaixa automaticamente B-rolls para Lite da mesma família.
                         </p>
                       </div>
-                      <Switch checked={isHybrid} onCheckedChange={setIsHybrid} />
+                      <div className="flex items-center justify-end shrink-0">
+                        <Switch checked={isHybrid} onCheckedChange={setIsHybrid} />
+                      </div>
                     </div>
                   </>
                 )
               })()}
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">IA do roteiro</label>
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-sm font-medium block">IA do roteiro</label>
                 {providers.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     Nenhuma chave de IA salva.{" "}
@@ -624,7 +650,7 @@ export default function FlowPage() {
                   </p>
                 ) : (
                   <Select value={provider} onValueChange={setProvider}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {providers.map((p) => (
                         <SelectItem key={p} value={p}>{PROVIDER_LABEL[p as FlowProvider] ?? p}</SelectItem>
@@ -634,7 +660,7 @@ export default function FlowPage() {
                 )}
               </div>
 
-              <Button onClick={generate} disabled={generating || !provider} className="w-full">
+              <Button onClick={generate} disabled={generating || !provider} className="w-full h-10 font-semibold">
                 {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                 {generating ? "Gerando roteiro..." : template.mode === "livre" ? "Montar com IA (completa o que faltar)" : "Gerar roteiro"}
               </Button>
@@ -649,8 +675,12 @@ export default function FlowPage() {
       )}
 
       {view === "projetos" && (
-        <div className="space-y-2">
-          {projects.length === 0 && <p className="text-sm text-muted-foreground">Nenhum projeto ainda.</p>}
+        <div className="space-y-2.5 min-w-0">
+          {projects.length === 0 && (
+            <div className="rounded-xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground">
+              Nenhum projeto criado ainda.
+            </div>
+          )}
           {projects.map((p) => {
             const hasVideo = Boolean(p.final_url)
             const effStatus = resolveEffectiveProjectStatus(p.status, hasVideo)
@@ -659,13 +689,13 @@ export default function FlowPage() {
               ? ` (${p.publish_platforms.join(", ")})`
               : ""
             return (
-              <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <button className="min-w-0 flex-1 text-left" onClick={() => openProject(p.id)}>
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-medium">{p.title || "Sem título"}</p>
+              <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border bg-card p-3.5 sm:p-4 min-w-0 overflow-hidden transition-colors hover:border-border/80">
+                <button className="min-w-0 flex-1 text-left space-y-1" onClick={() => openProject(p.id)}>
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <p className="truncate font-semibold text-sm">{p.title || "Sem título"}</p>
                     {hasVideo && <Badge variant="default" className="bg-emerald-600 text-white text-[10px] h-4 px-1.5 font-semibold shrink-0">MP4</Badge>}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground break-words">
                     {getFlowTemplate(p.template_id)?.name ?? p.template_id} · Criado em {new Date(p.created_at).toLocaleString("pt-BR")}
                     {effStatus === "scheduled" && p.scheduled_at && (
                       <span className="text-sky-400 font-medium">
@@ -683,21 +713,23 @@ export default function FlowPage() {
                       </span>
                     )}
                     {effStatus === "publish_failed" && p.publish_error && (
-                      <span className="text-destructive">
+                      <span className="text-destructive break-all">
                         {" "}· {p.publish_error.slice(0, 90)}
                       </span>
                     )}
                   </p>
                 </button>
-                <Badge variant={st.variant} className={cn("shrink-0", st.className)}>
-                  {effStatus === "scheduled" && <CalendarClock className="mr-1 h-3 w-3" />}
-                  {effStatus === "published" && <Check className="mr-1 h-3 w-3" />}
-                  {effStatus === "publishing" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-                  {st.label}
-                </Badge>
-                <Button variant="ghost" size="icon" onClick={() => removeProject(p.id)} aria-label="Apagar projeto">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                  <Badge variant={st.variant} className={cn("shrink-0", st.className)}>
+                    {effStatus === "scheduled" && <CalendarClock className="mr-1 h-3 w-3" />}
+                    {effStatus === "published" && <Check className="mr-1 h-3 w-3" />}
+                    {effStatus === "publishing" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    {st.label}
+                  </Badge>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeProject(p.id)} aria-label="Apagar projeto">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )
           })}
@@ -792,12 +824,12 @@ function SafetyPanel() {
   }
 
   const num = (k: "hourlyLimit" | "dailyLimit" | "minGapSec" | "postsPerDay") => (
-    <Input type="number" className="h-8 w-24" value={String(draft[k])} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} />
+    <Input type="number" className="h-8 w-full" value={String(draft[k])} onChange={(e) => setDraft({ ...draft, [k]: Number(e.target.value) })} />
   )
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
+    <Card className="overflow-hidden min-w-0">
+      <CardContent className="space-y-3 p-4 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={data.agentOnline ? "default" : "outline"} className="gap-1">
             {data.agentOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
@@ -837,20 +869,24 @@ function SafetyPanel() {
         )}
 
         {caps && (
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <p>
+          <div className="space-y-1.5 text-xs text-muted-foreground min-w-0 max-w-full overflow-hidden">
+            <p className="break-words">
               Leitura da conta pela extensão
               {agent.capabilitiesAt ? ` (${new Date(agent.capabilitiesAt).toLocaleString("pt-BR")})` : ""}
               {caps.note ? ` · ${caps.note}` : ""}
             </p>
-            <p>
+            <p className="break-words">
               Créditos: {caps.credits != null ? caps.credits : "não detectado"} · Modelos de vídeo:{" "}
               {Array.isArray(caps.videoModels) && caps.videoModels.length ? caps.videoModels.join(", ") : "não detectado"} · Modelos de imagem:{" "}
               {Array.isArray(caps.imageModels) && caps.imageModels.length ? caps.imageModels.join(", ") : "não detectado"}
             </p>
-            {caps.diag && <p>Detalhe: {JSON.stringify(caps.diag).slice(0, 600)}</p>}
+            {caps.diag && (
+              <div className="rounded-md bg-muted/40 p-2 font-mono text-[11px] break-all max-w-full overflow-x-auto">
+                Detalhe: {JSON.stringify(caps.diag).slice(0, 600)}
+              </div>
+            )}
             {caps.selectors && (
-              <p>
+              <p className="break-words">
                 Diagnóstico da página: {Object.entries(caps.selectors as Record<string, unknown>).map(([k, v]) => `${k}=${typeof v === "boolean" ? (v ? "ok" : "NÃO achou") : String(v)}`).join(" · ")}
                 {caps.path ? ` · rota ${caps.path}` : ""}
               </p>
@@ -858,22 +894,24 @@ function SafetyPanel() {
           </div>
         )}
 
-        <details>
+        <details className="min-w-0">
           <summary className="cursor-pointer text-sm font-medium">Segurança e limites (controle por sua conta e risco)</summary>
-          <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-3 min-w-0">
             <div className="grid gap-3 sm:grid-cols-3">
               <UsageBar label="Gerações na última hora" value={u.generationsHour} limit={s.hourlyLimit} band={bandFor(u.generationsHour, s.hourlyLimit)} />
               <UsageBar label="Gerações em 24 horas" value={u.generationsDay} limit={s.dailyLimit} band={bandFor(u.generationsDay, s.dailyLimit)} />
               <UsageBar label="Postagens em 24 horas" value={u.posts24h} limit={s.postsPerDay} band={u.bandPosts} />
             </div>
-            <div className="flex flex-wrap items-end gap-3 text-xs">
-              <label className="space-y-1">Por hora {num("hourlyLimit")}</label>
-              <label className="space-y-1">Por dia {num("dailyLimit")}</label>
-              <label className="space-y-1">Intervalo mín. (s) {num("minGapSec")}</label>
-              <label className="space-y-1">Postagens/dia {num("postsPerDay")}</label>
-              <label className="flex items-center gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+              <label className="flex flex-col gap-1 font-medium">Por hora {num("hourlyLimit")}</label>
+              <label className="flex flex-col gap-1 font-medium">Por dia {num("dailyLimit")}</label>
+              <label className="flex flex-col gap-1 font-medium">Intervalo mín. (s) {num("minGapSec")}</label>
+              <label className="flex flex-col gap-1 font-medium">Postagens/dia {num("postsPerDay")}</label>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/40 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={draft.riskMode} onChange={(e) => setDraft({ ...draft, riskMode: e.target.checked })} />
-                Ignorar bloqueio de limites (conta e risco)
+                <span>Ignorar bloqueio de limites (conta e risco)</span>
               </label>
               <Button size="sm" onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar limites
@@ -1340,39 +1378,41 @@ function ProjectView({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
-        </Button>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={agentOnline ? "default" : "outline"} className="gap-1">
+    <div className="space-y-5 min-w-0 max-w-full overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border bg-card p-3 sm:p-4 min-w-0">
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2.5">
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
+          </Button>
+          <Badge variant={agentOnline ? "default" : "outline"} className="gap-1 shrink-0">
             {agentOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {agentOnline ? "Computador online" : "Computador offline"}
           </Badge>
-          <Button variant="outline" size="sm" onClick={() => copyText(exportText(), "Roteiro copiado")}>
-            <Copy className="mr-1.5 h-4 w-4" /> Copiar tudo
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => copyText(exportText(), "Roteiro copiado")}>
+            <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar tudo
           </Button>
-          <Button variant="outline" size="sm" onClick={() => downloadText(`${script.title || "roteiro"}.txt`, exportText())}>
-            <Download className="mr-1.5 h-4 w-4" /> Baixar .txt
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => downloadText(`${script.title || "roteiro"}.txt`, exportText())}>
+            <Download className="mr-1.5 h-3.5 w-3.5" /> Baixar .txt
           </Button>
-          <Button variant="outline" size="sm" onClick={save} disabled={!dirty || saving}>
-            {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />} Salvar
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={save} disabled={!dirty || saving}>
+            {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />} Salvar
           </Button>
-          <Button size="sm" onClick={nextPart} disabled={creatingPart} title="A IA continua a história de onde esta parte parou, com os mesmos personagens">
-            {creatingPart ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null} Criar parte {part + 1}
+          <Button size="sm" className="h-8 text-xs" onClick={nextPart} disabled={creatingPart} title="A IA continua a história de onde esta parte parou, com os mesmos personagens">
+            {creatingPart ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null} Criar parte {part + 1}
           </Button>
         </div>
       </div>
 
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold">{script.title}</h2>
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold break-words">{script.title}</h2>
           {(() => {
             const effStatus = resolveEffectiveProjectStatus(status, Boolean(project.final_url))
             const st = PROJECT_STATUS_CONFIG[effStatus] || { label: effStatus, variant: "outline" as const }
             return (
-              <Badge variant={st.variant} className={st.className}>
+              <Badge variant={st.variant} className={cn("shrink-0", st.className)}>
                 {effStatus === "scheduled" && <CalendarClock className="mr-1 h-3 w-3" />}
                 {effStatus === "published" && <Check className="mr-1 h-3 w-3" />}
                 {effStatus === "publishing" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
@@ -1381,8 +1421,8 @@ function ProjectView({
             )
           })()}
         </div>
-        <p className="text-sm text-muted-foreground">{script.logline}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground break-words">{script.logline}</p>
+        <p className="mt-1 text-xs text-muted-foreground break-words">
           {template.name} · {script.takes.length} takes · total {fmtDuration(script.takes.reduce((n, k) => n + k.seconds, 0))} · {String(params.model)} · {String(params.quality)}
           {status === "scheduled" && (publish?.scheduledAt || project.scheduled_at) && (
             <span className="text-sky-400 font-medium">
@@ -1398,9 +1438,9 @@ function ProjectView({
       </div>
 
       {(script.characters.length > 0 || free) && (
-        <div className="space-y-3">
+        <div className="space-y-3 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium">
+            <p className="text-sm font-medium min-w-0">
               Personagens{" "}
               <span className="text-xs font-normal text-muted-foreground">
                 (descrição fixa em inglês: idade, rosto, cabelo, corpo, roupa; 25 a 35 palavras)
@@ -1428,16 +1468,16 @@ function ProjectView({
             </label>
           </div>
 
-          <Card className="border-dashed">
-            <CardContent className="space-y-3 p-4">
+          <Card className="border-dashed min-w-0 overflow-hidden">
+            <CardContent className="space-y-3 p-4 min-w-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium">Folha do elenco (cenas com mais de um personagem)</p>
                   <p className="text-xs text-muted-foreground">
                     Imagem 16:9 com os personagens lado a lado para manter a aparência quando contracenam no mesmo take.
                   </p>
                 </div>
-                <Badge variant={script.castSheetStatus === "aprovada" ? "default" : "outline"}>
+                <Badge variant={script.castSheetStatus === "aprovada" ? "default" : "outline"} className="shrink-0">
                   {script.castSheetStatus ? (SHEET_STATUS_LABEL[script.castSheetStatus] ?? script.castSheetStatus) : "Sem folha"}
                 </Badge>
               </div>
@@ -1446,7 +1486,7 @@ function ProjectView({
                 <img
                   src={script.castSheetUrl}
                   alt="Folha do elenco"
-                  className="max-h-44 rounded-md border bg-muted object-contain"
+                  className="max-h-44 w-full sm:w-auto max-w-full rounded-md border bg-muted object-contain"
                 />
               )}
 
@@ -1525,16 +1565,16 @@ function ProjectView({
             </CardContent>
           </Card>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {script.characters.map((c) => {
               const isVoiceOnly =
                 /^(narrador|narrator|voz|voice|locutor)\b/i.test(c.name || "") ||
                 /invisible voice|no visual features|off-screen voice|sem corpo|apenas voz|voz invis[ií]vel/i.test(c.description || "")
               return (
-              <Card key={c.id}>
-                <CardContent className="space-y-2.5 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <Input value={c.name} onChange={(e) => setCharacter(c.id, { name: e.target.value })} maxLength={60} />
+              <Card key={c.id} className="min-w-0 overflow-hidden">
+                <CardContent className="space-y-2.5 p-4 min-w-0">
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <Input value={c.name} onChange={(e) => setCharacter(c.id, { name: e.target.value })} maxLength={60} className="min-w-0" />
                     {isVoiceOnly ? (
                       <Badge variant="secondary" className="shrink-0 bg-blue-500/10 text-blue-400 border-blue-500/20 text-[11px]">
                         🎙️ Voz de narração
@@ -1661,7 +1701,7 @@ function ProjectView({
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-muted-foreground">
                       <span className="italic">🎙️ Voz em off (sem corpo físico em cena: não precisa de retrato).</span>
                       <Button
                         size="sm"
@@ -1681,7 +1721,7 @@ function ProjectView({
                       onValueChange={(v) => handleUseFromLibrary(c.id, v)}
                       disabled={library.length === 0 || !!sheetBusy}
                     >
-                      <SelectTrigger className="h-8 text-xs">
+                      <SelectTrigger className="h-8 text-xs w-full">
                         <SelectValue placeholder="Usar da biblioteca" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1704,11 +1744,11 @@ function ProjectView({
       )}
 
       {(free || script.locations.length > 0) && (
-        <details className="rounded-lg border p-3" open={free}>
+        <details className="rounded-lg border p-3 min-w-0" open={free}>
           <summary className="cursor-pointer text-sm font-medium">Cenários ({script.locations.length})</summary>
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-2 min-w-0">
             {script.locations.map((l) => (
-              <div key={l.id} className="grid gap-2 sm:grid-cols-[160px_1fr]">
+              <div key={l.id} className="grid gap-2 sm:grid-cols-[180px_1fr] min-w-0">
                 <Input value={l.name} onChange={(e) => setLocation(l.id, { name: e.target.value })} maxLength={60} />
                 <Textarea value={l.description} onChange={(e) => setLocation(l.id, { description: e.target.value })} rows={2} maxLength={600} placeholder="Descrição em inglês: lugar, hora do dia, luz, texturas" />
               </div>
@@ -1719,15 +1759,15 @@ function ProjectView({
       )}
 
       {issues.length > 0 && (
-        <Card className="border-amber-500/40">
-          <CardContent className="space-y-1 p-4 text-sm">
+        <Card className="border-amber-500/40 min-w-0 overflow-hidden">
+          <CardContent className="space-y-1 p-4 text-sm min-w-0">
             <p className="font-medium text-amber-500">Conferência do roteiro ({issues.length})</p>
-            {issues.slice(0, 12).map((i, k) => <p key={k} className="text-xs text-muted-foreground">• {i.message}</p>)}
+            {issues.slice(0, 12).map((i, k) => <p key={k} className="text-xs text-muted-foreground break-words">• {i.message}</p>)}
           </CardContent>
         </Card>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-3 min-w-0">
         {script.takes.map((t) => {
           const words = countWords(t.line)
           const limit = wordLimit(t.seconds)
@@ -1736,11 +1776,11 @@ function ProjectView({
           const job = bestJob(t.n)
           const prompt = buildTakePrompt(script, t, params, template, takeReference(script, t, params))
           return (
-            <Card key={t.n}>
-              <CardContent className="space-y-3 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">
+            <Card key={t.n} className="min-w-0 overflow-hidden">
+              <CardContent className="space-y-3 p-4 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <p className="font-medium break-words">
                       Take {t.n} <span className="text-xs font-normal text-muted-foreground">· {t.seconds}s{t.model ? ` · ${t.model}` : ""} · {fmtClock(script.takes.slice(0, t.n - 1).reduce((n, k) => n + k.seconds, 0))}–{fmtClock(script.takes.slice(0, t.n).reduce((n, k) => n + k.seconds, 0))}{t.beat ? " · " + t.beat : ""}</span>
                     </p>
                     <Badge variant="outline" className="text-[10px] font-normal py-0 h-5 border-primary/30 bg-primary/5">
@@ -1758,7 +1798,7 @@ function ProjectView({
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     {job && (
                       <Badge variant={job.status === "done" ? "default" : "outline"}>
                         {STATUS_LABEL[job.status] ?? job.status}
@@ -1775,8 +1815,8 @@ function ProjectView({
                 </div>
                 {job?.status === "done" && job.result_url && (
                   // Com o video final pronto, os takes so carregam ao dar play: menos videos pesando na pagina.
-                  <div className="space-y-1.5">
-                    <video src={job.result_url} controls preload={project.final_url ? "none" : "metadata"} className="max-h-72 rounded-md bg-black" />
+                  <div className="space-y-1.5 min-w-0 max-w-full">
+                    <video src={job.result_url} controls preload={project.final_url ? "none" : "metadata"} className="max-h-72 w-full sm:w-auto max-w-full rounded-md bg-black object-contain" />
                     <a
                       className="inline-flex items-center gap-1 text-xs text-primary underline"
                       href={`${job.result_url}${job.result_url.includes("?") ? "&" : "?"}download=1`}
@@ -1787,13 +1827,13 @@ function ProjectView({
                   </div>
                 )}
                 {free && (
-                  <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="grid gap-2 grid-cols-1 sm:grid-cols-3">
                     <Select value={kind} onValueChange={(v) => setTake(t.n, { kind: v as FlowTakeKind, ...(v === "ambiente" ? { line: "", speaker: "" } : v === "narracao" ? { speaker: "narrator" } : {}) })}>
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>{KIND_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={String(t.seconds)} onValueChange={(v) => setTake(t.n, { seconds: Number(v) })}>
-                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>{allowedSecondsForModel(t.model || String(params.model)).map((x) => <SelectItem key={x} value={String(x)}>{x}s</SelectItem>)}</SelectContent>
                     </Select>
                     <Button size="sm" variant="ghost" className="h-8 text-destructive" onClick={() => removeTake(t.n)} disabled={script.takes.length <= 1}>Remover take</Button>
@@ -1801,7 +1841,7 @@ function ProjectView({
                 )}
                 {kind === "dialogo" && script.characters.length > 0 && (
                   <Select value={t.speaker || "_"} onValueChange={(v) => setTake(t.n, { speaker: v === "_" ? "" : v, characters: v !== "_" && !t.characters.includes(v) ? [...t.characters, v] : t.characters })}>
-                    <SelectTrigger className="h-8"><SelectValue placeholder="Quem fala" /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Quem fala" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_">Quem fala...</SelectItem>
                       {script.characters.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -1818,7 +1858,7 @@ function ProjectView({
                   </div>
                 )}
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Ação da cena (em inglês: uma ação concreta, o objeto e a expressão)</label>
+                  <label className="text-xs text-muted-foreground block">Ação da cena (em inglês: uma ação concreta, o objeto e a expressão)</label>
                   <Textarea value={t.action} onChange={(e) => setTake(t.n, { action: e.target.value })} rows={2} maxLength={600} />
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -1829,7 +1869,7 @@ function ProjectView({
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     {script.locations.length > 0 && (
                       <Select value={t.location || script.locations[0]?.id} onValueChange={(v) => setTake(t.n, { location: v })}>
-                        <SelectTrigger className="h-7 w-44 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-7 w-full sm:w-48 max-w-full text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>{script.locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
                       </Select>
                     )}
@@ -1849,21 +1889,21 @@ function ProjectView({
                   </div>
                 )}
                 {/* Edição Conjugada, Transições e SFX (Remotion) */}
-                <div className="rounded-lg border bg-muted/40 p-2.5 space-y-2">
-                  <div className="flex items-center justify-between">
+                <div className="rounded-lg border bg-muted/40 p-2.5 space-y-2 min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
                     <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       🎬 Edição Dinâmica & Pós-Produção Remotion
                     </span>
                     <span className="text-[10px] text-muted-foreground">Transição e SFX por take</span>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] text-muted-foreground">Transição de corte</label>
+                  <div className="grid gap-2 grid-cols-1 sm:grid-cols-3">
+                    <div className="space-y-1 min-w-0">
+                      <label className="text-[11px] text-muted-foreground block">Transição de corte</label>
                       <Select
                         value={t.transition || "cut"}
                         onValueChange={(v) => setTake(t.n, { transition: v as FlowTransition })}
                       >
-                        <SelectTrigger className="h-8 text-xs bg-background">
+                        <SelectTrigger className="h-8 text-xs bg-background w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1876,13 +1916,13 @@ function ProjectView({
                       </Select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[11px] text-muted-foreground">Efeito Sonoro (SFX)</label>
+                    <div className="space-y-1 min-w-0">
+                      <label className="text-[11px] text-muted-foreground block">Efeito Sonoro (SFX)</label>
                       <Select
                         value={t.sfx || "none"}
                         onValueChange={(v) => setTake(t.n, { sfx: v as FlowSfx })}
                       >
-                        <SelectTrigger className="h-8 text-xs bg-background">
+                        <SelectTrigger className="h-8 text-xs bg-background w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1895,13 +1935,13 @@ function ProjectView({
                       </Select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[11px] text-muted-foreground">Mídia da Cena</label>
+                    <div className="space-y-1 min-w-0">
+                      <label className="text-[11px] text-muted-foreground block">Mídia da Cena</label>
                       <Select
                         value={t.mediaType || "ai_flow"}
                         onValueChange={(v) => setTake(t.n, { mediaType: v as FlowMediaType })}
                       >
-                        <SelectTrigger className="h-8 text-xs bg-background">
+                        <SelectTrigger className="h-8 text-xs bg-background w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1917,7 +1957,7 @@ function ProjectView({
 
                   {t.mediaType && t.mediaType !== "ai_flow" && (
                     <div className="pt-1 space-y-1">
-                      <label className="text-[11px] text-muted-foreground">URL ou Caminho do Arquivo Real / Print</label>
+                      <label className="text-[11px] text-muted-foreground block">URL ou Caminho do Arquivo Real / Print</label>
                       <Input
                         value={t.assetUrl || ""}
                         onChange={(e) => setTake(t.n, { assetUrl: e.target.value })}
@@ -1928,10 +1968,10 @@ function ProjectView({
                   )}
                 </div>
 
-                {job?.status === "draft" && job.error_message && <p className="text-xs text-destructive">{job.error_message}</p>}
-                <details className="text-xs">
+                {job?.status === "draft" && job.error_message && <p className="text-xs text-destructive break-words">{job.error_message}</p>}
+                <details className="text-xs min-w-0">
                   <summary className="cursor-pointer text-muted-foreground">Prompt do Flow</summary>
-                  <pre className="mt-2 whitespace-pre-wrap rounded-md bg-muted p-3 text-[11px]">{prompt}</pre>
+                  <pre className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-x-auto max-w-full rounded-md bg-muted p-3 text-[11px]">{prompt}</pre>
                   <Button variant="outline" size="sm" className="mt-2" onClick={() => copyText(prompt, `Prompt do take ${t.n} copiado`)}>
                     <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar prompt
                   </Button>
@@ -1947,10 +1987,10 @@ function ProjectView({
         )}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
-            Título, legenda e hashtags
+      <Card className="min-w-0 overflow-hidden">
+        <CardHeader className="p-4 pb-2">
+          <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+            <span>Título, legenda e hashtags</span>
             <Button
               variant="outline"
               size="sm"
@@ -1960,7 +2000,7 @@ function ProjectView({
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-1 text-sm">
+        <CardContent className="p-4 pt-2 space-y-1.5 text-sm break-words">
           <p><span className="text-muted-foreground">Título:</span> {script.seo.title}</p>
           <p><span className="text-muted-foreground">Legenda:</span> {script.seo.caption}</p>
           <p><span className="text-muted-foreground">Gancho:</span> {script.seo.hook}</p>
@@ -1968,8 +2008,8 @@ function ProjectView({
         </CardContent>
       </Card>
 
-      <Card className="border-primary/40">
-        <CardContent className="space-y-3 p-4">
+      <Card className="border-primary/40 min-w-0 overflow-hidden">
+        <CardContent className="space-y-3 p-4 min-w-0">
           <p className="font-medium">1. Gerar os vídeos no Google Flow</p>
           {(() => {
             // Estimativa com os limites atuais: cada take leva ~1,5 min no Flow + o intervalo minimo entre geracoes.
@@ -1995,19 +2035,21 @@ function ProjectView({
             )
           })()}
           {queuedAny ? (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Check className="h-4 w-4" /> Enviado. Os takes acima mostram o andamento.
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Check className="h-4 w-4 text-emerald-500 shrink-0" /> Enviado. Os takes acima mostram o andamento.
+              </span>
               {takeJobs.some((j) => j.status === "draft") && (
-                <Button size="sm" variant="outline" className="ml-3" onClick={retryAllFailed}>
+                <Button size="sm" variant="outline" onClick={retryAllFailed}>
                   <Send className="mr-1.5 h-3.5 w-3.5" /> Reenviar falhas ({takeJobs.filter((j) => j.status === "draft").length})
                 </Button>
               )}
-              {!agentOnline && " A extensão ainda não está online neste computador."}
-            </p>
+              {!agentOnline && <span>A extensão ainda não está online neste computador.</span>}
+            </div>
           ) : !confirming ? (
             <>
               <p className="text-sm text-muted-foreground">Cada take usa créditos da sua conta do Flow. O custo exato aparece no Flow na hora de gerar.</p>
-              <Button onClick={() => setConfirming(true)} disabled={overCount > 0 || dirty}>
+              <Button onClick={() => setConfirming(true)} disabled={overCount > 0 || dirty} className="w-full sm:w-auto">
                 <Send className="mr-2 h-4 w-4" /> Revisar e enviar para a fila do Flow
               </Button>
               {overCount > 0 && <p className="text-xs text-destructive">{overCount} take(s) com fala acima do limite. Ajuste antes de enviar.</p>}
@@ -2018,7 +2060,7 @@ function ProjectView({
                 Vão para a fila <strong>{script.takes.length} takes</strong> de {String(params.seconds)}s{String(params.model).toLowerCase().includes("omni") ? ` em ${String(params.quality)}` : ""}, modelo <strong>{String(params.model)}</strong>.
               </p>
               <p className="text-muted-foreground">Isso gasta créditos do seu Flow. Os vídeos só são gerados com a extensão aberta no seu Chrome, logada na conta do Flow.</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button onClick={queue} disabled={queueing}>
                   {queueing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Confirmar envio
                 </Button>
@@ -2030,8 +2072,8 @@ function ProjectView({
       </Card>
 
       {drafts.length > 0 && String(params.quality) === "360p" && (
-        <Card>
-          <CardContent className="space-y-3 p-4">
+        <Card className="min-w-0 overflow-hidden">
+          <CardContent className="space-y-3 p-4 min-w-0">
             <p className="font-medium">2. Aprovar os rascunhos e gerar a versão final (720p)</p>
             <p className="text-sm text-muted-foreground">Marque os takes que ficaram bons. Só eles serão refeitos em 720p, o que economiza créditos. Os rascunhos continuam guardados.</p>
             <div className="flex flex-wrap gap-2">
@@ -2056,20 +2098,20 @@ function ProjectView({
         </Card>
       )}
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
+      <Card className="min-w-0 overflow-hidden">
+        <CardContent className="space-y-3 p-4 min-w-0">
           <p className="font-medium">3. Montar o vídeo final</p>
           <p className="text-sm text-muted-foreground">Junta os takes (usando a versão 720p quando existir) e gera a legenda a partir do que é falado: nos vídeos curtos ela é gravada no vídeo; nos longos sai só o arquivo .srt, para ativar no YouTube.</p>
           <div className="flex flex-wrap items-end gap-3 pt-1">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Palavras por legenda</label>
+            <div className="space-y-1 w-full sm:w-auto">
+              <label className="text-xs font-medium text-muted-foreground block">Palavras por legenda</label>
               <Select
                 value={String(project.params?.wordsPerCaption ?? 2)}
                 onValueChange={(v) => {
                   setProject({ ...project, params: { ...project.params, wordsPerCaption: Number(v) } })
                 }}
               >
-                <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full sm:w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">1 palavra (dinâmico)</SelectItem>
                   <SelectItem value="2">2 palavras (rápido)</SelectItem>
@@ -2078,6 +2120,7 @@ function ProjectView({
               </Select>
             </div>
             <Button
+              className="w-full sm:w-auto"
               disabled={!allDone || status === "assembling" || busy === "asm"}
               onClick={async () => {
                 if (await run("asm", () => assembleFlowProjectAction(project.id, { wordsPerCaption: Number(project.params?.wordsPerCaption ?? 2) }), "Montagem iniciada.")) refreshProject()
@@ -2088,23 +2131,23 @@ function ProjectView({
             </Button>
           </div>
           {!allDone && <p className="text-xs text-muted-foreground">Disponível quando todos os takes estiverem prontos.</p>}
-          {status === "assemble_failed" && project.assemble_error && <p className="text-sm text-destructive">{project.assemble_error}</p>}
+          {status === "assemble_failed" && project.assemble_error && <p className="text-sm text-destructive break-words">{project.assemble_error}</p>}
           {project.final_url && (
-            <div className="space-y-2">
-              <video src={project.final_url} controls preload="metadata" className="max-h-96 rounded-md bg-black" />
-              <div className="flex flex-wrap gap-2 text-sm">
-                <a className="text-primary underline" href={`${project.final_url}${project.final_url.includes('?') ? '&' : '?'}download=1`} download={project.final_url.split('/').pop()}>Baixar vídeo</a>
-                {project.srt_url && <a className="text-primary underline" href={`${project.srt_url}${project.srt_url.includes('?') ? '&' : '?'}download=1`} download={project.srt_url.split('/').pop()}>Baixar legenda (.srt)</a>}
+            <div className="space-y-2 min-w-0 max-w-full">
+              <video src={project.final_url} controls preload="metadata" className="max-h-96 w-full sm:w-auto max-w-full rounded-md bg-black object-contain" />
+              <div className="flex flex-wrap gap-3 text-sm">
+                <a className="text-primary underline font-medium" href={`${project.final_url}${project.final_url.includes('?') ? '&' : '?'}download=1`} download={project.final_url.split('/').pop()}>Baixar vídeo MP4</a>
+                {project.srt_url && <a className="text-primary underline font-medium" href={`${project.srt_url}${project.srt_url.includes('?') ? '&' : '?'}download=1`} download={project.srt_url.split('/').pop()}>Baixar legenda (.srt)</a>}
               </div>
-              {project.assemble_error && <p className="text-xs text-muted-foreground">{project.assemble_error}</p>}
+              {project.assemble_error && <p className="text-xs text-muted-foreground break-words">{project.assemble_error}</p>}
             </div>
           )}
 
           {(allDone || project.final_url) && (
-            <div className="mt-4 pt-4 border-t border-border/60 space-y-3">
+            <div className="mt-4 pt-4 border-t border-border/60 space-y-3 min-w-0">
               <div>
                 <p className="text-sm font-medium flex items-center gap-1.5">
-                  <Mic className="h-4 w-4 text-primary" /> Substituir Voz por Áudio Externo / Gravação
+                  <Mic className="h-4 w-4 text-primary shrink-0" /> Substituir Voz por Áudio Externo / Gravação
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Envie um arquivo de áudio (.webm, .mp3, .wav, .m4a). O DarkTube corta o silêncio inicial, remonta sobre os takes limpos e queima as novas legendas Whisper.
@@ -2125,11 +2168,14 @@ function ProjectView({
                 <Button
                   size="sm"
                   variant="outline"
+                  className="max-w-full"
                   onClick={() => audioInputRef.current?.click()}
                   disabled={busy === "audio_replace"}
                 >
-                  <Upload className="mr-1.5 h-3.5 w-3.5" />
-                  {selectedAudioFile ? selectedAudioFile.name : "Escolher arquivo de áudio..."}
+                  <Upload className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate max-w-[220px] sm:max-w-xs">
+                    {selectedAudioFile ? selectedAudioFile.name : "Escolher arquivo de áudio..."}
+                  </span>
                 </Button>
 
                 {selectedAudioFile && (
@@ -2162,9 +2208,9 @@ function ProjectView({
       </Card>
 
       {project.final_url && (
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <p className="flex items-center gap-1.5 font-medium"><CalendarClock className="h-4 w-4" /> 4. Publicar ou agendar</p>
+        <Card className="min-w-0 overflow-hidden">
+          <CardContent className="space-y-3 p-4 min-w-0">
+            <p className="flex items-center gap-1.5 font-medium"><CalendarClock className="h-4 w-4 shrink-0" /> 4. Publicar ou agendar</p>
             {accounts.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nenhuma conta conectada. Conecte em Credenciais.</p>
             ) : (
@@ -2172,7 +2218,7 @@ function ProjectView({
                 {accounts.map((a) => {
                   const on = picked[a.platform] === a.id
                   return (
-                    <label key={a.platform + a.id} className={cn("flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-sm", on && "border-primary bg-primary/5")}>
+                    <label key={a.platform + a.id} className={cn("flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs sm:text-sm", on && "border-primary bg-primary/5")}>
                       <input
                         type="checkbox"
                         checked={on}
@@ -2185,7 +2231,7 @@ function ProjectView({
                           })
                         }
                       />
-                      {a.platform} · {a.name}
+                      <span className="truncate max-w-[200px]">{a.platform} · {a.name}</span>
                     </label>
                   )
                 })}
@@ -2194,8 +2240,8 @@ function ProjectView({
             {picked.facebook && (
               fbPages.length > 0 ? (
                 <label className="flex flex-wrap items-center gap-2 text-sm">
-                  Página do Facebook:
-                  <select className="h-8 rounded-md border bg-background px-2 text-sm" value={fbPage} onChange={(e) => setFbPage(e.target.value)}>
+                  <span>Página do Facebook:</span>
+                  <select className="h-8 rounded-md border bg-background px-2 text-sm max-w-full" value={fbPage} onChange={(e) => setFbPage(e.target.value)}>
                     {fbPages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </label>
@@ -2204,11 +2250,12 @@ function ProjectView({
               )
             )}
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              <label className="flex items-center gap-1.5"><input type="radio" checked={now} onChange={() => setNow(true)} /> Publicar agora</label>
-              <label className="flex items-center gap-1.5"><input type="radio" checked={!now} onChange={() => setNow(false)} /> Agendar</label>
-              {!now && <Input type="datetime-local" className="h-8 w-56" value={when} onChange={(e) => setWhen(e.target.value)} />}
+              <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" checked={now} onChange={() => setNow(true)} /> Publicar agora</label>
+              <label className="flex items-center gap-1.5 cursor-pointer"><input type="radio" checked={!now} onChange={() => setNow(false)} /> Agendar</label>
+              {!now && <Input type="datetime-local" className="h-8 w-full sm:w-56 max-w-full" value={when} onChange={(e) => setWhen(e.target.value)} />}
             </div>
             <Button
+              className="w-full sm:w-auto"
               disabled={busy === "pub" || status === "publishing" || Object.keys(picked).length === 0}
               onClick={async () => {
                 if (busy === "pub" || status === "publishing") return
@@ -2250,23 +2297,25 @@ function ProjectView({
               )}
             </Button>
             {status === "publishing" && (
-              <p className="flex items-center gap-1.5 text-xs text-indigo-400 font-medium">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />
-                Em publicação nas redes selecionadas{publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}... O andamento também aparece em Dark Clips.
+              <p className="flex items-center gap-1.5 text-xs text-indigo-400 font-medium break-words">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400 shrink-0" />
+                <span>Em publicação nas redes selecionadas{publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}... O andamento também aparece em Dark Clips.</span>
               </p>
             )}
             {status === "scheduled" && (
-              <p className="flex items-center gap-1.5 text-sm font-medium text-sky-400">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-sky-400 break-words">
                 <CalendarClock className="h-4 w-4 shrink-0" />
-                Agendado para publicação
-                {(publish?.scheduledAt || project.scheduled_at)
-                  ? ` em ${new Date((publish?.scheduledAt || project.scheduled_at) as string).toLocaleString("pt-BR")}`
-                  : ""}
-                {publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}. O andamento também aparece em Dark Clips.
+                <span>
+                  Agendado para publicação
+                  {(publish?.scheduledAt || project.scheduled_at)
+                    ? ` em ${new Date((publish?.scheduledAt || project.scheduled_at) as string).toLocaleString("pt-BR")}`
+                    : ""}
+                  {publish?.platforms?.length ? ` (${publish.platforms.join(", ")})` : ""}. O andamento também aparece em Dark Clips.
+                </span>
               </p>
             )}
             {status === "published" && (
-              <p className="text-sm font-medium text-emerald-500">
+              <p className="text-sm font-medium text-emerald-500 break-words">
                 ✓ Publicado com sucesso
                 {(publish?.publishedAt || project.published_at)
                   ? ` em ${new Date((publish?.publishedAt || project.published_at) as string).toLocaleString("pt-BR")}`
@@ -2276,7 +2325,7 @@ function ProjectView({
             )}
             {status === "publish_failed" && (
               <div className="space-y-2">
-                <p className="text-sm text-destructive">Falha na publicação{publish?.error ? `: ${publish.error}` : "."}</p>
+                <p className="text-sm text-destructive break-words">Falha na publicação{publish?.error ? `: ${publish.error}` : "."}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"

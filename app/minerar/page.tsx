@@ -347,7 +347,7 @@ export default function MinerarPage() {
             </div>
             <Button
               onClick={() => setWizardOpen(true)}
-              className="rounded-xl shadow-lg"
+              className="rounded-xl shadow-lg w-full md:w-auto shrink-0"
             >
               Iniciar Assistente
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -372,7 +372,7 @@ export default function MinerarPage() {
           {/* Search bar */}
           <div className="space-y-4">
             <div className="flex gap-2">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 {isUrlMode ? <Link2 className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-emerald-500" /> : <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
                 <input
                   type="text"
@@ -385,7 +385,7 @@ export default function MinerarPage() {
               </div>
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors ${showFilters
+                className={`flex h-11 items-center gap-1.5 sm:gap-2 rounded-lg border px-3 sm:px-4 text-sm font-medium transition-colors shrink-0 ${showFilters
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border bg-card text-muted-foreground hover:text-foreground"
                   }`}
@@ -396,7 +396,7 @@ export default function MinerarPage() {
               <Button
                 onClick={() => handleSearch()}
                 disabled={loading || extracting}
-                className={`flex h-11 items-center gap-2 rounded-lg px-5 text-sm font-medium shadow-md ${isUrlMode ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
+                className={`flex h-11 items-center gap-1.5 sm:gap-2 rounded-lg px-3.5 sm:px-5 text-sm font-medium shadow-md shrink-0 ${isUrlMode ? 'bg-emerald-600 hover:bg-emerald-700' : ''}`}
               >
                 {extracting ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /><span className="hidden sm:inline">Extraindo...</span></>

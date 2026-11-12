@@ -147,7 +147,7 @@ export default function AdminPromptsPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4 max-w-md mx-auto">
+      <div className="flex flex-col items-center justify-center py-24 text-center space-y-4 max-w-md mx-auto p-4">
         <div className="p-4 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
           <ShieldAlert className="h-10 w-10" />
         </div>
@@ -162,20 +162,20 @@ export default function AdminPromptsPage() {
   const isChanged = activePrompt ? currentContent.trim() !== activePrompt.content.trim() : false
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto p-3 xs:p-4 sm:p-6 lg:p-8 pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
               <Terminal className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">Gerenciador de Prompts do Sistema</h1>
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold uppercase text-[10px] px-2 py-0.5">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Gerenciador de Prompts do Sistema</h1>
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold uppercase text-[10px] px-2 py-0.5 shrink-0">
               Administração
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Configure e personalize em tempo real as instruções de sistema dos modelos de IA.
           </p>
         </div>
@@ -200,7 +200,7 @@ export default function AdminPromptsPage() {
                     key={p.id}
                     type="button"
                     onClick={() => handleSelectPrompt(p)}
-                    className={`w-full text-left p-4 rounded-xl border transition-all flex flex-col gap-2 ${
+                    className={`w-full text-left p-3.5 sm:p-4 rounded-xl border transition-all flex flex-col gap-2 ${
                       isActive
                         ? "bg-primary/10 border-primary shadow-sm"
                         : "bg-card hover:bg-secondary/40 border-border text-muted-foreground"
@@ -224,8 +224,8 @@ export default function AdminPromptsPage() {
                       {p.description}
                     </p>
                     <div className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground/80 font-mono">
-                      <Cpu className="h-3 w-3 text-primary" />
-                      <span>{p.targetModel}</span>
+                      <Cpu className="h-3 w-3 text-primary shrink-0" />
+                      <span className="truncate">{p.targetModel}</span>
                     </div>
                   </button>
                 )
@@ -256,26 +256,26 @@ export default function AdminPromptsPage() {
               <Card className="border-border shadow-lg overflow-hidden">
                 <CardHeader className="bg-secondary/20 border-b p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-lg font-bold">{activePrompt.name}</CardTitle>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-base sm:text-lg font-bold truncate">{activePrompt.name}</CardTitle>
                         {activePrompt.isCustomized ? (
-                          <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold">
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 font-bold text-xs shrink-0">
                             Personalizado no Banco
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs shrink-0">
                             Versão Padrão do Sistema
                           </Badge>
                         )}
                       </div>
-                      <CardDescription className="text-xs mt-1">
+                      <CardDescription className="text-xs mt-1 truncate">
                         {activePrompt.description}
                       </CardDescription>
                     </div>
 
                     {/* Action buttons top */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <Button
                         type="button"
                         variant="outline"
@@ -319,7 +319,7 @@ export default function AdminPromptsPage() {
                 </CardHeader>
 
                 {/* Editor Content Area */}
-                <CardContent className="p-4 sm:p-5 space-y-4">
+                <CardContent className="p-3.5 sm:p-5 space-y-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
                       <span>Editor de Instruções (System Prompt)</span>
@@ -328,8 +328,8 @@ export default function AdminPromptsPage() {
                     <Textarea
                       value={currentContent}
                       onChange={(e) => setCurrentContent(e.target.value)}
-                      rows={22}
-                      className="font-mono text-xs leading-relaxed bg-black/40 border-border/80 focus:border-primary p-4 rounded-xl resize-y"
+                      rows={20}
+                      className="font-mono text-xs leading-relaxed bg-black/40 border-border/80 focus:border-primary p-3 sm:p-4 rounded-xl resize-y"
                       placeholder="Digite as instruções do prompt de sistema..."
                     />
                   </div>
@@ -351,7 +351,7 @@ export default function AdminPromptsPage() {
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="gap-2 min-w-[160px] shadow-lg shadow-primary/20"
+                        className="gap-2 min-w-[160px] shadow-lg shadow-primary/20 w-full sm:w-auto"
                       >
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Salvar Prompt

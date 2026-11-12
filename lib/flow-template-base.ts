@@ -125,6 +125,7 @@ export const EMOTIONS: FlowFieldOption[] = [
 export const REALISM: FlowFieldOption[] = [
   { value: 'cinematografico', label: 'Cinematográfico (película, textura natural)' },
   { value: 'hiper', label: 'Hiper-realista (detalhe fino)' },
+  { value: 'cru', label: 'Cru / UGC de celular (sem cara de IA)' },
   { value: 'estilizado', label: 'Estilizado (cores fortes, acabamento limpo)' },
   { value: 'animacao3d', label: 'Animação 3D (estilo filme de animação)' },
   { value: 'massinha', label: 'Massinha / feltro (stop motion)' },
@@ -138,6 +139,7 @@ export const REALISM: FlowFieldOption[] = [
 export const REALISM_PROMPT: Record<string, string> = {
   cinematografico: 'cinematic 35mm film look, natural skin texture, motivated practical lighting',
   hiper: 'photorealistic, fine natural detail, realistic lighting',
+  cru: 'recorded on a smartphone front camera, natural raw domestic lighting, slight handheld shake, unpolished UGC video texture, flat realistic colors, low contrast, natural skin texture with small imperfections, zero cinematic lighting, zero airbrushed skin, no studio glow',
   estilizado: 'stylized cinematic look, bold clean colors, polished finish',
   animacao3d: 'high-end 3D animated film style, expressive characters, soft global illumination',
   massinha: 'handmade claymation and felt stop-motion look, tactile textures, warm light',

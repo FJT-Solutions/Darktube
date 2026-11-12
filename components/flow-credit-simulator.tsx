@@ -133,30 +133,30 @@ export function FlowCreditSimulator({
   const allowedSeconds = useMemo(() => allowedSecondsForModel(simModel), [simModel])
 
   return (
-    <Card className={`border-amber-500/30 bg-gradient-to-b from-amber-500/5 via-background to-background ${className ?? ""}`}>
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="rounded-lg bg-amber-500/10 p-2 text-amber-500">
+    <Card className={`border-amber-500/30 bg-gradient-to-b from-amber-500/5 via-background to-background overflow-hidden min-w-0 ${className ?? ""}`}>
+      <CardHeader className="p-4 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+          <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+            <div className="rounded-lg bg-amber-500/10 p-2 text-amber-500 shrink-0">
               <Calculator className="h-5 w-5" />
             </div>
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                Simulador de Créditos e Capacidade de Produção
-                <Badge variant="outline" className="border-amber-500/40 text-amber-500 font-normal">
+            <div className="min-w-0">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-sm sm:text-base">
+                <span>Simulador de Créditos e Capacidade</span>
+                <Badge variant="outline" className="border-amber-500/40 text-amber-500 font-normal text-[10px]">
                   Google Flow
                 </Badge>
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="text-xs mt-0.5">
                 Simule quantos vídeos completos você consegue produzir conforme o modelo e a duração dos takes
               </CardDescription>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 shrink-0">
             <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
-              <Coins className="h-3.5 w-3.5" />
-              <span>Saldo na Conta: {loadingCredits ? "..." : accountCredits.toLocaleString("pt-BR")} cred</span>
+              <Coins className="h-3.5 w-3.5 shrink-0" />
+              <span>Saldo: {loadingCredits ? "..." : accountCredits.toLocaleString("pt-BR")} cred</span>
             </div>
             <Button
               variant="ghost"
@@ -167,23 +167,23 @@ export function FlowCreditSimulator({
                 else setIsExpanded(!isExpanded)
               }}
             >
-              {onClose ? "Fechar" : isExpanded ? "Recolher" : "Expandir Simulador"}
+              {onClose ? "Fechar" : isExpanded ? "Recolher" : "Expandir"}
             </Button>
           </div>
         </div>
       </CardHeader>
 
       {isExpanded && (
-        <CardContent className="space-y-5 pt-0">
+        <CardContent className="space-y-4 p-4 pt-0 min-w-0">
           {/* Seção 1: Configuração do Saldo e Simulação */}
           <div className="grid gap-4 rounded-xl border bg-muted/30 p-3.5 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span className="flex items-center gap-1 text-foreground">
-                  <Coins className="h-3.5 w-3.5 text-amber-500" />
-                  Saldo para Simulação
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex items-center justify-between text-xs font-medium gap-1">
+                <span className="flex items-center gap-1 text-foreground truncate">
+                  <Coins className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  Saldo Simulado
                 </span>
-                <span className="font-bold text-amber-500">{simCredits.toLocaleString("pt-BR")} cred</span>
+                <span className="font-bold text-amber-500 shrink-0">{simCredits.toLocaleString("pt-BR")} cred</span>
               </div>
               <Input
                 type="number"
@@ -212,16 +212,16 @@ export function FlowCreditSimulator({
                     className="h-5 px-1.5 text-[10px] text-muted-foreground underline"
                     onClick={() => setSimCredits(accountCredits)}
                   >
-                    Resetar saldo
+                    Resetar
                   </Button>
                 )}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">Modelo de Vídeo</label>
+            <div className="space-y-1.5 min-w-0">
+              <label className="text-xs font-medium text-foreground block">Modelo de Vídeo</label>
               <Select value={simModel} onValueChange={handleModelChange}>
-                <SelectTrigger className="h-8 text-xs font-medium">
+                <SelectTrigger className="h-8 text-xs font-medium w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -237,19 +237,19 @@ export function FlowCreditSimulator({
               </p>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-foreground">Segundos por Take</label>
+            <div className="space-y-1.5 min-w-0">
+              <label className="text-xs font-medium text-foreground block">Segundos por Take</label>
               <Select
                 value={String(simSeconds)}
                 onValueChange={(v) => setSimSeconds(Number(v))}
               >
-                <SelectTrigger className="h-8 text-xs font-medium">
+                <SelectTrigger className="h-8 text-xs font-medium w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {allowedSeconds.map((s) => (
                     <SelectItem key={s} value={String(s)} className="text-xs">
-                      {s} segundos {simModel.includes("Veo") ? "(Nativo Veo)" : "(Nativo Omni)"}
+                      {s} segundos {simModel.includes("Veo") ? "(Veo)" : "(Omni)"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -259,10 +259,10 @@ export function FlowCreditSimulator({
               </p>
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-medium">
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex items-center justify-between text-xs font-medium gap-1">
                 <span className="text-foreground">Takes por Vídeo</span>
-                <span className="font-semibold text-primary">{simTakes} takes ({simTakes * simSeconds}s)</span>
+                <span className="font-semibold text-primary shrink-0">{simTakes} takes ({simTakes * simSeconds}s)</span>
               </div>
               <Slider
                 min={1}
@@ -282,26 +282,26 @@ export function FlowCreditSimulator({
           </div>
 
           {/* Seção 2: Toggle da Arquitetura Híbrida Inteligente */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2">
-            <div className="flex items-center gap-2">
-              <div className="rounded bg-emerald-500/10 p-1 text-emerald-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="rounded bg-emerald-500/10 p-1.5 text-emerald-500 shrink-0 mt-0.5">
                 <Zap className="h-4 w-4" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold text-foreground">
                   Arquitetura Híbrida Inteligente (Quality nos Diálogos + Lite no B-Roll)
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   Preserva máximo fotorrealismo nos rostos e economiza até 60% de créditos em tomadas de produtos e cenários
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={isHybrid ? "default" : "outline"} className="text-xs">
+            <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+              <Badge variant={isHybrid ? "default" : "outline"} className="text-[11px]">
                 {isHybrid
                   ? simResult.hybridSavingsPercent > 0
                     ? `Economia: ~${simResult.hybridSavingsPercent}%`
-                    : "Menor custo já ativo"
+                    : "Menor custo ativo"
                   : "100% no Modelo Base"}
               </Badge>
               <Switch checked={isHybrid} onCheckedChange={setIsHybrid} />
@@ -309,11 +309,11 @@ export function FlowCreditSimulator({
           </div>
 
           {/* Seção 3: Cartões de Resultados em Tempo Real */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-transparent p-3.5">
+          <div className="grid gap-3 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-transparent p-3.5 min-w-0">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Capacidade Total</span>
-              <div className="mt-1 flex items-baseline gap-1">
-                <span className="text-3xl font-extrabold text-foreground">{simResult.maxVideosPossible}</span>
+              <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground">{simResult.maxVideosPossible}</span>
                 <span className="text-xs font-semibold text-amber-500">vídeos completos</span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -321,9 +321,9 @@ export function FlowCreditSimulator({
               </p>
             </div>
 
-            <div className="rounded-xl border bg-card p-3.5">
+            <div className="rounded-xl border bg-card p-3.5 min-w-0">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Custo por Vídeo</span>
-              <div className="mt-1 flex items-baseline gap-1">
+              <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
                 <span className="text-2xl font-bold text-foreground">{simResult.costPerVideo}</span>
                 <span className="text-xs text-muted-foreground">créditos</span>
               </div>
@@ -332,22 +332,22 @@ export function FlowCreditSimulator({
               </p>
             </div>
 
-            <div className="rounded-xl border bg-card p-3.5">
+            <div className="rounded-xl border bg-card p-3.5 min-w-0">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Sobra de Créditos</span>
-              <div className="mt-1 flex items-baseline gap-1">
+              <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
                 <span className="text-2xl font-bold text-foreground">{simResult.remainingCredits}</span>
-                <span className="text-xs text-muted-foreground">créditos restantes</span>
+                <span className="text-xs text-muted-foreground">restantes</span>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {simResult.remainingCredits >= simResult.costPerTake
-                  ? `Dá para gerar mais ${Math.floor(simResult.remainingCredits / simResult.costPerTake)} takes avulsos`
+                  ? `Dá para gerar +${Math.floor(simResult.remainingCredits / simResult.costPerTake)} takes avulsos`
                   : "Aproveitamento quase total do saldo"}
               </p>
             </div>
 
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5">
-              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ganho com o Híbrido</span>
-              <div className="mt-1 flex items-baseline gap-1">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5 min-w-0">
+              <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Ganho com Híbrido</span>
+              <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
                 <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                   +{simResult.comparedToPureQuality.extraVideosGained}
                 </span>
@@ -355,41 +355,41 @@ export function FlowCreditSimulator({
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 {simResult.hybridSavingsPercent > 0
-                  ? `Economia comparado a rodar 100% em ${simModel}`
-                  : `Modelo base já está no menor custo disponível`}
+                  ? `Economia vs rodar 100% em ${simModel}`
+                  : `Modelo base já no menor custo`}
               </p>
             </div>
           </div>
 
           {/* Seção 4: Ações e Aplicação no Projeto */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-t pt-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-4 w-4 text-emerald-500" />
+              <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
               <span>Parâmetros 100% compatíveis com os limites nativos do Google Flow</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
               {simCredits !== accountCredits && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1.5"
+                  className="h-8 text-xs gap-1.5 flex-1 sm:flex-initial"
                   onClick={handleSaveAsDefaultCredits}
                   disabled={savingCredits}
                 >
                   <RefreshCw className={`h-3 w-3 ${savingCredits ? "animate-spin" : ""}`} />
-                  Salvar este saldo na Conta
+                  Salvar saldo na Conta
                 </Button>
               )}
 
               {onApplyConfig && (
                 <Button
                   size="sm"
-                  className="h-8 text-xs gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs"
+                  className="h-8 text-xs gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs flex-1 sm:flex-initial"
                   onClick={() => onApplyConfig(simModel, simSeconds, simTakes, isHybrid)}
                 >
                   <ArrowRight className="h-3.5 w-3.5" />
-                  Aplicar Configurações no Projeto
+                  Aplicar no Projeto
                 </Button>
               )}
             </div>
@@ -401,7 +401,6 @@ export function FlowCreditSimulator({
 }
 
 function getTakeSingleCost(model: string, seconds: number): number {
-  const cfg = MODEL_CREDIT_COSTS[model] || MODEL_CREDIT_COSTS["Omni 1.1 Flash"]
-  const validSec = clampSecondsForModel(seconds, model)
-  return cfg.rates[validSec] || Math.round(validSec * cfg.costPerSecond)
+  const rate = MODEL_CREDIT_COSTS[model]?.costPerSecond ?? 4
+  return Math.round(rate * seconds)
 }

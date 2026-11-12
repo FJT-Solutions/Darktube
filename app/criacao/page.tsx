@@ -34,6 +34,8 @@ import {
   Trash2,
   Download,
 } from "lucide-react"
+import { Header } from "@/components/layout/header"
+import { useAppShell } from "@/components/layout/app-shell"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,7 +76,7 @@ function VideoPlayerModal({ videoUrl, title }: { videoUrl: string; title: string
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 flex-wrap">
       <Dialog>
         <DialogTrigger asChild>
           <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-500">
@@ -83,17 +85,17 @@ function VideoPlayerModal({ videoUrl, title }: { videoUrl: string; title: string
           </Button>
         </DialogTrigger>
         <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none shadow-2xl">
-          <DialogHeader className="p-4 bg-zinc-900/50 backdrop-blur-md border-b border-white/10 flex flex-row items-center justify-between">
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Clapperboard className="h-4 w-4 text-emerald-500" />
-              {title}
+          <DialogHeader className="p-3 sm:p-4 bg-zinc-900/50 backdrop-blur-md border-b border-white/10 flex flex-row items-center justify-between gap-2">
+            <DialogTitle className="text-white flex items-center gap-2 text-sm sm:text-base truncate min-w-0">
+              <Clapperboard className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span className="truncate">{title}</span>
             </DialogTitle>
             <Button
               size="sm"
               variant="outline"
               onClick={handleDownload}
               disabled={downloading}
-              className="h-8 text-xs gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black font-semibold mr-6"
+              className="h-8 text-xs gap-1.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black font-semibold mr-6 shrink-0"
             >
               {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               Baixar MP4
@@ -158,33 +160,36 @@ function TranslatedPrompt({ text, label, icon: Icon, colorClass, isImagePrompt =
   }
 
   return (
-    <div className="space-y-1.5 flex-1">
-      <div className="flex items-center justify-between gap-1 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <Icon className={cn("h-3 w-3", colorClass)} />
-          <span className={cn("text-[9px] font-bold uppercase", colorClass)}>{label}</span>
+    <div className="space-y-1.5 flex-1 min-w-0 max-w-full overflow-hidden rounded-lg border border-border/40 bg-secondary/5 p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Icon className={cn("h-3.5 w-3.5 shrink-0", colorClass)} />
+          <span className={cn("text-[10px] font-bold uppercase tracking-wider truncate", colorClass)}>{label}</span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {isImagePrompt && (
             <button
+              type="button"
               onClick={() => handleCopy('midjourney')}
-              className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/30 transition-colors flex items-center gap-1"
+              className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/30 transition-colors flex items-center gap-1 shrink-0"
               title="Copiar formatado para Midjourney (/imagine)"
             >
               <Sparkles className="h-2.5 w-2.5" />
-              /imagine Midjourney
+              <span>/imagine</span>
             </button>
           )}
           <button
+            type="button"
             onClick={() => handleCopy('plain')}
-            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors flex items-center gap-1"
+            className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 border border-primary/30 transition-colors flex items-center gap-1 shrink-0"
           >
             {copied ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
-            {copied ? "Copiado!" : "Copiar"}
+            <span>{copied ? "Copiado!" : "Copiar"}</span>
           </button>
           <button 
+            type="button"
             onClick={handleTranslate}
-            className="text-[9px] flex items-center gap-1 text-muted-foreground hover:text-foreground font-bold ml-1"
+            className="text-[10px] px-2 py-0.5 rounded-md border border-border/60 bg-background/60 flex items-center gap-1 text-muted-foreground hover:text-foreground font-bold shrink-0"
             disabled={loading}
           >
             {loading ? (
@@ -192,15 +197,15 @@ function TranslatedPrompt({ text, label, icon: Icon, colorClass, isImagePrompt =
             ) : (
               <>
                 <Languages className="h-2.5 w-2.5" />
-                {showTranslation ? "Original (EN)" : "Traduzir PT-BR"}
+                <span>{showTranslation ? "EN" : "PT-BR"}</span>
               </>
             )}
           </button>
         </div>
       </div>
       <p className={cn(
-        "text-[11px] p-2 rounded transition-all duration-300 font-mono select-all leading-relaxed",
-        showTranslation ? "text-primary bg-primary/5 border border-primary/20 italic" : "text-muted-foreground bg-secondary/10 border border-border/30"
+        "text-[11px] p-2.5 rounded-md transition-all duration-300 font-mono select-all leading-relaxed break-words [overflow-wrap:anywhere] max-h-40 overflow-y-auto",
+        showTranslation ? "text-primary bg-primary/5 border border-primary/20 italic" : "text-muted-foreground bg-background/70 border border-border/30"
       )}>
         {showTranslation ? translated : text}
       </p>
@@ -211,6 +216,7 @@ function TranslatedPrompt({ text, label, icon: Icon, colorClass, isImagePrompt =
 type CreationMode = "auto" | "manual"
 
 export default function CriacaoPage() {
+  const { toggleSidebar } = useAppShell()
   const router = useRouter()
   const [templates, setTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -223,7 +229,6 @@ export default function CriacaoPage() {
   useEffect(() => {
     fetchAll()
 
-    // Polling automático a cada 4 segundos para atualizar o status das produções em tempo real
     const interval = setInterval(() => {
       fetchAll(true)
     }, 4000)
@@ -361,12 +366,19 @@ export default function CriacaoPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Clapperboard className="h-10 w-10 text-primary animate-pulse" />
-          <p className="text-sm text-muted-foreground animate-pulse">Carregando Central de Criação...</p>
+      <>
+        <Header
+          title="Central de Criação"
+          description="Escolha o modo de produção e acione seus templates"
+          onMenuToggle={toggleSidebar}
+        />
+        <div className="flex-1 flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Clapperboard className="h-10 w-10 text-primary animate-pulse" />
+            <p className="text-sm text-muted-foreground animate-pulse">Carregando Central de Criação...</p>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -376,311 +388,215 @@ export default function CriacaoPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
+    <>
+      <Header
+        title="Central de Criação"
+        description="Escolha o modo de produção e acione seus templates"
+        onMenuToggle={toggleSidebar}
+      />
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 xs:p-4 sm:p-6">
+        <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 min-w-0">
 
-        {/* Header */}
-        <div className="border-b pb-6 flex flex-col md:flex-row md:items-center gap-4 justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <Clapperboard className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Central de Criação</h1>
-              <p className="text-muted-foreground text-sm">Escolha o modo e acione seus templates</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Mode Selector */}
-        <div>
-          <p className="text-xs text-muted-foreground mb-3 font-medium">Modo de criação:</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {modeConfig.map(({ mode, emoji, label, desc }) => {
-              const isSelected = selectedMode === mode
-              const borderClass = isSelected
-                ? mode === "auto" ? "border-emerald-500 bg-emerald-500/5 shadow-lg shadow-emerald-500/10"
-                  : "border-purple-500 bg-purple-500/5 shadow-lg shadow-purple-500/10"
-                : "border-border bg-card hover:bg-secondary/30"
-              const checkClass = mode === "auto" ? "bg-emerald-500" : "bg-purple-500"
-              const iconClass = mode === "auto" ? "bg-emerald-500/10 border-emerald-500/20" : "bg-purple-500/10 border-purple-500/20"
-              return (
-                <button
-                  key={mode}
-                  onClick={() => { setSelectedMode(mode); setExpandedId(null) }}
-                  className={cn("relative flex flex-col items-start gap-3 p-5 rounded-xl border-2 transition-all duration-200 text-left", borderClass)}
-                >
-                  {isSelected && (
-                    <span className={cn("absolute top-3 right-3 h-5 w-5 rounded-full flex items-center justify-center", checkClass)}>
-                      <Check className="h-3 w-3 text-white" />
-                    </span>
-                  )}
-                  <div className={cn("h-10 w-10 rounded-lg border flex items-center justify-center text-xl", iconClass)}>{emoji}</div>
-                  <div>
-                    <p className="font-bold text-sm">{label}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Templates */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Seus Templates ({templates.length})
-            </h2>
-            <Link href="/templates">
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-                Gerenciar Templates
-                <ChevronRight className="h-3 w-3" />
-              </Button>
-            </Link>
-          </div>
-
-          {templates.length === 0 ? (
-            <div className="text-center py-20 border rounded-xl bg-card">
-              <BrainCircuit className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm text-muted-foreground">Nenhum template encontrado.</p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={() => router.push("/minerar")}>
-                Criar primeiro template
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {templates.map((template) => {
-                const analysis = template.template_data?.remodeling_template || template.template_data || {}
-                const segments: any[] = analysis?.script_base || []
-                const isExpanded = expandedId === template.id
-                const isDispatching = dispatching === template.id
-                const filledSegments = segments.filter((s: any) => s.custom_media_url).length
-
-                const isManualReady = segments.length > 0 && filledSegments === segments.length
-
+          {/* Mode Selector */}
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Modo de criação</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {modeConfig.map(({ mode, emoji, label, desc }) => {
+                const isSelected = selectedMode === mode
+                const borderClass = isSelected
+                  ? mode === "auto" ? "border-emerald-500 bg-emerald-500/5 shadow-lg shadow-emerald-500/10"
+                    : "border-purple-500 bg-purple-500/5 shadow-lg shadow-purple-500/10"
+                  : "border-border bg-card hover:bg-secondary/30"
+                const checkClass = mode === "auto" ? "bg-emerald-500" : "bg-purple-500"
+                const iconClass = mode === "auto" ? "bg-emerald-500/10 border-emerald-500/20" : "bg-purple-500/10 border-purple-500/20"
                 return (
-                  <div key={template.id} className="border rounded-xl bg-card overflow-hidden transition-all">
-                    {/* Row */}
-                    <div className="flex items-center justify-between p-4 gap-4 flex-wrap">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                          <Clapperboard className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm truncate">{template.name}</p>
-                          <p className="text-[11px] text-muted-foreground truncate">{template.video_title}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        <Badge variant={template.is_active ? "default" : "secondary"} className="text-[10px]">
-                          {template.is_active ? "Ativo" : "Pausado"}
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground hidden md:block">{segments.length} cenas</span>
-
-                        {selectedMode === "auto" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setExpandedId(isExpanded ? null : template.id)}
-                              className="gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 h-8 text-xs"
-                            >
-                              <Code className="h-3 w-3" />
-                              Prompts & Roteiro
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDispatch(template.id)}
-                              disabled={isDispatching}
-                              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-none h-8 text-xs"
-                            >
-                              {isDispatching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                              {isDispatching ? "Enviando..." : "Despachar Auto"}
-                            </Button>
-                          </>
-                        )}
-
-                        {selectedMode === "manual" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setExpandedId(isExpanded ? null : template.id)}
-                              className="gap-1.5 border-purple-500/30 hover:bg-purple-500/10 text-purple-400 h-8 text-xs"
-                            >
-                              <Upload className="h-3 w-3" />
-                              {filledSegments}/{segments.length} Mídias & Prompts
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDispatch(template.id)}
-                              disabled={isDispatching || !isManualReady}
-                              title={!isManualReady ? `Preencha todas as ${segments.length} mídias para habilitar o despacho (${filledSegments}/${segments.length} prontas)` : ""}
-                              className={cn(
-                                "gap-1.5 text-white border-none h-8 text-xs transition-all",
-                                isManualReady
-                                  ? "bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-500/20"
-                                  : "bg-purple-950/40 text-purple-400/50 cursor-not-allowed border border-purple-500/10"
-                              )}
-                            >
-                              {isDispatching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                              {isDispatching ? "Enviando..." : isManualReady ? "Despachar Manual" : `Despachar (${filledSegments}/${segments.length})`}
-                            </Button>
-                          </>
-                        )}
-
-                        <Link href={`/templates/${template.id}`}>
-                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Abrir template">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-
-                    {/* Auto Expanded: View Script & Translated Prompts */}
-                    {isExpanded && selectedMode === "auto" && (
-                      <div className="border-t bg-secondary/5 p-4 space-y-4">
-                        <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-border/40">
-                          <div>
-                            <p className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                              <Code className="h-3.5 w-3.5" /> Roteiro e Prompts (Automático)
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              Estes prompts e falas serão processados e gerados automaticamente ao despachar para o n8n.
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => exportRoteiro(template)}
-                            className="gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 h-7 text-[11px]"
-                          >
-                            <Copy className="h-3 w-3" />
-                            Exportar Roteiro
-                          </Button>
-                        </div>
-                        <div className="space-y-3">
-                          {segments.map((seg: any, idx: number) => (
-                            <div key={idx} className="bg-card rounded-lg border p-3.5 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <Badge variant="outline" className="font-mono text-[9px] border-primary/30 text-primary bg-primary/5">
-                                  #{idx + 1} · {seg.timestamp} · {seg.segment_type}
-                                </Badge>
-                                {seg.emotion && (
-                                  <Badge variant="secondary" className="text-[9px] h-4 px-1.5 uppercase italic">
-                                    {seg.emotion}
-                                  </Badge>
-                                )}
-                              </div>
-                              {seg.voiceover?.text && (
-                                <div className="space-y-0.5">
-                                  <p className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
-                                    <Mic2 className="h-2.5 w-2.5" /> Locução
-                                  </p>
-                                  <p className="text-xs italic text-foreground/80 leading-relaxed">&ldquo;{seg.voiceover?.text}&rdquo;</p>
-                                </div>
-                              )}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-border/40">
-                                <TranslatedPrompt
-                                  text={seg.visual_content?.image_prompt}
-                                  label="Prompt de Imagem"
-                                  icon={ImageIcon}
-                                  colorClass="text-blue-400"
-                                  isImagePrompt
-                                />
-                                <TranslatedPrompt
-                                  text={seg.visual_content?.animation_instructions}
-                                  label="Animação / Movimento"
-                                  icon={Video}
-                                  colorClass="text-purple-400"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => { setSelectedMode(mode); setExpandedId(null) }}
+                    className={cn("relative flex items-start gap-3.5 p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 text-left min-w-0", borderClass)}
+                  >
+                    {isSelected && (
+                      <span className={cn("absolute top-3 right-3 h-5 w-5 rounded-full flex items-center justify-center shrink-0", checkClass)}>
+                        <Check className="h-3 w-3 text-white" />
+                      </span>
                     )}
+                    <div className={cn("h-10 w-10 rounded-lg border flex items-center justify-center text-xl shrink-0", iconClass)}>{emoji}</div>
+                    <div className="min-w-0 pr-5">
+                      <p className="font-bold text-sm">{label}</p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-                    {/* Manual Expanded: Script, Prompts & Scene Media Upload */}
-                    {isExpanded && selectedMode === "manual" && (
-                      <div className="border-t bg-secondary/5 p-4 space-y-4">
-                        <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-border/40">
-                          <div>
-                            <p className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
-                              <Upload className="h-3.5 w-3.5" /> Roteiro, Prompts e Mídias por Cena
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              Copie os prompts em inglês para sua IA de escolha (ou traduza para PT-BR), faça o upload das mídias por cena e despache.
-                            </p>
+          {/* Templates */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-sm sm:text-base font-bold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Seus Templates ({templates.length})
+              </h2>
+              <Link href="/templates">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8">
+                  Gerenciar Templates
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
+
+            {templates.length === 0 ? (
+              <div className="text-center py-14 sm:py-16 border rounded-xl bg-card p-4">
+                <BrainCircuit className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">Nenhum template encontrado.</p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={() => router.push("/minerar")}>
+                  Criar primeiro template
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {templates.map((template) => {
+                  const analysis = template.template_data?.remodeling_template || template.template_data || {}
+                  const segments: any[] = analysis?.script_base || []
+                  const isExpanded = expandedId === template.id
+                  const isDispatching = dispatching === template.id
+                  const filledSegments = segments.filter((s: any) => s.custom_media_url).length
+
+                  const isManualReady = segments.length > 0 && filledSegments === segments.length
+
+                  return (
+                    <div key={template.id} className="border rounded-xl bg-card overflow-hidden transition-all shadow-xs min-w-0">
+                      {/* Card Header Row — Clean 2-column layout without crowding */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between p-4 gap-3.5 min-w-0">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                            <Clapperboard className="h-4 w-4 text-primary" />
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold text-sm text-foreground truncate max-w-full">{template.name}</p>
+                              <Badge variant={template.is_active ? "default" : "secondary"} className="text-[10px] h-5 px-2 shrink-0">
+                                {template.is_active ? "Ativo" : "Pausado"}
+                              </Badge>
+                              <Badge variant="outline" className="text-[10px] h-5 px-2 text-muted-foreground shrink-0">
+                                {segments.length} {segments.length === 1 ? "cena" : "cenas"}
+                              </Badge>
+                            </div>
+                            {template.video_title && (
+                              <p className="text-xs text-muted-foreground line-clamp-1 break-all">
+                                {template.video_title}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-border/40 md:border-t-0 md:pt-0 w-full md:w-auto shrink-0">
+                          {selectedMode === "auto" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setExpandedId(isExpanded ? null : template.id)}
+                                className="gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 h-8 text-xs flex-1 sm:flex-initial justify-center"
+                              >
+                                <Code className="h-3.5 w-3.5 shrink-0" />
+                                <span>Prompts & Roteiro</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDispatch(template.id)}
+                                disabled={isDispatching}
+                                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white border-none h-8 text-xs font-semibold flex-1 sm:flex-initial justify-center"
+                              >
+                                {isDispatching ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> : <Send className="h-3.5 w-3.5 shrink-0" />}
+                                <span>{isDispatching ? "Enviando..." : "Despachar"}</span>
+                              </Button>
+                            </>
+                          )}
+
+                          {selectedMode === "manual" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setExpandedId(isExpanded ? null : template.id)}
+                                className="gap-1.5 border-purple-500/30 hover:bg-purple-500/10 text-purple-400 h-8 text-xs flex-1 sm:flex-initial justify-center"
+                              >
+                                <Upload className="h-3.5 w-3.5 shrink-0" />
+                                <span>{filledSegments}/{segments.length} Mídias</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDispatch(template.id)}
+                                disabled={isDispatching || !isManualReady}
+                                title={!isManualReady ? `Preencha todas as ${segments.length} mídias para habilitar o despacho (${filledSegments}/${segments.length} prontas)` : ""}
+                                className={cn(
+                                  "gap-1.5 text-white border-none h-8 text-xs font-semibold transition-all flex-1 sm:flex-initial justify-center",
+                                  isManualReady
+                                    ? "bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-500/20"
+                                    : "bg-purple-950/40 text-purple-400/50 cursor-not-allowed border border-purple-500/10"
+                                )}
+                              >
+                                {isDispatching ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> : <Send className="h-3.5 w-3.5 shrink-0" />}
+                                <span>{isDispatching ? "Enviando..." : isManualReady ? "Despachar" : `Despachar (${filledSegments}/${segments.length})`}</span>
+                              </Button>
+                            </>
+                          )}
+
+                          <Link href={`/templates/${template.id}`} className="shrink-0">
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 border border-border/50" title="Abrir configurações do template">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Auto Expanded: View Script & Translated Prompts */}
+                      {isExpanded && selectedMode === "auto" && (
+                        <div className="border-t bg-secondary/5 p-3.5 sm:p-4 space-y-4 min-w-0">
+                          <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-border/40">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                                <Code className="h-3.5 w-3.5 shrink-0" /> Roteiro e Prompts (Automático)
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Estes prompts e falas serão processados e gerados automaticamente ao despachar para o n8n.
+                              </p>
+                            </div>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => exportRoteiro(template)}
-                              className="gap-1.5 border-purple-500/30 hover:bg-purple-500/10 text-purple-400 h-7 text-[11px]"
+                              className="gap-1.5 border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400 h-8 text-xs shrink-0"
                             >
                               <Copy className="h-3 w-3" />
                               Exportar Roteiro
                             </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDispatch(template.id)}
-                              disabled={isDispatching || !isManualReady}
-                              title={!isManualReady ? `Preencha todas as ${segments.length} mídias para habilitar o despacho (${filledSegments}/${segments.length} prontas)` : ""}
-                              className={cn(
-                                "gap-1.5 text-white border-none h-7 text-[11px] transition-all",
-                                isManualReady
-                                  ? "bg-purple-600 hover:bg-purple-700"
-                                  : "bg-purple-950/40 text-purple-400/50 cursor-not-allowed border border-purple-500/10"
-                              )}
-                            >
-                              {isDispatching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                              {isDispatching ? "Enviando..." : isManualReady ? "Despachar Manual p/ n8n" : `Aguardando Mídias (${filledSegments}/${segments.length})`}
-                            </Button>
                           </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          {segments.map((seg: any, idx: number) => {
-                            const isUploadingThis = uploadingIdx?.templateId === template.id && uploadingIdx?.idx === idx
-                            return (
-                              <div key={idx} className="bg-card rounded-lg border p-3.5 space-y-3">
-                                <div className="flex items-center justify-between flex-wrap gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="font-mono text-[9px] border-primary/30 text-primary bg-primary/5">
-                                      #{idx + 1} · {seg.timestamp}
-                                    </Badge>
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                      {seg.segment_type}
-                                    </span>
-                                  </div>
-                                  {seg.custom_media_url ? (
-                                    <Badge variant="outline" className="text-[9px] h-5 px-2 border-emerald-500 text-emerald-400 bg-emerald-500/10 flex items-center gap-1">
-                                      <Check className="h-3 w-3" /> Mídia Carregada
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="secondary" className="text-[9px] h-5 px-2 text-amber-400 bg-amber-500/10 border-amber-500/20">
-                                      Sem Mídia Manual
+                          <div className="space-y-3">
+                            {segments.map((seg: any, idx: number) => (
+                              <div key={idx} className="bg-card rounded-xl border p-3.5 space-y-3 min-w-0 overflow-hidden">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <Badge variant="outline" className="font-mono text-[10px] border-primary/30 text-primary bg-primary/5">
+                                    #{idx + 1} · {seg.timestamp} · {seg.segment_type}
+                                  </Badge>
+                                  {seg.emotion && (
+                                    <Badge variant="secondary" className="text-[10px] h-5 px-2 uppercase italic">
+                                      {seg.emotion}
                                     </Badge>
                                   )}
                                 </div>
-
-                                {/* Voiceover */}
                                 {seg.voiceover?.text && (
-                                  <div className="space-y-0.5">
-                                    <p className="text-[9px] font-bold text-emerald-500 uppercase flex items-center gap-1">
-                                      <Mic2 className="h-2.5 w-2.5" /> Locução
+                                  <div className="space-y-1 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                                    <p className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-1">
+                                      <Mic2 className="h-3 w-3" /> Locução
                                     </p>
-                                    <p className="text-xs italic text-foreground/80 leading-relaxed">&ldquo;{seg.voiceover?.text}&rdquo;</p>
+                                    <p className="text-xs italic text-foreground/90 leading-relaxed break-words">&ldquo;{seg.voiceover?.text}&rdquo;</p>
                                   </div>
                                 )}
-
-                                {/* Prompts em Inglês com botão de tradução PT-BR */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-border/40">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1">
                                   <TranslatedPrompt
                                     text={seg.visual_content?.image_prompt}
                                     label="Prompt de Imagem"
@@ -695,117 +611,215 @@ export default function CriacaoPage() {
                                     colorClass="text-purple-400"
                                   />
                                 </div>
-
-                                {/* Media Upload Controls */}
-                                <div className="pt-2 border-t border-border/40 space-y-1.5">
-                                  <label className="text-[9px] font-bold uppercase text-muted-foreground flex items-center justify-between">
-                                    <span className="flex items-center gap-1 text-purple-400">
-                                      <Upload className="h-3 w-3" /> Mídia da Cena (Cole a URL ou Faça Upload)
-                                    </span>
-                                  </label>
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="text"
-                                      placeholder="Cole a URL da mídia gerada..."
-                                      value={seg.custom_media_url || ""}
-                                      onChange={(e) => handleSegmentMedia(template, idx, e.target.value)}
-                                      className="text-xs h-8 rounded-lg border bg-input px-3 font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary transition-colors flex-1"
-                                    />
-                                    <label className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold cursor-pointer transition-colors shrink-0">
-                                      {isUploadingThis ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                                      <span>{isUploadingThis ? "..." : "Upload Arquivo"}</span>
-                                      <input
-                                        type="file"
-                                        accept="image/*,video/*"
-                                        className="hidden"
-                                        disabled={!!isUploadingThis}
-                                        onChange={(e) => {
-                                          const file = e.target.files?.[0]
-                                          if (file) handleFileUpload(template, idx, file)
-                                        }}
-                                      />
-                                    </label>
-                                  </div>
-                                </div>
-
                               </div>
-                            )
-                          })}
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Manual Expanded: Script, Prompts & Scene Media Upload */}
+                      {isExpanded && selectedMode === "manual" && (
+                        <div className="border-t bg-secondary/5 p-3.5 sm:p-4 space-y-4 min-w-0">
+                          <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-border/40">
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                                <Upload className="h-3.5 w-3.5 shrink-0" /> Roteiro, Prompts e Mídias por Cena
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                Copie os prompts em inglês para sua IA de escolha (ou traduza para PT-BR), faça o upload das mídias por cena e despache.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => exportRoteiro(template)}
+                                className="gap-1.5 border-purple-500/30 hover:bg-purple-500/10 text-purple-400 h-8 text-xs"
+                              >
+                                <Copy className="h-3 w-3" />
+                                Exportar Roteiro
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDispatch(template.id)}
+                                disabled={isDispatching || !isManualReady}
+                                title={!isManualReady ? `Preencha todas as ${segments.length} mídias para habilitar o despacho (${filledSegments}/${segments.length} prontas)` : ""}
+                                className={cn(
+                                  "gap-1.5 text-white border-none h-8 text-xs transition-all font-semibold",
+                                  isManualReady
+                                    ? "bg-purple-600 hover:bg-purple-700"
+                                    : "bg-purple-950/40 text-purple-400/50 cursor-not-allowed border border-purple-500/10"
+                                )}
+                              >
+                                {isDispatching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                                {isDispatching ? "Enviando..." : isManualReady ? "Despachar Manual" : `Aguardando Mídias (${filledSegments}/${segments.length})`}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            {segments.map((seg: any, idx: number) => {
+                              const isUploadingThis = uploadingIdx?.templateId === template.id && uploadingIdx?.idx === idx
+                              return (
+                                <div key={idx} className="bg-card rounded-xl border p-3.5 space-y-3 min-w-0 overflow-hidden">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge variant="outline" className="font-mono text-[10px] border-primary/30 text-primary bg-primary/5">
+                                        #{idx + 1} · {seg.timestamp}
+                                      </Badge>
+                                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                        {seg.segment_type}
+                                      </span>
+                                    </div>
+                                    {seg.custom_media_url ? (
+                                      <Badge variant="outline" className="text-[10px] h-5 px-2 border-emerald-500 text-emerald-400 bg-emerald-500/10 flex items-center gap-1">
+                                        <Check className="h-3 w-3" /> Mídia Carregada
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="secondary" className="text-[10px] h-5 px-2 text-amber-400 bg-amber-500/10 border-amber-500/20">
+                                        Sem Mídia Manual
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {/* Voiceover */}
+                                  {seg.voiceover?.text && (
+                                    <div className="space-y-1 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
+                                      <p className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-1">
+                                        <Mic2 className="h-3 w-3" /> Locução
+                                      </p>
+                                      <p className="text-xs italic text-foreground/90 leading-relaxed break-words">&ldquo;{seg.voiceover?.text}&rdquo;</p>
+                                    </div>
+                                  )}
+
+                                  {/* Prompts em Inglês com botão de tradução PT-BR */}
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-1">
+                                    <TranslatedPrompt
+                                      text={seg.visual_content?.image_prompt}
+                                      label="Prompt de Imagem"
+                                      icon={ImageIcon}
+                                      colorClass="text-blue-400"
+                                      isImagePrompt
+                                    />
+                                    <TranslatedPrompt
+                                      text={seg.visual_content?.animation_instructions}
+                                      label="Animação / Movimento"
+                                      icon={Video}
+                                      colorClass="text-purple-400"
+                                    />
+                                  </div>
+
+                                  {/* Media Upload Controls */}
+                                  <div className="pt-2 border-t border-border/40 space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center justify-between">
+                                      <span className="flex items-center gap-1 text-purple-400">
+                                        <Upload className="h-3 w-3" /> Mídia da Cena (Cole a URL ou Faça Upload)
+                                      </span>
+                                    </label>
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                      <input
+                                        type="text"
+                                        placeholder="Cole a URL da mídia gerada..."
+                                        value={seg.custom_media_url || ""}
+                                        onChange={(e) => handleSegmentMedia(template, idx, e.target.value)}
+                                        className="text-xs h-9 rounded-lg border bg-input px-3 font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary transition-colors flex-1 min-w-0"
+                                      />
+                                      <label className="flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-bold cursor-pointer transition-colors shrink-0">
+                                        {isUploadingThis ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                                        <span>{isUploadingThis ? "Enviando..." : "Upload Arquivo"}</span>
+                                        <input
+                                          type="file"
+                                          accept="image/*,video/*"
+                                          className="hidden"
+                                          disabled={!!isUploadingThis}
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) handleFileUpload(template, idx, file)
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Histórico Global Recente */}
+          <Card className="border-emerald-500/15 overflow-hidden">
+            <CardHeader className="p-4 pb-3 border-b border-border/40">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <History className="h-4 w-4 text-emerald-500" />
+                PRODUÇÕES RECENTES ({recentHistory.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4">
+              <ScrollArea className="h-[260px] pr-2">
+                <div className="space-y-2.5">
+                  {recentHistory.length > 0 ? (
+                    recentHistory.map((h: any) => (
+                      <div key={h.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border bg-secondary/5 gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                          {h.status === "completed" ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20 shrink-0">
+                              <Check className="h-3 w-3 text-emerald-400" />
+                              <span>Concluído</span>
+                            </div>
+                          ) : h.status === "failed" ? (
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/20 shrink-0">
+                              <AlertCircle className="h-3 w-3 text-rose-400" />
+                              <span>Falhou</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20 shrink-0 animate-pulse">
+                              <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
+                              <span>Processando...</span>
+                            </div>
+                          )}
+                          <span className="text-xs text-muted-foreground truncate">
+                            {new Date(h.dispatched_at).toLocaleString("pt-BR")}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 shrink-0 flex-wrap">
+                          <Badge variant={h.status?.includes("auto") ? "secondary" : "default"} className="text-[10px] uppercase">
+                            {h.status === "sent_auto" ? "Auto" : "Manual"}
+                          </Badge>
+                          {h.video_url && <VideoPlayerModal videoUrl={h.video_url} title="Produção Renderizada" />}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-400 opacity-70 hover:opacity-100"
+                            onClick={() => handleDeleteHistory(h.id)}
+                            title="Excluir do histórico"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Histórico Global Recente */}
-        <Card className="border-emerald-500/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <History className="h-4 w-4 text-emerald-500" />
-              PRODUÇÕES RECENTES
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[240px] pr-3">
-              <div className="space-y-2.5">
-                {recentHistory.length > 0 ? (
-                  recentHistory.map((h: any) => (
-                    <div key={h.id} className="flex items-center justify-between p-3 rounded-lg border bg-secondary/5 gap-3 flex-wrap">
-                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                        {h.status === "completed" ? (
-                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 shrink-0">
-                            <Check className="h-3 w-3 text-emerald-400" />
-                            <span>Concluído</span>
-                          </div>
-                        ) : h.status === "failed" ? (
-                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20 shrink-0">
-                            <AlertCircle className="h-3 w-3 text-rose-400" />
-                            <span>Falhou</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-[10px] font-medium text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20 shrink-0 animate-pulse">
-                            <Loader2 className="h-3 w-3 animate-spin text-amber-400" />
-                            <span>Processando...</span>
-                          </div>
-                        )}
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(h.dispatched_at).toLocaleString("pt-BR")}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant={h.status?.includes("auto") ? "secondary" : "default"} className="text-[8px] uppercase">
-                          {h.status === "sent_auto" ? "Auto" : "Manual"}
-                        </Badge>
-                        {h.video_url && <VideoPlayerModal videoUrl={h.video_url} title="Produção" />}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-rose-400 opacity-70 hover:opacity-100"
-                          onClick={() => handleDeleteHistory(h.id)}
-                          title="Excluir do histórico"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12 opacity-50">
+                      <History className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground">Nenhuma produção realizada ainda.</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Use um dos modos acima para iniciar.</p>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12 opacity-30">
-                    <History className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-[10px]">Nenhuma produção realizada ainda.</p>
-                    <p className="text-[9px] mt-1">Use um dos modos acima para iniciar.</p>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
+        </div>
       </div>
-    </div>
+    </>
   )
 }

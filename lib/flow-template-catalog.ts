@@ -1651,6 +1651,6 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'Zero text, cards, signs, tablets, screens or logos anywhere in the scene; the call-to-action is a banner strip added in post-assembly, never described in the visual prompt',
     ],
     look: 'commercial direct-response lighting, studio key light with clean green-screen back, crisp appetizing colors for b-roll',
-    defaults: { takes: 4, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '720p', realismo: 'hiper' },
+    defaults: { takes: 4, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
   },
 ]

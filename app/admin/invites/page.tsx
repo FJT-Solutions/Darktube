@@ -1,6 +1,5 @@
 "use client"
 
-
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { getPendingInvitesAction, approveInviteAction, declineInviteAction } from "@/app/actions"
@@ -108,49 +107,49 @@ export default function AdminInvitesPage() {
                 description="Gerencie os convites e acessos pendentes"
                 onMenuToggle={toggleSidebar}
             />
-            <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+            <div className="flex-1 overflow-y-auto p-3 xs:p-4 lg:p-6">
                 <div className="mx-auto max-w-5xl space-y-6">
                     <Card className="border-primary/10 bg-card/50 backdrop-blur-sm">
-                        <CardHeader>
+                        <CardHeader className="p-4 sm:p-6 pb-3 sm:pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-primary/10">
+                                <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                                     <UserPlus className="h-5 w-5 text-primary" />
                                 </div>
-                                <div>
-                                    <CardTitle>Pendentes</CardTitle>
-                                    <CardDescription>
+                                <div className="min-w-0">
+                                    <CardTitle className="text-base sm:text-lg">Pendentes</CardTitle>
+                                    <CardDescription className="text-xs sm:text-sm">
                                         Existem {invites.length} convites aguardando sua revisão.
                                     </CardDescription>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
+                        <CardContent className="p-4 sm:p-6 pt-0">
+                            <div className="space-y-3 sm:space-y-4">
                                 {invites.length === 0 ? (
-                                    <div className="text-center py-12 border-2 border-dashed rounded-xl opacity-50">
-                                        <p>Nenhum convite pendente no momento.</p>
+                                    <div className="text-center py-12 border-2 border-dashed rounded-xl opacity-50 p-4">
+                                        <p className="text-sm">Nenhum convite pendente no momento.</p>
                                     </div>
                                 ) : (
                                     invites.map((invite) => (
-                                        <div key={invite.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border/50 gap-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-primary/20 text-primary font-bold">
+                                        <div key={invite.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 rounded-xl bg-secondary/30 border border-border/50 gap-3 sm:gap-4">
+                                            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                                                <div className="h-10 w-10 flex items-center justify-center rounded-full bg-primary/20 text-primary font-bold shrink-0">
                                                     {invite.name.charAt(0).toUpperCase()}
                                                 </div>
-                                                <div>
-                                                    <p className="font-semibold">{invite.name}</p>
-                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                        <Mail className="h-3 w-3" /> {invite.email}
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-semibold text-sm sm:text-base truncate">{invite.name}</p>
+                                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
+                                                        <Mail className="h-3 w-3 shrink-0" /> <span className="truncate">{invite.email}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1">
-                                                        <Clock className="h-3 w-3" /> Solicidado em: {new Date(invite.created_at).toLocaleDateString('pt-BR')}
+                                                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+                                                        <Clock className="h-3 w-3 shrink-0" /> Solicitado em: {new Date(invite.created_at).toLocaleDateString('pt-BR')}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0 pt-2 sm:pt-0 border-t border-border/30 sm:border-0 w-full sm:w-auto">
                                                 <Button 
                                                     size="sm" 
-                                                    className="gap-2"
+                                                    className="gap-2 flex-1 sm:flex-none text-xs"
                                                     onClick={() => handleApprove(invite.id)}
                                                     disabled={processingId === invite.id}
                                                 >
@@ -159,12 +158,12 @@ export default function AdminInvitesPage() {
                                                     ) : (
                                                         <CheckCircle2 className="h-4 w-4" />
                                                     )}
-                                                    Aprovar Acesso
+                                                    Aprovar
                                                 </Button>
                                                 <Button 
                                                     size="sm" 
                                                     variant="outline"
-                                                    className="text-destructive hover:bg-destructive/10 border-destructive/20 gap-2"
+                                                    className="text-destructive hover:bg-destructive/10 border-destructive/20 gap-2 flex-1 sm:flex-none text-xs"
                                                     onClick={() => handleDecline(invite.id)}
                                                     disabled={processingId === invite.id}
                                                 >

@@ -69,13 +69,13 @@ export default function DashboardPage() {
     <>
       <Header
         title="Dashboard"
-        description="Visao geral dos seus canais e tendencias"
+        description="Visão geral dos seus canais e tendências"
         onMenuToggle={toggleSidebar}
       />
-      <div className="flex-1 overflow-y-auto scroll-touch p-3 lg:p-6 page-transition">
-        <div className="mx-auto max-w-7xl space-y-5">
+      <div className="flex-1 overflow-y-auto scroll-touch p-3 sm:p-4 lg:p-6 page-transition w-full max-w-full">
+        <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
           {/* Metrics row */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
             <MetricCard
               label="Canais rastreados"
               value={trackedChannels.length.toString()}
@@ -92,99 +92,100 @@ export default function DashboardPage() {
               icon={Eye}
             />
             <MetricCard
-              label="Receita estimada/mes"
+              label="Receita estimada/mês"
               value={formatCurrency(avgRevenue)}
               icon={DollarSign}
             />
           </div>
 
           {/* Quick actions */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
             <Link
               href="/minerar"
-              className="group flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+              className="group flex items-center gap-3.5 sm:gap-4 rounded-xl border border-border bg-card p-4 sm:p-5 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 min-w-0"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Search className="h-6 w-6 text-primary" />
+              <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+                <Search className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-card-foreground">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm sm:text-base text-card-foreground truncate">
                   Minerar canais
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
                   Descubra novos canais dark por nicho ou palavras-chave
                 </p>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary shrink-0" />
             </Link>
             <Link
               href="/tracker"
-              className="group flex items-center gap-4 rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+              className="group flex items-center gap-3.5 sm:gap-4 rounded-xl border border-border bg-card p-4 sm:p-5 transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 min-w-0"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Zap className="h-6 w-6 text-primary" />
+              <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+                <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-card-foreground">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm sm:text-base text-card-foreground truncate">
                   Ver tracker
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Acompanhe os canais que voce esta rastreando
+                <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1">
+                  Acompanhe os canais que você está rastreando
                 </p>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary shrink-0" />
             </Link>
           </div>
 
           {/* Tracked channels */}
           {trackedChannels.length > 0 && (
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-foreground">
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm sm:text-base font-semibold text-foreground">
                   Canais rastreados
                 </h2>
                 <Link
                   href="/tracker"
-                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                  className="flex items-center gap-1 text-xs sm:text-sm text-primary hover:underline font-medium"
                 >
                   Ver todos
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
-              {/* Mobile: horizontal scroll, Desktop: grid */}
-              <div className="-mx-3 overflow-x-auto pb-2 lg:mx-0">
-                <div className="flex gap-3 px-3 lg:grid lg:grid-cols-3 lg:gap-4 lg:px-0 xl:grid-cols-4">
+              {/* Mobile: horizontal scroll, Tablet & Desktop: grid */}
+              <div className="-mx-3 overflow-x-auto pb-2 sm:mx-0 sm:overflow-visible scroll-touch">
+                <div className="flex gap-3 px-3 sm:px-0 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 sm:gap-4">
                   {trackedChannels.slice(0, 6).map((channel) => (
-                  <ChannelCard
-                    key={channel.id}
-                    channel={channel}
-                    darkScore={channel.metrics?.darkScore}
-                    isTracked={true}
-                  />
-                ))}
+                    <div key={channel.id} className="w-[260px] xs:w-[280px] shrink-0 sm:w-auto">
+                      <ChannelCard
+                        channel={channel}
+                        darkScore={channel.metrics?.darkScore}
+                        isTracked={true}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
           )}
 
           {/* Trending videos */}
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-foreground">
-                Videos em alta
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm sm:text-base font-semibold text-foreground">
+                Vídeos em alta
               </h2>
             </div>
             {loading ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <VideoCardSkeleton key={i} />
                 ))}
               </div>
             ) : trendingVideos.length > 0 ? (
-              <div className="-mx-3 overflow-x-auto pb-2 lg:mx-0">
-                <div className="flex gap-3 px-3 lg:grid lg:grid-cols-3 lg:gap-4 lg:px-0 xl:grid-cols-4">
+              <div className="-mx-3 overflow-x-auto pb-2 sm:mx-0 sm:overflow-visible scroll-touch">
+                <div className="flex gap-3 px-3 sm:px-0 sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 sm:gap-4">
                   {trendingVideos.map((video) => (
-                    <div key={video.id} className="w-[280px] flex-shrink-0 lg:w-auto">
+                    <div key={video.id} className="w-[260px] xs:w-[280px] shrink-0 sm:w-auto">
                       <VideoCard video={video} />
                     </div>
                   ))}
@@ -193,8 +194,8 @@ export default function DashboardPage() {
             ) : (
               <EmptyState
                 icon={TrendingUp}
-                title="Nenhum video em alta encontrado"
-                description="Nao foi possivel carregar os videos em alta no momento. Tente novamente mais tarde."
+                title="Nenhum vídeo em alta encontrado"
+                description="Não foi possível carregar os vídeos em alta no momento. Tente novamente mais tarde."
               />
             )}
           </section>

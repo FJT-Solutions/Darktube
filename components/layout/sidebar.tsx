@@ -63,7 +63,7 @@ export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
           "fixed top-0 left-0 z-50 flex h-full flex-col border-r border-border bg-sidebar transition-all duration-300 ease-in-out",
           "lg:static lg:z-auto lg:translate-x-0",
           collapsed ? "lg:w-20" : "lg:w-64",
-          "w-64", // mobile width
+          "w-72 max-w-[85vw]", // mobile width
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
@@ -100,7 +100,7 @@ export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto overscroll-contain">
           {!collapsed && (
             <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Navegacao

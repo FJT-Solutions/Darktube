@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
+import { BottomNav } from "./bottom-nav"
 import { cn } from "@/lib/utils"
 import { getTrackedChannelsAction } from "@/app/actions"
 import { usePathname } from "next/navigation"
@@ -66,8 +67,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     >
       <div
         className={cn(
-          "flex bg-background",
-          isAuthPage ? "min-h-screen" : "h-screen overflow-hidden"
+          "flex bg-background w-full max-w-[100vw] overflow-x-hidden",
+          isAuthPage ? "min-h-screen min-h-[100dvh]" : "h-screen h-[100dvh] overflow-hidden"
         )}
       >
         {/* Sidebar — slide drawer on mobile, static on desktop */}
@@ -82,13 +83,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Main content */}
         <main
           className={cn(
-            "flex flex-1 flex-col min-w-0 h-full",
-            isAuthPage ? "w-full" : "overflow-y-auto"
+            "flex flex-1 flex-col min-w-0 h-full w-full max-w-full overflow-x-hidden",
+            isAuthPage ? "w-full" : "overflow-y-auto pb-24 lg:pb-0 scroll-touch"
           )}
         >
           {!isAuthPage && <ProductionNotifier />}
           {children}
         </main>
+
+        {/* Mobile bottom navigation */}
+        {!isAuthPage && <BottomNav />}
       </div>
     </AppShellContext.Provider>
   )

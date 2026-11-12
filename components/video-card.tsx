@@ -75,7 +75,6 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
 
-  // Use stored analysis from video if already analyzed
   const storedAnalysis = useMemo(() => {
     if (video.aiAnalysis) {
       try { return JSON.parse(video.aiAnalysis) } catch { return null }
@@ -100,10 +99,8 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
     setScriptSegments([])
 
     try {
-      // Determine if this is an external video (non-YouTube source)
       const isExternal = video.source && video.source !== 'youtube' && video.originalUrl
 
-      // Step 1-3: Visual analysis (download + upload + Gemini)
       const uploadTimer = setTimeout(() => setStep('uploading'), 3000)
       const analyzeTimer = setTimeout(() => setStep('analyzing'), 8000)
 
@@ -126,7 +123,6 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
       setAnalysisResult(result.analysis)
       setTranscript(result.transcript || '')
 
-      // Step 4: Generate script
       setStep('scripting')
       const scriptResult = await generateScriptAction(
         video.id,
@@ -171,8 +167,6 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
     setIsGeneratingScript(false)
   }
 
-
-
   function copyAllPrompts() {
     if (!scriptSegments.length) return
     const allPrompts = scriptSegments
@@ -190,7 +184,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
   if (compact) {
     return (
       <div className={cn("group flex gap-3", className)}>
-        <div className="relative aspect-video w-40 flex-shrink-0 overflow-hidden rounded-lg bg-secondary">
+        <div className="relative aspect-video w-32 xs:w-40 flex-shrink-0 overflow-hidden rounded-lg bg-secondary">
           <img src={video.thumbnail} alt={video.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" referrerPolicy="no-referrer" />
           {video.duration && (
             <span className="absolute right-1 bottom-1 rounded bg-black/80 px-1 py-0.5 text-[10px] font-medium text-white">{video.duration}</span>
@@ -200,9 +194,9 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <a href={video.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-card-foreground hover:text-primary transition-colors">{video.title}</a>
-          <p className="text-xs text-muted-foreground">{video.channelName}</p>
-          <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">
+          <a href={video.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-xs sm:text-sm font-medium text-card-foreground hover:text-primary transition-colors">{video.title}</a>
+          <p className="text-xs text-muted-foreground truncate">{video.channelName}</p>
+          <div className="mt-auto flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
             {video.views > 0 && <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{formatNumber(video.views)}</span>}
             {video.publishedAt && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDate(video.publishedAt)}</span>}
             {estimatedRevenue > 0 && <span className="flex items-center gap-1 text-emerald-500 font-medium"><DollarSign className="h-3 w-3" />{estimatedRevenue < 10 ? estimatedRevenue.toFixed(2) : formatNumber(Math.round(estimatedRevenue))}</span>}
@@ -224,8 +218,8 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
             <span className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white uppercase backdrop-blur-sm">{video.source}</span>
           )}
         </div>
-        <div className="flex flex-col gap-2 p-4">
-          <a href={video.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-sm font-medium text-card-foreground hover:text-primary transition-colors">{video.title}</a>
+        <div className="flex flex-col gap-2 p-3 sm:p-4">
+          <a href={video.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-xs sm:text-sm font-medium text-card-foreground hover:text-primary transition-colors">{video.title}</a>
           <Link href={`/canal/${encodeURIComponent(video.channelId)}`} className="text-xs text-muted-foreground hover:text-primary transition-colors truncate" title={video.channelName}>{video.channelName}</Link>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
             {video.views > 0 && <span className="flex items-center gap-1 shrink-0"><Eye className="h-2.5 w-2.5" />{formatNumber(video.views)}</span>}
@@ -282,7 +276,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
+            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
               <Brain className="h-4 w-4 text-primary" />
               Análise Visual — Gemini 2.5 Flash
             </DialogTitle>
@@ -310,7 +304,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                         : <div className="h-4 w-4 rounded-full border-2 border-border shrink-0" />
                     }
                     <s.icon className={cn("h-4 w-4 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} />
-                    <span className={cn("text-sm", isCurrent ? "text-foreground font-medium" : "text-muted-foreground")}>{s.label}</span>
+                    <span className={cn("text-xs sm:text-sm", isCurrent ? "text-foreground font-medium" : "text-muted-foreground")}>{s.label}</span>
                   </div>
                 )
               })}
@@ -333,28 +327,28 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
           {isDone && analysis && (
             <div className="space-y-4">
               {/* Badge */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 shrink-0">
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs font-bold text-primary uppercase">Análise Visual · {analysis.feasibility}</span>
                 </div>
-                <span className="text-xs text-muted-foreground italic">{analysis.style}</span>
-                <span className="ml-auto text-xs text-muted-foreground/60 font-mono">{Math.round((analysis.confidence || 0) * 100)}%</span>
+                <span className="text-xs text-muted-foreground italic truncate max-w-[180px]">{analysis.style}</span>
+                <span className="ml-auto text-xs text-muted-foreground/60 font-mono shrink-0">{Math.round((analysis.confidence || 0) * 100)}%</span>
               </div>
 
               {/* Tabs */}
               <div className="flex gap-1 p-1 rounded-lg bg-secondary/50">
-                <button onClick={() => setActiveTab('analysis')} className={cn("flex-1 text-xs py-1.5 rounded-md transition-all font-medium", activeTab === 'analysis' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                <button onClick={() => setActiveTab('analysis')} className={cn("flex-1 text-xs py-1.5 rounded-md transition-all font-medium truncate", activeTab === 'analysis' ? "bg-background shadow-sm text-foreground font-bold" : "text-muted-foreground hover:text-foreground")}>
                   Template de Análise
                 </button>
-                <button onClick={() => setActiveTab('script')} className={cn("flex-1 text-xs py-1.5 rounded-md transition-all font-medium", activeTab === 'script' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                <button onClick={() => setActiveTab('script')} className={cn("flex-1 text-xs py-1.5 rounded-md transition-all font-medium truncate", activeTab === 'script' ? "bg-background shadow-sm text-foreground font-bold" : "text-muted-foreground hover:text-foreground")}>
                   Roteiro de Produção {scriptSegments.length > 0 && <span className="ml-1 text-[9px] bg-primary/20 text-primary px-1 rounded">{scriptSegments.length}</span>}
                 </button>
               </div>
 
               {activeTab === 'analysis' && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
                     {[
                       { label: 'Estilo Visual', value: analysis.visualStyle },
                       { label: 'Ritmo', value: analysis.pacing },
@@ -362,7 +356,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                     ].map(item => (
                       <div key={item.label} className="rounded-lg bg-secondary/50 p-2 text-center">
                         <p className="text-[9px] text-muted-foreground uppercase tracking-wide">{item.label}</p>
-                        <p className="text-xs font-semibold text-foreground mt-0.5">{item.value}</p>
+                        <p className="text-xs font-semibold text-foreground mt-0.5 truncate">{item.value}</p>
                       </div>
                     ))}
                   </div>
@@ -370,21 +364,21 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                   {analysis.justification && (
                     <div className="rounded-lg bg-primary/5 border border-primary/10 p-3">
                       <p className="text-[10px] font-bold text-primary uppercase mb-1">Veredito Técnico</p>
-                      <p className="text-xs text-foreground/80 leading-relaxed">{analysis.justification}</p>
+                      <p className="text-xs text-foreground/80 leading-relaxed break-words">{analysis.justification}</p>
                     </div>
                   )}
 
                   {analysis.remodelingTip && (
                     <div className="rounded-lg bg-secondary/30 border border-border/50 p-3">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Dica de Remodelagem</p>
-                      <p className="text-xs text-foreground/80 leading-relaxed">{analysis.remodelingTip}</p>
+                      <p className="text-xs text-foreground/80 leading-relaxed break-words">{analysis.remodelingTip}</p>
                     </div>
                   )}
 
                   {analysis.remodeling_template?.thumbnail_prompt && (
                     <div className="rounded-lg bg-secondary/30 border border-border/50 p-3">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Prompt para Thumbnail</p>
-                      <p className="text-xs text-foreground/70 leading-relaxed font-mono">{analysis.remodeling_template.thumbnail_prompt}</p>
+                      <p className="text-xs text-foreground/70 leading-relaxed font-mono break-words">{analysis.remodeling_template.thumbnail_prompt}</p>
                     </div>
                   )}
                 </div>
@@ -393,12 +387,12 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
               {activeTab === 'script' && (
                 <div className="space-y-3">
                   {/* Script provider selector */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <label className="text-xs text-muted-foreground shrink-0">Gerar com:</label>
                     <select
                       value={scriptProvider}
                       onChange={e => setScriptProvider(e.target.value as ScriptProvider)}
-                      className="text-xs rounded-md bg-secondary border border-border px-2 py-1 text-foreground flex-1"
+                      className="text-xs rounded-md bg-secondary border border-border px-2 py-1 text-foreground flex-1 min-w-[140px]"
                     >
                       <option value="openai">GPT-4o (OpenAI)</option>
                       <option value="claude">Claude (Anthropic)</option>
@@ -407,7 +401,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                     <button
                       onClick={reGenerateScript}
                       disabled={isGeneratingScript}
-                      className="text-xs px-3 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 shrink-0"
+                      className="text-xs px-3 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 shrink-0 font-medium"
                     >
                       {isGeneratingScript ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Gerar'}
                     </button>
@@ -430,14 +424,14 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                   {!isGeneratingScript && scriptSegments.length > 0 ? (
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                       {/* Top Action Bar */}
-                      <div className="flex items-center justify-between bg-primary/5 p-2 rounded-lg border border-primary/20">
+                      <div className="flex items-center justify-between bg-primary/5 p-2 rounded-lg border border-primary/20 flex-wrap gap-2">
                         <span className="text-xs font-bold text-primary flex items-center gap-1.5">
                           <BookText className="h-3.5 w-3.5" />
                           {scriptSegments.length} Cenas Geradas
                         </span>
                         <button
                           onClick={copyAllPrompts}
-                          className="text-[10px] font-bold px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1 shadow-sm"
+                          className="text-[10px] font-bold px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1 shadow-sm shrink-0"
                         >
                           <Copy className="h-3 w-3" />
                           Copiar Todos os Prompts
@@ -464,7 +458,7 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                       <div className="space-y-3 rounded-lg border overflow-hidden p-1 bg-secondary/10">
                         {scriptSegments.map((seg: any, idx: number) => (
                           <div key={idx} className="border bg-card rounded-lg p-3 hover:border-primary/30 transition-colors space-y-3">
-                            <div className="flex items-center justify-between border-b pb-2">
+                            <div className="flex items-center justify-between border-b pb-2 flex-wrap gap-2">
                               <div className="flex items-center gap-2">
                                 <span className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">{seg.timestamp || `Cena ${idx + 1}`}</span>
                                 <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{seg.segment_type || 'SLIDE'}</span>
@@ -492,17 +486,17 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
                               </div>
                             )}
 
-                              {/* Visual Prompts */}
-                              <div className="space-y-2">
-                                {seg.visual_content?.image_prompt && (
-                                  <TranslatedPrompt text={seg.visual_content.image_prompt} label="Prompt de Imagem" icon={ImageIcon} colorClass="text-blue-500" isImagePrompt />
-                                )}
-                                {seg.visual_content?.animation_instructions && (
-                                  <TranslatedPrompt text={seg.visual_content.animation_instructions} label="Instrução de Animação / Vídeo" icon={Video} colorClass="text-purple-500" />
-                                )}
-                              </div>
+                            {/* Visual Prompts */}
+                            <div className="space-y-2">
+                              {seg.visual_content?.image_prompt && (
+                                <TranslatedPrompt text={seg.visual_content.image_prompt} label="Prompt de Imagem" icon={ImageIcon} colorClass="text-blue-500" isImagePrompt />
+                              )}
+                              {seg.visual_content?.animation_instructions && (
+                                <TranslatedPrompt text={seg.visual_content.animation_instructions} label="Instrução de Animação / Vídeo" icon={Video} colorClass="text-purple-500" />
+                              )}
                             </div>
-                          ))}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ) : !isGeneratingScript && (
@@ -536,7 +530,6 @@ export function VideoCard({ video, className, compact, cpm, channel }: VideoCard
         script={script}
         onSuccess={() => {
           setDialogOpen(false)
-          // The page will revalidate via server actions
         }}
       />
     </>

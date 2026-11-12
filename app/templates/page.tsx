@@ -114,40 +114,40 @@ export default function TemplatesPage() {
   )
 
   return (
-    <div className="flex-1 space-y-8 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
+    <div className="flex-1 space-y-6 sm:space-y-8 p-4 sm:p-6 lg:p-8 pt-4 sm:pt-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Meus Templates</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Meus Templates</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             Gerencie seus blueprints de remodelagem e estratégias de automação.
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar templates..."
-            className="pl-8"
+            className="pl-8 h-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2 self-start sm:self-auto shrink-0 h-10">
           <Filter className="h-4 w-4" />
           Filtros
         </Button>
       </div>
 
       {loading ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-[280px] rounded-xl border border-border bg-card animate-pulse" />
           ))}
         </div>
       ) : filteredTemplates.length > 0 ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredTemplates.map((template) => (
             <Card key={template.id} className="overflow-hidden group flex flex-col">
               <div className="relative aspect-video overflow-hidden bg-secondary">
@@ -167,7 +167,7 @@ export default function TemplatesPage() {
                 </div>
               </div>
               
-              <CardHeader className="p-4 pb-2">
+              <CardHeader className="p-3.5 sm:p-4 pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-sm font-bold line-clamp-1">{template.name}</CardTitle>
                   <DropdownMenu>
@@ -198,7 +198,7 @@ export default function TemplatesPage() {
                 </CardDescription>
               </CardHeader>
 
-              <CardContent className="p-4 pt-0 flex-1">
+              <CardContent className="p-3.5 sm:p-4 pt-0 flex-1">
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Badge variant="secondary" className="text-[10px] h-5 py-0">
                     <Mic2 className="mr-1 h-3 w-3" /> {template.voice_type?.includes('br') ? 'PT-BR' : 'EN'}
@@ -248,7 +248,7 @@ export default function TemplatesPage() {
                 </div>
               </CardContent>
 
-              <CardFooter className="p-4 pt-0 border-t bg-secondary/10 flex items-center gap-2 mt-3">
+              <CardFooter className="p-3.5 sm:p-4 pt-0 border-t bg-secondary/10 flex items-center gap-2 mt-3">
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -269,12 +269,12 @@ export default function TemplatesPage() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 bg-secondary/20 rounded-2xl border-2 border-dashed border-border/50">
-          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <LayoutTemplate className="h-8 w-8 text-primary" />
+        <div className="flex flex-col items-center justify-center py-16 sm:py-20 bg-secondary/20 rounded-2xl border-2 border-dashed border-border/50 p-4 text-center">
+          <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <LayoutTemplate className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
           </div>
-          <h3 className="text-lg font-bold">Nenhum template salvo</h3>
-          <p className="text-muted-foreground text-sm max-w-xs text-center mt-2">
+          <h3 className="text-base sm:text-lg font-bold">Nenhum template salvo</h3>
+          <p className="text-muted-foreground text-xs sm:text-sm max-w-xs text-center mt-2">
             Comece minerando vídeos e usando o Gemini Vision para criar seus blueprints de inteligência.
           </p>
           <Button asChild className="mt-6">

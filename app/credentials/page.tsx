@@ -49,7 +49,7 @@ export default function CredentialsPage() {
     const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
     const [isSaving, setIsSaving] = useState<string | null>(null)
     const [isAddingAccount, setIsAddingAccount] = useState(false)
-    const [syncFailed, setSyncFailed] = useState<boolean | null>(null) // null=not tried, false=ok, true=failed
+    const [syncFailed, setSyncFailed] = useState<boolean | null>(null)
 
     useEffect(() => {
         if (session) {
@@ -57,7 +57,7 @@ export default function CredentialsPage() {
                 if (data) setKeys(prev => ({ ...prev, ...data }))
             })
             fetchBlotatoAccounts()
-            handleSyncBlotato(true) // auto-sync silently on load
+            handleSyncBlotato(true)
         }
     }, [session])
 
@@ -77,7 +77,6 @@ export default function CredentialsPage() {
             toast.error(`Erro ao salvar ${provider}: ${result.error}`)
         }
     }
-
 
     const handleAddAccount = async () => {
         if (!newAccount.accountId) {
@@ -116,14 +115,12 @@ export default function CredentialsPage() {
             const result = await fetchBlotatoAccountsFromAPIAction()
 
             if (result.success && result.accounts) {
-                // Fix: use composite key to allow multiple pages for the same parent account
                 const alreadyLinkedSet = new Set(
                     blotatoAccounts.map(a => `${a.account_id}_${a.page_id || ''}`)
                 )
                 const flatAccounts: any[] = []
 
                 for (const acc of result.accounts as any[]) {
-                    // Normalize fields as mapped by the simplified server action
                     const accountId = acc.id
                     const displayUsername = acc.username || accountId
                     const platform = acc.platform || 'facebook'
@@ -138,7 +135,6 @@ export default function CredentialsPage() {
                     if (pages.length > 0) {
                         for (const page of pages) {
                             const pid = page.id || page.pageId || page._id
-                            // Use empty string to match DB standard
                             const compositeKey = `${accountId}_${pid || ''}`
                             
                             if (!alreadyLinkedSet.has(compositeKey)) {
@@ -202,7 +198,6 @@ export default function CredentialsPage() {
                     fetchBlotatoAccounts()
                 } else if (!silent) {
                     if ((result.accounts as any[]).length > 0) {
-                        // Se retornou contas mas nenhuma é nova
                         toast.info("Suas contas do Blotato já estão todas sincronizadas.", {
                              description: `${(result.accounts as any[]).length} conta(s) detectada(s).`
                         })
@@ -227,16 +222,6 @@ export default function CredentialsPage() {
 
     const toggleShow = (provider: string) => {
         setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }))
-    }
-
-    const getPlatformIcon = (platform: string) => {
-        switch (platform) {
-            case 'instagram': return <Instagram className="h-4 w-4 text-pink-500" />
-            case 'tiktok': return <Music2 className="h-4 w-4 text-cyan-400" />
-            case 'youtube': return <YoutubeIcon className="h-4 w-4 text-red-500" />
-            case 'facebook': return <Facebook className="h-4 w-4 text-blue-600" />
-            default: return <Globe className="h-4 w-4" />
-        }
     }
 
     if (loading) {
@@ -265,29 +250,28 @@ export default function CredentialsPage() {
     }
 
     return (
-        <div className="w-full max-w-4xl mx-auto flex flex-col h-[calc(100vh-4rem)] p-4 lg:p-8 animate-in fade-in duration-500 overflow-hidden">
-            <div className="flex items-center gap-4 mb-8 shrink-0">
+        <div className="w-full max-w-5xl mx-auto flex flex-col min-h-full p-4 sm:p-6 lg:p-8 animate-in fade-in duration-500">
+            <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8 shrink-0">
                 <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => router.back()}
-                    className="rounded-full hover:bg-secondary/50 transition-colors"
+                    className="rounded-full hover:bg-secondary/50 transition-colors shrink-0"
                 >
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Credenciais</h1>
-                    <p className="text-muted-foreground mt-1">Gerencie suas chaves de API e conexões de mídias.</p>
+                <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">Credenciais</h1>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 truncate">Gerencie suas chaves de API e conexões de mídias.</p>
                 </div>
             </div>
 
             {/* TAB SELECTOR */}
-            <div className="flex w-full gap-2 p-1.5 bg-secondary/20 border border-border/50 rounded-2xl mb-8 shrink-0">
+            <div className="flex w-full gap-1.5 sm:gap-2 p-1.5 bg-secondary/20 border border-border/50 rounded-2xl mb-6 sm:mb-8 shrink-0">
                 <button
                     onClick={() => setActiveTab("media")}
-                    style={{ width: '50%' }}
                     className={cn(
-                        "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-w-0",
+                        "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0",
                         activeTab === "media"
                             ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
                             : "text-muted-foreground hover:bg-red-600/10"
@@ -298,30 +282,27 @@ export default function CredentialsPage() {
                 </button>
                 <button
                     onClick={() => setActiveTab("ai")}
-                    style={{ width: '50%' }}
                     className={cn(
-                        "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-w-0",
+                        "flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all min-w-0",
                         activeTab === "ai"
                             ? "bg-red-600 text-white shadow-lg shadow-red-600/20"
                             : "text-muted-foreground hover:bg-red-600/10"
                     )}
                 >
                     <Cpu className="h-4 w-4 shrink-0" />
-                    <span className="truncate">IA (Inteligência Artificial)</span>
+                    <span className="truncate">Modelos de IA</span>
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-8">
-                <div className="grid gap-8">
+            <div className="flex-1 pr-0 sm:pr-2 pb-8">
+                <div className="grid gap-6 sm:gap-8">
                     {/* CONTENT: CANAIS E MÍDIAS */}
                     {activeTab === "media" && (
-                        <div className="space-y-8 animate-in slide-in-from-left-4 duration-300">
+                        <div className="space-y-6 sm:space-y-8 animate-in slide-in-from-left-4 duration-300">
                             {/* REDES SOCIAIS DIRETAS */}
                             <section>
                                 <SocialConnections />
                             </section>
-
-
                         </div>
                     )}
 
@@ -330,7 +311,7 @@ export default function CredentialsPage() {
                         <section className="space-y-4 animate-in slide-in-from-right-4 duration-300">
                             <div className="flex items-center gap-2 px-1">
                                 <Cpu className="h-5 w-5 text-purple-400" />
-                                <h2 className="text-lg font-bold uppercase tracking-wider text-muted-foreground">Modelos de IA</h2>
+                                <h2 className="text-base sm:text-lg font-bold uppercase tracking-wider text-muted-foreground">Modelos de IA</h2>
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -345,20 +326,20 @@ export default function CredentialsPage() {
                                     { id: 'kie_ai', label: 'Kie.AI', color: 'bg-pink-500/10 text-pink-400', desc: 'Modelos de nicho (Opcional).' },
                                 ].map((ai) => (
                                     <Card key={ai.id} className="border-primary/5 bg-card/30 backdrop-blur-sm overflow-hidden group">
-                                        <CardHeader className="p-4 pb-2">
-                                            <div className="flex items-center justify-between">
-                                                <CardTitle className="text-sm flex items-center gap-2 uppercase tracking-wide">
-                                                    <Sparkles className={cn("h-3.5 w-3.5", ai.color.split(' ')[1])} />
-                                                    {ai.label}
+                                        <CardHeader className="p-3.5 sm:p-4 pb-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <CardTitle className="text-xs sm:text-sm flex items-center gap-2 uppercase tracking-wide truncate">
+                                                    <Sparkles className={cn("h-3.5 w-3.5 shrink-0", ai.color.split(' ')[1])} />
+                                                    <span className="truncate">{ai.label}</span>
                                                 </CardTitle>
-                                                <div className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter", ai.color)}>
+                                                <div className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter shrink-0", ai.color)}>
                                                     {keys[ai.id] ? "Conectado" : "Pendente"}
                                                 </div>
                                             </div>
-                                            <CardDescription className="text-[11px] mt-0.5">{ai.desc}</CardDescription>
+                                            <CardDescription className="text-[11px] mt-0.5 truncate">{ai.desc}</CardDescription>
                                         </CardHeader>
-                                        <CardContent className="p-4 pt-2">
-                                            <div className="flex flex-col gap-3">
+                                        <CardContent className="p-3.5 sm:p-4 pt-2">
+                                            <div className="flex flex-col gap-2.5 sm:gap-3">
                                                 <div className="relative">
                                                     <Input
                                                         type={showKeys[ai.id] ? "text" : "password"}
@@ -368,8 +349,9 @@ export default function CredentialsPage() {
                                                         className="h-10 text-xs font-mono bg-background/30 pr-8 border-white/5 focus:border-primary/50"
                                                     />
                                                     <button
+                                                        type="button"
                                                         onClick={() => toggleShow(ai.id)}
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
                                                     >
                                                         {showKeys[ai.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                                                     </button>

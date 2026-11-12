@@ -64,3 +64,8 @@ public/*.mp4
 __pycache__/
 *.py[cod]
 *.pyc
+
+# Generated creative media & test frames
+/midia/criativos/
+/midia/mock_*
+/midia/prompts_*
