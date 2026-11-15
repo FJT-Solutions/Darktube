@@ -7,6 +7,7 @@
  */
 
 import fs from 'fs';
+import { getMcpUserId } from '@/lib/mcp/context';
 import path from 'path';
 import { FLOW_TEMPLATES, getFlowTemplate, type FlowTemplate } from '@/lib/flow-templates';
 import { VIDEO_MODELS, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel } from '@/lib/flow-template-base';
@@ -146,6 +147,8 @@ export async function listFlowTemplates() {
  * Resolve o usuário padrão no banco do DarkTube para vincular projetos.
  */
 async function resolveDefaultUserId(): Promise<string> {
+  const mcpUser = getMcpUserId();
+  if (mcpUser) return mcpUser;
   try {
     const { rows } = await pool.query('SELECT id FROM public.users ORDER BY created_at ASC LIMIT 1');
     if (rows && rows.length > 0) return rows[0].id;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateMcpAuth } from '@/lib/mcp/auth';
+import { resolveMcpAuth } from '@/lib/mcp/auth';
+import { runWithMcpUser } from '@/lib/mcp/context';
 import {
   listFlowTemplates,
   createCampaignCreative,
@@ -170,7 +171,7 @@ const MCP_TOOLS_MANIFEST = [
 ];
 
 export async function GET(req: NextRequest) {
-  const auth = validateMcpAuth(req);
+  const auth = await resolveMcpAuth(req);
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
@@ -184,7 +185,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = validateMcpAuth(req);
+  const auth = await resolveMcpAuth(req);
   if (!auth.authorized) {
     return NextResponse.json({ error: auth.error }, { status: 401 });
   }
@@ -226,7 +227,7 @@ export async function POST(req: NextRequest) {
 
       if (method === 'tools/call') {
         const { name, arguments: args } = params;
-        const toolResult = await executeTool(name, args || {});
+        const toolResult = await runWithMcpUser(auth.userId, () => executeTool(name, args || {}));
         return NextResponse.json({
           jsonrpc: '2.0',
           id,
@@ -251,7 +252,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Campo "tool" ou "name" é obrigatório.' }, { status: 400 });
     }
 
-    const result = await executeTool(toolName, toolArgs);
+    const result = await runWithMcpUser(auth.userId, () => executeTool(toolName, toolArgs));
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('[API MCP DarkTube] Erro na execução:', err);

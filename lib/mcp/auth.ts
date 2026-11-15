@@ -21,3 +21,17 @@ export function validateMcpAuth(req: Request): { authorized: boolean; error?: st
 
   return { authorized: true };
 }
+
+/**
+ * Autenticacao completa: segredo global (compatibilidade, usa o usuario padrao) ou token pessoal "dtk_..." (usa o dono do token).
+ */
+export async function resolveMcpAuth(req: Request): Promise<{ authorized: boolean; error?: string; userId?: string }> {
+  const authHeader = req.headers.get('authorization')
+  const token = (authHeader || '').replace(/^Bearer\s+/i, '').trim()
+  if (token.startsWith('dtk_')) {
+    const { findUserByMcpToken } = await import('@/lib/mcp/tokens')
+    const userId = await findUserByMcpToken(token).catch(() => null)
+    return userId ? { authorized: true, userId } : { authorized: false, error: 'Token do MCP inválido ou revogado.' }
+  }
+  return validateMcpAuth(req)
+}

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Youtube, Key, Save, LogOut, Loader2, ArrowLeft } from "lucide-react"
 import { updateSettingsAction, getSettingsAction } from "@/app/actions"
 import { toast } from "sonner"
+import { McpConnectCard } from "@/components/mcp-connect-card"
 
 export default function SettingsPage() {
     const { session, loading, signOut } = useAuth()
@@ -124,6 +125,8 @@ export default function SettingsPage() {
                         )}
                     </CardContent>
                 </Card>
+
+                {session && <McpConnectCard />}
             </div>
         </div>
     )
