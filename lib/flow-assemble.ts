@@ -13,6 +13,7 @@ import { getFlowTemplate } from '@/lib/flow-templates'
 import { getFlowProject, setFlowProjectAssembly } from '@/lib/flow-projects'
 import { getUserApiKey } from '@/lib/database'
 import type { FlowJob } from '@/lib/flow-jobs'
+import { inspectRenderedVideo } from '@/lib/motion-checks'
 
 const run = promisify(execFile)
 export const ffmpegBin = () => process.env.FFMPEG_PATH || 'ffmpeg'
@@ -521,6 +522,17 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       }
     }
 
+    const motionCheck = await inspectRenderedVideo(finalFile, {
+      ffmpegPath: ffmpegBin(),
+      expectedColors: cta.accent ? [cta.accent] : undefined,
+    })
+    if (motionCheck.warnings.length) {
+      console.warn(`[Flow] Motion check avisos (${projectId}):`, motionCheck.warnings.join(' | '))
+    }
+    if (!motionCheck.ok && motionCheck.durationSec <= 0) {
+      throw new Error(`Falha na validação Motion Check: ${motionCheck.errors.join('; ')}`)
+    }
+
     const finalUrl = await uploadMediaFile(fs.readFileSync(finalFile), `flow_final_${projectId}.mp4`, 'video/mp4')
     const srtUrl = srt ? await uploadMediaFile(Buffer.from(srt, 'utf8'), `flow_final_${projectId}.srt`, 'text/plain') : null
     await setFlowProjectAssembly(userId, projectId, {
@@ -529,7 +541,7 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       srtUrl,
       error: burn && !burned ? 'Legenda não foi gravada no vídeo (ffmpeg sem suporte). O arquivo .srt está disponível.' : null,
     })
-    return { finalUrl, srtUrl, burned, ctaApplied, takes: picked.length, seconds: Math.round(durations.reduce((a, b) => a + b, 0)) }
+    return { finalUrl, srtUrl, burned, ctaApplied, motionCheck, takes: picked.length, seconds: Math.round(durations.reduce((a, b) => a + b, 0)) }
   } catch (err: any) {
     await setFlowProjectAssembly(userId, projectId, { status: 'assemble_failed', error: String(err?.message || err).slice(0, 400) }).catch(() => {})
     throw err
