@@ -139,6 +139,101 @@ export function cuesFromWords(words: TimedWord[], maxWords = 2, maxGap = 0.5): C
   return cues.map((c, i) => ({ ...c, end: Math.min(c.end + 0.1, cues[i + 1] ? cues[i + 1].start - 0.02 : c.end + 0.1) }))
 }
 
+/** Escapa texto para Dialogue do formato SubStation Alpha (.ass). */
+function escapeAssText(s: string): string {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/\{/g, '(').replace(/\}/g, ')').replace(/\r?\n/g, ' ').trim()
+}
+
+function assTime(sec: number): string {
+  const s = Math.max(0, Number(sec) || 0)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const rem = (s % 60).toFixed(2).padStart(5, '0')
+  return `${h}:${String(m).padStart(2, '0')}:${rem}`
+}
+
+/**
+ * Gera legendas .ASS estilizadas em alta legibilidade (Montserrat Bold, CAIXA ALTA, contorno preto, sombra,
+ * animação pop e destaque em amarelo ouro palavra por palavra sincronizado com os timestamps reais do Whisper).
+ */
+export function buildFlowAss(words: TimedWord[] | null, cues: Cue[], width: number, height: number, maxWords = 2): string {
+  const vertical = height >= width
+  const fontSize = vertical ? Math.round(height * 0.044) : Math.round(height * 0.062)
+  const outline = vertical ? 4.5 : 3.6
+  const shadow = vertical ? 2.4 : 2.0
+  const marginV = vertical ? Math.round(height * 0.16) : Math.round(height * 0.09)
+  const marginH = vertical ? 52 : 90
+
+  const header = `[Script Info]
+ScriptType: v4.00+
+PlayResX: ${width}
+PlayResY: ${height}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: FlowViral,Montserrat,${fontSize},&H00FFFFFF,&H000AE6FF,&H00000000,&H99000000,-1,0,0,0,100,100,0.8,0,1,${outline},${shadow},2,${marginH},${marginH},${marginV},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`
+
+  const events: string[] = []
+  if (words && words.length > 0) {
+    // Agrupa palavras em blocos curtos (maxWords) preservando pausas e pontuação:
+    const groups: TimedWord[][] = []
+    let cur: TimedWord[] = []
+    for (const w of words) {
+      const cleanW = cleanCaptionText(w.word)
+      if (!cleanW) continue
+      if (cur.length && w.start - cur[cur.length - 1].end > 0.45) {
+        groups.push(cur)
+        cur = []
+      }
+      cur.push({ ...w, word: cleanW })
+      if (cur.length >= maxWords || /[.!?;:…]$/.test(w.word)) {
+        groups.push(cur)
+        cur = []
+      }
+    }
+    if (cur.length) groups.push(cur)
+
+    for (let gi = 0; gi < groups.length; gi++) {
+      const grp = groups[gi]
+      const nextGroupStart = groups[gi + 1]?.[0]?.start
+      const groupEndLimit = nextGroupStart !== undefined ? Math.min(grp[grp.length - 1].end + 0.14, nextGroupStart - 0.01) : grp[grp.length - 1].end + 0.14
+
+      for (let wi = 0; wi < grp.length; wi++) {
+        const start = grp[wi].start
+        const nextWordStart = grp[wi + 1]?.start
+        const rawEnd = nextWordStart !== undefined ? nextWordStart : groupEndLimit
+        const end = Math.max(start + 0.06, Math.min(rawEnd, groupEndLimit))
+
+        const rendered = grp
+          .map((item, idx) => {
+            const label = escapeAssText(item.word.toUpperCase())
+            if (idx === wi) return `{\\c&H000AE6FF&}${label}{\\c&H00FFFFFF&}`
+            return label
+          })
+          .join(' ')
+
+        const pop = wi === 0 ? '{\\fscx92\\fscy92\\t(0,65,\\fscx104\\fscy104)\\t(65,135,\\fscx100\\fscy100)}' : ''
+        events.push(`Dialogue: 0,${assTime(start)},${assTime(end)},FlowViral,,0,0,0,,${pop}${rendered}`)
+      }
+    }
+  } else {
+    for (const c of cues) {
+      const txt = escapeAssText(cleanCaptionText(c.text).toUpperCase())
+      if (!txt) continue
+      const pop = '{\\fscx92\\fscy92\\t(0,65,\\fscx104\\fscy104)\\t(65,135,\\fscx100\\fscy100)}'
+      events.push(`Dialogue: 0,${assTime(c.start)},${assTime(c.end)},FlowViral,,0,0,0,,${pop}${txt}`)
+    }
+  }
+
+  return header + events.join('\n') + '\n'
+}
+
 export function buildSrt(cues: Cue[]): string {
   return cues
     .filter((c) => c.text.trim())
@@ -265,7 +360,7 @@ async function detectVoice(file: string, duration: number) {
 const OPENAI_WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions'
 
 /** Transcreve o audio com tempo por palavra via OpenAI Whisper oficial (whisper-1). */
-export async function transcribeWhisper(file: string, language?: string, customApiKey?: string): Promise<TimedWord[] | null> {
+export async function transcribeWhisper(file: string, language?: string, customApiKey?: string, promptHint?: string): Promise<TimedWord[] | null> {
   const apiKey = customApiKey
   if (!apiKey) {
     console.warn('[Flow] Chave OpenAI nao encontrada nas Credenciais do usuario (Credenciais > IA > OpenAI).')
@@ -281,6 +376,7 @@ export async function transcribeWhisper(file: string, language?: string, customA
     fd.append('response_format', 'verbose_json')
     fd.append('timestamp_granularities[]', 'word')
     if (language) fd.append('language', language)
+    if (promptHint && promptHint.trim()) fd.append('prompt', promptHint.trim().slice(0, 600))
 
     const res = await fetch(OPENAI_WHISPER_URL, {
       method: 'POST',
@@ -373,7 +469,7 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const normalized: string[] = []
     const durations: number[] = []
     const hasAudio: boolean[] = []
-    const cues: Cue[] = []
+    const fallbackCuesList: Cue[] = []
     const openAiApiKey = (await getUserApiKey(userId, 'openai').catch(() => '')) || ''
     const wordsPerCaption = Math.min(Math.max(Number((project.params as any)?.wordsPerCaption) || 2, 1), 3)
     const lang = String(project.params.idioma || '').split('-')[0].toLowerCase() || undefined
@@ -397,66 +493,38 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       let dur = (await probe(norm)).duration || k?.seconds || 6
       let trimOffset = 0
 
-      // Corte inteligente de silêncio inicial em takes com fala (elimina o pre-roll ocioso):
+      // Corte inteligente de silêncio inicial com re-encode preciso (nunca -c copy, que corta no keyframe e gera deriva):
       if (t.mode !== 'ambiente' && k?.line?.trim() && info.hasAudio) {
-        const words = await transcribeWhisper(norm, lang, openAiApiKey)
-        if (words && words.length > 0) {
-          const firstWordStart = words[0].start
-          if (firstWordStart > 0.35) {
-            trimOffset = Math.max(0, firstWordStart - 0.15)
-            console.log(`[Flow] take ${clip.n}: cortando ${trimOffset.toFixed(2)}s de silêncio inicial (voz aos ${firstWordStart.toFixed(2)}s)`)
-            try {
-              await run(ffmpegBin(), ['-y', '-ss', String(trimOffset), '-i', norm, '-c', 'copy', trimmed], { timeout: 120000 })
-              if (fs.existsSync(trimmed) && fs.statSync(trimmed).size > 1000) {
-                clipFile = trimmed
-                dur = Math.max(0.5, dur - trimOffset)
-              } else {
-                trimOffset = 0
-              }
-            } catch {
+        const voiceWin = await detectVoice(norm, dur)
+        const preStart = voiceWin?.start ?? 0
+        if (preStart > 0.35 && preStart < dur - 1.0) {
+          trimOffset = Math.max(0, preStart - 0.14)
+          console.log(`[Flow] take ${clip.n}: cortando ${trimOffset.toFixed(2)}s de silêncio inicial (voz aos ${preStart.toFixed(2)}s)`)
+          try {
+            await run(
+              ffmpegBin(),
+              ['-y', '-ss', trimOffset.toFixed(3), '-i', norm, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-avoid_negative_ts', 'make_zero', trimmed],
+              { timeout: 120000 }
+            )
+            if (fs.existsSync(trimmed) && fs.statSync(trimmed).size > 1000) {
+              clipFile = trimmed
+              dur = (await probe(trimmed)).duration || Math.max(0.5, dur - trimOffset)
+            } else {
               trimOffset = 0
             }
+          } catch {
+            trimOffset = 0
           }
-
-          const adjustedWords = words
-            .filter((w) => w.end > trimOffset)
-            .map((w) => ({ ...w, start: Math.max(0, w.start - trimOffset), end: Math.max(0.1, w.end - trimOffset) }))
-            .filter((w) => w.start < dur)
-
-          const takeCues = cuesFromWords(tightenWords(adjustedWords), wordsPerCaption).map((c) => ({
+        }
+        const win = voiceWin || estimateSpeech(k.line, dur)
+        const chunks = splitCaption(k.line, wordsPerCaption)
+        if (chunks.length) {
+          const fallbackCues = timeChunks(chunks, Math.max(0, win.start - trimOffset), Math.max(0.2, Math.min(dur - 0.05, win.end - trimOffset))).map((c) => ({
             ...c,
             start: at + c.start,
             end: at + Math.min(c.end, dur - 0.05),
           }))
-          cues.push(...takeCues)
-          console.log(`[Flow] legenda take ${clip.n}: OpenAI whisper ${words.length} palavras, ${takeCues.length} frases (${wordsPerCaption} pal/leg)`)
-        } else {
-          // Fallback procedural com corte de silêncio estimado
-          const voiceWin = await detectVoice(norm, dur)
-          const win = voiceWin || estimateSpeech(k.line, dur)
-          if (win.start > 0.35) {
-            trimOffset = Math.max(0, win.start - 0.15)
-            try {
-              await run(ffmpegBin(), ['-y', '-ss', String(trimOffset), '-i', norm, '-c', 'copy', trimmed], { timeout: 120000 })
-              if (fs.existsSync(trimmed) && fs.statSync(trimmed).size > 1000) {
-                clipFile = trimmed
-                dur = Math.max(0.5, dur - trimOffset)
-              } else {
-                trimOffset = 0
-              }
-            } catch {
-              trimOffset = 0
-            }
-          }
-          const chunks = splitCaption(k.line, wordsPerCaption)
-          if (chunks.length) {
-            const fallbackCues = timeChunks(chunks, Math.max(0, win.start - trimOffset), Math.max(0.2, win.end - trimOffset)).map((c) => ({
-              ...c,
-              start: at + c.start,
-              end: at + Math.min(c.end, dur - 0.05),
-            }))
-            cues.push(...fallbackCues)
-          }
+          fallbackCuesList.push(...fallbackCues)
         }
       }
 
@@ -470,24 +538,39 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const joined = path.join(dir, 'joined.mp4')
     await run(ffmpegBin(), ['-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined], { timeout: 300000, cwd: dir })
 
+    // Sincronia exata: transcreve o audio FINAL de joined.mp4 inteiro via Whisper (0 ms de deriva entre takes),
+    // passando as falas oficiais do roteiro como guia de vocabulário/nomes próprios.
+    const spokenLines = picked
+      .map((clip, idx) => (takes.find((tk) => tk.n === clip.n) ?? takes[idx])?.line || '')
+      .filter(Boolean)
+      .join(' ')
+    let joinedWords: TimedWord[] | null = null
+    if (t.mode !== 'ambiente' && spokenLines.trim()) {
+      const rawWords = await transcribeWhisper(joined, lang, openAiApiKey, spokenLines)
+      if (rawWords && rawWords.length > 0) {
+        joinedWords = tightenWords(rawWords)
+        console.log(`[Flow] legenda sincronizada no video final joined.mp4: OpenAI Whisper ${joinedWords.length} palavras (${wordsPerCaption} pal/leg)`)
+      }
+    }
+
+    const cues = joinedWords ? cuesFromWords(joinedWords, wordsPerCaption) : fallbackCuesList
     const srt = buildSrt(cues)
 
     let finalFile = joined
     let burned = false
     // Curtos: legenda gravada no video (retencao no feed, muita gente assiste sem som).
     // Longos (YouTube 16:9): so o .srt, que vira legenda ativavel e traduzivel no YouTube e nao cobre a imagem.
-    const burn = !!srt && t.length !== 'longo'
+    const burn = (!!srt || (joinedWords && joinedWords.length > 0)) && t.length !== 'longo'
     if (srt) fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
     if (burn) {
-      fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
-      // Legenda estilo social media moderna compacta: fonte Montserrat-Bold/The Bold Font, tamanho proporcional, sem tampar o produto
+      const assContent = buildFlowAss(joinedWords, cues, W, H, wordsPerCaption)
+      fs.writeFileSync(path.join(dir, 'captions.ass'), assContent, 'utf8')
       const fontsDir = path.join(process.cwd(), 'public', 'fonts').replace(/\\/g, '/')
-      const style = `Fontname=Montserrat-Bold,Bold=1,FontSize=${vertical ? 15 : 13},Outline=2.2,Shadow=1,Alignment=2,MarginV=${vertical ? 75 : 35},PrimaryColour=&H00FFFFFF&,OutlineColour=&H00000000&,BackColour=&H80000000&`
       const burnedFile = path.join(dir, 'final.mp4')
       try {
         await run(
           ffmpegBin(),
-          ['-y', '-i', 'joined.mp4', '-vf', `subtitles=captions.srt:fontsdir='${fontsDir}':force_style='${style}'`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', 'final.mp4'],
+          ['-y', '-i', 'joined.mp4', '-vf', `ass=captions.ass:fontsdir='${fontsDir}'`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', 'final.mp4'],
           { timeout: 300000, cwd: dir }
         )
         if (fs.existsSync(burnedFile) && fs.statSync(burnedFile).size > 1000) {
@@ -495,7 +578,21 @@ export async function assembleFlowProject(userId: string, projectId: string) {
           burned = true
         }
       } catch {
-        burned = false // segue sem legenda queimada; o .srt continua disponivel
+        // Fallback para SRT estilizado se o filtro ass falhar
+        try {
+          const style = `Fontname=Montserrat-Bold,Bold=1,FontSize=${vertical ? 18 : 15},Outline=2.5,Shadow=1.2,Alignment=2,MarginV=${vertical ? 75 : 35},PrimaryColour=&H00FFFFFF&,OutlineColour=&H00000000&,BackColour=&H80000000&`
+          await run(
+            ffmpegBin(),
+            ['-y', '-i', 'joined.mp4', '-vf', `subtitles=captions.srt:fontsdir='${fontsDir}':force_style='${style}'`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', 'final.mp4'],
+            { timeout: 300000, cwd: dir }
+          )
+          if (fs.existsSync(burnedFile) && fs.statSync(burnedFile).size > 1000) {
+            finalFile = burnedFile
+            burned = true
+          }
+        } catch {
+          burned = false
+        }
       }
     }
 

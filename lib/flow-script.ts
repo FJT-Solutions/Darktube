@@ -183,8 +183,10 @@ export function cleanCamera(text: string): string {
 function styleFor(t: FlowTemplate | undefined, params: FlowParams, hasPeople: boolean): string {
   const realismo = normalizeRealism(String(params.realismo || ''))
   const realism = REALISM_PROMPT[realismo] || ''
-  // Template estilizado (2D, 3D...) com estilo escolhido: a cara do template repete o mesmo estilo ou contradiz a escolha.
-  const look = t?.look && !(t.defaults.realismo && realismo) ? t.look : ''
+  const isCustomStylized = ['animacao3d', 'ilustrado2d', 'stickman2d', 'avatar3d', 'brinquedo3d', 'massinha'].includes(realismo)
+  const hasCustomScript = Boolean(String(params.roteiro || '').trim())
+  // Template estilizado (2D, 3D...) ou roteiro livre nao deve herdar iluminacao/lente conflitante de outro look.
+  const look = t?.look && !(t.defaults.realismo && realismo) && !isCustomStylized && !hasCustomScript ? t.look : ''
   let s = [realism, look].filter(Boolean).join('; ') || 'cinematic 35mm film look, motivated natural lighting'
   if (!hasPeople) s = s.replace(/,?\s*(?:natural|realistic)\s+skin\s+(?:texture|detail)/gi, '')
   return s.replace(/\s+/g, ' ').replace(/^[\s,;]+|[\s,;.]+$/g, '')
@@ -248,7 +250,8 @@ Writing rules (avoid generic "AI slop"):
 - Immediate speech delivery: the character starts speaking immediately at the very start of the shot (second 0.1), coupled with an immediate physical micro-action (clenching a fist, stepping closer, holding up an object). Never leave the first 3 seconds silent waiting for speech.
 - Grounded dialogue and conflict (no empty melodrama): dialogue must involve concrete nouns and tangible stakes (e.g. a forged document, a failed business, missing money, a named relative, a hidden key, inheritance debts). Prohibit vague, context-free clichés ("you don't know half of what I know", "this car... it cannot be", "the truth is about to appear", "who are you?"). Each line must logically answer or escalate the previous line with real substance.
 - Temporary props: items like glasses, documents, phones or keys must be handled and released within the action. Never add temporary props to a character's fixed visual description.
-- The takes form ONE continuous story in order: each take starts from the exact state the previous one ended (same positions, props, wardrobe, injuries or stains, time of day and weather); lines read as one sequence, never a new topic. A change of location needs a visible reason in the action.
+- The takes form ONE continuous causal story in order: each take starts from the exact narrative, emotional and physical state the previous one ended (same positions, props, wardrobe, injuries or stains, time of day and weather). Dialogue lines must answer or react directly to what was just seen or spoken in the previous take—never jump to a character reacting to a hidden event or off-screen "them" without showing it first.
+- A change of location needs a clear narrative bridge in dialogue/action and an explicit lighting/time-of-day match (e.g. evening/candlelight stays evening unless a morning transition is explicitly told). If a character enters a work setting that requires workwear, note the outfit adjustment inside that take's action instead of contradicting fixed base wardrobe.
 - Each take is generated on its own, as ONE continuous shot with no cuts: one main action and one camera move. Never refer to other takes ("same as take 1", "continues", "as before"); restate the framing instead.
 - Vary the camera on purpose from take to take (close-up, over-the-shoulder, low angle, tracking...). Use the camera of the scene function.
 - Spoken lines are natural and short, with contractions and pauses; respect the word limit (about 2.3 words per second). Write numbers and money in words as they are spoken, never with currency symbols.
@@ -564,7 +567,13 @@ export function buildTakePrompt(
     lines.push(`Action: ${stripOnScreenText(noEnd(take.action))}.`)
     // O take anterior ancora a continuidade (posicao, objetos, expressao) sem citar "take N", que o modelo nao conhece.
     const prev = script.takes.find((k) => k.n === take.n - 1)
-    if (prev?.action && level <= 1) lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
+    if (prev?.action && level <= 1) {
+      if (prev.location === take.location) {
+        lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
+      } else {
+        lines.push(`Narrative bridge from the preceding beat: ${clipWords(noEnd(prev.action), 20)}.`)
+      }
+    }
     // Take sem ninguem na imagem (so maos e comida) nao tem boca para dublar: a fala vira narracao fora da tela, em vez de
     // "speaks... lip-sync" contra "no faces", que se contradizem.
     const offscreenLine = kind === 'dialogo' && !!take.line && visible.length === 0

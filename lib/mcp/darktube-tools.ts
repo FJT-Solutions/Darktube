@@ -304,7 +304,18 @@ async function generateAiScript(ctx: {
 }) {
   const { offer, angle, presetChosen, presetTitle, templateId, videoModel, secondsPerTake, quality, format, takesCount, benefits, customIdea, templateParams } = ctx;
   const selectedPreset = { title: presetTitle };
-  const t: FlowTemplate = getFlowTemplate(templateId) || getFlowTemplate('produto-tiktok-shop') || FLOW_TEMPLATES[0];
+  const TEMPLATE_ALIASES: Record<string, string> = {
+    'historia-moral': 'novelinha-dramatica',
+    'fabula': 'novelinha-dramatica',
+    'fabula-moral': 'novelinha-dramatica',
+    'drama': 'novelinha-dramatica',
+    'romance': 'novelinha-dramatica',
+    'novelinha': 'novelinha-dramatica',
+  };
+  const normalizedTemplateId = TEMPLATE_ALIASES[String(templateId || '').trim().toLowerCase()] || templateId;
+  const fallbackTemplate = customIdea ? getFlowTemplate('livre') : getFlowTemplate('produto-tiktok-shop');
+  const t: FlowTemplate = getFlowTemplate(normalizedTemplateId) || fallbackTemplate || FLOW_TEMPLATES[0];
+  const isProductOrRecipeTemplate = t.id === 'produto-tiktok-shop' || t.id === 'receita-viral' || t.id === 'receita-chromakey-expert';
 
   const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
   const resolvedModel = videoModel || t.defaults?.model || 'Omni 1.2 Flash';
@@ -315,7 +326,7 @@ async function generateAiScript(ctx: {
   const params: FlowParams = {
     tema: presetChosen ? `${offer} - ${selectedPreset.title}` : offer,
     produto: offer,
-    beneficios: benefits || 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos',
+    beneficios: benefits || (isProductOrRecipeTemplate ? 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos' : ''),
     estilo: angle === 'pao-frigideira' ? 'dor' : 'objecao',
     roteiro: customIdea || '',
     idioma: 'pt-BR',
@@ -910,10 +921,11 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     const startWait = Date.now();
     const maxMs = waitForSeconds * 1000;
     while (Date.now() - startWait < maxMs) {
+      // Evita baixar imagens/arquivos repetidamente a cada 5s durante o polling; baixa só ao retornar.
       const current = await getCreativeStatus({
         projectId: rawProjectId,
         assembleIfReady,
-        downloadLocal,
+        downloadLocal: false,
         outputDir,
         waitForSeconds: 0,
       });
@@ -922,7 +934,15 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
         current.awaitingCharacterApproval ||
         (current.progress.failedTakes > 0 && current.progress.inProgressTakes === 0)
       ) {
-        return current;
+        return downloadLocal
+          ? await getCreativeStatus({
+              projectId: rawProjectId,
+              assembleIfReady: false,
+              downloadLocal: true,
+              outputDir,
+              waitForSeconds: 0,
+            })
+          : current;
       }
       await new Promise((r) => setTimeout(r, 5000));
     }
