@@ -364,10 +364,24 @@ async function generateAiScript(ctx: {
 
   try {
     const system = buildSystemPrompt(t, params);
-    const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro de anúncio para "${offer}".`);
+    const text = await callFlowLLM('openai', apiKey, system, `Gere o roteiro completo com exatamente ${resolvedTakesCount} takes conectados em sequência causal para "${offer}".`);
     const json = extractJson(text);
     if (json && typeof json === 'object') {
       script = normalizeScript(json, t, params);
+      const errors = validateScript(script, t, params).filter((x) => x.level === 'erro');
+      if (errors.length > 0) {
+        try {
+          const { buildRepairPrompt } = await import('@/lib/flow-script');
+          const repairPrompt = buildRepairPrompt(script, errors);
+          const repairedText = await callFlowLLM('openai', apiKey, system, repairPrompt);
+          const repairedJson = extractJson(repairedText);
+          if (repairedJson && typeof repairedJson === 'object') {
+            script = normalizeScript(repairedJson, t, params);
+          }
+        } catch (repairErr: any) {
+          console.warn(`[MCP DarkTube] Aviso no reparo de roteiro (${errors.length} erro(s)): ${repairErr.message}`);
+        }
+      }
     }
   } catch (err: any) {
     throw new Error(`Falha ao gerar roteiro via OpenAI LLM: ${err.message}`);
