@@ -23,7 +23,7 @@ import {
   type FlowCharacter,
 } from '@/lib/flow-script';
 import { buildSheetPrompt, isChromaKeyTemplate } from '@/lib/flow-characters';
-import { callFlowLLM } from '@/lib/flow-llm';
+import { callFlowLLM, FLOW_PROVIDERS, type FlowProvider } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
 import { createFlowJob, getFlowAgentState, normalizeStorageReference } from '@/lib/flow-jobs';
 import { assembleFlowProject } from '@/lib/flow-assemble';
@@ -146,7 +146,7 @@ export async function listFlowTemplates() {
 /**
  * Resolve o usuário padrão no banco do DarkTube para vincular projetos.
  */
-async function resolveDefaultUserId(): Promise<string> {
+export async function resolveDefaultUserId(): Promise<string> {
   const mcpUser = getMcpUserId();
   if (mcpUser) return mcpUser;
   try {

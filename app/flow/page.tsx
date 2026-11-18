@@ -26,6 +26,7 @@ import {
   Mic,
   Calculator,
   Zap,
+  ScanEye,
 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
@@ -67,6 +68,7 @@ import {
   type FlowMediaType,
 } from "@/lib/flow-script"
 import { FlowCreditSimulator } from "@/components/flow-credit-simulator"
+import { FlowClonePanel } from "@/components/flow-clone-panel"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject, FlowPublishInfo } from "@/lib/flow-projects"
 import type { FlowLibraryCharacter } from "@/lib/flow-characters"
@@ -102,7 +104,7 @@ import {
   replaceFlowAudioAction,
 } from "./actions"
 
-type View = "novo" | "projeto" | "projetos"
+type View = "novo" | "clonar" | "projeto" | "projetos"
 type ProjectRow = Omit<FlowProject, "script">
 
 interface JobRow {
@@ -401,6 +403,15 @@ export default function FlowPage() {
               <span>Novo projeto</span>
             </Button>
             <Button
+              variant={view === "clonar" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs font-semibold flex-1 sm:flex-initial px-2.5 sm:px-3 justify-center"
+              onClick={() => setView("clonar")}
+            >
+              <ScanEye className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+              <span>Clonar de Link</span>
+            </Button>
+            <Button
               variant={view === "projetos" ? "default" : "ghost"}
               size="sm"
               className="h-7 text-xs font-semibold flex-1 sm:flex-initial px-2.5 sm:px-3 justify-center"
@@ -432,6 +443,18 @@ export default function FlowPage() {
             if (typeof hybrid === "boolean") setIsHybrid(hybrid)
             setShowSimulator(false)
             toast.success(`Parâmetros aplicados: ${tk} takes de ${s}s no modelo ${m}`)
+          }}
+        />
+      )}
+
+      {view === "clonar" && (
+        <FlowClonePanel
+          providers={providers}
+          defaultProvider={provider}
+          onProjectCreated={(p) => {
+            setProject(p)
+            setProjectPublish(null)
+            setView("projeto")
           }}
         />
       )}
@@ -693,6 +716,9 @@ export default function FlowPage() {
                 <button className="min-w-0 flex-1 text-left space-y-1" onClick={() => openProject(p.id)}>
                   <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <p className="truncate font-semibold text-sm">{p.title || "Sem título"}</p>
+                    {Boolean((p.params as any)?.cloneSourceUrl) && (
+                      <Badge variant="outline" className="text-[10px] h-4 px-1.5 shrink-0">Clonado</Badge>
+                    )}
                     {hasVideo && <Badge variant="default" className="bg-emerald-600 text-white text-[10px] h-4 px-1.5 font-semibold shrink-0">MP4</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground break-words">

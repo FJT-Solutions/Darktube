@@ -10,6 +10,11 @@ import {
   assembleFlowCreative,
   replaceCreativeAudio,
 } from '@/lib/mcp/darktube-tools';
+import {
+  createNextPartCreative,
+  analyzeVideoLinkMcp,
+  cloneVideoFromLinkMcp,
+} from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 900;
@@ -168,6 +173,80 @@ const MCP_TOOLS_MANIFEST = [
       required: ['audioPathOrUrl'],
     },
   },
+  {
+    name: 'darktube_create_next_part',
+    description: 'Cria a próxima parte (Parte 2, Parte 3...) continuando um projeto existente do /flow. Herda automaticamente personagens, retratos aprovados (sheetUrl) e voz do narrador da parte anterior, mantendo continuidade da história sem gerar folha de novo.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID completo ou prefixo de 8 caracteres do projeto da parte anterior (Parte 1, Parte 2...)' },
+        pipelineMode: { type: 'string', enum: ['flow', 'script_only'], description: '"flow" cria o projeto e enfileira os takes (padrão); "script_only" retorna apenas a prévia do roteiro da nova parte.', default: 'flow' },
+        videoModel: { type: 'string', enum: ['Omni 1.1 Flash', 'Omni 1.2 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'], description: 'Opcional: sobrescreve o modelo da parte anterior' },
+        secondsPerTake: { type: 'number', minimum: 3, maximum: 15, description: 'Opcional: sobrescreve segundos por take' },
+        quality: { type: 'string', enum: ['360p', '720p', '1080p'] },
+        takesCount: { type: 'number', description: 'Opcional: quantidade de takes da nova parte' },
+        customIdea: { type: 'string', description: 'Opcional: direcionamento ou roteiro específico para esta nova parte' },
+        provider: { type: 'string', enum: ['gemini', 'openai', 'claude', 'openrouter'], description: 'Provedor de IA das Credenciais do usuário' },
+        queueTakes: { type: 'boolean', default: true },
+        waitForSeconds: { type: 'number', description: 'Segundos para aguardar conclusão no Flow (0 = retorna projectId na hora)', default: 0 },
+        downloadLocal: { type: 'boolean', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+      },
+      required: ['projectId'],
+    },
+  },
+  {
+    name: 'darktube_analyze_video_link',
+    description: 'Baixa um vídeo a partir de um link (YouTube, Shorts, Reels, TikTok, X), extrai frames sequenciais + áudio/transcrição e faz engenharia reversa frame a frame com OCR visual usando a credencial de IA do usuário (Gemini Vision, OpenAI, Claude ou OpenRouter).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL pública do vídeo de referência' },
+        provider: { type: 'string', enum: ['gemini', 'openai', 'claude', 'openrouter'], description: 'Opcional: provedor multimodal salvo em Credenciais (padrão: primeiro disponível)' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'darktube_clone_video_from_link',
+    description: 'Estuda um vídeo por link frame a frame + OCR com a IA do usuário e replica exatamente a mesma estrutura narrativa, ritmo, enquadramentos e transições no /flow, trocando história/tema, personagem ou ambiente conforme pedido.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL pública do vídeo de referência a clonar' },
+        provider: { type: 'string', enum: ['gemini', 'openai', 'claude', 'openrouter'], description: 'Provedor multimodal salvo em Credenciais' },
+        pipelineMode: { type: 'string', enum: ['flow', 'script_only'], default: 'flow' },
+        newTheme: { type: 'string', description: 'Nova história, oferta ou tema para colocar dentro da mesma estrutura' },
+        newCharacter: { type: 'string', description: 'Novo personagem para substituir o original mantendo a mesma estrutura' },
+        newLocation: { type: 'string', description: 'Novo ambiente/cenário para substituir o original' },
+        keepInstructions: { type: 'string', description: 'O que manter ou observações extras de adaptação' },
+        videoModel: { type: 'string', enum: ['Omni 1.1 Flash', 'Omni 1.2 Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'] },
+        secondsPerTake: { type: 'number', minimum: 3, maximum: 15 },
+        quality: { type: 'string', enum: ['360p', '720p', '1080p'], default: '360p' },
+        format: { type: 'string', enum: ['9:16', '16:9'] },
+        takesCount: { type: 'number' },
+        idioma: { type: 'string', default: 'pt-BR' },
+        realismo: { type: 'string' },
+        isHybrid: { type: 'boolean', default: true },
+        wordsPerCaption: { type: 'number', default: 2 },
+        character: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            description: { type: 'string' },
+            voice: { type: 'string' },
+            sheetUrl: { type: 'string' },
+            generateSheet: { type: 'boolean', default: false },
+          },
+        },
+        queueTakes: { type: 'boolean', default: true },
+        waitForSeconds: { type: 'number', default: 0 },
+        downloadLocal: { type: 'boolean', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+      },
+      required: ['url'],
+    },
+  },
 ];
 
 export async function GET(req: NextRequest) {
@@ -284,6 +363,15 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_replace_audio':
       return await replaceCreativeAudio(args);
+
+    case 'darktube_create_next_part':
+      return await createNextPartCreative(args);
+
+    case 'darktube_analyze_video_link':
+      return await analyzeVideoLinkMcp(args);
+
+    case 'darktube_clone_video_from_link':
+      return await cloneVideoFromLinkMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);

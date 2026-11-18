@@ -54,6 +54,8 @@ import { deleteDarkClipPost, saveDarkClipPost, updateDarkClipPostStatus } from "
 import { isValidVideoUrl, triggerSocialDispatcher } from "@/lib/social-dispatcher"
 import { getUserCredits, setUserCredits } from "@/lib/flow-credits-server"
 import { simulateCredits, type SimulationResult } from "@/lib/flow-credits"
+import { analyzeVideoStructureFromLink, buildCloneTemplateAndParams } from "@/lib/flow-video-clone"
+import type { CloneCustomization, FlowClonedStructure } from "@/lib/flow-clone-types"
 
 async function requireUser() {
   const user = await getCurrentUser()
@@ -115,6 +117,45 @@ export async function generateFlowProjectAction(input: { templateId: string; par
 
     const { script, issues } = await writeFlowScript(provider, key, t, params)
     const project = await createFlowProject({ userId: user.id, templateId: t.id, params, script, provider })
+    return { success: true as const, project, issues: issues.map((i) => i.message) }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Baixa um video por link, analisa frame a frame + OCR via credencial do usuario e devolve a estrutura. */
+export async function analyzeVideoLinkForFlowAction(input: { url: string; provider: string }) {
+  try {
+    const user = await requireUser()
+    if (!FLOW_PROVIDERS.includes(input.provider as FlowProvider)) throw new Error("Provedor de IA inválido.")
+    const provider = input.provider as FlowProvider
+    const key = await getUserApiKey(user.id, provider)
+    if (!key) throw new Error(`Nenhuma chave salva em Credenciais para ${provider}.`)
+    const openaiKey = provider === "openai" ? key : await getUserApiKey(user.id, "openai").catch(() => null)
+    const structure = await analyzeVideoStructureFromLink({ url: input.url, provider, apiKey: key, openaiKey })
+    return { success: true as const, structure }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Replica a estrutura analisada de um link aplicando as trocas de historia/personagem/ambiente do usuario. */
+export async function createProjectFromCloneAction(input: {
+  structure: FlowClonedStructure
+  custom: CloneCustomization
+  provider: string
+  params: Record<string, any>
+}) {
+  try {
+    const user = await requireUser()
+    if (!FLOW_PROVIDERS.includes(input.provider as FlowProvider)) throw new Error("Provedor de IA inválido.")
+    const provider = input.provider as FlowProvider
+    const key = await getUserApiKey(user.id, provider)
+    if (!key) throw new Error(`Nenhuma chave salva em Credenciais para ${provider}.`)
+    const baseParams = cleanParams(input.params, "livre")
+    const { template, params } = buildCloneTemplateAndParams(input.structure, input.custom || {}, baseParams)
+    const { script, issues } = await writeFlowScript(provider, key, template, params)
+    const project = await createFlowProject({ userId: user.id, templateId: "livre", params, script, provider })
     return { success: true as const, project, issues: issues.map((i) => i.message) }
   } catch (err) {
     return fail(err)
