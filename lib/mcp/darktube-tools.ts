@@ -22,7 +22,7 @@ import {
   type FlowScript,
   type FlowCharacter,
 } from '@/lib/flow-script';
-import { buildSheetPrompt, isChromaKeyTemplate } from '@/lib/flow-characters';
+import { buildSheetPrompt, isChromaKeyTemplate, isVoiceOnlyCharacter } from '@/lib/flow-characters';
 import { callFlowLLM, FLOW_PROVIDERS, type FlowProvider } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
 import { createFlowJob, getFlowAgentState, normalizeStorageReference } from '@/lib/flow-jobs';
@@ -633,13 +633,14 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
       const charInput = input.character;
       const charId = 'c1';
       const existingCharIndex = finalScript.characters.findIndex((c) => c.id === charId);
+      const prevChar = existingCharIndex >= 0 ? finalScript.characters[existingCharIndex] : finalScript.characters[0];
       const newChar: FlowCharacter = {
         id: charId,
-        name: charInput.name || 'Apresentador',
-        description: charInput.description || 'Pessoa comunicativa e expressiva',
-        voice: charInput.voice || 'natural',
+        name: charInput.name || prevChar?.name || 'Apresentador',
+        description: charInput.description || prevChar?.description || 'Pessoa comunicativa e expressiva',
+        voice: charInput.voice || prevChar?.voice || 'natural',
         sheetUrl: charInput.sheetUrl ? (normalizeStorageReference(charInput.sheetUrl, 'character.sheetUrl') || undefined) : undefined,
-        sheetStatus: charInput.sheetUrl ? 'aprovada' : (charInput.generateSheet ? 'aguardando' : undefined),
+        sheetStatus: charInput.sheetUrl ? 'aprovada' : (charInput.generateSheet ? (queueTakes ? 'gerando' : 'aguardando') : undefined),
       };
 
       if (existingCharIndex >= 0) {
@@ -647,6 +648,16 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
       } else {
         finalScript.characters.unshift(newChar);
       }
+    }
+
+    if (input.character?.generateSheet) {
+      finalScript.characters = finalScript.characters.map((c) => {
+        if (isVoiceOnlyCharacter(c) || c.sheetUrl) return c;
+        return {
+          ...c,
+          sheetStatus: queueTakes ? 'gerando' : 'aguardando',
+        };
+      });
     }
 
     let savedProject = null;
@@ -661,20 +672,27 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
       });
 
       if (queueTakes) {
-        // Se pediu para gerar a folha do personagem por IA e ele ainda não tem foto anexada:
-        if (input.character?.generateSheet && !input.character.sheetUrl && finalScript.characters[0]) {
-          const charToGenerate = finalScript.characters[0];
-          const sheetPrompt = buildSheetPrompt(charToGenerate, String(params.realismo || ''), isChromaKeyTemplate(t.id));
-          await createFlowJob({
-            userId,
-            kind: 'image',
-            prompt: sheetPrompt,
-            params: { aspectRatio: String(params.aspect || '9:16'), model: 'Nano Banana' },
-            projectId: savedProject.id,
-            takeIndex: 0,
-            role: 'character_sheet',
-            deadlineMinutes: 720,
-          });
+        // Se pediu para gerar as folhas dos personagens por IA, gera para TODOS os personagens visuais sem foto anexada:
+        if (input.character?.generateSheet) {
+          for (let idx = 0; idx < finalScript.characters.length; idx++) {
+            const charToGenerate = finalScript.characters[idx];
+            if (isVoiceOnlyCharacter(charToGenerate) || charToGenerate.sheetUrl) continue;
+            const sheetPrompt = buildSheetPrompt(charToGenerate, String(params.realismo || ''), isChromaKeyTemplate(t.id));
+            await createFlowJob({
+              userId,
+              kind: 'image',
+              prompt: sheetPrompt,
+              params: {
+                aspectRatio: String(params.aspect || '9:16'),
+                model: 'Nano Banana',
+                characterId: charToGenerate.id,
+              },
+              projectId: savedProject.id,
+              takeIndex: idx,
+              role: 'character_sheet',
+              deadlineMinutes: 720,
+            });
+          }
         }
 
         for (const take of finalScript.takes) {
@@ -700,8 +718,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
         await updateFlowProject(userId, savedProject.id, { status: 'queued' });
       }
     } catch (dbErr: any) {
-      console.error(`[MCP DarkTube] Falha ao enfileirar takes/jobs no Flow: ${dbErr.message}`);
-      throw dbErr;
+      console.error(`[MCP DarkTube] Falha ao enfileirar takes/jobs no Flow: ${dbErr.message}`); throw dbErr;
     }
 
     const totalDuration = finalScript.takes.reduce((sum, tk) => sum + (tk.seconds || resolvedSeconds), 0);
@@ -720,7 +737,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
             downloadLocal,
             outputDir,
           });
-          if (statusResult.isComplete && statusResult.finalVideoUrl) {
+          if (statusResult.awaitingCharacterApproval || (statusResult.isComplete && statusResult.finalVideoUrl)) {
             return {
               success: true,
               pipelineMode: 'flow',
@@ -734,12 +751,14 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
               title: finalScript.title,
               hook: flowHook,
               copyMetaAds: flowCopy,
+              awaitingCharacterApproval: statusResult.awaitingCharacterApproval,
               character: statusResult.character,
+              characters: statusResult.characters,
               finalVideoUrl: statusResult.finalVideoUrl,
               srtUrl: statusResult.srtUrl,
               takes: statusResult.takes,
               localFiles: statusResult.localFiles,
-              status: 'video_delivered',
+              status: statusResult.awaitingCharacterApproval ? 'awaiting_character_approval' : 'video_delivered',
             };
           }
         } catch (pollErr: any) {
@@ -767,13 +786,23 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
       copyMetaAds: flowCopy,
       character: finalScript.characters[0]
         ? {
+            id: finalScript.characters[0].id,
             name: finalScript.characters[0].name,
             description: finalScript.characters[0].description,
             voice: finalScript.characters[0].voice,
             sheetUrl: finalScript.characters[0].sheetUrl || null,
-            sheetStatus: finalScript.characters[0].sheetStatus || (input.character?.generateSheet ? 'aguardando' : 'nenhuma'),
+            sheetStatus: finalScript.characters[0].sheetStatus || (input.character?.generateSheet ? 'gerando' : 'nenhuma'),
           }
         : undefined,
+      characters: finalScript.characters.map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        voice: c.voice,
+        sheetUrl: c.sheetUrl || null,
+        sheetStatus: c.sheetStatus || (input.character?.generateSheet && !isVoiceOnlyCharacter(c) ? 'gerando' : 'nenhuma'),
+        isVoiceOnly: isVoiceOnlyCharacter(c),
+      })),
       takes: finalScript.takes.map((take) => {
         const ref = takeReference(finalScript, take, params);
         return {
@@ -885,7 +914,11 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
         outputDir,
         waitForSeconds: 0,
       });
-      if (current.finalVideoUrl || (current.progress.failedTakes > 0 && current.progress.inProgressTakes === 0)) {
+      if (
+        current.finalVideoUrl ||
+        current.awaitingCharacterApproval ||
+        (current.progress.failedTakes > 0 && current.progress.inProgressTakes === 0)
+      ) {
         return current;
       }
       await new Promise((r) => setTimeout(r, 5000));
@@ -904,16 +937,58 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
   const userId = project.user_id;
 
   const { rows: jobs } = await pool.query(
-    'SELECT id, take_index, kind, role, status, result_url, error_message, finished_at FROM public.flow_jobs WHERE project_id = $1 ORDER BY take_index ASC NULLS FIRST',
+    'SELECT id, take_index, kind, role, status, params, result_url, error_message, finished_at, created_at FROM public.flow_jobs WHERE project_id = $1 ORDER BY take_index ASC NULLS FIRST, created_at ASC',
     [projectId]
   );
 
-  const charJob = jobs.find((j: any) => j.role === 'character_sheet');
+  const charJobs = jobs.filter((j: any) => j.role === 'character_sheet');
+  const charJob = charJobs[0];
   const takeJobs = jobs.filter((j: any) => j.role === 'take' || j.kind === 'video');
 
-  const charSheetUrl = charJob?.result_url
-    ? (charJob.result_url.startsWith('http') ? charJob.result_url : `${DARKTUBE_BASE_URL}${charJob.result_url}`)
-    : (project.script?.characters?.[0]?.sheetUrl || null);
+  const rawCharacters: FlowCharacter[] = Array.isArray(project.script?.characters) ? project.script.characters : [];
+  const characters = rawCharacters.map((c: FlowCharacter, idx: number) => {
+    const matching = charJobs.filter(
+      (j: any) => (j.params && j.params.characterId === c.id) || j.take_index === idx
+    );
+    const latestJob = matching[matching.length - 1];
+    const rawUrl = c.sheetUrl || latestJob?.result_url || null;
+    const absSheetUrl = rawUrl
+      ? rawUrl.startsWith('http')
+        ? rawUrl
+        : `${DARKTUBE_BASE_URL}${rawUrl}`
+      : null;
+    const voiceOnly = isVoiceOnlyCharacter(c);
+    return {
+      id: c.id || `c${idx + 1}`,
+      name: c.name || `Personagem ${idx + 1}`,
+      description: c.description || '',
+      voice: c.voice || 'natural',
+      isVoiceOnly: voiceOnly,
+      sheetUrl: absSheetUrl,
+      sheetStatus: c.sheetStatus || (absSheetUrl ? 'aguardando' : 'nenhuma'),
+      status: latestJob?.status || (absSheetUrl ? 'done' : voiceOnly ? 'voice_only' : 'none'),
+      error:
+        latestJob?.status === 'draft' || latestJob?.status === 'cancelled'
+          ? latestJob.error_message || null
+          : null,
+    };
+  });
+
+  const charSheetUrl =
+    characters[0]?.sheetUrl ||
+    (charJob?.result_url
+      ? charJob.result_url.startsWith('http')
+        ? charJob.result_url
+        : `${DARKTUBE_BASE_URL}${charJob.result_url}`
+      : null);
+
+  const inProgressSheets = charJobs.filter(
+    (j: any) => j.status === 'running' || j.status === 'queued' || j.status === 'collecting'
+  ).length;
+  const visualCharacters = characters.filter((c) => !c.isVoiceOnly);
+  const awaitingCharacterApproval =
+    inProgressSheets === 0 &&
+    visualCharacters.some((c) => c.sheetStatus === 'aguardando' && Boolean(c.sheetUrl));
 
   const totalTakes = project.script?.takes?.length || takeJobs.length;
   const completedTakes = takeJobs.filter((j: any) => j.status === 'done' && j.result_url).length;
@@ -948,6 +1023,19 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     if (charSheetUrl) {
       localFiles.characterSheet = await downloadCreativeToLocal(charSheetUrl, outputDir, `character_${projectId}.jpg`);
     }
+    const characterSheets: Record<string, any> = {};
+    for (const c of characters) {
+      if (c.sheetUrl) {
+        characterSheets[c.id] = await downloadCreativeToLocal(
+          c.sheetUrl,
+          outputDir,
+          `character_${projectId}_${c.id}.jpg`
+        );
+      }
+    }
+    if (Object.keys(characterSheets).length > 0) {
+      localFiles.characterSheets = characterSheets;
+    }
   }
 
   // So leitura, para acompanhar sem acesso a VPS: ultimo sinal da extensao e as ultimas linhas do log dos jobs do projeto.
@@ -958,7 +1046,8 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     success: true,
     projectId,
     title: project.title,
-    status: project.status,
+    status: awaitingCharacterApproval ? 'awaiting_character_approval' : project.status,
+    awaitingCharacterApproval,
     extension,
     isComplete: Boolean(finalUrl) || allTakesDone,
     progress: {
@@ -966,17 +1055,21 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
       completedTakes,
       failedTakes,
       inProgressTakes,
+      inProgressSheets,
       percent: totalTakes > 0 ? Math.round((completedTakes / totalTakes) * 100) : 0,
     },
     character: {
-      name: project.script?.characters?.[0]?.name || 'Apresentador',
+      id: characters[0]?.id || 'c1',
+      name: characters[0]?.name || project.script?.characters?.[0]?.name || 'Apresentador',
       sheetUrl: charSheetUrl,
-      status: charJob?.status || (charSheetUrl ? 'done' : 'none'),
-      error: charJob?.status === 'draft' || charJob?.status === 'cancelled' ? (charJob.error_message || null) : null,
+      sheetStatus: characters[0]?.sheetStatus || (charSheetUrl ? 'aguardando' : 'nenhuma'),
+      status: characters[0]?.status || charJob?.status || (charSheetUrl ? 'done' : 'none'),
+      error: characters[0]?.error || (charJob?.status === 'draft' || charJob?.status === 'cancelled' ? (charJob.error_message || null) : null),
     },
+    characters,
     // Retrato do personagem falhou: os takes ficam parados (nao gastam credito); o motivo aparece aqui em vez de "na fila 0/N".
     failureReason: project.status === 'failed'
-      ? (takeJobs.find((j: any) => j.error_message)?.error_message || charJob?.error_message || 'O projeto falhou.')
+      ? (takeJobs.find((j: any) => j.error_message)?.error_message || charJobs.find((j: any) => j.error_message)?.error_message || 'O projeto falhou.')
       : null,
     finalVideoUrl: finalUrl,
     srtUrl,

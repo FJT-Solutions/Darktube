@@ -353,15 +353,21 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       : 'ai_flow'
     const assetUrl = str(k?.assetUrl, 500)
 
+    const effSpeaker = eff === 'ambiente' ? '' : str(k?.speaker, 20) || (eff === 'narracao' ? 'narrator' : '')
+    const effChars = Array.isArray(k?.characters) ? k.characters.map((x: any) => str(x, 20)).filter(Boolean) : []
+    if (eff === 'dialogo' && effSpeaker && effSpeaker !== 'narrator' && !effChars.includes(effSpeaker) && characters.some((c) => c.id === effSpeaker)) {
+      effChars.unshift(effSpeaker)
+    }
+
     return {
       n: i + 1,
       seconds,
       model: effModel,
-      speaker: eff === 'ambiente' ? '' : str(k?.speaker, 20) || (eff === 'narracao' ? 'narrator' : ''),
+      speaker: effSpeaker,
       line: eff === 'ambiente' || looksLikeActionText(lineText, k) ? '' : lineText,
       action: str(k?.action, 600),
       location: str(k?.location, 20) || locations[0]?.id || '',
-      characters: Array.isArray(k?.characters) ? k.characters.map((x: any) => str(x, 20)).filter(Boolean) : [],
+      characters: effChars,
       sound: str(k?.sound, 240),
       camera: str(k?.camera, 200),
       beat: str(k?.beat, 160),
@@ -483,8 +489,8 @@ Current JSON:
 ${JSON.stringify(script)}`
 }
 
-/** Ultima linha de todo prompt: o modelo de video costuma escrever legenda quando ha fala. */
-const CLEAN_FRAME = 'Clean frame: no subtitles, captions, on-screen text, logos or watermarks.'
+/** Ultima linha de todo prompt: o modelo de video costuma escrever legenda ou numero de cena quando ha fala. */
+const CLEAN_FRAME = 'Clean frame: strictly no subtitles, captions, scene numbers, title cards, on-screen text, HUD overlays, logos or watermarks.'
 
 const NARRATOR_VOICE = 'warm, clear adult narrator voice with steady storytelling pacing'
 
@@ -530,9 +536,9 @@ export function buildTakePrompt(
   // 2 tambem resume cenario e estilo; 3 tambem resume quem fala. So passa de 0 quando o prompt estoura o limite.
   const compose = (level: number): string => {
     const lines: string[] = []
-    // A primeira linha comeca com "[Scene N of M]": identifica o take na galeria do Flow.
+    // Sem prefixo "[Scene N of M]": modelos como Omni 1.1/1.2 desenhavam literalmente "Scene 8 / 8" no topo do video.
     lines.push(
-      `[Scene ${take.n} of ${total}] ${take.seconds}-second ${aspect === '16:9' ? 'horizontal 16:9' : 'vertical 9:16'} video, one continuous shot. Visual style: ${level >= 2 ? clipWords(style, 25) : style}.`
+      `${take.seconds}-second ${aspect === '16:9' ? 'horizontal 16:9' : 'vertical 9:16'} video, one continuous shot. Visual style: ${level >= 2 ? clipWords(style, 25) : style}.`
     )
     lines.push(`Camera: ${cleanCamera(take.camera || '') || 'cinematic framing with one subtle, motivated camera move'}.`)
     if (visible.length) {
@@ -667,7 +673,7 @@ export function softenFlowPrompt(prompt: string, reason = '', attempt = 2): stri
   return lines
     .map((l) => {
       let x = stripOnScreenText(l)
-      if (style && x.startsWith('[Scene')) {
+      if (style && (x.startsWith('[Scene') || /Visual style:/i.test(x))) {
         // Estilo com realismo de foto vira o estilo suave inteiro (tirar so as palavras deixava "Visual style:, realistic
         // lighting."); estilos 2D, 3D e massinha ficam como estao.
         x = x.replace(/Visual style:(.*)$/, (m, s) => (PHOTO_STYLE.test(s) ? 'Visual style: cinematic film look, natural soft lighting.' : m))
@@ -699,11 +705,11 @@ export function softenFlowPrompt(prompt: string, reason = '', attempt = 2): stri
 export function buildPolicyRewritePrompt(prompt: string, reason: string): { system: string; user: string } {
   const system = `You fix prompts for Google Flow video models (Veo and Omni) that Google's safety filter refused. Reply with ONE JSON object only: {"prompt": "the rewritten prompt"}.
 Rules:
-- Keep the same scene: same lines in the same order with the same labels ("[Scene ...", "Camera:", "Subject", "Action:", "Dialogue:", "Narration:", "Setting:", "Sound:"...), same camera, setting, sound and story beat.
+- Keep the same scene: same lines in the same order with the same labels ("Camera:", "Subject", "Action:", "Dialogue:", "Narration:", "Setting:", "Sound:"...), same camera, setting, sound and story beat.
 - Keep every spoken line inside double quotes exactly, word for word.
 - Keep each character's identity anchors (hair, skin tone, outfit) and keep everyone clearly adult.
 - Change only what could trigger the refusal: ages, body descriptions, physical closeness, violence, weapons, injuries, real or famous people, brands, logos, anything that could be read as involving minors.
-- Remove any text, words or letters that must appear inside the image (cards, signs, labels, screens): use a plain blank object instead.
+- Remove any text, words, scene numbers or letters that must appear inside the image (cards, signs, labels, screens): use a plain blank object instead.
 - Same length or shorter.`
   return { system, user: `Refusal reason: ${String(reason || 'policy').slice(0, 300)}\n\nPrompt:\n${prompt}` }
 }
@@ -716,7 +722,7 @@ export function acceptPolicyRewrite(original: string, raw: string): string | nul
   } catch {
     return null
   }
-  if (!text.startsWith('[Scene') || text.length > Math.max(2600, original.length * 1.3)) return null
+  if (!/^(?:\[Scene|\d+-second)/i.test(text) || text.length > Math.max(2600, original.length * 1.3)) return null
   const quotes = original.match(/"[^"\n]+"/g) || []
   if (quotes.some((q) => !text.includes(q))) return null
   // A fala (Dialogue/Narration) tem que voltar identica, linha inteira: a narracao nao vai entre aspas.
@@ -735,24 +741,25 @@ export function takeReference(script: FlowScript, take: FlowTake, params: FlowPa
   const out: TakeRef = {}
   if (String(params.refImages ?? '1') !== '0') {
     const visible = script.characters.filter((c) => take.characters.includes(c.id) && !isVoiceOnly(c))
-    const ok = (c?: FlowCharacter) => (c && c.sheetStatus === 'aprovada' && c.sheetUrl ? c.sheetUrl : undefined)
+    const ok = (c?: FlowCharacter) => (c && (c.sheetStatus === 'aprovada' || c.sheetStatus === 'aguardando') && c.sheetUrl ? c.sheetUrl : undefined)
     if (visible.length === 1 && ok(visible[0])) {
       out.refImageUrl = ok(visible[0])
       out.refKind = 'portrait'
       out.refCharacterId = visible[0].id
       out.promptLine = `[Reference Image]: the attached image is the character reference portrait of ${visible[0].name}; keep ${visible[0].name}'s facial features, hair, skin tone and outfit identical to the person in the reference portrait. Ignore its plain background.`
-    } else if (visible.length > 1 && script.castSheetStatus === 'aprovada' && script.castSheetUrl) {
+    } else if (visible.length > 1 && (script.castSheetStatus === 'aprovada' || script.castSheetStatus === 'aguardando') && script.castSheetUrl) {
       out.refImageUrl = script.castSheetUrl
       out.refKind = 'cast'
       const order = script.characters.filter((c) => visible.includes(c)).map((c) => c.name).join(', ')
       out.promptLine = `[Reference Image]: the attached image shows the cast from left to right (${script.characters.map((c) => c.name).join(', ')}); in this scene appear ${order}. Keep their faces, hair and outfits exactly as in it. Ignore its plain background and layout.`
     } else if (visible.length > 1) {
       const sp = script.characters.find((c) => c.id === take.speaker)
-      if (ok(sp)) {
-        out.refImageUrl = ok(sp)
+      const picked = sp && ok(sp) ? sp : visible.find((c) => Boolean(ok(c)))
+      if (picked && ok(picked)) {
+        out.refImageUrl = ok(picked)
         out.refKind = 'portrait'
-        out.refCharacterId = sp!.id
-        out.promptLine = `[Reference Image]: the attached image is the reference portrait of ${sp!.name}; keep ${sp!.name}'s face, hair and outfit identical to the reference portrait.`
+        out.refCharacterId = picked.id
+        out.promptLine = `[Reference Image]: the attached image is the reference portrait of ${picked.name}; keep ${picked.name}'s face, hair and outfit identical to the reference portrait.`
       }
     }
   }

@@ -41,14 +41,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!job) return NextResponse.json({ success: false, error: 'Job não está em execução.' }, { status: 409 });
 
   // Se uma folha de personagem (character_sheet) acabou de ficar pronta para um projeto, vincula sheetUrl,
-  // destrava sheetStatus = 'aprovada' e propaga refImageUrl para os takes que ainda estao na fila.
+  // coloca sheetStatus = 'aguardando' (segurando os takes na fila até aprovação do usuário, a menos que autoApproveSheets esteja ativo)
+  // e já propaga refImageUrl para os takes enfileirados em que o personagem aparece.
   if (job.project_id && job.role === 'character_sheet') {
     try {
-      const { rows: pRows } = await pool.query(`SELECT script FROM public.flow_projects WHERE id = $1`, [job.project_id]);
+      const { rows: pRows } = await pool.query(
+        `SELECT script, params, template_id FROM public.flow_projects WHERE id = $1`,
+        [job.project_id]
+      );
       const sc = pRows[0]?.script;
+      const prjParams = pRows[0]?.params || {};
+      const templateId = String(pRows[0]?.template_id || '');
       if (sc && Array.isArray(sc.characters) && sc.characters.length > 0) {
-        const idx = typeof job.take_index === 'number' && sc.characters[job.take_index] ? job.take_index : 0;
-        sc.characters[idx] = { ...sc.characters[idx], sheetUrl: url, sheetStatus: 'aprovada' };
+        const charId = (job.params as any)?.characterId ? String((job.params as any).characterId) : '';
+        const byIdIdx = charId ? sc.characters.findIndex((c: any) => c.id === charId) : -1;
+        const idx =
+          byIdIdx >= 0
+            ? byIdIdx
+            : typeof job.take_index === 'number' && sc.characters[job.take_index]
+              ? job.take_index
+              : 0;
+        const autoApprove = Boolean(prjParams.autoApproveSheets === true || prjParams.autoApproveSheets === 'true');
+        sc.characters[idx] = {
+          ...sc.characters[idx],
+          sheetUrl: url,
+          sheetStatus: autoApprove ? 'aprovada' : 'aguardando',
+        };
         await pool.query(`UPDATE public.flow_projects SET script = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
           job.project_id,
           JSON.stringify(sc),
@@ -56,11 +74,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // So os takes em que o personagem aparece recebem o retrato (b-roll de maos e cenas de objetos seguem sem
         // referencia: anexa-la custava ~40 s de envio e pode atrair recusa). takeReference decide take a take e o
         // prompt e reescrito junto, citando a referencia.
-        const { rows: prj } = await pool.query(`SELECT params, template_id FROM public.flow_projects WHERE id = $1`, [job.project_id]);
-        await syncProjectQueuedJobsWithReferences(user.id, String(job.project_id), sc, prj[0]?.params || {}, String(prj[0]?.template_id || ''));
+        await syncProjectQueuedJobsWithReferences(user.id, String(job.project_id), sc, prjParams, templateId);
       }
     } catch (sheetErr: any) {
-      console.warn(`[Flow Complete] Falha ao propagar character_sheet aprovada: ${sheetErr.message}`);
+      console.warn(`[Flow Complete] Falha ao propagar character_sheet: ${sheetErr.message}`);
     }
   }
 

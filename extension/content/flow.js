@@ -1390,8 +1390,9 @@
     const p = normText(prompt);
     const b = normText(bodyText);
     const m = /\[scene \d+ of \d+\]/i.exec(p);
-    if (!m) return { known: false };
-    const i = b.indexOf(m[0]);
+    const anchor = m ? m[0] : p.slice(0, 48);
+    if (!anchor || anchor.length < 12) return { known: false };
+    const i = b.indexOf(anchor);
     if (i < 0) return { known: false };
     let seg = b.slice(i, i + 240);
     const cut = seg.search(/\.\.\.|…/);

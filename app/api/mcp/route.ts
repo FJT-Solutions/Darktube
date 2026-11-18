@@ -14,6 +14,7 @@ import {
   createNextPartCreative,
   analyzeVideoLinkMcp,
   cloneVideoFromLinkMcp,
+  reviewProjectCharactersMcp,
 } from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
@@ -247,6 +248,35 @@ const MCP_TOOLS_MANIFEST = [
       required: ['url'],
     },
   },
+  {
+    name: 'darktube_review_characters',
+    description: 'Aprova ou reprova/regenera as folhas de todos os personagens de um projeto do /flow (em lote, igual ao @Criativos). Enquanto houver personagens com sheetStatus "aguardando" ou "gerando", os takes de vídeo ficam retidos na fila sem gastar créditos; quando todos os personagens são aprovados, os takes são liberados automaticamente.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectId: { type: 'string', description: 'ID do projeto no /flow (ou prefixo de 8 caracteres)' },
+        approveAll: { type: 'boolean', description: 'Se true, aprova todos os personagens visuais que não tenham decisão explícita de reprovação em decisions', default: false },
+        decisions: {
+          type: 'array',
+          description: 'Decisões individuais por personagem (c1, c2, c3... ou pelo nome do personagem)',
+          items: {
+            type: 'object',
+            properties: {
+              characterId: { type: 'string', description: 'ID (c1, c2, c3) ou nome do personagem' },
+              decision: { type: 'string', enum: ['approve', 'reject', 'regenerate'], description: 'approve libera o personagem; reject/regenerate gera nova imagem no Nano Banana' },
+              newDescription: { type: 'string', description: 'Opcional: nova descrição física caso o usuário peça ajuste ao reprovar' },
+              sheetUrl: { type: 'string', description: 'Opcional: URL de foto enviada manualmente pelo usuário' },
+            },
+            required: ['characterId', 'decision'],
+          },
+        },
+        waitForSeconds: { type: 'number', description: 'Segundos para aguardar regeneração das folhas ou conclusão dos takes liberados', default: 0 },
+        downloadLocal: { type: 'boolean', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+      },
+      required: ['projectId'],
+    },
+  },
 ];
 
 export async function GET(req: NextRequest) {
@@ -384,6 +414,9 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_clone_video_from_link':
       return await cloneVideoFromLinkMcp(args);
+
+    case 'darktube_review_characters':
+      return await reviewProjectCharactersMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);

@@ -22,10 +22,10 @@ import {
   type FlowParams,
   type FlowScript,
 } from '@/lib/flow-script';
-import { buildSheetPrompt, isChromaKeyTemplate } from '@/lib/flow-characters';
+import { buildSheetPrompt, isChromaKeyTemplate, isVoiceOnlyCharacter } from '@/lib/flow-characters';
 import { callFlowLLM, FLOW_PROVIDERS, type FlowProvider } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject, type FlowProject } from '@/lib/flow-projects';
-import { createFlowJob, normalizeStorageReference } from '@/lib/flow-jobs';
+import { createFlowJob, normalizeStorageReference, syncProjectQueuedJobsWithReferences } from '@/lib/flow-jobs';
 import { analyzeVideoStructureFromLink, buildCloneTemplateAndParams } from '@/lib/flow-video-clone';
 import type { CloneCustomization } from '@/lib/flow-clone-types';
 import {
@@ -152,7 +152,7 @@ async function writeValidatedFlowScript(
   return { script, issues };
 }
 
-/** Enfileira retrato (se pedido) + takes de video no PostgreSQL e opcionalmente aguarda conclusao. */
+/** Enfileira retratos de todos os personagens visuais (se pedido) + takes de video no PostgreSQL e opcionalmente aguarda conclusao. */
 async function saveAndQueueFlowProject(opts: {
   userId: string;
   template: FlowTemplate;
@@ -166,7 +166,18 @@ async function saveAndQueueFlowProject(opts: {
   downloadLocal: boolean;
   outputDir: string;
 }) {
-  const { userId, template, params, script, provider, queueTakes, generateSheet, hasSheetUrl, waitForSeconds, downloadLocal, outputDir } = opts;
+  const { userId, template, params, script, provider, queueTakes, generateSheet, waitForSeconds, downloadLocal, outputDir } = opts;
+
+  if (generateSheet) {
+    script.characters = script.characters.map((c) => {
+      if (isVoiceOnlyCharacter(c) || c.sheetUrl) return c;
+      return {
+        ...c,
+        sheetStatus: queueTakes ? 'gerando' : 'aguardando',
+      };
+    });
+  }
+
   const savedProject = await createFlowProject({
     userId,
     templateId: template.id,
@@ -180,18 +191,26 @@ async function saveAndQueueFlowProject(opts: {
   const resolvedQuality = String(params.quality || template.defaults.quality || '360p');
 
   if (queueTakes) {
-    if (generateSheet && !hasSheetUrl && script.characters[0]) {
-      const sheetPrompt = buildSheetPrompt(script.characters[0], String(params.realismo || ''), isChromaKeyTemplate(template.id));
-      await createFlowJob({
-        userId,
-        kind: 'image',
-        prompt: sheetPrompt,
-        params: { aspectRatio: String(params.aspect || '9:16'), model: 'Nano Banana' },
-        projectId: savedProject.id,
-        takeIndex: 0,
-        role: 'character_sheet',
-        deadlineMinutes: 720,
-      });
+    if (generateSheet) {
+      for (let idx = 0; idx < script.characters.length; idx++) {
+        const charToGenerate = script.characters[idx];
+        if (isVoiceOnlyCharacter(charToGenerate) || charToGenerate.sheetUrl) continue;
+        const sheetPrompt = buildSheetPrompt(charToGenerate, String(params.realismo || ''), isChromaKeyTemplate(template.id));
+        await createFlowJob({
+          userId,
+          kind: 'image',
+          prompt: sheetPrompt,
+          params: {
+            aspectRatio: String(params.aspect || '9:16'),
+            model: 'Nano Banana',
+            characterId: charToGenerate.id,
+          },
+          projectId: savedProject.id,
+          takeIndex: idx,
+          role: 'character_sheet',
+          deadlineMinutes: 720,
+        });
+      }
     }
 
     for (const take of script.takes) {
@@ -230,7 +249,7 @@ async function saveAndQueueFlowProject(opts: {
           downloadLocal,
           outputDir,
         });
-        if (st.isComplete && st.finalVideoUrl) {
+        if (st.awaitingCharacterApproval || (st.isComplete && st.finalVideoUrl)) {
           completedStatus = st;
           break;
         }
@@ -327,7 +346,7 @@ export async function createNextPartCreative(input: CreateNextPartInput) {
     };
   }
 
-  const hasApprovedSheet = script.characters.some((c) => Boolean(c.sheetUrl));
+  const needsAnySheet = script.characters.some((c) => !isVoiceOnlyCharacter(c) && !c.sheetUrl);
   const { savedProject, completedStatus, resolvedQuality } = await saveAndQueueFlowProject({
     userId,
     template: t,
@@ -335,8 +354,8 @@ export async function createNextPartCreative(input: CreateNextPartInput) {
     script,
     provider,
     queueTakes,
-    generateSheet: !hasApprovedSheet && Boolean(script.characters[0]),
-    hasSheetUrl: hasApprovedSheet,
+    generateSheet: needsAnySheet,
+    hasSheetUrl: !needsAnySheet,
     waitForSeconds,
     downloadLocal,
     outputDir,
@@ -352,12 +371,14 @@ export async function createNextPartCreative(input: CreateNextPartInput) {
       flowUrl: `${DARKTUBE_BASE_URL}/flow`,
       title: script.title,
       totalDurationSeconds,
+      awaitingCharacterApproval: completedStatus.awaitingCharacterApproval,
       finalVideoUrl: completedStatus.finalVideoUrl,
       srtUrl: completedStatus.srtUrl,
       character: completedStatus.character,
+      characters: completedStatus.characters,
       takes: completedStatus.takes,
       localFiles: completedStatus.localFiles,
-      status: 'video_delivered',
+      status: completedStatus.awaitingCharacterApproval ? 'awaiting_character_approval' : 'video_delivered',
     };
   }
 
@@ -467,7 +488,7 @@ export async function cloneVideoFromLinkMcp(input: CloneVideoFromLinkInput) {
       description: character.description || script.characters[0]?.description || 'Adult presenter in natural lighting',
       voice: character.voice || script.characters[0]?.voice || 'natural',
       sheetUrl: character.sheetUrl ? (normalizeStorageReference(character.sheetUrl, 'character.sheetUrl') || undefined) : undefined,
-      sheetStatus: character.sheetUrl ? 'aprovada' : character.generateSheet ? 'aguardando' : undefined,
+      sheetStatus: character.sheetUrl ? 'aprovada' : character.generateSheet ? (queueTakes ? 'gerando' : 'aguardando') : undefined,
     };
     if (script.characters.length > 0) script.characters[0] = newChar;
     else script.characters.unshift(newChar);
@@ -497,8 +518,8 @@ export async function cloneVideoFromLinkMcp(input: CloneVideoFromLinkInput) {
     script,
     provider,
     queueTakes,
-    generateSheet: Boolean(character?.generateSheet && !character?.sheetUrl),
-    hasSheetUrl: Boolean(character?.sheetUrl || script.characters[0]?.sheetUrl),
+    generateSheet: Boolean(character?.generateSheet),
+    hasSheetUrl: script.characters.every((c) => isVoiceOnlyCharacter(c) || Boolean(c.sheetUrl)),
     waitForSeconds,
     downloadLocal,
     outputDir,
@@ -513,12 +534,14 @@ export async function cloneVideoFromLinkMcp(input: CloneVideoFromLinkInput) {
       structure,
       title: script.title,
       totalDurationSeconds,
+      awaitingCharacterApproval: completedStatus.awaitingCharacterApproval,
       finalVideoUrl: completedStatus.finalVideoUrl,
       srtUrl: completedStatus.srtUrl,
       character: completedStatus.character,
+      characters: completedStatus.characters,
       takes: completedStatus.takes,
       localFiles: completedStatus.localFiles,
-      status: 'video_delivered',
+      status: completedStatus.awaitingCharacterApproval ? 'awaiting_character_approval' : 'video_delivered',
     };
   }
 
@@ -539,5 +562,139 @@ export async function cloneVideoFromLinkMcp(input: CloneVideoFromLinkInput) {
     takes: summarizeTakes(script, params, template, resolvedSeconds, resolvedModel),
     issues: issues.map((i) => i.message),
     status: queueTakes ? 'queued_for_google_flow' : 'created_in_flow',
+  };
+}
+
+export interface CharacterDecisionInput {
+  characterId: string;
+  decision: 'approve' | 'reject' | 'regenerate';
+  newDescription?: string;
+  sheetUrl?: string;
+}
+
+export interface ReviewProjectCharactersInput {
+  projectId: string;
+  approveAll?: boolean;
+  decisions?: CharacterDecisionInput[];
+  waitForSeconds?: number;
+  downloadLocal?: boolean;
+  outputDir?: string;
+}
+
+/**
+ * 11. Aprova ou reprova/regenera as folhas de todos os personagens de um projeto no /flow.
+ * Quando todos os personagens visuais ficam com sheetStatus = 'aprovada', a trava do claimNextFlowJob
+ * destrava automaticamente os takes de video enfileirados.
+ */
+export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersInput) {
+  const {
+    projectId: rawProjectId,
+    approveAll = false,
+    decisions = [],
+    waitForSeconds = 0,
+    downloadLocal = true,
+    outputDir = './midia/criativos',
+  } = input;
+
+  const { rows } = await pool.query(
+    'SELECT * FROM public.flow_projects WHERE id::text = $1 OR id::text LIKE $2 ORDER BY created_at DESC LIMIT 1',
+    [rawProjectId, `${rawProjectId}%`]
+  );
+  if (!rows || rows.length === 0) {
+    throw new Error(`Projeto "${rawProjectId}" não foi encontrado.`);
+  }
+  const project = rows[0] as FlowProject;
+  const projectId = String(project.id);
+  const userId = String(project.user_id || (await resolveDefaultUserId()));
+  const script: FlowScript = JSON.parse(JSON.stringify(project.script));
+  const params: FlowParams = project.params || {};
+  const templateId = String(project.template_id || '');
+
+  const regeneratedIds: string[] = [];
+  const approvedIds: string[] = [];
+
+  for (let idx = 0; idx < script.characters.length; idx++) {
+    const c = script.characters[idx];
+    if (isVoiceOnlyCharacter(c)) continue;
+
+    const match = decisions.find(
+      (d) =>
+        d.characterId.toLowerCase() === String(c.id).toLowerCase() ||
+        d.characterId.toLowerCase() === String(c.name).toLowerCase()
+    );
+
+    const action = match?.decision || (approveAll ? 'approve' : undefined);
+    if (!action) continue;
+
+    if (action === 'approve') {
+      if (match?.sheetUrl) {
+        c.sheetUrl = normalizeStorageReference(match.sheetUrl, 'character.sheetUrl') || match.sheetUrl;
+      }
+      if (c.sheetUrl) {
+        c.sheetStatus = 'aprovada';
+        approvedIds.push(c.id);
+      } else {
+        // Se foi pedido para aprovar mas ainda nao tinha sheetUrl gerada, enfileira a geracao da folha:
+        c.sheetStatus = 'gerando';
+        const sheetPrompt = buildSheetPrompt(c, String(params.realismo || ''), isChromaKeyTemplate(templateId));
+        await createFlowJob({
+          userId,
+          kind: 'image',
+          prompt: sheetPrompt,
+          params: {
+            aspectRatio: String(params.aspect || '9:16'),
+            model: 'Nano Banana',
+            characterId: c.id,
+          },
+          projectId,
+          takeIndex: idx,
+          role: 'character_sheet',
+          deadlineMinutes: 720,
+        });
+        regeneratedIds.push(c.id);
+      }
+    } else if (action === 'reject' || action === 'regenerate') {
+      if (match?.newDescription && match.newDescription.trim()) {
+        c.description = match.newDescription.trim();
+      }
+      c.sheetUrl = undefined;
+      c.sheetStatus = 'gerando';
+      const sheetPrompt = buildSheetPrompt(c, String(params.realismo || ''), isChromaKeyTemplate(templateId));
+      await createFlowJob({
+        userId,
+        kind: 'image',
+        prompt: sheetPrompt,
+        params: {
+          aspectRatio: String(params.aspect || '9:16'),
+          model: 'Nano Banana',
+          characterId: c.id,
+        },
+        projectId,
+        takeIndex: idx,
+        role: 'character_sheet',
+        deadlineMinutes: 720,
+      });
+      regeneratedIds.push(c.id);
+    }
+  }
+
+  await updateFlowProject(userId, projectId, { script });
+  await syncProjectQueuedJobsWithReferences(userId, projectId, script, params, templateId);
+
+  const statusResult = await getCreativeStatus({
+    projectId,
+    assembleIfReady: true,
+    downloadLocal,
+    outputDir,
+    waitForSeconds,
+  });
+
+  return {
+    success: true,
+    projectId,
+    approvedCharacters: approvedIds,
+    regeneratedCharacters: regeneratedIds,
+    takesUnlocked: script.characters.every((c) => isVoiceOnlyCharacter(c) || c.sheetStatus === 'aprovada' || (!c.sheetStatus && !c.sheetUrl)),
+    ...statusResult,
   };
 }
