@@ -1607,12 +1607,16 @@
   }
 
   // Chips de referencia na caixa de prompt (o Flow cria o chip so depois de processar a imagem enviada).
-  const ingredientChips = () =>
-    Math.max(
-      $$('flow-ingredient-chip').length,
-      $$('flow-image-ingredient-chip, flow-video-ingredient-chip').length,
-      $$('flow-ingredient-bar img.chip-image, flow-ingredient-bar .chip-container').length
-    );
+  const CHIP_SEL = 'flow-ingredient-chip, flow-image-ingredient-chip, flow-video-ingredient-chip, flow-ingredient-bar .chip-container';
+  function ingredientChipEls() {
+    const raw = $$(CHIP_SEL).filter(vis);
+    return raw.filter((el) => !raw.some((other) => other !== el && other.contains(el)));
+  }
+  const ingredientChips = () => {
+    const els = ingredientChipEls();
+    if (els.length > 0) return els.length;
+    return $$('flow-ingredient-bar img.chip-image').filter(vis).length;
+  };
 
   // Abre o menu "+", entrega a imagem ao campo de arquivo do Flow por codigo (sem a janela do Windows),
   // registra o que mudou (biblioteca, chip de ingrediente) e fecha o menu.
@@ -1751,10 +1755,34 @@
     return true;
   }
 
-  // Anexa um arquivo como ingrediente: soltar na caixa, colar, ou enviar e escolher na biblioteca.
+  function refUploadActive(tilesBefore) {
+    if ($$(tileSel()).length > tilesBefore) return true;
+    if ($$(S.pendingTile).length > 0) return true;
+    const box = promptBox();
+    if (box && $('mat-spinner, mat-progress-spinner, mat-progress-bar, [role=progressbar], .spinner', box)) return true;
+    return false;
+  }
+
+  // Anexa um arquivo como ingrediente: colar na caixa (preferido, sem overlay nem upload duplo),
+  // soltar na area "Add reference", ou enviar e escolher na biblioteca.
   async function attachFile(file) {
-    if (await attachByDrop(file)) return 'soltar';
-    if (await attachByPaste(file)) return 'colar';
+    const tilesBefore = $$(tileSel()).length;
+    if (await attachByPaste(file, tilesBefore)) return 'colar';
+    if (refUploadActive(tilesBefore)) {
+      dtLog('Envio da referência já detectado na página; aguardando chip em vez de reenviar.', { tilesAntes: tilesBefore, tilesAgora: $$(tileSel()).length });
+      const before = ingredientChips();
+      if (await until(() => ingredientChips() > before, 25000, 500)) return 'colar';
+      if (await attachFromLibrary(file.name.replace(/\.[a-z0-9]+$/i, ''))) return 'biblioteca';
+      return '';
+    }
+    if (await attachByDrop(file, tilesBefore)) return 'soltar';
+    if (refUploadActive(tilesBefore)) {
+      dtLog('Envio por arraste já detectado na página; aguardando chip em vez de reenviar.', { tilesAntes: tilesBefore, tilesAgora: $$(tileSel()).length });
+      const before = ingredientChips();
+      if (await until(() => ingredientChips() > before, 25000, 500)) return 'soltar';
+      if (await attachFromLibrary(file.name.replace(/\.[a-z0-9]+$/i, ''))) return 'biblioteca';
+      return '';
+    }
     if ((await uploadToLibrary(file)) && (await attachFromLibrary(file.name.replace(/\.[a-z0-9]+$/i, '')))) return 'biblioteca';
     await clearDragOverlay();
     return '';
@@ -1791,11 +1819,31 @@
   async function attachJobReferences(job) {
     const p = job.params || {};
     const refs = [];
-    if (p.refImageUrl) refs.push(['imagem de referência (retrato)', p.refImageUrl, 'referencia.png']);
+    const seenUrls = new Set();
+    const addRef = (label, url, name) => {
+      const u = String(url || '').trim();
+      if (!u || seenUrls.has(u)) return;
+      seenUrls.add(u);
+      refs.push([label, u, name]);
+    };
+    if (p.refImageUrl) addRef('imagem de referência (retrato)', p.refImageUrl, 'referencia.png');
+    if (Array.isArray(p.refImageUrls)) {
+      p.refImageUrls.forEach((u, idx) => addRef(`imagem de referência (${idx + 1})`, u, `referencia_${idx + 1}.png`));
+    }
+    if (!refs.length) return;
+
+    if (ingredientChips() > 0) {
+      dtLog('Removendo referências residuais antes de anexar.', { chips: ingredientChips() });
+      if (!(await clearIngredients())) {
+        throw err('stale_references', 'Sobrou referência de outro take na caixa de prompt do Flow e não consegui removê-la.');
+      }
+    }
+
     for (const [label, url, name] of refs) {
       try {
         const file = await fetchRefFile(url, name);
         const t0 = Date.now();
+        const chipsBefore = ingredientChips();
         try {
           if (String(file.type).indexOf('image/') === 0) {
             const bmp = await createImageBitmap(file);
@@ -1810,9 +1858,19 @@
           const fim = await until(() => $$(S.pendingTile).length === 0, 40000, 500);
           dtLog('Esperando o envio da referência terminar.', { pendentesAntes: pend0, terminou: !!fim });
           await sleep(3000);
+          // Se o Flow adicionou o mesmo arquivo mais de uma vez como chip, remove os excedentes.
+          if (ingredientChips() > chipsBefore + 1) {
+            dtLog('Referência duplicada detectada na caixa de prompt; removendo excedente.', { chipsAntes: chipsBefore, chipsAgora: ingredientChips() }, 'warn');
+            while (ingredientChips() > chipsBefore + 1) {
+              const list = ingredientChipEls();
+              const last = list[list.length - 1];
+              if (!last || !(await removeSingleIngredientChip(last))) break;
+            }
+          }
         }
-        dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chips: ingredientChips(), segundos: Math.round((Date.now() - t0) / 1000) }, how ? 'success' : 'warn');
+        dtLog(how ? 'Referência anexada: ' + label + ' (' + how + ').' : 'Não consegui anexar a ' + label + '; o take segue sem ela.', { bytes: file.size, chipsAntes: chipsBefore, chips: ingredientChips(), segundos: Math.round((Date.now() - t0) / 1000) }, how ? 'success' : 'warn');
       } catch (e) {
+        if (e && e.code === 'stale_references') throw e;
         dtLog('Referência não anexada (' + label + '): ' + String((e && e.message) || e).slice(0, 160), null, 'warn');
       } finally {
         await clearDragOverlay();
@@ -1825,24 +1883,94 @@
 
   const promptBox = () => $('flow-base-prompt-box') || ($(S.editor) && ancestor($(S.editor), 4));
 
-  // Remove todos os chips de ingrediente da caixa de prompt (clique no X de cada um).
+  function hoverEl(el) {
+    if (!el) return;
+    try {
+      const r = el.getBoundingClientRect ? el.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+      const clientX = r.left + r.width / 2;
+      const clientY = r.top + r.height / 2;
+      const mo = { bubbles: true, cancelable: true, view: window, clientX, clientY };
+      const po = { ...mo, pointerType: 'mouse', isPrimary: true };
+      el.dispatchEvent(new PointerEvent('pointerover', po));
+      el.dispatchEvent(new MouseEvent('mouseover', mo));
+      el.dispatchEvent(new PointerEvent('pointerenter', { ...po, bubbles: false }));
+      el.dispatchEvent(new MouseEvent('mouseenter', { ...mo, bubbles: false }));
+      el.dispatchEvent(new PointerEvent('pointermove', po));
+    } catch (_) {}
+  }
+
+  function findChipCloseBtn(chip) {
+    if (!chip) return null;
+    const roots = [chip, chip.closest && chip.closest('flow-ingredient-chip, flow-image-ingredient-chip, flow-video-ingredient-chip')].filter(Boolean);
+    const seen = new Set();
+    const candidates = [];
+    for (const root of roots) {
+      if (seen.has(root)) continue;
+      seen.add(root);
+      const scopes = root.shadowRoot ? [root, root.shadowRoot] : [root];
+      for (const scope of scopes) {
+        scope.querySelectorAll('button, [role=button], mat-icon, i').forEach((n) => candidates.push(n));
+      }
+    }
+    const isClose = (e) => {
+      const label = (txt(e) + ' ' + (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '')).trim();
+      return /\b(cancel|close|remove|delete|clear|fechar|remover|excluir)\b/i.test(label);
+    };
+    const match = candidates.find(isClose);
+    if (match) return match.closest ? (match.closest('button, [role=button]') || match) : match;
+    return candidates.find((e) => e !== chip && (e.tagName === 'BUTTON' || e.getAttribute('role') === 'button') && !e.classList.contains('chip-container')) || null;
+  }
+
+  async function removeSingleIngredientChip(chip) {
+    const before = ingredientChips();
+    if (!chip || before === 0) return false;
+    hoverEl(chip);
+    await sleep(200);
+    let x = findChipCloseBtn(chip);
+    if (!x) {
+      const inner = $('button.chip-container, img, .chip-container', chip);
+      if (inner) hoverEl(inner);
+      if (typeof chip.focus === 'function') chip.focus();
+      await sleep(200);
+      x = findChipCloseBtn(chip);
+    }
+    if (x) {
+      realClick(x);
+      if (await until(() => ingredientChips() < before, 1500, 150)) return true;
+      if (typeof x.click === 'function') x.click();
+      if (await until(() => ingredientChips() < before, 1500, 150)) return true;
+    }
+    try {
+      const target = $('button.chip-container, button', chip) || chip;
+      if (typeof target.focus === 'function') target.focus();
+      for (const key of ['Backspace', 'Delete']) {
+        const kc = key === 'Backspace' ? 8 : 46;
+        target.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, keyCode: kc, which: kc, bubbles: true, cancelable: true }));
+        target.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, keyCode: kc, which: kc, bubbles: true, cancelable: true }));
+      }
+      if (await until(() => ingredientChips() < before, 1200, 150)) return true;
+    } catch (_) {}
+    realClick(chip);
+    await sleep(300);
+    const x2 = findChipCloseBtn(chip);
+    if (x2) realClick(x2);
+    return !!(await until(() => ingredientChips() < before, 1500, 150));
+  }
+
+  // Remove todos os chips de ingrediente da caixa de prompt (hover + clique no X de cada um).
   async function clearIngredients() {
-    for (let i = 0; i < 6 && ingredientChips() > 0; i++) {
-      const chip = $('flow-ingredient-chip button.chip-container, flow-ingredient-chip');
+    for (let i = 0; i < 8 && ingredientChips() > 0; i++) {
+      const chip = ingredientChipEls()[0] || $('flow-ingredient-bar img.chip-image');
       if (!chip) break;
-      realClick(chip);
-      await sleep(300);
-      const x = $$('flow-ingredient-chip mat-icon, flow-ingredient-chip button').find((e) => /cancel|close|remove|delete/i.test(txt(e) + ' ' + (e.getAttribute('aria-label') || '')));
-      if (x) realClick(x);
-      await sleep(500);
+      const removed = await removeSingleIngredientChip(chip);
+      if (!removed) break;
     }
     return ingredientChips() === 0;
   }
 
-  // Caminho 1: soltar o arquivo sobre a caixa de prompt (como arrastar do computador).
   // Area "Drop media / + Add reference" que o Flow abre sobre a pagina quando algo e arrastado para ela.
   // Suporta interface em ingles ("Drop media / Add reference") e portugues ("Soltar mídia / Adicionar referência").
-  const dropZoneEl = () => {
+  const anyDropOverlayEl = () => {
     const cand = $$('div, span, button, p, flow-media-upload, [class*="drop" i], [class*="upload" i]').filter((e) => {
       const t = txt(e);
       return (
@@ -1859,10 +1987,20 @@
     );
   };
 
+  // Para soltar uma referencia sem cair no upload geral da galeria ("Drop media"), so aceita explicitamente "Add reference".
+  const dropZoneEl = () => {
+    const cand = $$('div, span, button, p, flow-media-upload, [class*="drop" i], [class*="upload" i]').filter((e) => {
+      const t = txt(e);
+      return t.length > 0 && t.length < 50 && /(add reference|adicionar refer[eê]ncia)/i.test(t) && vis(e);
+    });
+    const el = cand[0];
+    return el ? (el.closest('button, [role=button], [class*=drop i], [class*=upload i]') || el) : null;
+  };
+
   // Desfaz um arrasto que ficou pela metade: sem isso a area de soltar fica por cima e esconde a caixa de prompt.
   async function clearDragOverlay() {
     for (let i = 0; i < 4; i++) {
-      const dz = dropZoneEl();
+      const dz = anyDropOverlayEl();
       const dt = new DataTransfer();
       const targets = [dz, document.body, document.documentElement, $(S.editor), $('.cdk-overlay-container')].filter(Boolean);
       for (const el of targets) {
@@ -1876,9 +2014,9 @@
         try { closeBtn.click(); } catch (_) {}
       }
       await sleep(250);
-      if (!dropZoneEl()) break;
+      if (!anyDropOverlayEl()) break;
     }
-    if (dropZoneEl()) {
+    if (anyDropOverlayEl()) {
       const canvas = $('main, flow-canvas, .canvas, [role=main]');
       if (canvas) {
         try { canvas.click(); } catch (_) {}
@@ -1886,11 +2024,11 @@
         await sleep(300);
       }
     }
-    return !dropZoneEl();
+    return !anyDropOverlayEl();
   }
 
-  // Caminho 1: arrastar o arquivo para a pagina e SOLTAR na area "Add reference" / "Adicionar referência" que o Flow abre.
-  async function attachByDrop(file) {
+  // Caminho 2 (reserva): arrastar o arquivo para a pagina e SOLTAR na area "Add reference" / caixa de prompt.
+  async function attachByDrop(file, tilesBefore = $$(tileSel()).length) {
     const box = promptBox();
     const editor = $(S.editor) || box;
     if (!editor) return false;
@@ -1904,7 +2042,7 @@
       await sleep(150);
     }
     const zone = await until(() => dropZoneEl(), 2500, 150);
-    // 2) solta onde o Flow espera (a area aberta); sem ela, na caixa de prompt
+    // 2) solta apenas na area "Add reference" ou direto na caixa de prompt (evita "Drop media", que so sobe na galeria)
     const target = zone || editor;
     dtLog('Anexar soltando o arquivo.', { areaDeSoltar: zone ? snapClean(txt(zone)).slice(0, 30) : null });
     for (const type of ['dragenter', 'dragover', 'drop']) {
@@ -1912,9 +2050,7 @@
       await sleep(150);
     }
     let ok = !!(await until(() => ingredientChips() > before, 25000, 500)); // o Flow processa a imagem antes de mostrar o chip
-    // Envio ainda em andamento (tile pendente): espera mais em vez de soltar de novo por "colar", que subia a mesma
-    // imagem duas vezes (nos logs a referencia levava ~40 s por take por causa disso).
-    if (!ok && $$(S.pendingTile).length > 0) {
+    if (!ok && refUploadActive(tilesBefore)) {
       dtLog('O Flow ainda está processando a referência; esperando mais um pouco.', { pendentes: $$(S.pendingTile).length });
       ok = !!(await until(() => ingredientChips() > before, 25000, 500));
     }
@@ -1924,16 +2060,22 @@
     return ok;
   }
 
-  // Caminho 2: colar a imagem na caixa de prompt.
-  async function attachByPaste(file) {
+  // Caminho 1 (preferido): colar a imagem na caixa de prompt (sem overlay de arraste nem upload duplicado).
+  async function attachByPaste(file, tilesBefore = $$(tileSel()).length) {
     const ed = $(S.editor);
     if (!ed) return false;
     const before = ingredientChips();
     ed.focus();
     const dt = new DataTransfer();
     dt.items.add(file);
+    dtLog('Anexar colando o arquivo.');
     ed.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
-    return !!(await until(() => ingredientChips() > before, 15000, 500));
+    let ok = !!(await until(() => ingredientChips() > before, 25000, 500));
+    if (!ok && refUploadActive(tilesBefore)) {
+      dtLog('O Flow ainda está processando a referência colada; esperando mais um pouco.', { pendentes: $$(S.pendingTile).length });
+      ok = !!(await until(() => ingredientChips() > before, 25000, 500));
+    }
+    return ok;
   }
 
   // Caminho 3: escolher pelo nome na biblioteca do menu "+" (imagem ja enviada antes).
@@ -1954,11 +2096,18 @@
     }
     const list = $('flow-add-menu-asset-list', menu);
     if (list) dtSnapshot('anexar: lista da biblioteca', list, 'info');
-    // Item da lista: algo clicavel com a imagem ou o nome do arquivo.
+    // Item da lista: exige correspondencia pelo nome para nunca selecionar um personagem/asset errado.
     const items = $$('[role=option], .asset-item, flow-add-menu-asset-item, cdk-virtual-scroll-viewport [class*=asset]', menu).filter((e) => vis(e));
-    const item = items.find((e) => new RegExp(name.replace(/[.*+?^()[\]{}|]/g, ''), 'i').test(txt(e) + ' ' + ($('img', e)?.alt || ''))) || items[0];
-    dtLog('Anexar pela biblioteca: itens na lista.', { itens: items.length, escolhido: item ? snapClean(txt(item).slice(0, 60)) : null });
-    if (!item) return false;
+    const safeRx = new RegExp(esc(name), 'i');
+    const item = items.find((e) => safeRx.test(txt(e) + ' ' + ($('img', e)?.alt || '')));
+    dtLog('Anexar pela biblioteca: itens na lista.', { itens: items.length, procurado: name.slice(0, 40), escolhido: item ? snapClean(txt(item).slice(0, 60)) : null });
+    if (!item) {
+      for (let i = 0; i < 3 && $('flow-add-menu-popover-content'); i++) {
+        pressEscape();
+        await sleep(300);
+      }
+      return false;
+    }
     realClick(item);
     await sleep(1200);
     const pane = $('flow-add-menu-detail-pane', menu);
@@ -2654,7 +2803,10 @@
       await closeLayers();
       if (ingredientChips() > 0) {
         dtLog('Removendo referências que sobraram do take anterior.', { chips: ingredientChips() });
-        await clearIngredients();
+        const cleared = await clearIngredients();
+        if (!cleared) {
+          throw err('stale_references', 'Sobrou referência de outro take na caixa de prompt do Flow e não consegui removê-la.');
+        }
       }
       const prob = classifyProblem();
       if (prob) throw err(prob.code, prob.msg);

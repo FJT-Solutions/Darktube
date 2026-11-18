@@ -3,12 +3,12 @@
 // Toda a rede passa por aqui (o content script do Flow nao fala com o darktube).
 // Por padrao so faz o ENSAIO (le as opcoes da conta). Gerar de verdade exige ligar no popup.
 
-const FLOW_VERSION = '1.3.34';
-const FLOW_BUILD = '2026-11-08-calibrar-duracao-slider-omni'; // confirma que a extensao recarregada e a nova
+const FLOW_VERSION = '1.3.35';
+const FLOW_BUILD = '2026-11-18-anexo-sem-duplicar-e-limpeza'; // confirma que a extensao recarregada e a nova
 const GHOST_LEFT = -10000;
 const GHOST_TOP = -10000;
 // Falhas de tela (menu aberto, painel em outro estado): o take volta para a fila em vez de virar rascunho.
-const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project'];
+const FLOW_UI_CODES = ['editor_missing', 'generate_disabled', 'generate_missing', 'mode_missing', 'model_btn_missing', 'option_missing', 'prompt_not_written', 'settings_btn_missing', 'settings_close_failed', 'settings_panel_missing', 'config_mismatch', 'no_project', 'stale_references'];
 const FLOW_ALARM = 'flow-tick';
 // Vigia por tipo: a pagina tem o proprio limite (imagem 3 min, video 9 min) e o vigia so cobre a pagina travada, entao fica logo acima.
 const FLOW_JOB_TIMEOUT_MS = { image: 5 * 60 * 1000, video: 11 * 60 * 1000 };
