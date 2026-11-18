@@ -153,6 +153,26 @@ export const REALISM_PROMPT: Record<string, string> = {
     'clean 3D miniature diorama look: toy-like low-poly buildings and objects on a bright green and blue landscape, soft studio lighting, smooth glossy materials, simple stylized shapes, smooth camera moves',
 }
 
+/** Normaliza aliases de estilo visual (`3d_pixar`, `pixar`, `2d_ilustrado`, etc.) para as chaves oficiais de `REALISM_PROMPT`. */
+export function normalizeRealism(raw?: string): string {
+  const s = String(raw || '').trim().toLowerCase()
+  if (!s) return ''
+  if (REALISM_PROMPT[s]) return s
+  const compact = s.replace(/[\s_-]+/g, '')
+  if (REALISM_PROMPT[compact]) return compact
+  if (/pixar|disney|animacao3d|3d/.test(compact) && !/avatar|brinquedo|toy|block/.test(compact)) return 'animacao3d'
+  if (/ilustrad|2dilustr/.test(compact) || compact === '2d') return 'ilustrado2d'
+  if (/stickman|cartoon|cartum/.test(compact)) return 'stickman2d'
+  if (/massinha|clay|stopmotion|feltro/.test(compact)) return 'massinha'
+  if (/avatar/.test(compact)) return 'avatar3d'
+  if (/brinquedo|diorama|toy/.test(compact)) return 'brinquedo3d'
+  if (/estiliz|styliz/.test(compact)) return 'estilizado'
+  if (/hiper|photoreal|realist/.test(compact)) return 'hiper'
+  if (/cru|ugc|celular/.test(compact)) return 'cru'
+  if (/cinema/.test(compact)) return 'cinematografico'
+  return s
+}
+
 export const VIDEO_MODELS: FlowFieldOption[] = [
   { value: 'Omni 1.2 Flash', label: 'Omni 1.2 Flash' },
   { value: 'Omni 1.1 Flash', label: 'Omni 1.1 Flash' },

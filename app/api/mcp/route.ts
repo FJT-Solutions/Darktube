@@ -256,6 +256,7 @@ const MCP_TOOLS_MANIFEST = [
       properties: {
         projectId: { type: 'string', description: 'ID do projeto no /flow (ou prefixo de 8 caracteres)' },
         approveAll: { type: 'boolean', description: 'Se true, aprova todos os personagens visuais que não tenham decisão explícita de reprovação em decisions', default: false },
+        realismo: { type: 'string', description: 'Opcional: atualiza o estilo visual do projeto (ex: animacao3d, ilustrado2d, cinematografico) antes de regenerar personagens reprovados' },
         decisions: {
           type: 'array',
           description: 'Decisões individuais por personagem (c1, c2, c3... ou pelo nome do personagem)',

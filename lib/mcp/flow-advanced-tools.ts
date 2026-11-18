@@ -7,7 +7,7 @@
 
 import { pool } from '@/lib/db-client';
 import { getUserApiKey } from '@/lib/database';
-import { getFlowTemplate, MAX_TAKES, clampSecondsForModel, type FlowTemplate } from '@/lib/flow-templates';
+import { getFlowTemplate, MAX_TAKES, clampSecondsForModel, normalizeRealism, type FlowTemplate } from '@/lib/flow-templates';
 import {
   buildRepairPrompt,
   buildSystemPrompt,
@@ -466,7 +466,7 @@ export async function cloneVideoFromLinkMcp(input: CloneVideoFromLinkInput) {
   const custom: CloneCustomization = { newTheme, newCharacter, newLocation, keepInstructions };
   const baseParams: FlowParams = {
     idioma: idioma || structure.language || 'pt-BR',
-    realismo: realismo || structure.visualStyle || 'cinematografico',
+    realismo: normalizeRealism(realismo || structure.visualStyle || 'cinematografico'),
     takes: resolvedTakes,
     seconds: resolvedSeconds,
     aspect: resolvedAspect,
@@ -575,6 +575,7 @@ export interface CharacterDecisionInput {
 export interface ReviewProjectCharactersInput {
   projectId: string;
   approveAll?: boolean;
+  realismo?: string;
   decisions?: CharacterDecisionInput[];
   waitForSeconds?: number;
   downloadLocal?: boolean;
@@ -590,6 +591,7 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
   const {
     projectId: rawProjectId,
     approveAll = false,
+    realismo: newRealismo,
     decisions = [],
     waitForSeconds = 0,
     downloadLocal = true,
@@ -607,7 +609,12 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
   const projectId = String(project.id);
   const userId = String(project.user_id || (await resolveDefaultUserId()));
   const script: FlowScript = JSON.parse(JSON.stringify(project.script));
-  const params: FlowParams = project.params || {};
+  const params: FlowParams = { ...(project.params || {}) };
+  if (newRealismo && String(newRealismo).trim()) {
+    params.realismo = normalizeRealism(String(newRealismo));
+  } else if (params.realismo) {
+    params.realismo = normalizeRealism(String(params.realismo));
+  }
   const templateId = String(project.template_id || '');
 
   const regeneratedIds: string[] = [];
@@ -678,7 +685,7 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
     }
   }
 
-  await updateFlowProject(userId, projectId, { script });
+  await updateFlowProject(userId, projectId, { script, params });
   await syncProjectQueuedJobsWithReferences(userId, projectId, script, params, templateId);
 
   const statusResult = await getCreativeStatus({

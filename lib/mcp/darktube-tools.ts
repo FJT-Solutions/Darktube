@@ -10,7 +10,7 @@ import fs from 'fs';
 import { getMcpUserId } from '@/lib/mcp/context';
 import path from 'path';
 import { FLOW_TEMPLATES, getFlowTemplate, type FlowTemplate } from '@/lib/flow-templates';
-import { VIDEO_MODELS, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel } from '@/lib/flow-template-base';
+import { VIDEO_MODELS, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, normalizeRealism, resolveTakeModel } from '@/lib/flow-template-base';
 import {
   buildSystemPrompt,
   buildTakePrompt,
@@ -327,6 +327,9 @@ async function generateAiScript(ctx: {
     quality: resolvedQuality,
     ...templateParams,
   };
+  if (params.realismo) {
+    params.realismo = normalizeRealism(String(params.realismo));
+  }
 
   if (templateId === 'receita-viral') {
     if (!params.prato) params.prato = offer;

@@ -1,6 +1,6 @@
 import { pool } from '@/lib/db-client'
 import { adultAge, type FlowCharacter } from '@/lib/flow-script'
-import { REALISM_PROMPT } from '@/lib/flow-template-base'
+import { normalizeRealism, REALISM_PROMPT } from '@/lib/flow-template-base'
 
 export interface FlowLibraryCharacter {
   id: string
@@ -124,22 +124,27 @@ export function isChromaKeyTemplate(templateId?: string | null): boolean {
  */
 export function buildSheetPrompt(c: FlowCharacter, realismo = '', chromaKey = false): string {
   const desc = adultAge((c.description || '').trim()).replace(/\.+$/, '')
+  let normRealismo = normalizeRealism(realismo)
+  if (!normRealismo && /\b(3d\s*animated|pixar|disney|3d\s*film|stylized\s*3d)\b/i.test(desc)) {
+    normRealismo = 'animacao3d'
+  }
   // O fundo do sufixo padrao ("neutro") contradiria o pedido de fundo verde e quebraria o recorte do chroma key.
   const green = chromaKey || wantsGreenBackdrop(desc)
   const backdrop = green
     ? 'Solid pure flat green chroma-key backdrop (#00FF00), perfectly uniform with no gradient, no shadows and no green spill on the subject, even soft lighting'
     : 'Clean solid neutral backdrop'
-  if (STYLIZED.includes(realismo) && REALISM_PROMPT[realismo]) {
-    return `character design reference of a fictional original character, drawn exactly in this visual style: ${REALISM_PROMPT[realismo]}. The character: ${desc}. Single character, waist-up, facing the camera with a natural expression, wearing their signature outfit. ${green ? backdrop + '.' : 'Plain light neutral background, even soft lighting.'} Single character only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark.`
+  if (STYLIZED.includes(normRealismo) && REALISM_PROMPT[normRealismo]) {
+    return `character design reference portrait of a fictional original adult character, rendered strictly and uniformly in this visual style: ${REALISM_PROMPT[normRealismo]}. Consistent unified art style across the entire cast, NO photorealism, NO real photographic skin texture. The character: ${desc}. Single character, waist-up, facing the camera with a natural expression, wearing their signature outfit. ${green ? backdrop + '.' : 'Plain light neutral background, even soft lighting.'} Single character only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark.`
   }
   return `cinematic character reference portrait of a fictional original adult character, not based on any real or famous person: ${desc}. Single subject waist-up medium portrait, facing the camera with a natural expressive gaze, wearing their signature clothing. ${backdrop}, cinematic soft studio lighting with gentle key light, ${green ? 'sharp background' : 'shallow depth of field'}, sharp detailed facial features, realistic skin texture, clear eyes and natural hair. Single person only, no multiple views, no split screen, no turnaround, no grid, no text, no watermark.`
 }
 
 /** Folha do elenco (todos lado a lado). `realismo`: estilo visual do projeto (valor de REALISM). */
 export function buildCastPrompt(chars: FlowCharacter[], realismo = ''): string {
+  const normRealismo = normalizeRealism(realismo)
   const list = chars
     .map((c, idx) => `Character ${idx + 1} (from left to right): ${adultAge((c.description || c.name).trim()).replace(/\.+$/, '')}`)
     .join('; ')
-  const style = STYLIZED.includes(realismo) && REALISM_PROMPT[realismo] ? ` Drawn exactly in this visual style: ${REALISM_PROMPT[realismo]}.` : ''
+  const style = STYLIZED.includes(normRealismo) && REALISM_PROMPT[normRealismo] ? ` Rendered strictly and uniformly in this visual style: ${REALISM_PROMPT[normRealismo]}.` : ''
   return `Professional cast reference sheet of ${chars.length} fictional original adult characters, not based on any real or famous person, standing side by side in a single row from left to right in this exact order: ${list}.${style} Full-body standing front view of all characters together, relaxed A-pose, consistent scale, even soft studio lighting, clean neutral plain light-gray background, sharp details, perfect identity consistency. No text, no labels, no names, no numbers, no captions, no watermark.`.slice(0, 3900)
 }

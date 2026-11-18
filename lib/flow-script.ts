@@ -3,7 +3,7 @@
 // de personagem e cenario, camera motivada, audio limpo e nenhum texto na imagem).
 
 import { policyReason } from './flow-failure'
-import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, MAX_TAKES, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel, VIDEO_MODELS } from './flow-templates'
+import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, normalizeRealism, MAX_TAKES, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel, VIDEO_MODELS } from './flow-templates'
 
 export type FlowTakeKind = 'dialogo' | 'narracao' | 'ambiente'
 
@@ -181,7 +181,7 @@ export function cleanCamera(text: string): string {
 
 /** Estilo visual do take: o estilo escolhido (realismo) e a cara do template, sem textura de pele quando nao ha pessoas. */
 function styleFor(t: FlowTemplate | undefined, params: FlowParams, hasPeople: boolean): string {
-  const realismo = String(params.realismo || '')
+  const realismo = normalizeRealism(String(params.realismo || ''))
   const realism = REALISM_PROMPT[realismo] || ''
   // Template estilizado (2D, 3D...) com estilo escolhido: a cara do template repete o mesmo estilo ou contradiz a escolha.
   const look = t?.look && !(t.defaults.realismo && realismo) ? t.look : ''
@@ -217,7 +217,8 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
     .filter((l) => !l.endsWith(':'))
     .join('\n')
   const emotion = EMOTIONS.find((e) => e.value === params.emocao)?.label
-  const realism = REALISM.find((r) => r.value === params.realismo)?.label
+  const normRealismo = normalizeRealism(String(params.realismo || ''))
+  const realism = REALISM.find((r) => r.value === normRealismo)?.label || (params.realismo ? String(params.realismo) : '')
   const userScript = String(params.roteiro || '').trim()
   const part = Number(params.parte) || 1
   const prevPart = String(params.parteAnterior || '').trim()
@@ -256,6 +257,7 @@ Writing rules (avoid generic "AI slop"):
 - Negative constraints compliance: never introduce unscripted background people, extra characters, morphing items, floating hands, or unmotivated camera drifting.
 - ${modeRules}
 - Character descriptions are fixed anchors of 25-35 words; never change a character's look between takes. Every take names its location id and visible characters.
+- Visual style uniformity across cast: EVERY character in "characters" MUST explicitly share the EXACT SAME rendering medium and art style (${realism || 'matched to Visual realism'}); NEVER mix 3D/Pixar/cartoon characters with photorealistic characters.
 - Never describe on-screen writing: no screens with text, signs, newspapers, labels, logos or interfaces.
 - Spoken lines and the SEO block are written in ${lang}. Everything else (descriptions, actions, camera, sound) is in English.
 - Safety: fictional everyday people only (no real or famous people, no look-alikes), no brands or logos, no medical or financial promises, no hate or humiliation of any group.
