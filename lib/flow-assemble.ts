@@ -556,11 +556,14 @@ export async function assembleFlowProject(userId: string, projectId: string) {
     const cues = joinedWords ? cuesFromWords(joinedWords, wordsPerCaption) : fallbackCuesList
     const srt = buildSrt(cues)
 
+    const pr = (project.params || {}) as Record<string, any>
+    const noBurnCaptions = pr.noCaptions === true || pr.noCaptions === 'true' || pr.burnCaptions === false || pr.burnCaptions === 'false'
+
     let finalFile = joined
     let burned = false
-    // Curtos: legenda gravada no video (retencao no feed, muita gente assiste sem som).
+    // Curtos: legenda gravada no video (retencao no feed, muita gente assiste sem som), exceto quando noCaptions/burnCaptions=false.
     // Longos (YouTube 16:9): so o .srt, que vira legenda ativavel e traduzivel no YouTube e nao cobre a imagem.
-    const burn = (!!srt || (joinedWords && joinedWords.length > 0)) && t.length !== 'longo'
+    const burn = !noBurnCaptions && (!!srt || (joinedWords && joinedWords.length > 0)) && t.length !== 'longo'
     if (srt) fs.writeFileSync(path.join(dir, 'captions.srt'), srt, 'utf8')
     if (burn) {
       const assContent = buildFlowAss(joinedWords, cues, W, H, wordsPerCaption)
@@ -598,7 +601,6 @@ export async function assembleFlowProject(userId: string, projectId: string) {
 
     // CTA animado (Remotion, fundo transparente): o Flow nao desenha texto, ele entra aqui, na edicao.
     let ctaApplied = false
-    const pr = project.params as Record<string, any>
     const cta: FlowCtaOverlay = {
       title: String(pr.ctaTitle || '').trim(),
       subtitle: String(pr.ctaSubtitle || '').trim() || undefined,

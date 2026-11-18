@@ -687,7 +687,8 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
       }
     }
 
-    if (input.character?.generateSheet || explicitChars.some((c) => c.generateSheet)) {
+    const shouldGenerateSheets = Boolean(input.character?.generateSheet || explicitChars.some((c) => c.generateSheet));
+    if (shouldGenerateSheets) {
       finalScript.characters = finalScript.characters.map((c) => {
         if (isVoiceOnlyCharacter(c) || c.sheetUrl) return c;
         return {
@@ -710,7 +711,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
 
       if (queueTakes) {
         // Se pediu para gerar as folhas dos personagens por IA, gera para TODOS os personagens visuais sem foto anexada:
-        if (input.character?.generateSheet) {
+        if (shouldGenerateSheets) {
           for (let idx = 0; idx < finalScript.characters.length; idx++) {
             const charToGenerate = finalScript.characters[idx];
             if (isVoiceOnlyCharacter(charToGenerate) || charToGenerate.sheetUrl) continue;
