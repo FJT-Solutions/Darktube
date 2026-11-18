@@ -68,6 +68,7 @@ export interface CampaignCreativeInput {
   benefits?: string;
   customIdea?: string;
   character?: CampaignCharacterInput;
+  characters?: CampaignCharacterInput[];
   templateParams?: Record<string, string | number>;
   isDraft?: boolean;
   downloadLocal?: boolean;
@@ -313,8 +314,11 @@ async function generateAiScript(ctx: {
     'novelinha': 'novelinha-dramatica',
   };
   const normalizedTemplateId = TEMPLATE_ALIASES[String(templateId || '').trim().toLowerCase()] || templateId;
-  const fallbackTemplate = customIdea ? getFlowTemplate('livre') : getFlowTemplate('produto-tiktok-shop');
-  const t: FlowTemplate = getFlowTemplate(normalizedTemplateId) || fallbackTemplate || FLOW_TEMPLATES[0];
+  const resolved = getFlowTemplate(normalizedTemplateId);
+  if (!resolved && templateId && !customIdea) {
+    throw new Error(`Template "${templateId}" não encontrado no catálogo. Use um ID válido: ${FLOW_TEMPLATES.map((x) => x.id).join(', ')}`);
+  }
+  const t: FlowTemplate = resolved || getFlowTemplate('livre') || FLOW_TEMPLATES[0];
   const isProductOrRecipeTemplate = t.id === 'produto-tiktok-shop' || t.id === 'receita-viral' || t.id === 'receita-chromakey-expert';
 
   const resolvedTakesCount = takesCount || t.defaults?.takes || 4;
@@ -324,11 +328,11 @@ async function generateAiScript(ctx: {
   const resolvedQuality = quality || t.defaults?.quality || '360p';
 
   const params: FlowParams = {
-    tema: presetChosen ? `${offer} - ${selectedPreset.title}` : offer,
+    tema: presetChosen ? `${offer} - ${selectedPreset.title}` : (customIdea ? `${offer} — ${customIdea}` : offer),
     produto: offer,
     beneficios: benefits || (isProductOrRecipeTemplate ? 'Sem glúten, sem açúcar, sem lactose, pronto em 5 minutos' : ''),
     estilo: angle === 'pao-frigideira' ? 'dor' : 'objecao',
-    roteiro: customIdea || '',
+    roteiro: String(templateParams?.roteiro || ''),
     idioma: 'pt-BR',
     realismo: t.defaults?.realismo || 'cinematografico',
     takes: resolvedTakesCount,
@@ -342,7 +346,7 @@ async function generateAiScript(ctx: {
     params.realismo = normalizeRealism(String(params.realismo));
   }
 
-  if (templateId === 'receita-viral') {
+  if (t.id === 'receita-viral') {
     if (!params.prato) params.prato = offer;
     if (!params.voz) params.voz = 'sem_voz';
     if (!params.tipo) params.tipo = 'tres_ingredientes';
@@ -643,28 +647,33 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
         };
     const flowHook = finalScript.seo?.hook || (presetChosen ? selectedPreset.hook : '');
 
-    if (input.character) {
-      const charInput = input.character;
-      const charId = 'c1';
+    const explicitChars: CampaignCharacterInput[] = Array.isArray(input.characters) && input.characters.length > 0
+      ? input.characters
+      : (input.character ? [input.character] : []);
+
+    for (let idx = 0; idx < explicitChars.length; idx++) {
+      const charInput = explicitChars[idx];
+      const charId = `c${idx + 1}`;
       const existingCharIndex = finalScript.characters.findIndex((c) => c.id === charId);
-      const prevChar = existingCharIndex >= 0 ? finalScript.characters[existingCharIndex] : finalScript.characters[0];
+      const prevChar = existingCharIndex >= 0 ? finalScript.characters[existingCharIndex] : finalScript.characters[idx];
+      const normUrl = charInput.sheetUrl ? (normalizeStorageReference(charInput.sheetUrl, `characters[${idx}].sheetUrl`) || undefined) : undefined;
       const newChar: FlowCharacter = {
         id: charId,
-        name: charInput.name || prevChar?.name || 'Apresentador',
+        name: charInput.name || prevChar?.name || `Personagem ${idx + 1}`,
         description: charInput.description || prevChar?.description || 'Pessoa comunicativa e expressiva',
         voice: charInput.voice || prevChar?.voice || 'natural',
-        sheetUrl: charInput.sheetUrl ? (normalizeStorageReference(charInput.sheetUrl, 'character.sheetUrl') || undefined) : undefined,
-        sheetStatus: charInput.sheetUrl ? 'aprovada' : (charInput.generateSheet ? (queueTakes ? 'gerando' : 'aguardando') : undefined),
+        sheetUrl: normUrl,
+        sheetStatus: normUrl ? 'aprovada' : (charInput.generateSheet ? (queueTakes ? 'gerando' : 'aguardando') : undefined),
       };
 
       if (existingCharIndex >= 0) {
         finalScript.characters[existingCharIndex] = newChar;
       } else {
-        finalScript.characters.unshift(newChar);
+        finalScript.characters.push(newChar);
       }
     }
 
-    if (input.character?.generateSheet) {
+    if (input.character?.generateSheet || explicitChars.some((c) => c.generateSheet)) {
       finalScript.characters = finalScript.characters.map((c) => {
         if (isVoiceOnlyCharacter(c) || c.sheetUrl) return c;
         return {

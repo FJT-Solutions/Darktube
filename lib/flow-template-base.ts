@@ -40,7 +40,21 @@ export interface FlowBeat {
    * e vazia ou narracao fora da tela: o roteiro nao deve gerar "Dialogue/lip-sync" nem pedir rosto.
    */
   presence?: FlowBeatPresence
+  /** Opcional. O que este beat deve passar visualmente ou narrativamente para o proximo take. */
+  carryOver?: string
 }
+
+/**
+ * Regra global de conexao entre cenas injetada em TODOS os templates (curtos e longos, dialogo, narracao, ambiente ou livre).
+ * Garante que nenhum take pareca um clipe isolado com objetos, cores, horario ou enredo desconexos.
+ */
+export const GLOBAL_CONTINUITY_RULES: string[] = [
+  'Global scene connection: all takes belong to ONE continuous causal narrative—take N starts from the exact physical pose, emotional beat, active props, wardrobe, and time-of-day where take N-1 ended',
+  'Shared Props Bible: lock every recurring physical object (bouquet, gift, dish, document, bag, key, ring) in "props" with exact fixed colors, count, and materials, and keep them 100% identical across every take where they appear',
+  'No unmotivated cuts or props out of thin air: never introduce a sudden object, vehicle, or bystander in a take unless it was visually anchored or verbally foreshadowed in the preceding take (or already belongs to the active scene)',
+  'Unified faceless/B-roll continuity: any faceless or close-up beat takes place inside the exact same active location, lighting hour, and color palette as its neighboring scenes—never cut to an unrelated backdrop',
+  'Location transition bridge: changing location id requires an explicit causal bridge in "carryOver" and action (e.g., stepping from doorway to dining table), preserving coherent lighting and time of day',
+]
 
 /** Presenca efetiva de um beat: o valor explicito ou o padrao do modo ('dialogo' = personagem, demais = sem rosto). */
 export function beatPresence(mode: FlowProductionMode, beat?: Pick<FlowBeat, 'presence'>): FlowBeatPresence {

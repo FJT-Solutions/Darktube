@@ -3,7 +3,7 @@
 // de personagem e cenario, camera motivada, audio limpo e nenhum texto na imagem).
 
 import { policyReason } from './flow-failure'
-import { FlowTemplate, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, normalizeRealism, MAX_TAKES, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel, VIDEO_MODELS } from './flow-templates'
+import { FlowTemplate, GLOBAL_CONTINUITY_RULES, wordLimit, LANGUAGES, LANGUAGE_PROMPT, EMOTIONS, REALISM, REALISM_PROMPT, normalizeRealism, MAX_TAKES, TAKE_SECONDS, allowedSecondsForModel, clampSecondsForModel, resolveTakeModel, VIDEO_MODELS } from './flow-templates'
 
 export type FlowTakeKind = 'dialogo' | 'narracao' | 'ambiente'
 
@@ -34,6 +34,13 @@ export interface FlowLocation {
   description: string
 }
 
+export interface FlowProp {
+  id: string
+  name: string
+  /** Ancora visual fixa em ingles (cores exatas, material, tamanho, quantidade) repetida em todo take onde o objeto aparece. */
+  description: string
+}
+
 export interface FlowTake {
   n: number
   seconds: number
@@ -48,6 +55,10 @@ export interface FlowTake {
   location: string
   /** Ids dos personagens visiveis neste take. */
   characters: string[]
+  /** Ids dos objetos-chave recorrentes visiveis neste take (mantem cor/material identicos). */
+  props?: string[]
+  /** Ponte narrativa/visual do take anterior para este take (estado inicial -> estado final). */
+  carryOver?: string
   /** Som da cena (foley e ambiente), em ingles curto. */
   sound: string
   /** Plano e movimento de camera, em ingles. */
@@ -78,6 +89,8 @@ export interface FlowScript {
   logline: string
   characters: FlowCharacter[]
   locations: FlowLocation[]
+  /** Objetos recorrentes com aparencia travada (ex.: buque de rosas vermelhas, carta, prato). */
+  props?: FlowProp[]
   takes: FlowTake[]
   seo: FlowSeo
   /** Voz fixa do narrador (em ingles), repetida em todo take narrado para nao mudar de voz entre takes. */
@@ -114,7 +127,8 @@ const SCHEMA = `{
   "characters": [{"id": "c1", "name": "string", "description": "fixed visual anchor in English, 25-35 words, starting with the age range in words (e.g. 'adult woman in her early thirties'): skin tone, face, exact hair color and cut, build (average, athletic, broad or heavyset), full outfit with colors and fabrics", "voice": "accent, timbre and delivery in English"}],
   "narratorVoice": "only when there is narration: one fixed narrator voice in English (gender, age range, timbre, pacing), used in every narrated take",
   "locations": [{"id": "l1", "name": "string", "description": "full visual description in English: place, time of day, light sources, textures"}],
-  "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "sound": "specific foley and ambience in English", "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch", "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none", "mediaType": "ai_flow | stock_asset"}],
+  "props": [{"id": "p1", "name": "string", "description": "fixed visual anchor in English (10-20 words: exact colors, count, materials, wrapping/details) for every recurring key object across takes"}],
+  "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "props": ["recurring prop ids visible in this shot"], "carryOver": "short English bridge explaining how this shot picks up directly from the previous take's ending pose/props/emotion and what passes to the next take", "sound": "specific foley and ambience in English", "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch", "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none", "mediaType": "ai_flow | stock_asset"}],
   "seo": {"title": "string", "caption": "string", "hook": "engagement question", "hashtags": ["#tag"]}
 }`
 
@@ -213,7 +227,13 @@ export function buildSystemPrompt(t: FlowTemplate, params: FlowParams): string {
           ? `There is no speech at all. Set "kind" to "ambiente", "speaker" and "line" to "" in every take. Describe rich, specific foley in "sound".`
           : `Choose per take: "dialogo" (one on-screen speaker, lip-sync, at most ${limit} words), "narracao" (off-screen narrator, at most ${limit} words) or "ambiente" (no speech). Never two speakers in the same take. If any take is "narracao", define "narratorVoice" once.`
 
-  const beats = t.beats.map((b, i) => `  ${i + 1}. ${b.fn} — camera: ${b.camera}`).join('\n')
+  const beats = t.beats
+    .map((b, i) => `  ${i + 1}. ${b.fn} — camera: ${b.camera}${b.carryOver ? ` — carry-over: ${b.carryOver}` : ''}`)
+    .join('\n')
+  const formatRules = [...(t.rules || []), ...GLOBAL_CONTINUITY_RULES]
+    .filter((r, i, arr) => r && arr.indexOf(r) === i)
+    .map((r) => `- ${r}`)
+    .join('\n')
   const extra = t.fields
     .map((f) => `${f.label}: ${String(params[f.id] ?? f.default).trim()}`)
     .filter((l) => !l.endsWith(':'))
@@ -238,7 +258,7 @@ Structure:
 - Dynamic Visual Editing & Transitions: for each take, assign a specific cut transition to the next scene ("cut", "white_flash", "whip_pan", "zoom_punch", "crossfade", "glitch") and an accompanying audio SFX ("whoosh", "camera_click", "bass_drop", "paper_rustle", "pop", "none") to maximize viewer retention in Remotion compilation. Hooks and key twists use white_flash or zoom_punch with whoosh or bass_drop; product/ingredient reveals use camera_click; culinary uses crossfade; dynamic shifts use whip_pan.
 - Scene functions for this format, in order (if there are more takes than functions, treat them as acts and escalate the middle; if fewer, merge neighbours). Put the function in "beat":
 ${beats}
-${(t.rules || []).map((r) => `- ${r}`).join('\n')}
+${formatRules}
 
 Writing rules (avoid generic "AI slop"):
 - Take 1 opens in media res with a visual hook in the first 1.5 seconds; never open with greetings or encyclopedic sentences ("Did you know...").
@@ -321,6 +341,16 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       name: str(l?.name, 60) || `Local ${i + 1}`,
       description: str(l?.description, 600),
     }))
+  const props: FlowProp[] = (Array.isArray(raw?.props) ? raw.props : [])
+    .slice(0, 16)
+    .map(
+      (p: any, i: number): FlowProp => ({
+        id: str(p?.id, 20) || `p${i + 1}`,
+        name: str(p?.name, 60) || `Objeto ${i + 1}`,
+        description: str(p?.description, 400),
+      })
+    )
+    .filter((p: FlowProp) => Boolean(p.description || p.name))
   // A IA as vezes poe a descricao da cena no campo de fala de takes sem personagem; isso vira narracao errada.
   const looksLikeActionText = (text: string, k: any): boolean => {
     if (!text.trim() || str(k?.speaker, 20) || (Array.isArray(k?.characters) && k.characters.length > 0)) return false
@@ -364,6 +394,9 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       effChars.unshift(effSpeaker)
     }
 
+    const rawPropIds = Array.isArray(k?.props) ? k.props.map((x: any) => str(x, 20)).filter(Boolean) : []
+    const carryOver = str(k?.carryOver, 300)
+
     return {
       n: i + 1,
       seconds,
@@ -373,6 +406,8 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       action: str(k?.action, 600),
       location: str(k?.location, 20) || locations[0]?.id || '',
       characters: effChars,
+      ...(rawPropIds.length ? { props: rawPropIds } : {}),
+      ...(carryOver ? { carryOver } : {}),
       sound: str(k?.sound, 240),
       camera: str(k?.camera, 200),
       beat: str(k?.beat, 160),
@@ -393,6 +428,7 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
     logline: str(raw?.logline, 300),
     characters,
     locations,
+    ...(props.length ? { props } : {}),
     takes,
     ...(narratorVoice ? { narratorVoice } : {}),
     seo: {
@@ -449,6 +485,14 @@ export function validateScript(script: FlowScript, t: FlowTemplate, params: Flow
     const visual = `${k.action} ${k.camera || ''}`
     const hit = visual.match(TEXT_TRIGGERS)
     if (hit) issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} mentions "${hit[0]}", which makes the video model write on screen; describe it without written words.` })
+    const propIds = new Set((script.props || []).map((p) => p.id))
+    for (const pid of k.props || []) {
+      if (propIds.size && !propIds.has(pid)) issues.push({ take: k.n, level: 'aviso', message: `Take ${k.n} references unknown prop "${pid}".` })
+    }
+    const prevTake = script.takes[k.n - 2]
+    if (prevTake && prevTake.location && k.location && prevTake.location !== k.location && !k.carryOver) {
+      issues.push({ take: k.n, level: lvl('erro'), message: `Take ${k.n} changes location (${prevTake.location} -> ${k.location}) without a "carryOver" causal bridge explaining the transition.` })
+    }
   }
   const first = script.takes[0]?.line || ''
   if (/^(ol[aá]|oi|hello|hi|hey|voc[eê] sabia|did you know|hoje vamos|today we)/i.test(first.trim())) {
@@ -565,13 +609,23 @@ export function buildTakePrompt(
       lines.push(`Subject (fictional adults, not based on any real or famous person): ${cast}${who}.`)
     }
     lines.push(`Action: ${stripOnScreenText(noEnd(take.action))}.`)
+    const takeProps = (take.props || [])
+      .map((pid) => (script.props || []).find((p) => p.id === pid))
+      .filter((p): p is FlowProp => Boolean(p && (p.description || p.name)))
+    if (takeProps.length && level <= 2) {
+      const propText = takeProps
+        .map((p) => `${p.name}: ${level >= 2 ? clipWords(noEnd(p.description || p.name), 12) : noEnd(p.description || p.name)}`)
+        .join('; ')
+      lines.push(`Recurring objects (keep exact identical color, count and material across every scene): ${propText}.`)
+    }
     // O take anterior ancora a continuidade (posicao, objetos, expressao) sem citar "take N", que o modelo nao conhece.
     const prev = script.takes.find((k) => k.n === take.n - 1)
-    if (prev?.action && level <= 1) {
-      if (prev.location === take.location) {
-        lines.push(`This shot picks up right after: ${clipWords(noEnd(prev.action), 22)}.`)
+    if (level <= 1 && (take.carryOver || prev?.action)) {
+      const bridge = take.carryOver ? clipWords(noEnd(take.carryOver), 24) : clipWords(noEnd(prev?.action || ''), 22)
+      if (prev && prev.location === take.location) {
+        lines.push(`This shot picks up right after: ${bridge}.`)
       } else {
-        lines.push(`Narrative bridge from the preceding beat: ${clipWords(noEnd(prev.action), 20)}.`)
+        lines.push(`Narrative bridge from the preceding beat: ${bridge}.`)
       }
     }
     // Take sem ninguem na imagem (so maos e comida) nao tem boca para dublar: a fala vira narracao fora da tela, em vez de

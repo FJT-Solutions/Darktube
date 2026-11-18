@@ -57,9 +57,9 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
         camera: 'low-angle close-up on the antagonist, shallow depth of field',
       },
       {
-        fn: 'Disruption: an unexpected witness, key object, or luxury vehicle arrives',
-        camera: 'whip-pan tracking shot following the arriving element',
-        presence: 'faceless',
+        fn: 'Escalation / disruption: an already-introduced key object, witness, or proof enters or shifts the confrontation inside the active scene',
+        camera: 'medium tracking or over-the-shoulder shot connecting the active character to the revealing detail',
+        carryOver: 'Keep the exact same character wardrobe, active props and room lighting into the twist reveal',
       },
       {
         fn: 'Twist: hidden authority, true ownership, or secret proof is exposed',
@@ -124,25 +124,29 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
         fn: 'Tension and test: put the item through a demanding, hands-on physical test',
         camera: 'macro close-up on hands operating the item in real time',
         presence: 'faceless',
+        carryOver: 'The same item, same hands, counter surface and window light as the presenter take; only the hands enter, never a new item',
       },
       {
         fn: 'Turning point: immediate side-by-side contrast showing the problem solved on contact',
         camera: 'steady overhead close-up with crisp focus on the result',
         presence: 'faceless',
+        carryOver: 'The same surface and the same item from the test, showing the problem area just treated; same lighting and counter',
       },
       {
         fn: 'Payoff: highlight a clever secondary detail or durability feature',
         camera: 'medium close-up tilting from the item to the presenter',
         presence: 'character',
+        carryOver: 'The same presenter, outfit and room; the detail shown belongs to the same item used in the previous takes',
       },
       {
         fn: 'Closing recommendation and loop bridge: direct spoken recommendation that connects back to the opening problem (the call-to-action is a banner added in post)',
         camera: 'eye-level medium shot, presenter nodding at the camera while holding the item',
         presence: 'character',
+        carryOver: 'The same presenter, outfit and room of the hook, holding the very item shown in the test; the recommendation closes the opening problem',
       },
     ],
     rules: [
-      'Faceless takes (hands and item only) carry no lip-sync: the line is empty or an off-screen voice; reference images of the presenter are used only for room and lighting continuity there',
+      'Faceless takes (hands and item only) stay in the exact same room, counter surface and lighting as the presenter shots and carry no lip-sync: the line is empty or an off-screen voice; reference images of the presenter are used only for room and lighting continuity there',
       'No text, signs, price tags, cards or screens drawn in the scene',
       'No medical claims, no guaranteed miracles, no trademarked brand marks',
       'Keep the physical item clearly visible in action in every single take',
@@ -186,18 +190,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Setup and rising stakes: establish the isolated place and the warning everyone ignored',
         camera: 'low-angle dolly glide across the environment',
+        carryOver: 'Start from the central artifact of the hook sitting inside this place; the same object, location, era and light hour carry into the setup',
       },
       {
         fn: 'Escalation: the mechanism or crisis unfolds step by step',
         camera: 'tight over-the-shoulder tracking shot of silent physical action',
+        carryOver: 'Same place, same artifact and same unnamed figure from the setup; the ignored warning is now physically unfolding in that exact location',
       },
       {
         fn: 'Twist: the counter-intuitive reason behind the mystery is revealed',
         camera: 'dramatic crane pull-back revealing the full scale of the scene',
+        carryOver: 'Pull back from the exact action of take 3 to reveal the cause, without introducing any object or location not already shown',
       },
       {
         fn: 'Payoff and seamless loop: final sentence completes the opening thought and returns to the first object',
         camera: 'macro close-up matching the opening frame composition',
+        carryOver: 'Return to the same artifact as the hook, now marked by what happened; same surface, same light, same composition as take 1',
       },
     ],
     rules: [
@@ -243,18 +251,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Tension or curiosity: the creature navigates a weather element or terrain obstacle',
         camera: 'low-angle tracking shot at ground level beside paws or wings',
+        carryOver: 'Same animal, same markings and same habitat patch from the hook; it moves from the spot where take 1 ended, with identical light hour and weather',
       },
       {
         fn: 'Turning point: a tactile interaction with water, snow, foliage, or a companion',
         camera: 'medium profile shot with slow-motion droplets or particles',
+        carryOver: 'Same animal and habitat as take 2; the obstacle or terrain just crossed becomes the water, snow, foliage or companion it now touches, in the same light',
       },
       {
         fn: 'Payoff: intimate sensory detail of fur, feathers, or breathing in golden light',
         camera: 'extreme macro close-up with backlit rim glow',
+        carryOver: 'Macro on the same animal markings and the same wet, snowy or leafy texture left by take 3, same golden light direction',
       },
       {
         fn: 'Seamless loop: calm resting posture matching the lighting and tone of the opening frame',
         camera: 'slow smooth pull-back into the surrounding habitat',
+        carryOver: 'Start from the macro detail of take 4 and pull back to reveal the exact habitat and pose of the opening frame so the loop closes',
       },
     ],
     rules: [
@@ -311,18 +323,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Tension: step forward through a claustrophobic or hostile environment as a threat approaches',
         camera: 'first-person walking POV pushing through mist, rain, or torchlit corridor',
+        carryOver: 'Same viewer hands, same period tool and clothing sleeves from take 1; walk away from the exact spot where the hook ended, same weather and light source',
       },
       {
         fn: 'Turning point: interact physically with a mechanism, door, or survival tool that suddenly fails or reveals a secret',
         camera: 'first-person close-up on hands struggling with a heavy latch or instrument',
+        carryOver: 'The mechanism or door is the one reached at the end of the walk in take 2, with the same tool still in hand and the same threat sounding behind',
       },
       {
         fn: 'Climax: whip around to face the massive environmental event or approaching silhouette',
         camera: 'urgent first-person whip-pan tilting upward into the looming spectacle',
+        carryOver: 'Whip around inside the same location after the latch reaction; the looming event must be the threat already foreshadowed by sound in takes 1-3',
       },
       {
         fn: 'Payoff and loop bridge: sudden blackout or blink transition that grammatically completes the opening line',
         camera: 'first-person stumble backward as shadows close in over the lens',
+        carryOver: 'Continue from the exact pose and view of take 4, same hands and tool; the blackout returns to the awakening framing of take 1',
       },
     ],
     rules: [
@@ -379,19 +395,23 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Escalation: character explains the bizarre daily struggle as background chaos subtly unfolds behind them',
         camera: 'eye-level handheld shot, rack focus briefly to the background absurdity',
+        carryOver: 'Same speaker, same outfit, same street or room and same handheld mic as the hook; the background absurdity is the one seen behind them',
       },
       {
         fn: 'Visual proof: quick cut to the ridiculous physical evidence or coworker causing the issue',
         camera: 'shaky documentary whip-pan to the side action, then snap back',
         presence: 'faceless',
+        carryOver: 'The evidence is the background absurdity already glimpsed in the previous take, in the same location and light',
       },
       {
         fn: 'Twist: an unexpected interruption forces the speaker to react on the spot',
         camera: 'tight close-up on the speaker pausing mid-sentence in disbelief',
+        carryOver: 'Same speaker and location, picking up after the proof; the interruption comes from something already established nearby',
       },
       {
         fn: 'Payoff punchline: ironic closing remark delivered to the lens before walking off frame',
         camera: 'handheld medium shot holding steady as the speaker turns away',
+        carryOver: 'Same speaker, outfit and place as the twist; the speaker leaves in the direction of the interruption',
       },
     ],
     rules: [
@@ -448,18 +468,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Hidden mechanism: reveal what happens inside the system under pressure',
         camera: 'translucent cross-section camera glide through internal gears, vessels, or fibers',
+        carryOver: 'Enter the exact same metaphor object from the hook (same material, color and size) and show its interior; same dark studio, same rim light direction',
       },
       {
         fn: 'Escalation: chronological progression pushes the object or organ to its breaking point',
         camera: 'orbital macro shot as heat, tension, or liquid mercury rises',
+        carryOver: 'Same object and internal structure seen in take 2, now under rising pressure; no new object enters the studio',
       },
       {
         fn: 'Turning point: the unexpected scientific or psychological shift transforms the material',
         camera: 'high-speed slow-motion macro capture of the physical transformation',
+        carryOver: 'The transformation starts from the breaking-point state of take 3 and keeps the same material palette and lighting',
       },
       {
         fn: 'Payoff and loop bridge: restored equilibrium that visually and verbally mirrors the opening frame',
         camera: 'clean overhead macro shot pulling back to match the first composition',
+        carryOver: 'The transformed material settles back into the same object, surface and composition of take 1 so the loop closes',
       },
     ],
     rules: [
@@ -515,14 +539,17 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Sensory escalation: slice smoothly through the glowing interior revealing intricate internal layers',
         camera: 'extreme macro side profile following the blade edge through the material',
+        carryOver: 'Same blade or press, same material and same dark slab from the hook; the cut continues from the crack made in take 1',
       },
       {
         fn: 'Turning point: a dense liquid core or shimmering geometric fragments spill across the dark slab',
         camera: 'high-frame-rate macro shot capturing refracted light and rolling droplets',
+        carryOver: 'The interior opened in take 2 releases the core onto the same slab, same colors and same refraction light',
       },
       {
         fn: 'Payoff and seamless loop: final clean slice falls into place as a fresh identical object slides into position',
         camera: 'locked-off macro frame matching the exact geometry of the first take',
+        carryOver: 'The same slab is cleared and an identical fresh object takes the exact position of take 1 so the loop closes',
       },
     ],
     rules: [
@@ -578,18 +605,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Aggressive stripping: high-pressure wash, sandblasting, or demolition removes decades of grime',
         camera: 'macro close-up on sparks, water jets, and peeling oxidation',
+        carryOver: 'The very same ruined subject from the hook, still on the same workbench and angle; the stripping removes its grime without swapping it for another object',
       },
       {
         fn: 'Precision craftsmanship: oiled gears, fresh woodwork, or polished metal parts click into place',
         camera: 'tight side-angle dolly across gloved hands fitting precision components',
+        carryOver: 'The same subject, now stripped bare in take 2, with the same gloves, tools and workbench; the parts fitted are its own components',
       },
       {
         fn: 'Final polish: warm light sweeps across the newly finished surface',
         camera: 'slow macro glide over the mirror-like finish',
+        carryOver: 'The assembled subject of take 3 on the same bench; the same warm lamp now sweeps its finished surface',
       },
       {
         fn: 'Payoff reveal: the fully restored masterpiece working smoothly in the exact framing of the opening shot',
         camera: 'locked-off three-quarter shot matching Beat 1 for instant visual comparison',
+        carryOver: 'The same restored subject placed in the exact position, angle and focal length of take 1, with identical background',
       },
     ],
     rules: [
@@ -635,18 +666,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Timeline tension: reconstruct the final known evening through shadows and rain-soaked exteriors',
         camera: 'high-angle wide shot of a lone vehicle or doorway in heavy rain and fog',
+        carryOver: 'Same rain, same cold palette and same evening as the hook; the doorway or vehicle belongs to the very location where the clue object was found',
       },
       {
         fn: 'The overlooked clue: an investigator gloved hand examines a small anomalous detail',
         camera: 'extreme close-up under a magnifying glass or flashlight beam',
+        carryOver: 'The detail examined is part of the object or location already shown in takes 1-2; same gloved hand, same lamp color',
       },
       {
         fn: 'Twist revelation: the detail proves the event happened in reverse or from the inside',
         camera: 'slow low-angle push-in down a dark hallway toward an open door',
+        carryOver: 'The hallway leads out of the same building seen earlier; the door and light match what the clue implies',
       },
       {
         fn: 'Payoff and loop bridge: haunting closing question that connects directly back to the opening clue',
         camera: 'close-up returning to the initial object as the light dims',
+        carryOver: 'Return to the same object and desk lamp of take 1, same placement, with only the light dimming',
       },
     ],
     rules: [
@@ -692,18 +727,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Escalation: show the harsh immediate reality on the street or landscape within seconds',
         camera: 'sweeping crane shot across the authentic period environment or shifting skyline',
+        carryOver: 'The tool or anomaly from the hook is visibly part of this same place, era, weather and light; the crane starts from where the hook ended',
       },
       {
         fn: 'Turning point: the hidden biological or mechanical consequence hits everyday people',
         camera: 'medium tracking shot following an ordinary person reacting to the phenomenon',
+        carryOver: 'Same street or landscape from take 2 with the same clothing, tones and light; the person is one already seen there',
       },
       {
         fn: 'Twist: reveal the ironic survival rule or unexpected long-term outcome',
         camera: 'low-angle dramatic push-in on the surviving structure or artifact',
+        carryOver: 'The structure or artifact belongs to the same place shown before; it is not a new unrelated monument',
       },
       {
         fn: 'Payoff and loop bridge: final observation that links seamlessly back to the opening visual shock',
         camera: 'tight close-up mirroring the opening frame lighting and surface detail',
+        carryOver: 'Return to the same tool or detail of take 1, same surface and light, marked by what the story revealed',
       },
     ],
     rules: [
@@ -759,18 +798,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Comedic attempt: a clumsy first try goes adorably wrong',
         camera: 'wide side shot capturing playful physical comedy in the miniature world',
+        carryOver: 'Same protagonist (same colors, scarf or accessory) and same miniature world from the hook; the dilemma object is the one it tries to solve',
       },
       {
         fn: 'Turning point: a gentle friend or tiny glowing detail offers a clever clue',
         camera: 'over-the-shoulder shot focusing on the shared discovery',
+        carryOver: 'The friend or glowing detail appears inside the same setting where the mishap happened; no new location, same warm light',
       },
       {
         fn: 'Payoff: the protagonist succeeds through kindness or courage, transforming the cozy environment',
         camera: 'gentle crane pull-back as warm lantern or sunbeams fill the scene',
+        carryOver: 'The clue from take 3 is used on the same dilemma object; the same place becomes brighter and cozier',
       },
       {
         fn: 'Cozy loop ending: sweet moral and a peaceful gesture that connects back to the opening pose',
         camera: 'soft close-up on the smiling protagonist settling down',
+        carryOver: 'Same protagonist in the same spot as the opening pose, now calm, with the same friend or detail resting nearby',
       },
     ],
     rules: [
@@ -816,18 +859,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Tension: illustrate the trap of seeking external validation or comfort',
         camera: 'slow tracking shot behind a lone figure walking against a blurred crowd or storm',
+        carryOver: 'Same lone figure, same clothing and hands from the hook; the walk starts from the place of the opening action, same weather and light',
       },
       {
         fn: 'Turning point: a deliberate pause where discipline replaces impulse',
         camera: 'extreme close-up on calm eyes reflecting warm fire or dawn light',
+        carryOver: 'The same figure stops at the end of the walk of take 2; the light reflected in the eyes is the light source already present',
       },
       {
         fn: 'Payoff: quiet mastery shown through a completed craft or steady horizon',
         camera: 'wide anamorphic composition holding steady on the vast landscape or workshop',
+        carryOver: 'The craft or horizon is the one the figure was working toward from take 1; no new person, vehicle or symbol appears',
       },
       {
         fn: 'Loop reflection: final stoic sentence completes the opening premise',
         camera: 'slow pull-back returning to the opening visual motif',
+        carryOver: 'Return to the exact motif of take 1 (hands or rain-streaked glass), same light, now calm',
       },
     ],
     rules: [
@@ -882,14 +929,17 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Deadpan escalation: the anomaly performs a mundane task while the employee watches unimpressed',
         camera: 'crash-zoom onto the employee blank, tired expression looking into the lens',
+        carryOver: 'Same office, same lighting and the same anomaly from the hook, now doing a mundane task in the background; same employee outfit',
       },
       {
         fn: 'Turning point: the employee addresses the situation with a bureaucratic complaint',
         camera: 'medium two-shot under flat office lighting as the employee speaks calmly',
+        carryOver: 'Same employee and same anomaly in the same office position as the escalation take; only these two are in frame',
       },
       {
         fn: 'Payoff punchline: a second tiny absurd detail happens right on cue and the worker just sighs',
         camera: 'quick pan to the secondary gag, then back to the worker sipping from a plain mug',
+        carryOver: 'The secondary gag happens in the same office, near the anomaly already shown; same worker and same plain mug on the same desk',
       },
     ],
     rules: [
@@ -940,18 +990,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Act II (The Ambition & Hidden Mechanism): reconstruct how the system was built and the fatal flaw hidden beneath the surface',
         camera: 'wide architectural tracking shots alternating with macro close-ups of physical mechanisms',
+        carryOver: 'The structure or anomaly of Act I is the same one being built or examined here; same site, same materials, same palette',
       },
       {
         fn: 'Act III (The Escalation & Domino Effect): show the chronological chain reaction as warnings fail one by one',
         camera: 'tense handheld documentary movement and low-angle dolly shots through corridors or sites',
+        carryOver: 'The fatal flaw shown in Act II is the physical spot where the chain reaction begins; same site, with visible signs of wear and time passing',
       },
       {
         fn: 'Act IV (The Climax & Unseen Consequence): reveal the decisive turning point and the human or environmental aftermath',
         camera: 'sweeping crane reveal across the transformed landscape in dramatic twilight',
+        carryOver: 'The same site seen in Acts I-III, now transformed by the failure; the crane starts from the exact corridor or spot of Act III',
       },
       {
         fn: 'Act V (Synthesis & Lingering Echo): connect the lesson back to the cold-open image and leave a thought-provoking final image',
         camera: 'slow symmetrical pull-back matching the opening widescreen composition',
+        carryOver: 'Return to the exact opening composition of Act I, with the lasting change from Act IV visible; same site and camera geometry',
       },
     ],
     rules: [
@@ -996,18 +1050,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Act II (The Official Timeline): trace the last confirmed movements through atmospheric night exteriors and silent interiors',
         camera: 'wide anamorphic tracking shot along a rain-slicked road or corridor in deep shadow',
+        carryOver: 'The road or corridor leads to the exact location of the key object in Act I; same rain, same cold green-amber palette and night hour',
       },
       {
         fn: 'Act III (The False Leads & Cold Years): illustrate how investigators chased the wrong hypothesis while a tiny clue sat in storage',
         camera: 'overhead close-up of gloved hands examining physical evidence trays under a focused lamp',
+        carryOver: 'The evidence trays hold the key object and items already shown in Acts I-II; same gloved hands, same lamp color, no unrelated new evidence',
       },
       {
         fn: 'Act IV (The Forensic Breakthrough): reveal the scientific test or microscopic detail that inverted the entire timeline',
         camera: 'extreme macro close-up on fibers, gears, or chemical reactions, followed by a dramatic camera push-in',
+        carryOver: 'The macro detail is a part of the same stored object from Act III; the push-in ends facing the scene location of Act I',
       },
       {
         fn: 'Act V (The Resolution & Final Echo): reconstruct what truly happened in sequence and return to the opening location at dawn',
         camera: 'wide slow pull-back from the quiet location as morning mist clears',
+        carryOver: 'The same location and key object as Act I, now at dawn; the path of events matches what Act IV revealed',
       },
     ],
     rules: [
@@ -1058,18 +1116,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Act II (First Escalation — Human Scale): explore the phenomenon at everyday human scale with clear physical cause and effect',
         camera: 'smooth gimbal tracking shot following the physical reaction in natural light',
+        carryOver: 'The same subject or phenomenon from Act I, now seen at human scale; the surprising environment of the pull-back is the same place',
       },
       {
         fn: 'Act III (Second Escalation — Extreme Environments): move into deep ocean, extreme altitude, or microscopic scale where rules bend',
         camera: 'sweeping underwater or high-altitude wide shot transitioning to a detailed close-up',
+        carryOver: 'The same phenomenon from Act II enters the extreme setting through a visible link (same object, material or creature carried over); keep the same color grade',
       },
       {
         fn: 'Act IV (The Apex Paradox): present the most counter-intuitive, extreme case that challenges intuition',
         camera: 'slow orbital camera movement around the central phenomenon with dramatic lighting',
+        carryOver: 'The apex case grows out of the extreme environment of Act III with the same subject and palette, only larger or more intense',
       },
       {
         fn: 'Act V (Unified Payoff): tie all levels together into one unforgettable rule and mirror the opening visual',
         camera: 'symmetrical widescreen pull-back returning to the opening subject',
+        carryOver: 'Return to the same subject and composition of Act I, with brief echoes of the objects from Acts II-IV, nothing new',
       },
     ],
     rules: [
@@ -1115,18 +1177,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Act II (The World & The Stakes): establish the daily reality, scarcity, and geographical obstacle facing the group',
         camera: 'sweeping widescreen crane shot over the ancient settlement, harbor, or mountain pass',
+        carryOver: 'The camp or street of Act I sits inside this same settlement or pass; same era, clothing, tools, weather and light hour',
       },
       {
         fn: 'Act III (The Ordeal): physical conditions worsen as weather, siege, or mechanical failure tests endurance',
         camera: 'handheld medium close-ups on weathered hands working ropes, iron, or oars in heavy weather',
+        carryOver: 'The same group and tools shown in Acts I-II face the obstacle named in Act II; weather worsens from the same baseline',
       },
       {
         fn: 'Act IV (The Decisive Hour): the pivotal ingenious tactic or unexpected natural event changes the outcome',
         camera: 'dramatic dolly push-in through torchlight and smoke revealing the turning point',
+        carryOver: 'The tactic uses tools and people already established in Act III, in the same location and fading light',
       },
       {
         fn: 'Act V (The Aftermath & Legacy): quiet dawn over the remnants of the event, connecting past survival to the present',
         camera: 'slow wide pull-back across the silent landscape at sunrise',
+        carryOver: 'The same location of Act IV at sunrise, with remnants of the exact tools and structures already shown',
       },
     ],
     rules: [
@@ -1182,18 +1248,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Act II (The Quiet Stroll): a peaceful evening walk collecting fireflies, stars, or sleepy animal friends',
         camera: 'slow lateral dolly glide beside the protagonist through soft glowing foliage',
+        carryOver: 'The same protagonist leaves the glowing cottage or window of Act I; same colors, accessories and dusk light, slightly darker',
       },
       {
         fn: 'Act III (The Soothing Shelter): gentle rain or snow begins outside while everyone gathers in a warm shelter',
         camera: 'medium shot inside a lantern-lit cabin or burrow looking out at soft falling rain',
+        carryOver: 'The same friends and fireflies collected in Act II arrive at the shelter; same protagonist and lantern color',
       },
       {
         fn: 'Act IV (Settling into Slumber): each small friend curls up as lights dim one by one and breathing slows',
         camera: 'intimate close-up panning slowly across sleepy eyes and warm blankets',
+        carryOver: 'Only the characters and blankets already present inside the shelter of Act III; same lantern light, dimming',
       },
       {
         fn: 'Act V (Starlight Loop): the whole landscape rests under a calm starry sky with rhythmic, peaceful ambient sound',
         camera: 'ultra-slow pull-back into the quiet night sky',
+        carryOver: 'Pull back from the same shelter window to the landscape of Act I, now under stars, with the last warm light still glowing',
       },
     ],
     rules: [
@@ -1249,18 +1319,22 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'Act II (Tactile Water & Light): focus on the hypnotic interaction of water droplets, ripples, or reflections',
         camera: 'slow macro slider shot across rain-streaked glass, bamboo fountain, or tide pool',
+        carryOver: 'Macro detail taken from the same sanctuary and the same natural element of Act I; same light hour and palette',
       },
       {
         fn: 'Act III (Warmth vs. Elements): contrast the cozy interior warmth against the vast weather outside',
         camera: 'medium framing past a glowing hearth or lantern toward the misty landscape beyond',
+        carryOver: 'The hearth or lantern is the one in the sanctuary of Act I; the weather outside matches the water and light of Act II',
       },
       {
         fn: 'Act IV (Deep Stillness): twilight deepens and wind softens into a steady, meditative rhythm',
         camera: 'ultra-slow pan across the quiet horizon and shimmering water surface',
+        carryOver: 'The horizon seen from the same sanctuary window of Act III, with light a few shades darker than before',
       },
       {
         fn: 'Act V (Infinite Loop Return): return to the opening sanctuary framing for uninterrupted replay',
         camera: 'locked-off widescreen frame matching the exact geometry of Act I',
+        carryOver: 'The exact framing and objects of Act I, now at the final light of the progression; no new object or person',
       },
     ],
     rules: [
@@ -1328,38 +1402,47 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       {
         fn: 'The old life: the daily grind of the salaried job (boss, alarm clock, crowded bus, small paycheck) that makes the dream feel necessary',
         camera: 'medium shot following the protagonist through the routine, gentle lateral parallax',
+        carryOver: 'The same grayscale protagonist (same outfit and spiky hair) from the kitchen of take 1, shown earlier in time; the phone and the amount at risk stay consistent',
       },
       {
         fn: 'The decision: the protagonist spends savings on used equipment or stock and turns part of the home into a workplace, family doubtful',
         camera: 'close-up on hands counting money, then wide shot of the transformed corner of the house',
+        carryOver: 'The same money amount named so far; the transformed corner is the same ceramic-tile kitchen of take 1 with the same peeling green cabinets',
       },
       {
         fn: 'First orders: a small win, the first customers arrive by phone and the protagonist delivers with pride',
         camera: 'over-the-shoulder on the work surface, then tracking shot along the street at dusk',
+        carryOver: 'The equipment bought in the decision is on the same work surface; the delivery bag and motorbike introduced here are reused later',
       },
       {
         fn: 'Growth and excitement: orders multiply, family helps, sleep shrinks, the hero product looks irresistible',
         camera: 'hyper-appetizing macro close-ups of the product alternating with a fast montage of full order bags',
+        carryOver: 'The same product, bags and kitchen as the first orders; the family members shown here are the ones doubtful in the decision',
       },
       {
         fn: 'Cracks appear: a harsh complaint, hidden costs, mistakes and a kitchen too small for the demand',
         camera: 'low angle on the pile of tasks and bills, slow push-in on the exhausted face',
+        carryOver: 'The same kitchen, now visibly crowded with the same bags and equipment; the protagonist wears the same outfit with visible exhaustion',
       },
       {
         fn: 'Overload: more customers than the protagonist can serve, late deliveries and a confrontation with a worried family member',
         camera: 'tense two-shot across the table, cluttered wide shot with orders piling up',
+        carryOver: 'The family member is the one seen earlier, at the same table of the same kitchen; the piles are those of the cracks beat',
       },
       {
         fn: 'The big bet: a large loan or investment to open a dedicated spot, the point of no return',
         camera: 'slow dolly toward a desk with documents under a single lamp, extreme close-up on a hesitating hand',
+        carryOver: 'The same protagonist leaves the overloaded kitchen for the desk; the amount spoken here is greater than the earlier ones',
       },
       {
         fn: 'Peak tension: the night before the leap, success itself may destroy everything the protagonist built',
         camera: 'empty street or empty new storefront at night, slow pull-back showing how small the protagonist is',
+        carryOver: 'The same night, same outfit and same documents or keys from the big bet; the storefront is the spot being rented',
       },
       {
         fn: 'Open ending and loop: a final question to the viewer, the invitation to comment the keyword, and a last line that connects to the opening line',
         camera: 'locked wide shot of the home kitchen matching the opening frame, light turning off',
+        carryOver: 'The same home kitchen and frame of take 1, now quiet, with the phone still on the counter; the last light turns off',
       },
     ],
     rules: [
@@ -1404,11 +1487,11 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'A 40 to 60 second narrated historical story in a simple cartoon style. Open with the absurd outcome or the strangest detail, explain how it happened in clear cause-and-effect steps, and end on an ironic twist.',
     beats: [
       { fn: 'Hook: state the strangest or most shocking outcome of the story in one line', camera: 'static wide shot of a throne room or battlefield, characters reacting' },
-      { fn: 'Setup: who the characters are and what they wanted', camera: 'slow push-in on the main character at the center of the scene' },
-      { fn: 'The problem: the decision or mistake that starts the chain of events', camera: 'close-up on the character and the object that causes the problem' },
-      { fn: 'Escalation: the situation gets worse in an exaggerated, visual way', camera: 'wide shot with crowd of identical background characters reacting in sync' },
-      { fn: 'Twist: the unexpected consequence', camera: 'quick zoom on the shocked face, then wide reveal' },
-      { fn: 'Ironic closing line that echoes the hook', camera: 'locked wide shot, a single character looking at the camera' },
+      { fn: 'Setup: who the characters are and what they wanted', camera: 'slow push-in on the main character at the center of the scene', carryOver: 'Same throne room or battlefield of the hook with the same characters, outfit colors and painted background' },
+      { fn: 'The problem: the decision or mistake that starts the chain of events', camera: 'close-up on the character and the object that causes the problem', carryOver: 'The object that causes the problem is introduced already in the setup, in the same location and with the same color' },
+      { fn: 'Escalation: the situation gets worse in an exaggerated, visual way', camera: 'wide shot with crowd of identical background characters reacting in sync', carryOver: 'The same object and characters now cause the chaos in the same painted location; the crowd wears the same colors as before' },
+      { fn: 'Twist: the unexpected consequence', camera: 'quick zoom on the shocked face, then wide reveal', carryOver: 'The shocked character is the main character from the setup, and the consequence stems from the object and chaos already shown' },
+      { fn: 'Ironic closing line that echoes the hook', camera: 'locked wide shot, a single character looking at the camera', carryOver: 'Return to the exact location and composition of the hook, with the object or its aftermath visible; same character, same outfit' },
     ],
     rules: [
       'Characters are simple round-headed cartoon figures with thin limbs; keep the same face and outfit colors for each role in every take',
@@ -1450,11 +1533,11 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'A 40 to 60 second narrated history explainer: a blocky 3D game-style avatar guide travels to the chosen era and discovers how a famous thing was really done, step by step, with light humor.',
     beats: [
       { fn: 'Hook: pose the surprising question and show the avatar arriving in the era', camera: 'wide shot of the avatar standing in the landscape, slow push-in' },
-      { fn: 'First step: the workers or locals start the task in a practical, concrete way', camera: 'medium tracking shot following the workers' },
-      { fn: 'The clever trick: reveal the technique or tool that explains the mystery', camera: 'close-up on the tool or mechanism in action' },
-      { fn: 'The scale: show how many people and how much time it takes', camera: 'high wide shot revealing the large crowd and the structure' },
-      { fn: 'Surprising detail that most people get wrong', camera: 'close-up on the avatar reacting, then cut to the detail' },
-      { fn: 'Closing line that answers the question and teases another', camera: 'slow pull-back with the avatar waving at the camera' },
+      { fn: 'First step: the workers or locals start the task in a practical, concrete way', camera: 'medium tracking shot following the workers', carryOver: 'Same era, same landscape and same yellow-capped avatar from the hook; the workers appear in the place where the avatar arrived' },
+      { fn: 'The clever trick: reveal the technique or tool that explains the mystery', camera: 'close-up on the tool or mechanism in action', carryOver: 'The tool or mechanism is used by the same workers on the same material and structure as the first step' },
+      { fn: 'The scale: show how many people and how much time it takes', camera: 'high wide shot revealing the large crowd and the structure', carryOver: 'The same structure and tool, seen from above; the crowd wears the same colors and the same sunny light' },
+      { fn: 'Surprising detail that most people get wrong', camera: 'close-up on the avatar reacting, then cut to the detail', carryOver: 'The detail belongs to the structure or tool already shown; the avatar stands in the same place seen in the previous take' },
+      { fn: 'Closing line that answers the question and teases another', camera: 'slow pull-back with the avatar waving at the camera', carryOver: 'Return to the landscape of the hook with the finished or advanced structure now visible; same avatar and light' },
     ],
     rules: [
       'One recurring blocky avatar (bright yellow outfit and cap) appears in every take; era characters share the same blocky style',
@@ -1494,11 +1577,11 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'A 40 to 60 second narrated explainer made of clean toy-like 3D miniature scenes. Start with a surprising question, show one visual demonstration per take with simple cause and effect, and end with a memorable takeaway.',
     beats: [
       { fn: 'Hook: a surprising question or comparison shown as a clear visual setup', camera: 'static medium shot of the miniature scene, centered' },
-      { fn: 'Demonstration one: the first change happens, slow and readable', camera: 'smooth push-in on the object changing' },
-      { fn: 'Demonstration two: raise the scale or intensity', camera: 'smooth rise upward showing a bigger scene' },
-      { fn: 'The surprising result that breaks expectation', camera: 'quick orbit around the result' },
-      { fn: 'Why it happens in one simple sentence, shown with a cutaway', camera: 'cutaway close-up showing the inside of the object' },
-      { fn: 'Takeaway line that lingers, last scene mirrors the first', camera: 'locked frame matching take 1' },
+      { fn: 'Demonstration one: the first change happens, slow and readable', camera: 'smooth push-in on the object changing', carryOver: 'The very object and miniature scene of the hook, with the same colors and the same palette, starting its first change' },
+      { fn: 'Demonstration two: raise the scale or intensity', camera: 'smooth rise upward showing a bigger scene', carryOver: 'The same object after the change in demonstration one, now in a bigger view of the same miniature world' },
+      { fn: 'The surprising result that breaks expectation', camera: 'quick orbit around the result', carryOver: 'The result arises from the same object and scene of demonstration two; no new object enters the diorama' },
+      { fn: 'Why it happens in one simple sentence, shown with a cutaway', camera: 'cutaway close-up showing the inside of the object', carryOver: 'The cutaway shows the inside of the same object that produced the result, same material colors and lighting' },
+      { fn: 'Takeaway line that lingers, last scene mirrors the first', camera: 'locked frame matching take 1', carryOver: 'The same miniature scene and framing of take 1, now showing the outcome; same palette and objects' },
     ],
     rules: [
       'No text, numbers or diagrams drawn in the image; labels are only spoken in narration',
@@ -1552,11 +1635,11 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       'A 40 to 55 second viral recipe video in a warm home kitchen, shot mostly on hands and food. Show the finished dish as a hook, then ingredients, the key preparation step, one satisfying transformation (cheese pull, cut, syrup pour, crunch) and a final close-up. The voice option is given in the Narração field.',
     beats: [
       { fn: 'Hook: the finished dish in a tempting close-up, steam or a first bite or cut', camera: 'macro close-up of the dish with a slow push-in' },
-      { fn: 'Ingredients laid out simply on the counter, only what the recipe needs', camera: 'top-down shot of the counter, hands placing ingredients' },
-      { fn: 'Key preparation step: mixing, shaping or assembling, easy to follow', camera: 'over-the-hands medium close-up' },
-      { fn: 'Cooking step: oven, airfryer, pan or fridge; an adult hand firmly grasps the handle to slide the basket open/closed; food sizzles and changes texture', camera: 'medium close-up on appliance with hand action, followed by macro close-up on the sizzling food' },
-      { fn: 'The satisfying transformation: cheese pull, cut, syrup pour or crunch', camera: 'slow-motion macro on the transformation' },
-      { fn: 'Final plated dish; last frame echoes the hook (the call-to-action is a banner added in post, never in the picture)', camera: 'locked close-up of the plated dish, soft rack focus' },
+      { fn: 'Ingredients laid out simply on the counter, only what the recipe needs', camera: 'top-down shot of the counter, hands placing ingredients', carryOver: 'Same kitchen, same counter surface and same soft window light as the hook; only the ingredients of the dish shown in take 1' },
+      { fn: 'Key preparation step: mixing, shaping or assembling, easy to follow', camera: 'over-the-hands medium close-up', carryOver: 'The same ingredients, bowls and utensils laid out in take 2, on the same counter, with the same hands and sleeves' },
+      { fn: 'Cooking step: oven, airfryer, pan or fridge; an adult hand firmly grasps the handle to slide the basket open/closed; food sizzles and changes texture', camera: 'medium close-up on appliance with hand action, followed by macro close-up on the sizzling food', carryOver: 'The same prepared food from take 3, with the same dish or tray, enters the same appliance in the same kitchen' },
+      { fn: 'The satisfying transformation: cheese pull, cut, syrup pour or crunch', camera: 'slow-motion macro on the transformation', carryOver: 'The cooked food of take 4, now in the same dish, with the same color and texture as it came out of the appliance' },
+      { fn: 'Final plated dish; last frame echoes the hook (the call-to-action is a banner added in post, never in the picture)', camera: 'locked close-up of the plated dish, soft rack focus', carryOver: 'The same plated dish, plate and counter as the hook, exactly the dish whose transformation was shown in take 5' },
     ],
     rules: [
       'Only hands and food appear, never a face; the kitchen is the same in every take; every take is faceless, so lines are empty or off-screen voice, never lip-sync',
