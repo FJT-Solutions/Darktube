@@ -2403,17 +2403,25 @@
 
     // Registra os elementos, URLs e digitais dos tiles que JA EXISTIAM antes deste take
     const prevTiles = new Set($$(S.videoTile));
+    const prevImageTiles = new Set($$(S.imageTile));
     const prevFps = new Set($$(S.videoTile).map(tileFp));
     const prevImageIds = new Set($$('img[data-media-id]').map((i) => i.getAttribute('data-media-id')));
-    const prevImageSrcs = new Set($$('img').map((i) => (i.currentSrc || i.src || '').split('?')[0]).filter(Boolean));
+    const prevImageSrcs = new Set(
+      $$('img')
+        .flatMap((i) => [i.currentSrc, i.src, i.getAttribute('src')])
+        .filter((s) => s && !s.startsWith('data:'))
+        .map((s) => s.split('?')[0])
+    );
     const knownOldUrls = new Set();
     $$('video').forEach((v) => {
       const s = getVideoSrc(v);
       if (s) knownOldUrls.add(s);
     });
-    $$('flow-video-tile img, flow-image-tile img').forEach((img) => {
+    $$('flow-video-tile img, flow-image-tile img, flow-grid-tile-container img, flow-media-tile img').forEach((img) => {
       const s = img.currentSrc || img.src;
       if (s && !s.startsWith('data:')) knownOldUrls.add(s);
+      img.setAttribute('data-dt-old', '1');
+      img.setAttribute('data-dt-seen', '1');
     });
     $$(tileSel()).forEach((t) => {
       t.setAttribute('data-dt-old', '1');
@@ -2499,16 +2507,50 @@
             dtLog('Detalhes da recusa.', { rede: netTail(10), avisos: pageToasts(), tile: String(bad.outerHTML || '').replace(/[ \t\r\n]+/g, ' ').slice(0, 700) }, 'error');
             throw err(failCode(m), 'O Flow recusou a geração: ' + m);
           }
+          // Nunca aceitar placeholder/miniatura reciclada (34 KB em 2s) ou imagem de tile de video/pendente:
+          // exige tile novo (nao marcado data-dt-old/seen), imagem carregada (>=256x256), fora de videoTile/pendingTile e sem spinner.
+          const isStaticUiImg = (u) => /\/assets\/|favicon|lh3\.googleusercontent\.com\/a\//i.test(String(u || ''));
+          const pendingNew = $$(S.pendingTile).filter((pt) => !pt.closest('[data-dt-old], [data-dt-seen]'));
           const ready = $$(S.imageTileImg).filter((i) => {
-            if (i.closest('[data-dt-seen]')) return false;
+            if (i.hasAttribute('data-dt-seen') || i.hasAttribute('data-dt-old')) return false;
+            if (i.closest('[data-dt-seen], [data-dt-old]')) return false;
+            if (i.closest(S.videoTile) || i.closest(S.pendingTile) || i.closest('flow-error-tile')) return false;
+            const tile = i.closest(S.imageTile);
+            if (tile && (prevImageTiles.has(tile) || tileState(tile).generating)) return false;
             const mid = i.getAttribute('data-media-id');
             if (mid && prevImageIds.has(mid)) return false;
-            const src = (i.currentSrc || i.src || '').split('?')[0];
-            if (src && prevImageSrcs.has(src)) return false;
-            return (i.naturalWidth > 64 || i.clientWidth > 64 || (i.src && !i.src.startsWith('data:')));
+            const srcRaw = i.currentSrc || i.src || '';
+            if (!srcRaw || srcRaw.startsWith('data:') || isStaticUiImg(srcRaw)) return false;
+            const srcBase = srcRaw.split('?')[0];
+            if (prevImageSrcs.has(srcBase) || knownOldUrls.has(srcRaw)) return false;
+            return i.complete && i.naturalWidth >= 256 && i.naturalHeight >= 256;
           });
-          if (ready.length >= count) dtLog('Imagem gerada detectada.', { prontas: ready.length, mediaId: ready[0].getAttribute('data-media-id') }, 'success');
-          if (ready.length >= count) return { ...(await capture('image', ready[0], knownOldUrls)), costHint: hint };
+          const elapsedMs = Date.now() - t0;
+          if (ready.length >= count && (pendingNew.length === 0 || elapsedMs > 25000)) {
+            if (!readySince.has(ready[0])) {
+              readySince.set(ready[0], Date.now());
+            } else if (Date.now() - readySince.get(ready[0]) >= 2500) {
+              dtLog('Imagem gerada detectada.', {
+                prontas: ready.length,
+                mediaId: ready[0].getAttribute('data-media-id'),
+                dim: `${ready[0].naturalWidth}x${ready[0].naturalHeight}`,
+                segundos: Math.round(elapsedMs / 1000),
+              }, 'success');
+              const out = await capture('image', ready[0], knownOldUrls);
+              for (const imgEl of ready) {
+                imgEl.setAttribute('data-dt-seen', '1');
+                imgEl.setAttribute('data-dt-old', '1');
+                const t = imgEl.closest(S.imageTile);
+                if (t) {
+                  t.setAttribute('data-dt-seen', '1');
+                  t.setAttribute('data-dt-old', '1');
+                  prevImageTiles.add(t);
+                  seenTileKeys.add(tileKey(t));
+                }
+              }
+              return { ...out, costHint: hint };
+            }
+          }
         } else {
           const currentTiles = $$(S.videoTile);
           // O Google Flow insere novos videos no INICIO da galeria (topo/esquerda).
@@ -2576,6 +2618,14 @@
         $$(S.videoTile).forEach((t) => {
           t.setAttribute('data-dt-old', '1');
           prevTiles.add(t);
+        });
+        $$(S.imageTile).forEach((t) => {
+          t.setAttribute('data-dt-old', '1');
+          t.setAttribute('data-dt-seen', '1');
+        });
+        $$(S.imageTileImg).forEach((i) => {
+          i.setAttribute('data-dt-old', '1');
+          i.setAttribute('data-dt-seen', '1');
         });
       } catch (_) {}
       if (visInfo) await restoreVisible();
