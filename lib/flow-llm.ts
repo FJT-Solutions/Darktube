@@ -13,7 +13,7 @@ export const PROVIDER_LABEL: Record<FlowProvider, string> = {
 
 const MODELS: Record<FlowProvider, string> = {
   gemini: 'gemini-2.5-flash',
-  openai: 'gpt-4o',
+  openai: 'gpt-4o-mini',
   claude: 'claude-sonnet-5-5',
   openrouter: 'google/gemini-2.5-flash',
 }
@@ -103,7 +103,7 @@ export async function callFlowLLM(provider: FlowProvider, key: string, system: s
 
 /**
  * Chamada multimodal (Visao + OCR frame a frame) usando a credencial do proprio usuario
- * (Gemini Vision, GPT-4o / OpenAI, Claude ou OpenRouter).
+ * (Gemini Vision, GPT-4o-mini / OpenAI, Claude ou OpenRouter).
  */
 export async function callFlowVisionLLM(
   provider: FlowProvider,
@@ -141,7 +141,7 @@ export async function callFlowVisionLLM(
       if (img.label) content.push({ type: 'text', text: img.label })
       content.push({
         type: 'image_url',
-        image_url: { url: `data:${img.mimeType || 'image/jpeg'};base64,${img.dataBase64}`, detail: 'high' },
+        image_url: { url: `data:${img.mimeType || 'image/jpeg'};base64,${img.dataBase64}`, detail: 'auto' },
       })
     }
     const url = provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions'

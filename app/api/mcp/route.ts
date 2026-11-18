@@ -306,14 +306,26 @@ export async function POST(req: NextRequest) {
 
       if (method === 'tools/call') {
         const { name, arguments: args } = params;
-        const toolResult = await runWithMcpUser(auth.userId, () => executeTool(name, args || {}));
-        return NextResponse.json({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            content: [{ type: 'text', text: JSON.stringify(toolResult, null, 2) }],
-          },
-        });
+        try {
+          const toolResult = await runWithMcpUser(auth.userId, () => executeTool(name, args || {}));
+          return NextResponse.json({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              content: [{ type: 'text', text: JSON.stringify(toolResult, null, 2) }],
+            },
+          });
+        } catch (toolErr: any) {
+          console.error(`[API MCP DarkTube] Erro na tool ${name}:`, toolErr);
+          return NextResponse.json({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              isError: true,
+              content: [{ type: 'text', text: `Erro ao executar ${name}: ${toolErr?.message || 'Erro interno'}` }],
+            },
+          });
+        }
       }
 
       return NextResponse.json({

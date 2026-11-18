@@ -80,33 +80,39 @@ export interface CloneVideoFromLinkInput {
   outputDir?: string;
 }
 
-/** Resolve qual provedor e chave de IA o usuario possui em Credenciais (priorizando o pedido, se informado). */
+/** Resolve qual provedor e chave de IA o usuario possui em Credenciais (priorizando o pedido, senao OpenAI -> outros). */
 async function resolveUserLlmCredential(userId: string, preferred?: FlowProvider | string) {
+  const defaultPriority: FlowProvider[] = ['openai', 'claude', 'openrouter', 'gemini'];
   const order: FlowProvider[] = [];
   if (preferred && FLOW_PROVIDERS.includes(preferred as FlowProvider)) {
     order.push(preferred as FlowProvider);
+  }
+  for (const p of defaultPriority) {
+    if (!order.includes(p)) order.push(p);
   }
   for (const p of FLOW_PROVIDERS) {
     if (!order.includes(p)) order.push(p);
   }
 
-  let chosen: { provider: FlowProvider; apiKey: string } | null = null;
+  const credentials: Array<{ provider: FlowProvider; apiKey: string }> = [];
   let openaiKey = '';
 
   for (const p of order) {
     const k = await getUserApiKey(userId, p).catch(() => '');
     if (k) {
-      if (!chosen) chosen = { provider: p, apiKey: k };
+      credentials.push({ provider: p, apiKey: k });
       if (p === 'openai') openaiKey = k;
     }
   }
-  if (!openaiKey) {
-    openaiKey = await getUserApiKey(userId, 'openai').catch(() => '');
-  }
-  if (!chosen) {
+  if (!credentials.length) {
     throw new Error('Nenhuma chave de IA (Gemini, OpenAI, Claude ou OpenRouter) configurada em Credenciais.');
   }
-  return { ...chosen, openaiKey };
+  return {
+    provider: credentials[0].provider,
+    apiKey: credentials[0].apiKey,
+    fallbackCredentials: credentials.slice(1),
+    openaiKey,
+  };
 }
 
 /** Gera o roteiro pela IA e executa ate 2 rodadas automaticas de validacao e reparo contra as regras do /flow. */
@@ -381,12 +387,13 @@ export async function createNextPartCreative(input: CreateNextPartInput) {
  */
 export async function analyzeVideoLinkMcp(input: AnalyzeVideoLinkInput) {
   const userId = await resolveDefaultUserId();
-  const { provider, apiKey, openaiKey } = await resolveUserLlmCredential(userId, input.provider);
+  const { provider, apiKey, fallbackCredentials, openaiKey } = await resolveUserLlmCredential(userId, input.provider);
   const structure = await analyzeVideoStructureFromLink({
     url: input.url,
     provider,
     apiKey,
     openaiKey,
+    fallbackCredentials,
   });
   return { success: true, structure };
 }
@@ -420,13 +427,14 @@ export async function cloneVideoFromLinkMcp(input: CloneVideoFromLinkInput) {
   } = input;
 
   const userId = await resolveDefaultUserId();
-  const { provider, apiKey, openaiKey } = await resolveUserLlmCredential(userId, preferredProvider);
+  const { provider, apiKey, fallbackCredentials, openaiKey } = await resolveUserLlmCredential(userId, preferredProvider);
 
   const structure = await analyzeVideoStructureFromLink({
     url,
     provider,
     apiKey,
     openaiKey,
+    fallbackCredentials,
   });
 
   const resolvedModel = videoModel || structure.recommendedModel || 'Omni 1.2 Flash';

@@ -200,7 +200,7 @@ function normalizeStructure(
     pacing: String(raw?.pacing || 'dinamico').slice(0, 60),
     language: String(raw?.language || 'pt-BR').slice(0, 20),
     ocrTexts,
-    transcript: ctx.transcript.slice(0, 4000),
+    transcript: ctx.transcript.slice(0, 10000),
     detectedCharacters: Array.isArray(raw?.detectedCharacters)
       ? raw.detectedCharacters.map((c: any) => String(c || '').trim()).filter(Boolean).slice(0, 6)
       : [],
@@ -226,12 +226,14 @@ export async function analyzeVideoStructureFromLink(input: {
   provider: FlowProvider
   apiKey: string
   openaiKey?: string | null
+  fallbackCredentials?: Array<{ provider: FlowProvider; apiKey: string }>
 }): Promise<FlowClonedStructure> {
   const cleanUrl = input.url.trim()
   if (!/^https?:\/\//i.test(cleanUrl)) throw new Error('Cole uma URL válida começando com http:// ou https://.')
   const platform = detectPlatform(cleanUrl)
   const fileId = urlToId(cleanUrl)
   let transcript = ''
+  let fullAudioTmp = ''
 
   if (platform === 'youtube') {
     const match = cleanUrl.match(/(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
@@ -242,10 +244,17 @@ export async function analyzeVideoStructureFromLink(input: {
     const download = await VideoCaptureService.downloadFromUrl(cleanUrl)
     const meta = download.videoPath ? await probeVideoMeta(download.videoPath) : { durationSec: 30, aspect: '9:16' as const }
 
-    // Se houver chave OpenAI (ou do usuario), transcreve o audio real para complementar a visao + OCR
+    // Se houver chave OpenAI (ou do usuario), transcreve o audio completo (ate 5 min; o download padrao corta em 60s)
     const whisperKey = input.openaiKey || (input.provider === 'openai' ? input.apiKey : '')
     if (!transcript && whisperKey && (download.audioPath || download.videoPath)) {
-      const audioSrc = download.audioPath || download.videoPath!
+      let audioSrc = download.audioPath || download.videoPath!
+      if (meta.durationSec > 60 && download.videoPath && fs.existsSync(download.videoPath)) {
+        fullAudioTmp = path.join(os.tmpdir(), `flow_clone_full_${Date.now()}.mp3`)
+        try {
+          await run(ffmpegBin(), ['-y', '-i', download.videoPath, '-t', '300', '-vn', '-ac', '1', '-b:a', '32k', fullAudioTmp], { timeout: 30000 })
+          if (fs.existsSync(fullAudioTmp) && fs.statSync(fullAudioTmp).size > 1000) audioSrc = fullAudioTmp
+        } catch {}
+      }
       const words = await transcribeWhisper(audioSrc, undefined, whisperKey).catch(() => null)
       if (words && words.length > 0) {
         transcript = words.map((w) => `[${w.start.toFixed(1)}s] ${w.word}`).join(' ')
@@ -301,11 +310,28 @@ Rules:
       `URL de origem: ${cleanUrl} (${platform})`,
       `Duração medida: ${meta.durationSec}s | Formato detectado: ${meta.aspect}`,
       `Total de frames anexados em ordem cronológica: ${frames.length}`,
-      transcript ? `\nTranscrição do áudio original:\n${transcript.slice(0, 6000)}` : '\n(Sem transcrição de áudio prévia — analise pelos frames e OCR visual.)',
-      '\nAnalise os frames abaixo em ordem cronológica, leia todo o OCR visível e devolva o JSON estruturado.',
+      transcript ? `\nTranscrição do áudio original:\n${transcript.slice(0, 9000)}` : '\n(Sem transcrição de áudio prévia — analise pelos frames e OCR visual.)',
+      '\nAnalise os frames abaixo em ordem cronológica, leia todo o OCR visível e devolva o JSON estruturado cobrindo toda a duração do vídeo.',
     ].join('\n')
 
-    const rawText = await callFlowVisionLLM(input.provider, input.apiKey, system, userPrompt, frames)
+    const candidates: Array<{ provider: FlowProvider; apiKey: string }> = [
+      { provider: input.provider, apiKey: input.apiKey },
+      ...(input.fallbackCredentials || []).filter((c) => c.provider !== input.provider && Boolean(c.apiKey)),
+    ]
+    let rawText = ''
+    let usedProvider: FlowProvider = input.provider
+    let lastErr: unknown = null
+    for (const c of candidates) {
+      try {
+        rawText = await callFlowVisionLLM(c.provider, c.apiKey, system, userPrompt, frames)
+        usedProvider = c.provider
+        lastErr = null
+        break
+      } catch (err) {
+        lastErr = err
+      }
+    }
+    if (lastErr) throw lastErr
     const parsed = extractJson(rawText)
 
     return normalizeStructure(parsed, {
@@ -315,10 +341,13 @@ Rules:
       aspect: meta.aspect,
       transcript,
       framesAnalyzed: frames.length,
-      provider: input.provider,
+      provider: usedProvider,
       usedFallbackThumbs: Boolean(download.isFallback),
     })
   } finally {
+    if (fullAudioTmp && fs.existsSync(fullAudioTmp)) {
+      try { fs.unlinkSync(fullAudioTmp) } catch {}
+    }
     await VideoCaptureService.cleanupVideo(fileId).catch(() => {})
     const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp')
     try {

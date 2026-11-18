@@ -132,7 +132,12 @@ export async function analyzeVideoLinkForFlowAction(input: { url: string; provid
     const key = await getUserApiKey(user.id, provider)
     if (!key) throw new Error(`Nenhuma chave salva em Credenciais para ${provider}.`)
     const openaiKey = provider === "openai" ? key : await getUserApiKey(user.id, "openai").catch(() => null)
-    const structure = await analyzeVideoStructureFromLink({ url: input.url, provider, apiKey: key, openaiKey })
+    const otherProviders = FLOW_PROVIDERS.filter((p) => p !== provider)
+    const otherKeys = await Promise.all(otherProviders.map((p) => getUserApiKey(user.id, p).catch(() => "")))
+    const fallbackCredentials = otherProviders
+      .map((p, idx) => ({ provider: p, apiKey: otherKeys[idx] || "" }))
+      .filter((c) => Boolean(c.apiKey))
+    const structure = await analyzeVideoStructureFromLink({ url: input.url, provider, apiKey: key, openaiKey, fallbackCredentials })
     return { success: true as const, structure }
   } catch (err) {
     return fail(err)
