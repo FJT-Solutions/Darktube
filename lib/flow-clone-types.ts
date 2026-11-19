@@ -4,6 +4,9 @@ import type { FlowProvider } from './flow-llm'
 import type { FlowSfx, FlowTakeKind, FlowTransition } from './flow-script'
 import type { FlowProductionMode } from './flow-template-base'
 
+export type ClonedBeatSourceType = 'filmed' | 'ai_generated' | 'coded_html_svg'
+export type ClonedRecommendedEngine = 'html_svg' | 'remotion' | 'flow'
+
 export interface ClonedSceneBeat {
   n: number
   timestamp: string
@@ -17,6 +20,7 @@ export interface ClonedSceneBeat {
   transition: FlowTransition
   sfx: FlowSfx
   presence: 'character' | 'faceless'
+  sourceType?: ClonedBeatSourceType
 }
 
 export interface FlowClonedStructure {
@@ -39,6 +43,9 @@ export interface FlowClonedStructure {
   recommendedTakes: number
   recommendedSeconds: number
   recommendedModel: string
+  recommendedEngine?: ClonedRecommendedEngine
+  paletteHex?: string[]
+  energy?: 'cinematografico' | 'fluido' | 'cinetico'
   providerUsed: FlowProvider
   usedFallbackThumbs: boolean
 }

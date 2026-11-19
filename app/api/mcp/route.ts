@@ -15,6 +15,7 @@ import {
   analyzeVideoLinkMcp,
   cloneVideoFromLinkMcp,
   reviewProjectCharactersMcp,
+  renderHtmlSvgVideoMcp,
 } from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
@@ -292,6 +293,95 @@ const MCP_TOOLS_MANIFEST = [
       required: ['projectId'],
     },
   },
+  {
+    name: 'darktube_render_html_svg_video',
+    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D low-poly + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks automáticos (Frame 0, paleta hex e duração).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        preset: {
+          type: 'string',
+          enum: [
+            'html_svg_explainer',
+            'html_svg_character_story',
+            'html_svg_product_motion',
+            'html_svg_tech_crimson',
+            'html_svg_3d_diorama',
+          ],
+          default: 'html_svg_explainer',
+        },
+        dioramaMode: {
+          type: 'string',
+          enum: ['rural_plot', 'storefront', 'cutaway_oven'],
+          description: 'Submodo 3D quando preset = html_svg_3d_diorama (rural_plot, storefront ou cutaway_oven)',
+        },
+        title: { type: 'string', description: 'Título geral do vídeo' },
+        aspect: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
+        fps: { type: 'number', default: 30 },
+        palette: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Até 3 cores hex da marca [fundo, destaquePrincipal, destaqueSecundario]',
+        },
+        characters: {
+          type: 'array',
+          description: 'Personagens vetoriais consistentes para o preset html_svg_character_story',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              skinColor: { type: 'string' },
+              hairColor: { type: 'string' },
+              shirtColor: { type: 'string' },
+              pattern: { type: 'string', enum: ['solid', 'watermelon_stripes', 'strawberry_seeds', 'avocado_bumps'] },
+            },
+            required: ['id', 'name'],
+          },
+        },
+        scenes: {
+          type: 'array',
+          description: 'Cenas sequenciais da animação',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              subtitle: { type: 'string' },
+              spokenLine: { type: 'string' },
+              badge: { type: 'string' },
+              durationSec: { type: 'number', default: 4 },
+              icon: { type: 'string', enum: ['chart', 'bolt', 'shield', 'rocket', 'heart', 'code'] },
+              speakerId: { type: 'string' },
+              expression: { type: 'string', enum: ['happy', 'shocked', 'smirk', 'angry', 'sad', 'thinking'] },
+              metricValue: { type: 'string' },
+              metricLabel: { type: 'string' },
+              visual: {
+                type: 'string',
+                enum: [
+                  'pc_ram',
+                  'giant_matrix',
+                  'binary_target',
+                  'cpu_chip',
+                  'node_tree',
+                  'memory_corridor',
+                  'dual_monitors',
+                  'repo_night',
+                ],
+                description: 'Ilustração vetorial para preset = html_svg_tech_crimson',
+              },
+              callout: { type: 'string', description: 'Rótulo flutuante ancorado no cenário 3D (html_svg_3d_diorama)' },
+            },
+          },
+        },
+        customHtml: { type: 'string', description: 'Opcional: documento HTML+SVG customizado implementando window.__dtSeek(timeSec)' },
+        durationSec: { type: 'number', description: 'Duração total em segundos (usada quando customHtml for informado)' },
+        isDraft: { type: 'boolean', default: false },
+        downloadLocal: { type: 'boolean', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+        fileName: { type: 'string' },
+      },
+    },
+  },
 ];
 
 export async function GET(req: NextRequest) {
@@ -432,6 +522,9 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_review_characters':
       return await reviewProjectCharactersMcp(args);
+
+    case 'darktube_render_html_svg_video':
+      return await renderHtmlSvgVideoMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);

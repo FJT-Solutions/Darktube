@@ -5,8 +5,14 @@
  * - darktube_clone_video_from_link: clona a estrutura de um link aplicando trocas de historia/personagem/ambiente e enfileira no /flow.
  */
 
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { pool } from '@/lib/db-client';
 import { getUserApiKey } from '@/lib/database';
+import { uploadMediaFile } from '@/lib/storage';
+import { renderHtmlSvgToMp4 } from '@/lib/html-svg-render';
+import type { HtmlSvgProjectSpec } from '@/lib/html-svg-templates';
 import { getFlowTemplate, MAX_TAKES, clampSecondsForModel, normalizeRealism, type FlowTemplate } from '@/lib/flow-templates';
 import {
   buildRepairPrompt,
@@ -26,7 +32,7 @@ import { buildSheetPrompt, isChromaKeyTemplate, isVoiceOnlyCharacter } from '@/l
 import { callFlowLLM, FLOW_PROVIDERS, type FlowProvider } from '@/lib/flow-llm';
 import { createFlowProject, updateFlowProject, type FlowProject } from '@/lib/flow-projects';
 import { createFlowJob, normalizeStorageReference, syncProjectQueuedJobsWithReferences } from '@/lib/flow-jobs';
-import { analyzeVideoStructureFromLink, buildCloneTemplateAndParams } from '@/lib/flow-video-clone';
+import { analyzeVideoStructureFromLink, buildCloneTemplateAndParams, formatCloneAsVideoMd } from '@/lib/flow-video-clone';
 import type { CloneCustomization } from '@/lib/flow-clone-types';
 import {
   getCreativeStatus,
@@ -416,7 +422,7 @@ export async function analyzeVideoLinkMcp(input: AnalyzeVideoLinkInput) {
     openaiKey,
     fallbackCredentials,
   });
-  return { success: true, structure };
+  return { success: true, structure, videoMd: formatCloneAsVideoMd(structure) };
 }
 
 /**
@@ -703,5 +709,58 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
     regeneratedCharacters: regeneratedIds,
     takesUnlocked: script.characters.every((c) => isVoiceOnlyCharacter(c) || c.sheetStatus === 'aprovada' || (!c.sheetStatus && !c.sheetUrl)),
     ...statusResult,
+  };
+}
+
+export interface RenderHtmlSvgInput extends HtmlSvgProjectSpec {
+  isDraft?: boolean;
+  downloadLocal?: boolean;
+  outputDir?: string;
+  fileName?: string;
+}
+
+/**
+ * 12. Renderiza video em HTML + SVG + fisica deterministica ($0 de creditos IA)
+ * via Playwright Chromium + FFmpeg, rodando Motion Checks (Frame 0, paleta hex e duracao).
+ */
+export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
+  const safeBase = String(input.fileName || `htmlsvg_${Date.now()}`)
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 60);
+  const wantLocal = input.downloadLocal !== false;
+  const targetDir = wantLocal
+    ? path.resolve(process.cwd(), input.outputDir || './midia/criativos')
+    : os.tmpdir();
+  const outputPath = path.join(targetDir, `${safeBase}.mp4`);
+
+  const rendered = await renderHtmlSvgToMp4({
+    spec: input,
+    outputPath,
+    draft: Boolean(input.isDraft),
+  });
+
+  let storageUrl: string | null = null;
+  try {
+    const buf = fs.readFileSync(rendered.outputPath);
+    const storagePath = await uploadMediaFile(buf, `${safeBase}_${Date.now()}.mp4`, 'video/mp4');
+    storageUrl = `https://darktube.fjt-solutions.com${storagePath}`;
+  } catch {
+    // Segue sem falhar se rodar offline sem banco configurado; arquivo local continua entregue.
+  }
+
+  return {
+    success: true,
+    engine: 'html_svg',
+    creditsCost: 0,
+    localFile: wantLocal ? rendered.outputPath : null,
+    videoUrl: storageUrl,
+    width: rendered.width,
+    height: rendered.height,
+    fps: rendered.fps,
+    durationSec: rendered.durationSec,
+    totalFrames: rendered.totalFrames,
+    palette: rendered.palette,
+    motionCheck: rendered.motionCheck,
+    timelineIssues: rendered.timelineIssues,
   };
 }

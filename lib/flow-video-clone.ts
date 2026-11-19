@@ -22,7 +22,14 @@ import {
   type FlowTransition,
 } from './flow-script'
 import { clampSecondsForModel, MAX_TAKES, type FlowProductionMode, type FlowTemplate } from './flow-template-base'
-import type { ClonedSceneBeat, CloneCustomization, FlowClonedStructure } from './flow-clone-types'
+import type {
+  ClonedBeatSourceType,
+  ClonedRecommendedEngine,
+  ClonedSceneBeat,
+  CloneCustomization,
+  FlowClonedStructure,
+} from './flow-clone-types'
+import { normalizeHex, recommendBpmRange, validateBrandPalette, type MotionEnergy } from './motion-checks'
 
 const run = promisify(execFile)
 
@@ -147,6 +154,13 @@ function normalizeStructure(
     const sfxRaw = String(b?.sfx || '').trim()
     const sfx: FlowSfx = (FLOW_SFX as readonly string[]).includes(sfxRaw) ? (sfxRaw as FlowSfx) : 'none'
     const presence = String(b?.presence || '').trim().toLowerCase() === 'faceless' ? 'faceless' : 'character'
+    const stRaw = String(b?.sourceType || '').trim().toLowerCase()
+    const sourceType: ClonedBeatSourceType =
+      stRaw === 'coded_html_svg' || stRaw === 'coded' || stRaw === 'html_svg'
+        ? 'coded_html_svg'
+        : stRaw === 'ai_generated' || stRaw === 'ai'
+          ? 'ai_generated'
+          : 'filmed'
     return {
       n: i + 1,
       timestamp: String(b?.timestamp || `${i * recommendedSeconds}s-${(i + 1) * recommendedSeconds}s`).slice(0, 30),
@@ -160,6 +174,7 @@ function normalizeStructure(
       transition,
       sfx,
       presence,
+      sourceType,
     }
   })
 
@@ -188,6 +203,24 @@ function normalizeStructure(
     ? raw.ocrTexts.map((t: any) => String(t || '').trim()).filter(Boolean).slice(0, 30)
     : Array.from(new Set(beats.map((b) => b.ocrText).filter(Boolean)))
 
+  const rawPal: string[] = Array.isArray(raw?.paletteHex)
+    ? raw.paletteHex.map((c: any) => normalizeHex(String(c || ''))).filter(Boolean) as string[]
+    : []
+  const paletteHex = validateBrandPalette(rawPal, { maxColors: 3 }).normalized.slice(0, 3)
+
+  const energyRaw = String(raw?.energy || '').trim().toLowerCase()
+  const energy: MotionEnergy =
+    energyRaw === 'cinematografico' || energyRaw === 'cinetico' ? energyRaw : 'fluido'
+
+  const codedCount = beats.filter((b) => b.sourceType === 'coded_html_svg').length
+  const engineRaw = String(raw?.recommendedEngine || '').trim().toLowerCase()
+  const recommendedEngine: ClonedRecommendedEngine =
+    engineRaw === 'html_svg' || engineRaw === 'remotion' || engineRaw === 'flow'
+      ? (engineRaw as ClonedRecommendedEngine)
+      : codedCount >= Math.ceil(beats.length / 2)
+        ? 'html_svg'
+        : 'flow'
+
   return {
     sourceUrl: ctx.url,
     sourcePlatform: ctx.platform,
@@ -212,6 +245,9 @@ function normalizeStructure(
     recommendedTakes,
     recommendedSeconds,
     recommendedModel,
+    recommendedEngine,
+    paletteHex,
+    energy,
     providerUsed: ctx.provider,
     usedFallbackThumbs: ctx.usedFallbackThumbs,
   }
@@ -279,6 +315,9 @@ Reply with ONE valid JSON object matching this exact schema:
   "recommendedTakes": number (between 2 and 12),
   "recommendedSeconds": 4 | 6 | 8 | 10,
   "recommendedModel": "Omni 1.2 Flash" | "Veo 3.1 - Fast" | "Veo 3.1 - Quality",
+  "recommendedEngine": "html_svg | remotion | flow",
+  "paletteHex": ["#0B1020", "#38BDF8", "#FACC15"],
+  "energy": "cinematografico | fluido | cinetico",
   "ocrTexts": ["exact text read on screen across frames, in chronological order"],
   "detectedCharacters": ["visual summary of each recurring person/character seen in the video (in English, adult wording)"],
   "detectedLocations": ["visual summary of each environment/location seen in the video (in English)"],
@@ -295,7 +334,8 @@ Reply with ONE valid JSON object matching this exact schema:
       "spokenSummary": "what is spoken or communicated in this beat (in the video language), or empty string",
       "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch",
       "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none",
-      "presence": "character | faceless"
+      "presence": "character | faceless",
+      "sourceType": "filmed | ai_generated | coded_html_svg"
     }
   ]
 }
@@ -446,4 +486,46 @@ export function buildCloneTemplateAndParams(
   }
 
   return { template, params }
+}
+
+/**
+ * Exporta a estrutura analisada no formato aberto VIDEO.md (padrao rea-video),
+ * classificando cada take (filmed / ai_generated / coded_html_svg), paleta hex e faixa de BPM.
+ */
+export function formatCloneAsVideoMd(s: FlowClonedStructure): string {
+  const bpm = recommendBpmRange((s.energy as MotionEnergy) || 'fluido')
+  const paletteLine = s.paletteHex?.length ? s.paletteHex.join(', ') : '(não detectada — usar até 3 cores hex)'
+  const lines = [
+    `# VIDEO.md — ${s.title}`,
+    '',
+    `- **Fonte:** ${s.sourceUrl} (${s.sourcePlatform})`,
+    `- **Formato & Duração:** ${s.aspect} · ${s.durationSec}s · ${s.beats.length} takes`,
+    `- **Estilo & Ritmo:** ${s.visualStyle} · ${s.pacing} · ${bpm.label}`,
+    `- **Motor Recomendado:** \`${s.recommendedEngine || 'flow'}\``,
+    `- **Paleta Dominante (<=3 hex):** ${paletteLine}`,
+    '',
+    `## Resumo Estrutural`,
+    s.summary || '-',
+    '',
+    `## Beats Plano a Plano`,
+    '',
+    '| # | Tempo | Origem Visual | Tipo | Câmera | Transição / SFX | OCR / Fala |',
+    '|---|---|---|---|---|---|---|',
+  ]
+
+  for (const b of s.beats) {
+    const ocrOrSpeech = [b.ocrText ? `OCR: "${b.ocrText}"` : '', b.spokenSummary ? `Fala: "${b.spokenSummary}"` : '']
+      .filter(Boolean)
+      .join(' / ')
+      .replace(/\|/g, '\\|')
+    lines.push(
+      `| ${b.n} | ${b.timestamp} (${b.durationSec}s) | \`${b.sourceType || 'filmed'}\` | ${b.kind} | ${b.camera.replace(/\|/g, '\\|')} | ${b.transition} / ${b.sfx} | ${ocrOrSpeech || '-'} |`
+    )
+  }
+
+  if (s.transcript) {
+    lines.push('', '## Transcrição', '', s.transcript.slice(0, 3000))
+  }
+
+  return lines.join('\n')
 }

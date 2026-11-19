@@ -22,6 +22,11 @@ import {
   assembleFlowCreative,
   replaceCreativeAudio,
 } from '../lib/mcp/darktube-tools';
+import {
+  analyzeVideoLinkMcp,
+  cloneVideoFromLinkMcp,
+  renderHtmlSvgVideoMcp,
+} from '../lib/mcp/flow-advanced-tools';
 
 const server = new Server(
   {
@@ -190,6 +195,39 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['audioPathOrUrl'],
         },
       },
+      {
+        name: 'darktube_render_html_svg_video',
+        description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D low-poly para MP4 via Chromium + FFmpeg com Motion Checks automáticos.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            preset: {
+              type: 'string',
+              enum: [
+                'html_svg_explainer',
+                'html_svg_character_story',
+                'html_svg_product_motion',
+                'html_svg_tech_crimson',
+                'html_svg_3d_diorama',
+              ],
+              default: 'html_svg_explainer',
+            },
+            dioramaMode: { type: 'string', enum: ['rural_plot', 'storefront', 'cutaway_oven'] },
+            title: { type: 'string' },
+            aspect: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
+            fps: { type: 'number', default: 30 },
+            palette: { type: 'array', items: { type: 'string' } },
+            characters: { type: 'array', items: { type: 'object' } },
+            scenes: { type: 'array', items: { type: 'object' } },
+            customHtml: { type: 'string' },
+            durationSec: { type: 'number' },
+            isDraft: { type: 'boolean', default: false },
+            downloadLocal: { type: 'boolean', default: true },
+            outputDir: { type: 'string', default: './midia/criativos' },
+            fileName: { type: 'string' },
+          },
+        },
+      },
     ],
   };
 });
@@ -233,6 +271,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'darktube_replace_audio':
         result = await replaceCreativeAudio(args as any);
+        break;
+
+      case 'darktube_analyze_video_link':
+        result = await analyzeVideoLinkMcp(args as any);
+        break;
+
+      case 'darktube_clone_video_from_link':
+        result = await cloneVideoFromLinkMcp(args as any);
+        break;
+
+      case 'darktube_render_html_svg_video':
+        result = await renderHtmlSvgVideoMcp(args as any);
         break;
 
       default:
