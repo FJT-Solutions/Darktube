@@ -22,6 +22,7 @@ import {
   Terminal,
   Sparkles,
   Film,
+  Box,
 } from "lucide-react"
 
 const navItems = [
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/minerar", label: "Minerar", icon: Search },
   { href: "/dark-clips", label: "Dark Clips", icon: Sparkles },
   { href: "/flow", label: "Flow", icon: Film },
+  { href: "/studio-3d", label: "Estúdio 3D", icon: Box },
   { href: "/tracker", label: "Tracker", icon: Bookmark },
   { href: "/credentials", label: "Credenciais", icon: Key },
   { href: "/templates", label: "Templates", icon: LayoutTemplate },

@@ -26,6 +26,9 @@ import {
   analyzeVideoLinkMcp,
   cloneVideoFromLinkMcp,
   renderHtmlSvgVideoMcp,
+  renderThreeJsVideoMcp,
+  getRenderQueueStatusMcp,
+  searchAndDownload3dAssetsMcp,
 } from '../lib/mcp/flow-advanced-tools';
 
 const server = new Server(
@@ -228,6 +231,60 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: 'darktube_render_3d_video',
+        description: 'Motor 3D articulado ($0 créditos Flow) na Fila Multi-Usuário FIFO: 1 cena ou vídeo completo, voz híbrida (externo -> ElevenLabs -> OpenAI -> Edge TTS fallback) e legendas virais.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            kind: { type: 'string', enum: ['single_scene', 'full_video'], default: 'full_video' },
+            preset: { type: 'string', enum: ['curiosidade_cratera', 'custom_storyboard'], default: 'curiosidade_cratera' },
+            title: { type: 'string' },
+            aspect: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
+            fps: { type: 'number', default: 24 },
+            isDraft: { type: 'boolean', default: true },
+            scriptText: { type: 'string' },
+            storyboard: { type: 'object' },
+            captions: { type: 'object' },
+            voiceProvider: { type: 'string', enum: ['auto', 'external', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+            voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
+            voiceId: { type: 'string' },
+            language: { type: 'string', default: 'pt-BR' },
+            speed: { type: 'number', default: 1.02 },
+            topic: { type: 'string' },
+            durationSec: { type: 'number' },
+            quality: { type: 'string', enum: ['alta', 'basica'] },
+            audioPathOrUrl: { type: 'string' },
+            waitForResult: { type: 'boolean', default: true },
+            downloadLocal: { type: 'boolean', default: true },
+            outputDir: { type: 'string', default: './midia/criativos' },
+            fileName: { type: 'string' },
+          },
+        },
+      },
+      {
+        name: 'darktube_get_render_queue_status',
+        description: 'Consulta a Fila Multi-Usuário FIFO de renderização na VPS.',
+        inputSchema: {
+          type: 'object',
+          properties: { jobId: { type: 'string' } },
+        },
+      },
+      {
+        name: 'darktube_search_3d_assets',
+        description: 'Busca e baixa modelos 3D gratuitos CC0 (.glb/.gltf) no cache local, Poly Haven e Poly Pizza.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+            limit: { type: 'number', default: 16 },
+            downloadSource: { type: 'string', enum: ['polyhaven', 'polypizza', 'url'] },
+            assetId: { type: 'string' },
+            url: { type: 'string' },
+            name: { type: 'string' },
+          },
+        },
+      },
     ],
   };
 });
@@ -283,6 +340,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'darktube_render_html_svg_video':
         result = await renderHtmlSvgVideoMcp(args as any);
+        break;
+
+      case 'darktube_render_3d_video':
+        result = await renderThreeJsVideoMcp(args as any);
+        break;
+
+      case 'darktube_get_render_queue_status':
+        result = await getRenderQueueStatusMcp(args as any);
+        break;
+
+      case 'darktube_search_3d_assets':
+        result = await searchAndDownload3dAssetsMcp(args as any);
         break;
 
       default:

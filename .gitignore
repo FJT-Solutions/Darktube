@@ -69,3 +69,7 @@ __pycache__/
 /midia/criativos/
 /midia/mock_*
 /midia/prompts_*
+
+# Cached 3D models downloaded dynamically from CC0 libraries (Poly Haven / Poly Pizza)
+public/threejs-engine/models/*
+!public/threejs-engine/models/.gitkeep

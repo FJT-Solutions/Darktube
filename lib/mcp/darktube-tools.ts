@@ -30,6 +30,7 @@ import { assembleFlowProject } from '@/lib/flow-assemble';
 import { replaceVideoAudio, replaceProjectAudio } from '@/lib/flow-audio-replace';
 import { getUserApiKey } from '@/lib/database';
 import { pool } from '@/lib/db-client';
+import { runQueuedRenderTask } from '@/lib/render-queue';
 
 const DARKTUBE_BASE_URL = process.env.DARKTUBE_BASE_URL || 'https://darktube.fjt-solutions.com';
 
@@ -215,86 +216,99 @@ export async function downloadCreativeToLocal(
  * 3. Renderiza a composição real no Remotion Server (com timeout de 5 minutos e pool de candidatos).
  */
 export async function renderCreative(input: RenderCreativeInput) {
+  const userId = await resolveDefaultUserId();
   const isVertical = (input.format || 'vertical') === 'vertical';
   const historyId = `mcp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const templateId = input.templateId || 'ShortVideo';
+  const kind = input.scenes?.length === 1 ? 'single_scene' : 'full_video';
 
-  const composition = {
-    scenes: input.scenes,
-    format: isVertical ? 'vertical' : 'horizontal',
-    captionStyle: input.captionStyle || 'pop',
-    primaryColor: input.primaryColor || '#EAB308',
-    accentColor: input.accentColor || '#FFFFFF',
-    showWatermark: false,
-  };
+  return await runQueuedRenderTask(
+    {
+      userId,
+      engine: 'remotion',
+      kind,
+      title: `Remotion ${templateId} (${input.scenes?.length || 0} cenas)`,
+      payload: { templateId, isDraft: Boolean(input.isDraft), scenesCount: input.scenes?.length || 0 },
+    },
+    async () => {
+      const composition = {
+        scenes: input.scenes,
+        format: isVertical ? 'vertical' : 'horizontal',
+        captionStyle: input.captionStyle || 'pop',
+        primaryColor: input.primaryColor || '#EAB308',
+        accentColor: input.accentColor || '#FFFFFF',
+        showWatermark: false,
+      };
 
-  let res: Response | null = null;
-  let lastError: Error | null = null;
+      let res: Response | null = null;
+      let lastError: Error | null = null;
 
-  for (const base of CANDIDATE_URLS) {
-    const cleanBase = base.replace(/\/+$/, '');
-    const endpoint = input.isDraft
-      ? `${cleanBase}/render-draft`
-      : `${cleanBase}/render`;
+      for (const base of CANDIDATE_URLS) {
+        const cleanBase = base.replace(/\/+$/, '');
+        const endpoint = input.isDraft
+          ? `${cleanBase}/render-draft`
+          : `${cleanBase}/render`;
 
-    try {
-      console.log(`[MCP DarkTube] Tentando Remotion Server em ${endpoint}...`);
-      const attempt = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          historyId,
-          templateId,
-          composition,
-          callbackUrl: `${DARKTUBE_BASE_URL}/api/mcp/callback`,
-        }),
-        signal: AbortSignal.timeout(300000), // 5 minutos para permitir compilação e render do Chromium
-      });
+        try {
+          console.log(`[MCP DarkTube] Tentando Remotion Server em ${endpoint}...`);
+          const attempt = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              historyId,
+              templateId,
+              composition,
+              callbackUrl: `${DARKTUBE_BASE_URL}/api/mcp/callback`,
+            }),
+            signal: AbortSignal.timeout(300000),
+          });
 
-      if (attempt.ok) {
-        res = attempt;
-        console.log(`[MCP DarkTube] Remotion render concluído com sucesso em ${cleanBase}!`);
-        break;
-      } else {
-        const text = await attempt.text().catch(() => attempt.statusText);
-        console.warn(`[MCP DarkTube] Candidato ${cleanBase} retornou HTTP ${attempt.status}: ${text}`);
+          if (attempt.ok) {
+            res = attempt;
+            console.log(`[MCP DarkTube] Remotion render concluído com sucesso em ${cleanBase}!`);
+            break;
+          } else {
+            const text = await attempt.text().catch(() => attempt.statusText);
+            console.warn(`[MCP DarkTube] Candidato ${cleanBase} retornou HTTP ${attempt.status}: ${text}`);
+          }
+        } catch (err: any) {
+          console.warn(`[MCP DarkTube] Falha ao conectar em ${cleanBase}: ${err.message}`);
+          lastError = err;
+        }
       }
-    } catch (err: any) {
-      console.warn(`[MCP DarkTube] Falha ao conectar em ${cleanBase}: ${err.message}`);
-      lastError = err;
+
+      if (!res) {
+        throw new Error(`Falha ao conectar no Remotion Server: ${lastError?.message || 'Nenhum candidato respondeu'}`);
+      }
+
+      const result = await res.json();
+      const rawVideoUrl = result.draftVideoUrl || result.videoUrl || result.outputUrl || '';
+
+      const videoUrl = rawVideoUrl.startsWith('http')
+        ? rawVideoUrl
+        : `${DARKTUBE_BASE_URL}${rawVideoUrl.startsWith('/') ? '' : '/'}${rawVideoUrl}`;
+
+      const sheetUrl = result.contactSheetUrl
+        ? (result.contactSheetUrl.startsWith('http')
+            ? result.contactSheetUrl
+            : `${DARKTUBE_BASE_URL}${result.contactSheetUrl.startsWith('/') ? '' : '/'}${result.contactSheetUrl}`)
+        : null;
+
+      let localFile: { success: boolean; filePath: string; sizeBytes: number } | null = null;
+      if (input.downloadLocal && videoUrl) {
+        localFile = await downloadCreativeToLocal(videoUrl, input.outputDir);
+      }
+
+      return {
+        success: true,
+        historyId,
+        videoUrl,
+        contactSheetUrl: sheetUrl,
+        isDraft: Boolean(input.isDraft),
+        localFile,
+      };
     }
-  }
-
-  if (!res) {
-    throw new Error(`Falha ao conectar no Remotion Server: ${lastError?.message || 'Nenhum candidato respondeu'}`);
-  }
-
-  const result = await res.json();
-  const rawVideoUrl = result.draftVideoUrl || result.videoUrl || result.outputUrl || '';
-  
-  const videoUrl = rawVideoUrl.startsWith('http')
-    ? rawVideoUrl
-    : `${DARKTUBE_BASE_URL}${rawVideoUrl.startsWith('/') ? '' : '/'}${rawVideoUrl}`;
-
-  const sheetUrl = result.contactSheetUrl
-    ? (result.contactSheetUrl.startsWith('http')
-        ? result.contactSheetUrl
-        : `${DARKTUBE_BASE_URL}${result.contactSheetUrl.startsWith('/') ? '' : '/'}${result.contactSheetUrl}`)
-    : null;
-
-  let localFile: { success: boolean; filePath: string; sizeBytes: number } | null = null;
-  if (input.downloadLocal && videoUrl) {
-    localFile = await downloadCreativeToLocal(videoUrl, input.outputDir);
-  }
-
-  return {
-    success: true,
-    historyId,
-    videoUrl,
-    contactSheetUrl: sheetUrl,
-    isDraft: Boolean(input.isDraft),
-    localFile,
-  };
+  );
 }
 
 /** Roteiro de IA para a oferta pedida (mesmo caminho do flow): usado pelo flow e pela previa gratuita do script_only. */

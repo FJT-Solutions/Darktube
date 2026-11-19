@@ -63,10 +63,39 @@ async function initBundle() {
 }
 
 // ──────────────────────────────────────────────
+// FILA FIFO ÚNICA DO CONTAINER (1 render por vez com RENDER_CONCURRENCY=4)
+// ──────────────────────────────────────────────
+let renderQueueChain = Promise.resolve();
+let activeQueueJob = null;
+let queuedJobsCount = 0;
+
+function enqueueRemotionTask(label, fn) {
+  queuedJobsCount++;
+  const run = async () => {
+    queuedJobsCount = Math.max(0, queuedJobsCount - 1);
+    activeQueueJob = { label, startedAt: new Date().toISOString() };
+    try {
+      return await fn();
+    } finally {
+      activeQueueJob = null;
+    }
+  };
+  const next = renderQueueChain.then(run, run);
+  renderQueueChain = next.catch(() => {});
+  return next;
+}
+
+// ──────────────────────────────────────────────
 // HEALTH CHECK
 // ──────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', bundled: !!bundledLocation });
+  res.json({
+    status: 'ok',
+    bundled: !!bundledLocation,
+    activeJob: activeQueueJob,
+    queuedCount: queuedJobsCount,
+    concurrency: process.env.RENDER_CONCURRENCY || '4',
+  });
 });
 
 // ──────────────────────────────────────────────
@@ -181,14 +210,15 @@ app.post('/render', async (req, res) => {
     return res.status(400).json({ error: 'composition.scenes não pode estar vazio' });
   }
 
-  // 202 imediato — render em background
+  // 202 imediato — enfileira na fila FIFO (1 por vez com RENDER_CONCURRENCY=4)
   res.status(202).json({
     success: true,
-    message: 'Renderização Remotion iniciada.',
+    message: 'Renderização Remotion enfileirada.',
     historyId,
+    queuedAhead: queuedJobsCount + (activeQueueJob ? 1 : 0),
   });
 
-  renderAsync(historyId, composition, callbackUrl);
+  enqueueRemotionTask(`render:${historyId || 'job'}`, () => renderAsync(historyId, composition, callbackUrl));
 });
 
 // ──────────────────────────────────────────────
@@ -203,10 +233,11 @@ app.post('/render-draft', async (req, res) => {
     return res.status(400).json({ error: 'composition.scenes obrigatório' });
   }
 
-  console.log(`[Remotion Draft] Iniciando render de draft rápido para ${draftId}...`);
-  
+  console.log(`[Remotion Draft] Enfileirando render de draft rápido para ${draftId}...`);
+
   try {
-    if (!bundledLocation) await initBundle();
+    return await enqueueRemotionTask(`draft:${draftId}`, async () => {
+      if (!bundledLocation) await initBundle();
     await preloadAndProcessAllAssets(composition.scenes);
 
     const isVertical = (composition.format || 'vertical') === 'vertical';
@@ -300,6 +331,7 @@ app.post('/render-draft', async (req, res) => {
       draftVideoUrl,
       contactSheetUrl,
     });
+    });
   } catch (err) {
     console.error(`[Remotion Draft] Erro ao renderizar draft:`, err);
     return res.status(500).json({ success: false, error: err.message });
@@ -325,10 +357,11 @@ async function handleDarkClipsRender(req, res) {
     return res.status(503).json({ error: 'Bundle Remotion ainda não está pronto' });
   }
 
-  console.log(`[Remotion DarkClips] Iniciando render do clipe ${jobId}...`);
+  console.log(`[Remotion DarkClips] Enfileirando render do clipe ${jobId}...`);
 
   try {
-    const serveUrl = bundledLocation;
+    return await enqueueRemotionTask(`darkclips:${jobId}`, async () => {
+      const serveUrl = bundledLocation;
     const outputFileName = `darkclip_${jobId}.mp4`;
     const outputFilePath = path.join(OUTPUT_DIR, outputFileName);
 
@@ -649,6 +682,7 @@ async function handleDarkClipsRender(req, res) {
         jobId,
       });
     }
+    });
   } catch (err) {
     console.error(`[Remotion DarkClips] ERRO no render ${jobId}:`, err);
     if (callbackUrl) {

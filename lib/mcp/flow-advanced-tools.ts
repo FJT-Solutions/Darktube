@@ -13,6 +13,17 @@ import { getUserApiKey } from '@/lib/database';
 import { uploadMediaFile } from '@/lib/storage';
 import { renderHtmlSvgToMp4 } from '@/lib/html-svg-render';
 import type { HtmlSvgProjectSpec } from '@/lib/html-svg-templates';
+import { enqueueDetachedRenderTask, getRenderQueueSnapshot, runQueuedRenderTask, type RenderJobKind } from '@/lib/render-queue';
+import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
+import { compileThreeJsStoryboard, type ThreeJsStoryboard, type ThreeJsViralCaptionsConfig } from '@/lib/threejs-scene-compiler';
+import { renderThreeJsToMp4 } from '@/lib/threejs-render';
+import { generateThreeJsDirection } from '@/lib/threejs-director';
+import {
+  downloadExternalGlbToLibrary,
+  downloadPolyHavenModel,
+  listLocal3dModels,
+  searchFree3dAssets,
+} from '@/lib/threejs-asset-hub';
 import { getFlowTemplate, MAX_TAKES, clampSecondsForModel, normalizeRealism, type FlowTemplate } from '@/lib/flow-templates';
 import {
   buildRepairPrompt,
@@ -713,17 +724,24 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
 }
 
 export interface RenderHtmlSvgInput extends HtmlSvgProjectSpec {
+  kind?: RenderJobKind;
   isDraft?: boolean;
   downloadLocal?: boolean;
   outputDir?: string;
   fileName?: string;
+  voiceProvider?: VoiceProviderChoice;
+  voiceGender?: VoiceGender;
+  voiceId?: string;
+  audioPathOrUrl?: string;
+  scriptText?: string;
 }
 
 /**
  * 12. Renderiza video em HTML + SVG + fisica deterministica ($0 de creditos IA)
- * via Playwright Chromium + FFmpeg, rodando Motion Checks (Frame 0, paleta hex e duracao).
+ * via Fila FIFO multi-usuario + Playwright Chromium + FFmpeg + Motion Checks.
  */
 export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
+  const userId = await resolveDefaultUserId();
   const safeBase = String(input.fileName || `htmlsvg_${Date.now()}`)
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .slice(0, 60);
@@ -732,35 +750,273 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
     ? path.resolve(process.cwd(), input.outputDir || './midia/criativos')
     : os.tmpdir();
   const outputPath = path.join(targetDir, `${safeBase}.mp4`);
+  const kind: RenderJobKind = input.kind === 'single_scene' || input.scenes?.length === 1 ? 'single_scene' : 'full_video';
 
-  const rendered = await renderHtmlSvgToMp4({
-    spec: input,
-    outputPath,
-    draft: Boolean(input.isDraft),
-  });
+  return await runQueuedRenderTask(
+    {
+      userId,
+      engine: 'html_svg',
+      kind,
+      title: input.title || input.preset || safeBase,
+      payload: { preset: input.preset || 'html_svg_explainer', aspect: input.aspect || '9:16', isDraft: Boolean(input.isDraft) },
+    },
+    async ({ onProgress }) => {
+      let audioPath: string | undefined;
+      if (input.audioPathOrUrl || input.scriptText) {
+        const spoken =
+          input.scriptText ||
+          (input.scenes || [])
+            .map((s) => s.spokenLine || s.subtitle || s.title)
+            .filter(Boolean)
+            .join(' ');
+        if (spoken || input.audioPathOrUrl) {
+          const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_voice_'));
+          const vr = await resolveVoiceWithTimestamps({
+            userId,
+            scriptText: spoken,
+            outputDir: voiceDir,
+            audioPathOrUrl: input.audioPathOrUrl,
+            voiceProvider: input.voiceProvider || 'auto',
+            voiceGender: input.voiceGender || 'male',
+            voiceId: input.voiceId,
+          });
+          audioPath = vr.audioPath;
+        }
+      }
 
-  let storageUrl: string | null = null;
-  try {
-    const buf = fs.readFileSync(rendered.outputPath);
-    const storagePath = await uploadMediaFile(buf, `${safeBase}_${Date.now()}.mp4`, 'video/mp4');
-    storageUrl = `https://darktube.fjt-solutions.com${storagePath}`;
-  } catch {
-    // Segue sem falhar se rodar offline sem banco configurado; arquivo local continua entregue.
-  }
+      await onProgress(15);
+      const rendered = await renderHtmlSvgToMp4({
+        spec: input,
+        outputPath,
+        draft: Boolean(input.isDraft),
+        audioPath,
+      });
+      await onProgress(92);
 
-  return {
-    success: true,
-    engine: 'html_svg',
-    creditsCost: 0,
-    localFile: wantLocal ? rendered.outputPath : null,
-    videoUrl: storageUrl,
-    width: rendered.width,
-    height: rendered.height,
-    fps: rendered.fps,
-    durationSec: rendered.durationSec,
-    totalFrames: rendered.totalFrames,
-    palette: rendered.palette,
-    motionCheck: rendered.motionCheck,
-    timelineIssues: rendered.timelineIssues,
+      let storageUrl: string | null = null;
+      try {
+        const buf = fs.readFileSync(rendered.outputPath);
+        const storagePath = await uploadMediaFile(buf, `${safeBase}_${Date.now()}.mp4`, 'video/mp4');
+        storageUrl = `https://darktube.fjt-solutions.com${storagePath}`;
+      } catch {
+        // Segue sem falhar se rodar offline sem banco configurado; arquivo local continua entregue.
+      }
+
+      return {
+        success: true,
+        engine: 'html_svg',
+        kind,
+        creditsCost: 0,
+        localFile: wantLocal ? rendered.outputPath : null,
+        videoUrl: storageUrl,
+        width: rendered.width,
+        height: rendered.height,
+        fps: rendered.fps,
+        durationSec: rendered.durationSec,
+        totalFrames: rendered.totalFrames,
+        palette: rendered.palette,
+        motionCheck: rendered.motionCheck,
+        timelineIssues: rendered.timelineIssues,
+      };
+    }
+  );
+}
+
+export interface RenderThreeJsInput {
+  kind?: RenderJobKind;
+  preset?: 'curiosidade_cratera' | 'custom_storyboard';
+  topic?: string;
+  durationSec?: number;
+  quality?: 'alta' | 'basica';
+  provider?: FlowProvider;
+  title?: string;
+  aspect?: '9:16' | '16:9' | '1:1';
+  fps?: number;
+  isDraft?: boolean;
+  scriptText?: string;
+  storyboard?: Partial<ThreeJsStoryboard>;
+  captions?: ThreeJsViralCaptionsConfig;
+  voiceProvider?: VoiceProviderChoice;
+  voiceGender?: VoiceGender;
+  voiceId?: string;
+  language?: string;
+  speed?: number;
+  audioPathOrUrl?: string;
+  waitForResult?: boolean;
+  downloadLocal?: boolean;
+  outputDir?: string;
+  fileName?: string;
+}
+
+/**
+ * 13. Renderiza video 3D (Three.js articulado + GLTFLoader .glb) na Fila FIFO multi-usuario com Voz Hibrida
+ * (Audio externo -> ElevenLabs do usuario -> OpenAI TTS -> Edge TTS fallback $0) e Legendas Virais.
+ */
+export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
+  const userId = await resolveDefaultUserId();
+  const safeBase = String(input.fileName || `darktube3d_${Date.now()}`)
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 60);
+  const wantLocal = input.downloadLocal !== false;
+  const targetDir = wantLocal
+    ? path.resolve(process.cwd(), input.outputDir || './midia/criativos')
+    : os.tmpdir();
+  const outputPath = path.join(targetDir, `${safeBase}.mp4`);
+  const kind: RenderJobKind = input.kind === 'single_scene' ? 'single_scene' : 'full_video';
+
+  const executeJob = async ({ onProgress }: { jobId: string; onProgress: (pct: number) => Promise<void> }) => {
+    let workingStoryboard = input.storyboard;
+    let workingScript = input.scriptText;
+    let directorProvider: string | null = null;
+
+    if (input.topic && !workingStoryboard?.cenas?.length) {
+      const directed = await generateThreeJsDirection({
+        userId,
+        topic: input.topic,
+        durationSec: input.durationSec,
+        kind,
+        aspect: input.aspect || '9:16',
+        quality: input.quality || (input.isDraft ? 'basica' : 'alta'),
+        isDraft: input.isDraft,
+        provider: input.provider,
+        captions: input.captions,
+      });
+      workingStoryboard = directed.compiled.storyboard;
+      workingScript = workingScript || directed.spokenScript;
+      directorProvider = directed.providerUsed;
+      await onProgress(8);
+    }
+
+    const initialCompile = compileThreeJsStoryboard({
+      kind,
+      preset: workingStoryboard?.cenas?.length ? 'custom_storyboard' : (input.preset || 'curiosidade_cratera'),
+      title: input.title || input.topic,
+      aspect: input.aspect || '9:16',
+      fps: input.fps,
+      isDraft: input.isDraft,
+      storyboard: workingStoryboard,
+      captions: input.captions,
+    });
+
+    const spokenText = String(workingScript || initialCompile.spokenScript || '').trim();
+    const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_3d_voice_'));
+    const voiceRes = await resolveVoiceWithTimestamps({
+      userId,
+      scriptText: spokenText,
+      outputDir: voiceDir,
+      audioPathOrUrl: input.audioPathOrUrl,
+      voiceProvider: input.voiceProvider || 'auto',
+      voiceGender: input.voiceGender || 'male',
+      voiceId: input.voiceId,
+      language: input.language || 'pt-BR',
+      speed: input.speed,
+    });
+    await onProgress(15);
+
+    const finalCompile = compileThreeJsStoryboard({
+      kind,
+      preset: workingStoryboard?.cenas?.length ? 'custom_storyboard' : (input.preset || 'curiosidade_cratera'),
+      title: input.title || input.topic,
+      aspect: input.aspect || '9:16',
+      fps: input.fps,
+      isDraft: input.isDraft,
+      storyboard: {
+        ...workingStoryboard,
+        ...(input.quality ? { qualidade: input.quality } : {}),
+      },
+      captions: input.captions,
+      audioDurationSec: kind === 'single_scene' ? undefined : voiceRes.durationSec,
+    });
+
+    const rendered = await renderThreeJsToMp4({
+      storyboard: finalCompile.storyboard,
+      words: voiceRes.words,
+      audioPath: voiceRes.audioPath,
+      outputPath,
+      isDraft: Boolean(input.isDraft),
+      onProgress,
+    });
+
+    try {
+      fs.rmSync(voiceDir, { recursive: true, force: true });
+    } catch {}
+
+    let storageUrl: string | null = null;
+    try {
+      const buf = fs.readFileSync(rendered.outputPath);
+      const storagePath = await uploadMediaFile(buf, `${safeBase}_${Date.now()}.mp4`, 'video/mp4');
+      storageUrl = `https://darktube.fjt-solutions.com${storagePath}`;
+    } catch {}
+
+    return {
+      success: true,
+      engine: 'threejs_3d',
+      kind,
+      creditsCost: 0,
+      directorProvider,
+      voiceProviderUsed: voiceRes.providerUsed,
+      voiceUsed: voiceRes.voiceUsed,
+      wordsCount: voiceRes.words.length,
+      sceneCount: finalCompile.sceneCount,
+      auditFixes: finalCompile.auditFixes,
+      localFile: wantLocal ? rendered.outputPath : null,
+      videoUrl: storageUrl,
+      width: rendered.width,
+      height: rendered.height,
+      fps: rendered.fps,
+      durationSec: rendered.durationSec,
+      totalFrames: rendered.totalFrames,
+      motionCheck: rendered.motionCheck,
+    };
   };
+
+  const queueOpts = {
+    userId,
+    engine: 'threejs_3d' as const,
+    kind,
+    title: input.title || input.topic || input.preset || safeBase,
+    payload: { kind, preset: input.preset || (input.topic ? 'director_llm' : 'curiosidade_cratera'), isDraft: Boolean(input.isDraft) },
+  };
+
+  if (input.waitForResult === false) {
+    return await enqueueDetachedRenderTask(queueOpts, executeJob);
+  }
+  return await runQueuedRenderTask(queueOpts, executeJob);
+}
+
+/**
+ * 14. Consulta o status da Fila Multi-Usuario FIFO de renderizacao na VPS.
+ */
+export async function getRenderQueueStatusMcp(input: { jobId?: string }) {
+  const userId = await resolveDefaultUserId();
+  const snapshot = await getRenderQueueSnapshot(userId, input.jobId);
+  return { success: true, ...snapshot };
+}
+
+/**
+ * 15. Busca e baixa modelos 3D gratuitos CC0 (.glb/.gltf) no cache local, Poly Haven e Poly Pizza.
+ */
+export async function searchAndDownload3dAssetsMcp(input: {
+  query?: string;
+  limit?: number;
+  downloadSource?: 'polyhaven' | 'polypizza' | 'url';
+  assetId?: string;
+  url?: string;
+  name?: string;
+}) {
+  if (input.downloadSource === 'polyhaven' && input.assetId) {
+    const saved = await downloadPolyHavenModel(input.assetId);
+    return { success: true, action: 'downloaded', model: saved, localCount: listLocal3dModels().length };
+  }
+  if ((input.downloadSource === 'polypizza' || input.downloadSource === 'url') && input.url) {
+    const saved = await downloadExternalGlbToLibrary({
+      url: input.url,
+      id: input.assetId,
+      name: input.name,
+      source: input.downloadSource,
+    });
+    return { success: true, action: 'downloaded', model: saved, localCount: listLocal3dModels().length };
+  }
+  const found = await searchFree3dAssets(input.query || '', { limit: input.limit || 16 });
+  return { success: true, action: 'search', ...found };
 }

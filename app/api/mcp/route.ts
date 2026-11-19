@@ -16,6 +16,9 @@ import {
   cloneVideoFromLinkMcp,
   reviewProjectCharactersMcp,
   renderHtmlSvgVideoMcp,
+  renderThreeJsVideoMcp,
+  getRenderQueueStatusMcp,
+  searchAndDownload3dAssetsMcp,
 } from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
@@ -379,6 +382,76 @@ const MCP_TOOLS_MANIFEST = [
         downloadLocal: { type: 'boolean', default: true },
         outputDir: { type: 'string', default: './midia/criativos' },
         fileName: { type: 'string' },
+        voiceProvider: { type: 'string', enum: ['auto', 'external', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+        voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
+        audioPathOrUrl: { type: 'string' },
+        scriptText: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'darktube_render_3d_video',
+    description: 'Motor 3D articulado ($0 créditos Flow) na Fila Multi-Usuário FIFO: suporta 1 cena (single_scene) ou vídeo completo (full_video), voz híbrida (áudio externo -> ElevenLabs -> OpenAI -> Edge TTS fallback homem/mulher), legendas virais word-by-word (#ffd60a) e regras anti-oclusão/Set Bible.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['single_scene', 'full_video'], default: 'full_video' },
+        preset: { type: 'string', enum: ['curiosidade_cratera', 'custom_storyboard'], default: 'curiosidade_cratera' },
+        title: { type: 'string' },
+        aspect: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
+        fps: { type: 'number', default: 24 },
+        isDraft: { type: 'boolean', default: true },
+        scriptText: { type: 'string' },
+        storyboard: { type: 'object' },
+        captions: {
+          type: 'object',
+          properties: {
+            ativo: { type: 'boolean', default: true },
+            palavrasPorBloco: { type: 'number', default: 2 },
+            maiusculas: { type: 'boolean', default: true },
+            corDestaque: { type: 'string', default: '#ffd60a' },
+            tamanho: { type: 'number', default: 1.32 },
+            posicaoY: { type: 'number', default: 0.69 },
+          },
+        },
+        voiceProvider: { type: 'string', enum: ['auto', 'external', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+        voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
+        voiceId: { type: 'string' },
+        language: { type: 'string', default: 'pt-BR' },
+        speed: { type: 'number', default: 1.02 },
+        topic: { type: 'string', description: 'Tema livre em PT-BR: aciona o Diretor 3D com LLM automaticamente quando storyboard não for enviado' },
+        durationSec: { type: 'number', description: 'Duração alvo em segundos quando topic for usado (ex: 30, 45, 60)' },
+        quality: { type: 'string', enum: ['alta', 'basica'], description: 'Qualidade de pós-processamento Three.js (alta = GTAO+Bloom+Grade)' },
+        audioPathOrUrl: { type: 'string' },
+        waitForResult: { type: 'boolean', default: true },
+        downloadLocal: { type: 'boolean', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+        fileName: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'darktube_get_render_queue_status',
+    description: 'Consulta a Fila Multi-Usuário FIFO de renderização na VPS (posição na fila, job ativo e histórico recente).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jobId: { type: 'string', description: 'Opcional: UUID do job para ver posição exata' },
+      },
+    },
+  },
+  {
+    name: 'darktube_search_3d_assets',
+    description: 'Busca e baixa modelos 3D gratuitos CC0 (.glb/.gltf) no cache local, Poly Haven API ($0 sem chave) e Poly Pizza API (filtro CC0) para uso no motor Three.js.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Termo de busca em inglês ou português (ex: waterwheel, barrel, generator, house, tree)' },
+        limit: { type: 'number', default: 16 },
+        downloadSource: { type: 'string', enum: ['polyhaven', 'polypizza', 'url'], description: 'Quando preenchido, baixa o modelo para a biblioteca local /threejs-engine/models/' },
+        assetId: { type: 'string', description: 'ID do modelo no Poly Haven ou slug local' },
+        url: { type: 'string', description: 'URL direta .glb (para downloadSource polypizza ou url)' },
+        name: { type: 'string', description: 'Nome amigável do modelo' },
       },
     },
   },
@@ -525,6 +598,15 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_render_html_svg_video':
       return await renderHtmlSvgVideoMcp(args);
+
+    case 'darktube_render_3d_video':
+      return await renderThreeJsVideoMcp(args);
+
+    case 'darktube_get_render_queue_status':
+      return await getRenderQueueStatusMcp(args);
+
+    case 'darktube_search_3d_assets':
+      return await searchAndDownload3dAssetsMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);
