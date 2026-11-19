@@ -33,8 +33,9 @@ COPY . .
 # Se construído a partir da raiz do repositório, copiar scripts de servidor sem sobrescrever remotion raiz
 RUN if [ -f scripts/remotion-server/server.js ]; then cp -f scripts/remotion-server/server.js scripts/remotion-server/package* scripts/remotion-server/sfx.mjs scripts/remotion-server/beats.py . 2>/dev/null || true; if [ -d scripts/remotion-server/lib ]; then cp -rf scripts/remotion-server/lib .; fi; fi
 
-# Instalar dependências do Node.js
-RUN npm install --omit=dev
+# Instalar dependências do Node.js (pula binário CUDA GPU do onnxruntime-node que retorna 404 na v1.17.3; VPS roda em CPU)
+ENV npm_config_onnxruntime_node_install_cuda=skip
+RUN npm install --omit=dev --onnxruntime-node-install-cuda=skip
 
 EXPOSE 3001
 
