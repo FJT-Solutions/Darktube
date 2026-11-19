@@ -827,7 +827,7 @@ export interface RenderThreeJsInput {
   preset?: 'curiosidade_cratera' | 'custom_storyboard';
   topic?: string;
   durationSec?: number;
-  quality?: 'alta' | 'basica';
+  quality?: 'alta' | 'media' | 'basica';
   provider?: FlowProvider;
   title?: string;
   aspect?: '9:16' | '16:9' | '1:1';
@@ -876,7 +876,7 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
         durationSec: input.durationSec,
         kind,
         aspect: input.aspect || '9:16',
-        quality: input.quality || (input.isDraft ? 'basica' : 'alta'),
+        quality: input.quality || (input.isDraft ? 'basica' : 'media'),
         isDraft: input.isDraft,
         provider: input.provider,
         captions: input.captions,

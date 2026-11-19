@@ -9,10 +9,12 @@ export interface ThreeJsViralCaptionsConfig {
   posicaoY?: number;
 }
 
+export type ThreeJsQuality = 'alta' | 'media' | 'basica';
+
 export interface ThreeJsStoryboard {
   versao: number;
   titulo: string;
-  qualidade?: 'alta' | 'basica';
+  qualidade?: ThreeJsQuality;
   formato: { largura: number; altura: number; fps: number };
   duracao: number;
   audio?: string;
@@ -519,7 +521,7 @@ export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThr
   const storyboard: ThreeJsStoryboard = {
     versao: 1,
     titulo: input.title || custom?.titulo || 'Por que a rua abre cratera do nada?',
-    qualidade: custom?.qualidade || (input.isDraft ? 'basica' : 'alta'),
+    qualidade: custom?.qualidade || (input.isDraft ? 'basica' : 'media'),
     formato: { ...dims, fps },
     duracao: totalDur,
     audio: 'narracao.mp3',

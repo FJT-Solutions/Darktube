@@ -4,6 +4,7 @@ import { listLocal3dModels } from '@/lib/threejs-asset-hub';
 import {
   compileThreeJsStoryboard,
   type CompileThreeJsResult,
+  type ThreeJsQuality,
   type ThreeJsStoryboard,
   type ThreeJsViralCaptionsConfig,
 } from '@/lib/threejs-scene-compiler';
@@ -14,7 +15,7 @@ export interface GenerateThreeJsDirectionInput {
   durationSec?: number;
   kind?: 'single_scene' | 'full_video';
   aspect?: '9:16' | '16:9' | '1:1';
-  quality?: 'alta' | 'basica';
+  quality?: ThreeJsQuality;
   isDraft?: boolean;
   provider?: FlowProvider;
   captions?: ThreeJsViralCaptionsConfig;
@@ -136,11 +137,11 @@ Crie agora o JSON completo com spokenScript envolvente e cenas 3D ricas e coeren
     preset: 'custom_storyboard',
     title: String(parsed?.titulo || input.topic),
     aspect: input.aspect || '9:16',
-    isDraft: input.isDraft ?? (input.quality !== 'alta'),
+    isDraft: input.isDraft ?? (input.quality === 'basica'),
     captions: input.captions,
     storyboard: {
       titulo: String(parsed?.titulo || input.topic),
-      qualidade: input.quality || (input.isDraft ? 'basica' : 'alta'),
+      qualidade: input.quality || (input.isDraft ? 'basica' : 'media'),
       duracao: durationSec,
       cenas,
     },

@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
     const spokenScript = String(body?.spokenScript || '').trim();
     const kind: RenderJobKind = body?.kind === 'single_scene' ? 'single_scene' : 'full_video';
     const aspect = body?.aspect === '16:9' || body?.aspect === '1:1' ? body.aspect : '9:16';
-    const quality: 'alta' | 'basica' = body?.quality === 'alta' ? 'alta' : 'basica';
-    const isDraft = body?.isDraft !== undefined ? Boolean(body.isDraft) : quality !== 'alta';
+    const quality: 'alta' | 'media' | 'basica' = body?.quality === 'alta' ? 'alta' : body?.quality === 'basica' ? 'basica' : 'media';
+    const isDraft = body?.isDraft !== undefined ? Boolean(body.isDraft) : quality === 'basica';
     const voiceProvider: VoiceProviderChoice = body?.voiceProvider || 'auto';
     const voiceGender: VoiceGender = body?.voiceGender === 'female' ? 'female' : 'male';
     const audioPathOrUrl = body?.audioPathOrUrl ? String(body.audioPathOrUrl) : undefined;

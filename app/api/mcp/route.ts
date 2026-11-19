@@ -421,7 +421,7 @@ const MCP_TOOLS_MANIFEST = [
         speed: { type: 'number', default: 1.02 },
         topic: { type: 'string', description: 'Tema livre em PT-BR: aciona o Diretor 3D com LLM automaticamente quando storyboard não for enviado' },
         durationSec: { type: 'number', description: 'Duração alvo em segundos quando topic for usado (ex: 30, 45, 60)' },
-        quality: { type: 'string', enum: ['alta', 'basica'], description: 'Qualidade de pós-processamento Three.js (alta = GTAO+Bloom+Grade)' },
+        quality: { type: 'string', enum: ['alta', 'media', 'basica'], description: 'Qualidade Three.js: media (30fps Bloom+Grade rápido p/ VPS), alta (GTAO+Bloom+Grade) ou basica (rascunho)' },
         audioPathOrUrl: { type: 'string' },
         waitForResult: { type: 'boolean', default: true },
         downloadLocal: { type: 'boolean', default: true },

@@ -25,6 +25,7 @@ export interface RenderThreeJsResult {
   fps: number;
   durationSec: number;
   totalFrames: number;
+  gpuAccelerated: boolean;
   motionCheck: MotionCheckResult;
 }
 
@@ -142,9 +143,12 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
     throw new Error(`Motor Three.js não encontrado em ${engineRoot}`);
   }
 
-  const scale = opts.isDraft ? 0.5 : 1;
-  const width = Math.round((opts.storyboard.formato?.largura || 1080) * scale);
-  const height = Math.round((opts.storyboard.formato?.altura || 1920) * scale);
+  const forceSwift = process.env.THREEJS_FORCE_SWIFTSHADER === '1';
+  const wantGpu = !forceSwift && (process.env.THREEJS_USE_GPU === '1' || process.platform !== 'linux');
+  const isCpuVpsMedia = !wantGpu && !opts.isDraft && opts.storyboard.qualidade === 'media';
+  const scale = opts.isDraft ? 0.5 : (isCpuVpsMedia ? 2 / 3 : 1);
+  const width = Math.round(((opts.storyboard.formato?.largura || 1080) * scale) / 2) * 2;
+  const height = Math.round(((opts.storyboard.formato?.altura || 1920) * scale) / 2) * 2;
   const fps = opts.isDraft ? Math.min(opts.storyboard.formato?.fps || 24, 24) : (opts.storyboard.formato?.fps || 30);
   const durationSec = Math.max(1, Number(opts.storyboard.duracao || 5));
   const totalFrames = Math.max(1, Math.round(durationSec * fps));
@@ -156,41 +160,68 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
 
   const { server, port } = await startThreeJsStaticServer(engineRoot, jobDir);
   const executablePath = findBrowserExecutable();
-  const browser = await chromium.launch({
+  const baseArgs = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--hide-scrollbars',
+    '--mute-audio',
+    '--ignore-gpu-blocklist',
+    '--enable-webgl',
+    `--window-size=${width},${height}`,
+  ];
+  const swiftArgs = [...baseArgs, '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+  const gpuArgs = [...baseArgs, '--use-gl=angle'];
+
+  let gpuAccelerated = wantGpu;
+  let browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
     headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--hide-scrollbars',
-      '--mute-audio',
-      '--ignore-gpu-blocklist',
-      '--enable-webgl',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      `--window-size=${width},${height}`,
-    ],
+    args: wantGpu ? gpuArgs : swiftArgs,
+  }).catch(async () => {
+    gpuAccelerated = false;
+    return await chromium.launch({
+      ...(executablePath ? { executablePath } : {}),
+      headless: true,
+      args: swiftArgs,
+    });
   });
 
   try {
-    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+    let page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     const pageErrors: string[] = [];
-    page.on('console', (m) => {
-      if (m.type() === 'error') pageErrors.push(m.text());
-    });
-    page.on('pageerror', (e) => pageErrors.push(String(e?.message || e)));
-    page.on('response', (r) => {
-      if (r.status() >= 400) pageErrors.push(`HTTP ${r.status()} em ${r.url()}`);
-    });
-    await page.goto(
-      `http://127.0.0.1:${port}/threejs-engine/engine/player.html?projeto=job&render=1&w=${width}&h=${height}`,
-      { waitUntil: 'load', timeout: 60_000 }
-    );
+    const attachListeners = (p: typeof page) => {
+      p.on('console', (m) => {
+        if (m.type() === 'error') pageErrors.push(m.text());
+      });
+      p.on('pageerror', (e) => pageErrors.push(String(e?.message || e)));
+      p.on('response', (r) => {
+        if (r.status() >= 400) pageErrors.push(`HTTP ${r.status()} em ${r.url()}`);
+      });
+    };
+    attachListeners(page);
+    const playerUrl = `http://127.0.0.1:${port}/threejs-engine/engine/player.html?projeto=job&render=1&w=${width}&h=${height}`;
+    await page.goto(playerUrl, { waitUntil: 'load', timeout: 60_000 });
     await page.waitForFunction('window.__pronto === true || window.__erro', undefined, { timeout: 60_000 }).catch((e) => {
       throw new Error(`${e.message}${pageErrors.length ? ' | Detalhes página: ' + pageErrors.slice(0, 4).join(' ; ') : ''}`);
     });
-    const pageErr = await page.evaluate(() => (window as any).__erro);
+    let pageErr = await page.evaluate(() => (window as any).__erro);
+    if (pageErr && gpuAccelerated) {
+      // Fallback automático para SwiftShader se WebGL de hardware falhar no host
+      await browser.close().catch(() => {});
+      gpuAccelerated = false;
+      pageErrors.length = 0;
+      browser = await chromium.launch({
+        ...(executablePath ? { executablePath } : {}),
+        headless: true,
+        args: swiftArgs,
+      });
+      page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+      attachListeners(page);
+      await page.goto(playerUrl, { waitUntil: 'load', timeout: 60_000 });
+      await page.waitForFunction('window.__pronto === true || window.__erro', undefined, { timeout: 60_000 });
+      pageErr = await page.evaluate(() => (window as any).__erro);
+    }
     if (pageErr) throw new Error(`Erro no player 3D: ${pageErr}`);
 
     const hasAudio = Boolean(opts.audioPath && fs.existsSync(opts.audioPath));
@@ -263,6 +294,7 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
     fps,
     durationSec,
     totalFrames,
+    gpuAccelerated,
     motionCheck,
   };
 }

@@ -16,14 +16,14 @@ export async function POST(req: NextRequest) {
     const mode = String(body?.mode || 'llm');
     const kind = body?.kind === 'single_scene' ? 'single_scene' : 'full_video';
     const aspect = body?.aspect === '16:9' || body?.aspect === '1:1' ? body.aspect : '9:16';
-    const quality = body?.quality === 'alta' ? 'alta' : 'basica';
+    const quality = body?.quality === 'alta' ? 'alta' : body?.quality === 'basica' ? 'basica' : 'media';
 
     if (mode === 'preset') {
       const compiled = compileThreeJsStoryboard({
         kind,
         preset: 'curiosidade_cratera',
         aspect,
-        isDraft: quality !== 'alta',
+        isDraft: quality === 'basica',
         storyboard: { qualidade: quality },
       });
       return NextResponse.json({
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       kind,
       aspect,
       quality,
-      isDraft: quality !== 'alta',
+      isDraft: quality === 'basica',
       provider: body?.provider as FlowProvider | undefined,
     });
 

@@ -73,7 +73,7 @@ export default function Studio3dPage() {
   const [kind, setKind] = useState<"full_video" | "single_scene">("full_video")
   const [durationSec, setDurationSec] = useState("60")
   const [aspect, setAspect] = useState<"9:16" | "16:9" | "1:1">("9:16")
-  const [quality, setQuality] = useState<"alta" | "basica">("alta")
+  const [quality, setQuality] = useState<"alta" | "media" | "basica">("media")
   const [voiceProvider, setVoiceProvider] = useState<"auto" | "elevenlabs" | "openai" | "edge">("auto")
   const [voiceGender, setVoiceGender] = useState<"male" | "female">("male")
 
@@ -206,7 +206,7 @@ export default function Studio3dPage() {
           kind,
           aspect,
           quality,
-          isDraft: quality !== "alta",
+          isDraft: quality === "basica",
           voiceProvider,
           voiceGender,
         }),
@@ -410,8 +410,9 @@ export default function Studio3dPage() {
                     <Select value={quality} onValueChange={(v) => setQuality(v as any)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="alta">Alta (1080p + GTAO + Bloom)</SelectItem>
-                        <SelectItem value="basica">Rascunho rápido (540p)</SelectItem>
+                        <SelectItem value="media">Média 30fps (Bloom + Grade — Recomendado VPS)</SelectItem>
+                        <SelectItem value="alta">Alta 30fps (1080p + GTAO + Bloom — Ideal GPU)</SelectItem>
+                        <SelectItem value="basica">Rascunho 24fps (540p rápido)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

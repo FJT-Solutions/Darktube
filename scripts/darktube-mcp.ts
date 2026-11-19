@@ -253,7 +253,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             speed: { type: 'number', default: 1.02 },
             topic: { type: 'string' },
             durationSec: { type: 'number' },
-            quality: { type: 'string', enum: ['alta', 'basica'] },
+            quality: { type: 'string', enum: ['alta', 'media', 'basica'] },
             audioPathOrUrl: { type: 'string' },
             waitForResult: { type: 'boolean', default: true },
             downloadLocal: { type: 'boolean', default: true },

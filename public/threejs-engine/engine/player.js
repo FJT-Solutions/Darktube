@@ -74,12 +74,12 @@ if (!modoRender) {
   addEventListener('resize', ajustar);
 }
 
-// qualidade: "alta" (padrão: sombreamento suave, oclusão de luz, brilho e correção de cor) ou "basica" (rápida)
-const qualidade = q.get('qualidade') || sb.qualidade || 'alta';
+// qualidade: "alta" (GTAO + Bloom + Grade), "media" (Bloom + Grade rápido p/ VPS 30fps) ou "basica" (rascunho)
+const qualidade = q.get('qualidade') || sb.qualidade || 'media';
 const canvas = document.getElementById('tela');
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: qualidade === 'basica', preserveDrawingBuffer: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: qualidade !== 'alta', preserveDrawingBuffer: true });
 } catch (e) {
   throw new Error(`Não foi possível iniciar o WebGL (${e.message}). Ative a aceleração de hardware do navegador.`);
 }
@@ -524,15 +524,21 @@ const GRADE = {
       gl_FragColor = vec4(col, c.a); }`,
 };
 let composer = null;
-if (qualidade !== 'basica') {
-  composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: 4 }));
+if (qualidade === 'alta' || qualidade === 'media') {
+  const isAlta = qualidade === 'alta';
+  composer = new EffectComposer(
+    renderer,
+    new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType, samples: isAlta ? 4 : 0 })
+  );
   composer.setPixelRatio(1);
   composer.setSize(W, H);
   composer.addPass(new RenderPass(scene, camera));
-  const gtao = new GTAOPass(scene, camera, W, H);
-  gtao.updateGtaoMaterial({ radius: 0.7, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
-  gtao.blendIntensity = 0.9;
-  composer.addPass(gtao);
+  if (isAlta) {
+    const gtao = new GTAOPass(scene, camera, W, H);
+    gtao.updateGtaoMaterial({ radius: 0.7, distanceExponent: 1.4, thickness: 1.2, scale: 1.1, samples: 16, distanceFallOff: 1, screenSpaceRadius: false });
+    gtao.blendIntensity = 0.9;
+    composer.addPass(gtao);
+  }
   composer.addPass(new UnrealBloomPass(new THREE.Vector2(W, H), 0.1, 0.5, 0.92));
   composer.addPass(new OutputPass());
   composer.addPass(new ShaderPass(GRADE));
