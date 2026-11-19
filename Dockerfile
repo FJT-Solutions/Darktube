@@ -81,6 +81,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python-is-python3 \
     ca-certificates \
     openssl \
+    libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies for pytubefix, requests, playwright, psycopg2-binary, python-dotenv, edge-tts
