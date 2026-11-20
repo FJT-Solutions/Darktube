@@ -1020,3 +1020,77 @@ export async function searchAndDownload3dAssetsMcp(input: {
   const found = await searchFree3dAssets(input.query || '', { limit: input.limit || 16 });
   return { success: true, action: 'search', ...found };
 }
+
+export interface GenerateFlowImageMcpInput {
+  action?: 'generate' | 'cutout_only';
+  assetKind?: 'character' | 'expressions' | 'prop' | 'background';
+  description?: string;
+  customPrompt?: string;
+  realismo?: string;
+  aspectRatio?: '9:16' | '16:9' | '1:1';
+  chromaGreen?: boolean;
+  gridLayout?: '2x2' | '3x2';
+  autoCutout?: boolean;
+  imageUrl?: string;
+  similarity?: number;
+  blend?: number;
+  waitForSeconds?: number;
+  downloadLocal?: boolean;
+  outputDir?: string;
+}
+
+/**
+ * 16. Gera imagens avulsas no Nano Banana (Google Flow kind: 'image') com suporte a Fundo Verde Chroma (#00FF00),
+ * recorte automático para PNG 32-bit transparente (RGBA) e fatiamento de folha de expressões (2x2 ou 3x2) para
+ * animar a $0 nos motores procedurais (Stickman 2.5D, Netflix Doc, Remotion, HTML+SVG, HyperFrames).
+ */
+export async function generateFlowImageMcp(input: GenerateFlowImageMcpInput) {
+  const userId = await resolveDefaultUserId();
+  const { createStandaloneFlowImageJob, removeChromaGreenToPng } = await import('@/lib/flow-image-tools');
+
+  if (input.action === 'cutout_only' || (input.imageUrl && !input.description && !input.customPrompt)) {
+    if (!input.imageUrl) {
+      throw new Error('Informe "imageUrl" para recortar uma imagem existente em fundo verde (#00FF00).');
+    }
+    const cutout = await removeChromaGreenToPng({
+      inputSource: input.imageUrl,
+      sliceGrid: input.gridLayout,
+      similarity: input.similarity,
+      blend: input.blend,
+      downloadLocal: input.downloadLocal !== false,
+      outputDir: input.outputDir || './midia/criativos',
+    });
+    return {
+      success: true,
+      action: 'cutout_only',
+      ...cutout,
+    };
+  }
+
+  const res = await createStandaloneFlowImageJob({
+    userId,
+    assetKind: input.assetKind || 'character',
+    description: input.description,
+    customPrompt: input.customPrompt,
+    realismo: input.realismo,
+    aspectRatio: input.aspectRatio || (input.assetKind === 'expressions' ? '1:1' : '9:16'),
+    chromaGreen: input.chromaGreen,
+    gridLayout: input.gridLayout,
+    autoCutout: input.autoCutout !== false,
+    waitForSeconds: input.waitForSeconds ?? 0,
+    downloadLocal: input.downloadLocal !== false,
+    outputDir: input.outputDir || './midia/criativos',
+  });
+
+  return {
+    success: true,
+    action: 'generate',
+    jobId: res.job.id,
+    status: res.job.status,
+    resultUrl: res.job.result_url,
+    assetKind: res.assetKind,
+    chromaGreen: res.chromaGreen,
+    prompt: res.prompt,
+    cutout: res.cutout,
+  };
+}

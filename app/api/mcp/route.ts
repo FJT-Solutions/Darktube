@@ -19,6 +19,7 @@ import {
   renderThreeJsVideoMcp,
   getRenderQueueStatusMcp,
   searchAndDownload3dAssetsMcp,
+  generateFlowImageMcp,
 } from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
@@ -455,6 +456,30 @@ const MCP_TOOLS_MANIFEST = [
       },
     },
   },
+  {
+    name: 'darktube_generate_image',
+    description: 'Gera imagens avulsas no Nano Banana (Google Flow kind: "image") com Fundo Verde Chroma (#00FF00) opcional para personagens, folhas de expressões (2x2 ou 3x2), objetos/props ou cenários, e recorta automaticamente o fundo #00FF00 em PNG 32-bit transparente (RGBA) pronto para animar nos motores $0.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['generate', 'cutout_only'], default: 'generate', description: '"generate" enfileira no Nano Banana (e recorta se waitForSeconds > 0); "cutout_only" recorta uma imagem #00FF00 já existente informada em imageUrl.' },
+        assetKind: { type: 'string', enum: ['character', 'expressions', 'prop', 'background'], default: 'character', description: 'Tipo da peça visual: personagem, folha de expressões (2x2 ou 3x2), prop/objeto ou background.' },
+        description: { type: 'string', description: 'Descrição física detalhada do personagem, objeto ou cenário.' },
+        customPrompt: { type: 'string', description: 'Opcional: prompt completo em inglês (sobrescreve o construtor automático).' },
+        realismo: { type: 'string', description: 'Estilo visual do projeto (ilustrado2d, animacao3d, estilizado, cinematografico, etc.).', default: 'ilustrado2d' },
+        aspectRatio: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
+        chromaGreen: { type: 'boolean', default: true, description: 'Se true, gera com fundo verde puro (#00FF00) para recorte PNG transparente.' },
+        gridLayout: { type: 'string', enum: ['2x2', '3x2'], default: '2x2', description: 'Para assetKind="expressions" ou cutout_only: fatia a grade em 4 (2x2) ou 6 (3x2) sprites PNG individuais.' },
+        autoCutout: { type: 'boolean', default: true, description: 'Se true e a imagem terminar dentro de waitForSeconds, já devolve o PNG transparente recortado.' },
+        imageUrl: { type: 'string', description: 'Caminho local, /api/storage/... ou URL de uma imagem em fundo #00FF00 para recortar (action="cutout_only").' },
+        similarity: { type: 'number', default: 0.28, description: 'Tolerância do filtro colorkey #00FF00 (0.08 a 0.60).' },
+        blend: { type: 'number', default: 0.1, description: 'Suavização de borda do filtro colorkey (0.02 a 0.40).' },
+        waitForSeconds: { type: 'number', default: 0, description: 'Segundos para aguardar o Nano Banana entregar a imagem (0 retorna o jobId imediatamente).' },
+        downloadLocal: { type: 'boolean', default: true },
+        outputDir: { type: 'string', default: './midia/criativos' },
+      },
+    },
+  },
 ];
 
 export async function GET(req: NextRequest) {
@@ -607,6 +632,9 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_search_3d_assets':
       return await searchAndDownload3dAssetsMcp(args);
+
+    case 'darktube_generate_image':
+      return await generateFlowImageMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);

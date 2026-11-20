@@ -4,6 +4,13 @@ const nextConfig = {
     unoptimized: true,
   },
   output: 'standalone',
+  serverExternalPackages: ['playwright-core'],
+  outputFileTracingIncludes: {
+    '/api/**': [
+      './node_modules/playwright-core/**/*',
+      './node_modules/.pnpm/playwright-core*/**/*',
+    ],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -69,6 +69,7 @@ import {
 } from "@/lib/flow-script"
 import { FlowCreditSimulator } from "@/components/flow-credit-simulator"
 import { FlowClonePanel } from "@/components/flow-clone-panel"
+import { FlowImageStudioPanel } from "@/components/flow-image-studio-panel"
 import { PROVIDER_LABEL, type FlowProvider } from "@/lib/flow-llm"
 import type { FlowProject, FlowPublishInfo } from "@/lib/flow-projects"
 import type { FlowLibraryCharacter } from "@/lib/flow-characters"
@@ -104,7 +105,7 @@ import {
   replaceFlowAudioAction,
 } from "./actions"
 
-type View = "novo" | "clonar" | "projeto" | "projetos"
+type View = "novo" | "clonar" | "imagens" | "projeto" | "projetos"
 type ProjectRow = Omit<FlowProject, "script">
 
 interface JobRow {
@@ -412,6 +413,15 @@ export default function FlowPage() {
               <span>Clonar de Link</span>
             </Button>
             <Button
+              variant={view === "imagens" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs font-semibold flex-1 sm:flex-initial px-2.5 sm:px-3 justify-center"
+              onClick={() => setView("imagens")}
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <span>Imagens & Props (#00FF00)</span>
+            </Button>
+            <Button
               variant={view === "projetos" ? "default" : "ghost"}
               size="sm"
               className="h-7 text-xs font-semibold flex-1 sm:flex-initial px-2.5 sm:px-3 justify-center"
@@ -458,6 +468,8 @@ export default function FlowPage() {
           }}
         />
       )}
+
+      {view === "imagens" && <FlowImageStudioPanel />}
 
       {view === "novo" && (
         <div className="grid gap-5 lg:grid-cols-[300px_1fr] xl:grid-cols-[320px_1fr] items-start min-w-0">

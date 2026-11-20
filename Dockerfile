@@ -62,6 +62,12 @@ RUN cp -r public/* .next/standalone/public/ || true
 RUN mkdir -p .next/standalone/.next/static
 RUN cp -r .next/static/* .next/standalone/.next/static/ || true
 
+# Copy complete playwright-core (including browsers.json omitted by Next standalone file tracer)
+RUN cp -rL node_modules/playwright-core .next/standalone/node_modules/playwright-core || true
+RUN for d in node_modules/.pnpm/playwright-core*/node_modules/playwright-core; do \
+      if [ -d "$d" ]; then mkdir -p ".next/standalone/$d" && cp -r "$d"/* ".next/standalone/$d"/; fi; \
+    done
+
 # Download yt-dlp NIGHTLY build (latest anti-bot patches for datacenter IPs)
 RUN curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux -o .next/standalone/yt-dlp
 RUN chmod a+rx .next/standalone/yt-dlp

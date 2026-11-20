@@ -997,3 +997,67 @@ export async function simulateCreditsAction(input: {
     return fail(err)
   }
 }
+
+/** Enfileira imagem avulsa no Nano Banana (personagem, folha de expressões, prop em #00FF00 ou cenário) */
+export async function createStandaloneFlowImageAction(input: {
+  assetKind: "character" | "expressions" | "prop" | "background"
+  description: string
+  realismo?: string
+  aspectRatio?: "9:16" | "16:9" | "1:1"
+  chromaGreen?: boolean
+  gridLayout?: "2x2" | "3x2"
+}) {
+  try {
+    const user = await requireUser()
+    const { createStandaloneFlowImageJob } = await import("@/lib/flow-image-tools")
+    const out = await createStandaloneFlowImageJob({
+      userId: user.id,
+      assetKind: input.assetKind,
+      description: input.description,
+      realismo: input.realismo,
+      aspectRatio: input.aspectRatio,
+      chromaGreen: input.chromaGreen,
+      gridLayout: input.gridLayout,
+      waitForSeconds: 0,
+    })
+    return { success: true as const, ...out }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Lista imagens geradas no Nano Banana para a galeria de imagens e recorte chroma */
+export async function listStandaloneFlowImagesAction() {
+  try {
+    const user = await requireUser()
+    const { listStandaloneFlowImageJobs } = await import("@/lib/flow-image-tools")
+    const jobs = await listStandaloneFlowImageJobs(user.id, 40)
+    return { success: true as const, jobs }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Recorta fundo verde (#00FF00) de uma imagem do Nano Banana em PNG transparente RGBA e opcionalmente fatia grade de expressões */
+export async function cutoutChromaImageAction(input: {
+  imageUrl: string
+  jobId?: string
+  sliceGrid?: "2x2" | "3x2"
+  similarity?: number
+  blend?: number
+}) {
+  try {
+    await requireUser()
+    const { removeChromaGreenToPng } = await import("@/lib/flow-image-tools")
+    const cutout = await removeChromaGreenToPng({
+      inputSource: input.imageUrl,
+      outputFilename: `chroma_cutout_${(input.jobId || Date.now().toString()).slice(0, 10)}`,
+      sliceGrid: input.sliceGrid,
+      similarity: input.similarity,
+      blend: input.blend,
+    })
+    return { success: true as const, cutout }
+  } catch (err) {
+    return fail(err)
+  }
+}

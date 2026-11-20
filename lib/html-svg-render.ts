@@ -2,7 +2,6 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
-import { chromium } from 'playwright-core';
 import { ffmpegBin } from './flow-assemble';
 import { inspectRenderedVideo, type MotionCheckResult } from './motion-checks';
 import {
@@ -65,6 +64,7 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
 
   fs.mkdirSync(path.dirname(opts.outputPath), { recursive: true });
   const executablePath = findBrowserExecutable();
+  const { chromium } = await import('playwright-core');
   const browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
     headless: true,

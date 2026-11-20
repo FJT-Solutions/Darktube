@@ -3,7 +3,6 @@ import http from 'http';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
-import { chromium } from 'playwright-core';
 import { ffmpegBin } from '@/lib/flow-assemble';
 import { inspectRenderedVideo, type MotionCheckResult } from '@/lib/motion-checks';
 import type { ThreeJsStoryboard } from '@/lib/threejs-scene-compiler';
@@ -174,6 +173,7 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   const gpuArgs = [...baseArgs, '--use-gl=angle'];
 
   let gpuAccelerated = wantGpu;
+  const { chromium } = await import('playwright-core');
   let browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
     headless: true,
