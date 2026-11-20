@@ -1387,6 +1387,7 @@ export async function batchRenderMcp(input: {
               durationSec: compiled.storyboard.duracao,
             });
             const outMp4 = path.join(tmpDir, `mcp_batch_3d_${i}.mp4`);
+            const sheetPath = path.join(tmpDir, `mcp_batch_3d_qa_${i}.png`);
             const rendered = await renderThreeJsToMp4({
               storyboard: compiled.storyboard,
               words: voiceRes.words,
@@ -1394,6 +1395,8 @@ export async function batchRenderMcp(input: {
               audioPath: voiceRes.audioPath,
               outputPath: outMp4,
               isDraft,
+              generateContactSheet: true,
+              contactSheetPath: sheetPath,
               onProgress,
             });
             const storagePath = await uploadMediaFile(
@@ -1401,8 +1404,23 @@ export async function batchRenderMcp(input: {
               `mcp_batch_3d_${Date.now()}_${i}.mp4`,
               'video/mp4'
             );
+            let contactSheetUrl: string | null = null;
+            try {
+              if (rendered.contactSheetPath && fs.existsSync(rendered.contactSheetPath)) {
+                const qaPath = await uploadMediaFile(
+                  fs.readFileSync(rendered.contactSheetPath),
+                  `mcp_batch_3d_qa_${Date.now()}_${i}.png`,
+                  'image/png'
+                );
+                contactSheetUrl = `https://darktube.fjt-solutions.com${qaPath}`;
+              }
+            } catch {}
             return {
               videoUrl: `https://darktube.fjt-solutions.com${storagePath}`,
+              contactSheetUrl,
+              qaChecks: rendered.qaChecks,
+              auditFixes: compiled.auditFixes,
+              lipSyncEngine: lipSync.engine,
               durationSec: rendered.durationSec,
               renderDurationMs: rendered.renderDurationMs,
               renderDurationLabel: rendered.renderDurationLabel,

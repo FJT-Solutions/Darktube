@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
+import { findBrowserExecutable } from './browser-executable';
 import { ffmpegBin } from './flow-assemble';
 import { formatDeliveryDuration } from './render-timing';
 import { inspectRenderedVideo, type MotionCheckResult } from './motion-checks';
@@ -31,22 +32,6 @@ export interface HtmlSvgRenderResult {
   renderDurationLabel: string;
 }
 
-function findBrowserExecutable(): string | undefined {
-  const candidates = [
-    process.env.CHROME_EXECUTABLE_PATH,
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ].filter(Boolean) as string[];
-
-  return candidates.find((p) => fs.existsSync(p));
-}
-
 function writeChunk(stream: NodeJS.WritableStream, chunk: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     if (stream.write(chunk)) return resolve();
@@ -67,8 +52,11 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
   }
 
   fs.mkdirSync(path.dirname(opts.outputPath), { recursive: true });
-  const executablePath = findBrowserExecutable();
   const { chromium } = await import('playwright-core');
+  const executablePath = findBrowserExecutable({
+    preferFullChrome: false,
+    defaultExecutablePath: chromium.executablePath(),
+  });
   const browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
     headless: true,

@@ -104,6 +104,10 @@ RUN adduser --system --uid 1001 nextjs
 # Copy standalone output including the public and static copied inside .next/standalone
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 
+# Ensure Node playwright-core exact Chromium revision is also present in /ms-playwright
+RUN (node ./node_modules/playwright-core/cli.js install --with-deps chromium || node ./node_modules/.pnpm/playwright-core*/node_modules/playwright-core/cli.js install --with-deps chromium) \
+    && chmod -R 777 /ms-playwright
+
 # Copy scripts directory (social-uploader, remotion-server, etc.)
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 

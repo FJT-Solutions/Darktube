@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
+import { findBrowserExecutable } from '@/lib/browser-executable';
 import { ffmpegBin } from '@/lib/flow-assemble';
 import { inspectRenderedVideo, type MotionCheckResult } from '@/lib/motion-checks';
 import { formatDeliveryDuration } from '@/lib/render-timing';
@@ -61,21 +62,6 @@ const MIME_MAP: Record<string, string> = {
   '.bin': 'application/octet-stream',
   '.ktx2': 'image/ktx2',
 };
-
-function findBrowserExecutable(): string | undefined {
-  const candidates = [
-    process.env.CHROME_EXECUTABLE_PATH,
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ].filter(Boolean) as string[];
-  return candidates.find((p) => fs.existsSync(p));
-}
 
 function writeChunk(stream: NodeJS.WritableStream, chunk: Buffer, isDead?: () => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -181,7 +167,11 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   let qaChecks = { scenesSampled: 0, blankFramesDetected: 0, passed: true };
 
   const { server, port } = await startThreeJsStaticServer(engineRoot, jobDir);
-  const executablePath = findBrowserExecutable();
+  const { chromium } = await import('playwright-core');
+  const executablePath = findBrowserExecutable({
+    preferFullChrome: true,
+    defaultExecutablePath: chromium.executablePath(),
+  });
   const baseArgs = [
     '--no-sandbox',
     '--disable-setuid-sandbox',
@@ -196,7 +186,6 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   const gpuArgs = [...baseArgs, '--use-gl=angle'];
 
   let gpuAccelerated = wantGpu;
-  const { chromium } = await import('playwright-core');
   let browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
     headless: true,
