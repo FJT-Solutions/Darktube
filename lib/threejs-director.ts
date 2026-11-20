@@ -108,7 +108,7 @@ REGRAS OBRIGATÓRIAS DE DIREÇÃO:
 2. NUNCA invente nomes de "asset" que não estejam na lista acima. Se precisar de um modelo .glb da lista local, use a chave "glb" no objeto (em vez de "asset") com "altura" em metros.
 3. NUNCA use "etapa" em objetos que devem aparecer prontos na cena! Só use "etapa" quando a narração estiver explicitamente mostrando algo sendo construído, enchendo ou erodindo.
 4. REGRA ANTI-OCLUSÃO: Se houver corte subterrâneo (corte_terreno ou rua_camadas) com tubo/cano, coloque o bloco de corte em z=-1.2 com opacidade=0.35 e o tubo na frente em z=2.8..3.2 com raio>=0.32.
-5. ENQUADRAMENTO VERTICAL 9:16: Mantenha personagens próximos ao centro horizontal (|x| <= 2.2) em planos "medio" e "close", e nunca coloque obstáculos cinzas grandes entre a câmera e o objeto principal.
+5. ENQUADRAMENTO E CENÁRIO 3D: Mantenha personagens próximos ao centro horizontal (|x| <= 2.2) em planos "medio" e "close"; NUNCA coloque paredes, edifícios ou caixas grandes entre a câmera e o sujeito (mantenha deriva entre -18 e +18 graus); use ambiente.fundo="interior" + chao="piso" para cenas internas de banco/cofre/quarto, nunca jogando blocos soltos no meio do asfalto.
 6. Cada cena precisa de: inicio, fim, ambiente, objetos (cada um com id único), camera ({ tipo: "enquadrar", alvo: "<id existente na cena>", plano: "geral"|"medio"|"close", angulo, elevacao, deriva }), e opcionalmente personagens, fluxos, elementos, textos.
 7. Nunca cite em camera.alvo ou elementos.ancora um id que não exista em objetos ou personagens daquela mesma cena.`;
 

@@ -39,6 +39,8 @@ export interface RenderThreeJsResult {
   qaChecks: {
     scenesSampled: number;
     blankFramesDetected: number;
+    occlusionsGuarded?: number;
+    occlusionsRemaining?: number;
     passed: boolean;
   };
   renderDurationMs: number;
@@ -164,7 +166,13 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   }
 
   let generatedContactSheetPath: string | undefined;
-  let qaChecks = { scenesSampled: 0, blankFramesDetected: 0, passed: true };
+  let qaChecks: RenderThreeJsResult['qaChecks'] = {
+    scenesSampled: 0,
+    blankFramesDetected: 0,
+    occlusionsGuarded: 0,
+    occlusionsRemaining: 0,
+    passed: true,
+  };
 
   const { server, port } = await startThreeJsStaticServer(engineRoot, jobDir);
   const { chromium } = await import('playwright-core');
@@ -241,12 +249,19 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
       const sampleScenes = opts.storyboard.cenas.slice(0, 16);
       const stillFiles: string[] = [];
       let blankCount = 0;
+      let occlusionsGuarded = 0;
+      let occlusionsRemaining = 0;
       for (let sIdx = 0; sIdx < sampleScenes.length; sIdx++) {
         const sc = sampleScenes[sIdx];
         const sIni = Number(sc.inicio || 0);
         const sFim = Number(sc.fim || sIni + 2);
-        const midT = Math.min(durationSec, Math.max(0, sIni + (sFim - sIni) * 0.5));
+        const midT = Math.min(durationSec, Math.max(0, sIni + (sFim - sIni) * 0.55));
         await page.evaluate((sec) => (window as any).renderAt(sec), midT);
+        const frameQa = await page
+          .evaluate(() => (window as any).__lastFrameQa || {})
+          .catch(() => ({} as any));
+        if (frameQa?.guardAdjusted) occlusionsGuarded++;
+        if (frameQa?.occludedAfterGuard) occlusionsRemaining++;
         const shotBuf = await page.screenshot({ type: 'jpeg', quality: 82, timeout: 25_000 });
         if (shotBuf.length < 1500) blankCount++;
         const shotFile = path.join(jobDir, `qa_${String(sIdx).padStart(2, '0')}.jpg`);
@@ -256,7 +271,9 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
       qaChecks = {
         scenesSampled: stillFiles.length,
         blankFramesDetected: blankCount,
-        passed: blankCount === 0,
+        occlusionsGuarded,
+        occlusionsRemaining,
+        passed: blankCount === 0 && occlusionsRemaining === 0,
       };
       if (stillFiles.length > 0) {
         const cols = Math.min(4, Math.ceil(Math.sqrt(stillFiles.length)));

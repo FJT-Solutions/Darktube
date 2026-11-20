@@ -49,6 +49,7 @@ export interface HtmlSvgSceneInput {
   visual?: TechCrimsonVisual;
   callout?: string;
   imageUrl?: string;
+  mediaQuery?: string;
   yearLabel?: string;
   chartItems?: HtmlSvgChartItem[];
 }
@@ -97,8 +98,8 @@ export function resolveCanvasDimensions(aspect: '9:16' | '16:9' | '1:1' = '9:16'
   return draft ? { width: 540, height: 960 } : { width: 1080, height: 1920 };
 }
 
-type NormalizedHtmlSvgScene = Required<Omit<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'yearLabel' | 'chartItems'>> &
-  Pick<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'yearLabel' | 'chartItems'>;
+type NormalizedHtmlSvgScene = Required<Omit<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'mediaQuery' | 'yearLabel' | 'chartItems'>> &
+  Pick<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'mediaQuery' | 'yearLabel' | 'chartItems'>;
 
 function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
   const raw = Array.isArray(spec.scenes) && spec.scenes.length > 0
@@ -142,6 +143,7 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     visual: sc.visual,
     callout: sc.callout ? String(sc.callout).slice(0, 48) : undefined,
     imageUrl: sc.imageUrl ? String(sc.imageUrl).trim() : undefined,
+    mediaQuery: sc.mediaQuery ? String(sc.mediaQuery).slice(0, 80) : undefined,
     yearLabel: sc.yearLabel ? String(sc.yearLabel).slice(0, 20) : undefined,
     chartItems: Array.isArray(sc.chartItems)
       ? sc.chartItems.slice(0, 8).map((c) => ({

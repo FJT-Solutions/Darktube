@@ -6,9 +6,11 @@ import { findBrowserExecutable } from './browser-executable';
 import { ffmpegBin } from './flow-assemble';
 import { formatDeliveryDuration } from './render-timing';
 import { inspectRenderedVideo, type MotionCheckResult } from './motion-checks';
+import { searchWikimediaImages } from './threejs-asset-hub';
 import {
   compileHtmlSvgDocument,
   type HtmlSvgProjectSpec,
+  type HtmlSvgSceneInput,
 } from './html-svg-templates';
 
 export interface HtmlSvgRenderOptions {
@@ -16,6 +18,7 @@ export interface HtmlSvgRenderOptions {
   outputPath: string;
   draft?: boolean;
   audioPath?: string;
+  autoEnrichMedia?: boolean;
 }
 
 export interface HtmlSvgRenderResult {
@@ -40,14 +43,97 @@ function writeChunk(stream: NodeJS.WritableStream, chunk: Buffer): Promise<void>
   });
 }
 
+function buildWikimediaSearchQuery(raw: string): string {
+  const cleaned = String(raw || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(teste|v5|v4|editorial|dossie|netflix|doc|vox|papercut|kaz|chart|de|da|do|das|dos|e|o|a|os|as|em|para|por|com|que|uma|um)\b/gi, ' ')
+    .replace(/[^a-zA-Z0-9\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned.split(' ').slice(0, 4).join(' ');
+}
+
+async function cacheRemoteImageToLocal(url: string, dir: string, index: number): Promise<string | undefined> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'DarkTube-Studio/1.0' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return undefined;
+    const ctype = String(res.headers.get('content-type') || '').toLowerCase();
+    if (!ctype.startsWith('image/')) return undefined;
+    const ext = ctype.includes('png') ? '.png' : ctype.includes('webp') ? '.webp' : '.jpg';
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 1024) return undefined;
+    const filePath = path.join(dir, `media_${index}_${Date.now()}${ext}`);
+    fs.writeFileSync(filePath, buf);
+    return `file://${filePath.replace(/\\/g, '/')}`;
+  } catch {
+    return undefined;
+  }
+}
+
+async function enrichEditorialMedia(
+  spec: HtmlSvgProjectSpec,
+  assetDir: string,
+  allowAutoSearch: boolean
+): Promise<HtmlSvgProjectSpec> {
+  const scenes = Array.isArray(spec.scenes) ? spec.scenes : [];
+  if (scenes.length === 0) return spec;
+
+  const isEditorial = spec.preset === 'html_svg_netflix_doc' || spec.preset === 'html_svg_vox_papercut';
+  let fallbackPool: string[] = [];
+
+  const updatedScenes: HtmlSvgSceneInput[] = [];
+  for (let i = 0; i < scenes.length; i++) {
+    const sc = { ...scenes[i] };
+    let imgUrl = sc.imageUrl ? String(sc.imageUrl).trim() : '';
+
+    if (!imgUrl && isEditorial && allowAutoSearch) {
+      const qScene = buildWikimediaSearchQuery(sc.mediaQuery || sc.title || '');
+      const qTitle = buildWikimediaSearchQuery(spec.title || '');
+      let candidates = qScene ? await searchWikimediaImages(qScene, 6).catch(() => []) : [];
+      if (candidates.length === 0 && qTitle && qTitle !== qScene) {
+        if (fallbackPool.length === 0) {
+          const pool = await searchWikimediaImages(qTitle, 8).catch(() => []);
+          fallbackPool = pool.map((c) => c.thumbUrl || c.url).filter(Boolean);
+        }
+        imgUrl = fallbackPool[i % Math.max(1, fallbackPool.length)] || '';
+      } else if (candidates.length > 0) {
+        const chosen = candidates.find((c) => c.width >= 480) || candidates[0];
+        imgUrl = chosen.thumbUrl || chosen.url;
+      }
+    }
+
+    if (imgUrl && /^https?:\/\//i.test(imgUrl)) {
+      const localUrl = await cacheRemoteImageToLocal(imgUrl, assetDir, i);
+      if (localUrl) {
+        sc.imageUrl = localUrl;
+      } else {
+        delete sc.imageUrl;
+      }
+    } else if (imgUrl) {
+      sc.imageUrl = imgUrl;
+    }
+
+    updatedScenes.push(sc);
+  }
+
+  return { ...spec, scenes: updatedScenes };
+}
+
 /**
  * Renderiza uma composicao HTML + SVG frame a frame (deterministica via window.__dtSeek)
  * usando Playwright Chromium + FFmpeg, rodando Motion Checks automaticos no MP4 final.
  */
 export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<HtmlSvgRenderResult> {
   const renderStartMs = Date.now();
-  const compiled = compileHtmlSvgDocument(opts.spec, Boolean(opts.draft));
+  const assetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_htmlsvg_assets_'));
+  const enrichedSpec = await enrichEditorialMedia(opts.spec, assetDir, opts.autoEnrichMedia !== false);
+  const compiled = compileHtmlSvgDocument(enrichedSpec, Boolean(opts.draft));
   if (compiled.timelineIssues.errors.length > 0) {
+    fs.rmSync(assetDir, { recursive: true, force: true });
     throw new Error(`Falha na validação pré-render (Motion Checks): ${compiled.timelineIssues.errors.join(' | ')}`);
   }
 
@@ -77,6 +163,17 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     await page.goto(`file://${tmpHtml.replace(/\\/g, '/')}`, { waitUntil: 'load', timeout: 30000 });
     await page.evaluate(async () => {
       if (document.fonts) await document.fonts.ready;
+      const imgs = Array.from(document.images || []);
+      await Promise.all(
+        imgs.map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((res) => {
+                img.addEventListener('load', () => res(), { once: true });
+                img.addEventListener('error', () => res(), { once: true });
+              })
+        )
+      );
     }).catch(() => {});
 
     const hasAudioFile = Boolean(opts.audioPath && fs.existsSync(opts.audioPath));
@@ -140,6 +237,7 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     if (fs.existsSync(tmpHtml)) {
       try { fs.unlinkSync(tmpHtml); } catch {}
     }
+    fs.rmSync(assetDir, { recursive: true, force: true });
   }
 
   const motionCheck = await inspectRenderedVideo(opts.outputPath, {

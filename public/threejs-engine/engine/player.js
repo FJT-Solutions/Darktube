@@ -1043,7 +1043,73 @@ function cameraEm(cena, t) {
     look.z + Math.cos(ang) * Math.cos(elev) * dist,
   );
   pos.y = Math.max(pos.y, 0.4);
-  return { pos, look, fov: fov0 };
+  return { pos, look, fov: fov0, dist, ang, elev, alvoId: c.alvo, isEnquadrar: true };
+}
+
+const _camRay = new THREE.Raycaster();
+function collectCameraOccluders(cena, excludeId) {
+  const list = [];
+  for (const ent of Object.values(cena.ents || {})) {
+    if (ent.tipo !== 'objeto' || ent.id === excludeId) continue;
+    if (!ent.holder || ent.holder.visible === false) continue;
+    if (ent.def?.opacidade !== undefined && ent.def.opacidade < 0.85) continue;
+    if (['rua_reta', 'cruzamento'].includes(ent.def?.asset)) continue;
+    if ((ent.tamanho?.[1] ?? 0) < 0.25) continue;
+    list.push(ent.holder);
+  }
+  return list;
+}
+
+function guardCameraOcclusion(cena, cam) {
+  const occluders = collectCameraOccluders(cena, cam.alvoId);
+  if (!occluders.length) {
+    return { occludedBeforeGuard: false, occludedAfterGuard: false, guardAdjusted: false };
+  }
+  cena.grp.updateMatrixWorld(true);
+  const checkRay = (from, to) => {
+    const dir = new THREE.Vector3().subVectors(to, from);
+    const len = dir.length();
+    if (len < 0.2) return null;
+    dir.divideScalar(len);
+    _camRay.set(from, dir);
+    _camRay.far = Math.max(0.2, len - 0.25);
+    const hits = _camRay.intersectObjects(occluders, true);
+    return hits.length ? hits[0] : null;
+  };
+
+  const initialHit = checkRay(cam.look, cam.pos);
+  if (!initialHit) {
+    return { occludedBeforeGuard: false, occludedAfterGuard: false, guardAdjusted: false };
+  }
+
+  // Tenta ângulos alternativos sem obstáculos antes de puxar a câmera muito perto
+  if (cam.isEnquadrar && cam.dist) {
+    const offsets = [
+      [0.62, 0], [-0.62, 0], [1.15, 0.12], [-1.15, 0.12],
+      [1.85, 0.18], [-1.85, 0.18], [0, 0.42], [2.6, 0.15], [-2.6, 0.15],
+    ];
+    for (const [dAng, dElev] of offsets) {
+      const a = cam.ang + dAng;
+      const e = clamp(cam.elev + dElev, 0.08, 1.25);
+      const cand = new THREE.Vector3(
+        cam.look.x + Math.sin(a) * Math.cos(e) * cam.dist,
+        Math.max(0.55, cam.look.y + Math.sin(e) * cam.dist),
+        cam.look.z + Math.cos(a) * Math.cos(e) * cam.dist,
+      );
+      if (!checkRay(cam.look, cand)) {
+        cam.pos.copy(cand);
+        return { occludedBeforeGuard: true, occludedAfterGuard: false, guardAdjusted: true };
+      }
+    }
+  }
+
+  // Fallback: puxa a câmera para a frente da parede/obstáculo mantendo distância mínima legível
+  const dir = new THREE.Vector3().subVectors(cam.pos, cam.look).normalize();
+  const safeDist = Math.max(1.15, initialHit.distance - 0.35);
+  cam.pos.copy(cam.look).addScaledVector(dir, safeDist);
+  cam.pos.y = Math.max(cam.pos.y, 0.55);
+  const afterHit = checkRay(cam.look, cam.pos);
+  return { occludedBeforeGuard: true, occludedAfterGuard: Boolean(afterHit), guardAdjusted: true };
 }
 
 const PHONEME_OPENNESS = { A: 0.04, B: 0.35, C: 0.56, D: 0.9, E: 0.68, F: 0.44, G: 0.22, H: 0.5, X: 0.03 };
@@ -1263,8 +1329,10 @@ window.renderAt = (t) => {
     m.rotation.y = Math.atan2(ux, uz);
   }
 
-  // câmera
+  // câmera com guarda anti-oclusão determinística
   const cam = cameraEm(cena, t);
+  const frameQa = guardCameraOcclusion(cena, cam);
+  window.__lastFrameQa = { t, ...frameQa };
   camera.position.copy(cam.pos);
   camera.lookAt(cam.look);
   if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
