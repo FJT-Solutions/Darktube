@@ -4,6 +4,7 @@ import { pool } from '@/lib/db-client';
 import { logger } from '@/lib/logger';
 import { saveDarkClipPost, ensureDarkClipsTablesExist } from '@/lib/database';
 import { processNextQueueItem, setQueuePaused, getIsQueuePaused } from '@/lib/dark-clips-queue';
+import { computeRenderTiming } from '@/lib/render-timing';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,11 +37,14 @@ export async function GET() {
       setTimeout(() => processNextQueueItem(), 100);
     }
 
+    const withTiming = (r: any) =>
+      r ? { ...r, timing: computeRenderTiming({ createdAt: r.created_at, startedAt: r.status === 'rendering' ? r.created_at : null }) } : null;
+
     return NextResponse.json({
       success: true,
       isPaused: getIsQueuePaused(),
-      activeItem: activeRes.rows[0] || null,
-      queuedItems: queuedRes.rows,
+      activeItem: withTiming(activeRes.rows[0]),
+      queuedItems: queuedRes.rows.map(withTiming),
       totalQueued: queuedRes.rows.length,
     });
   } catch (err: any) {

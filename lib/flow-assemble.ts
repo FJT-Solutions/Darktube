@@ -14,6 +14,7 @@ import { getFlowProject, setFlowProjectAssembly } from '@/lib/flow-projects'
 import { getUserApiKey } from '@/lib/database'
 import type { FlowJob } from '@/lib/flow-jobs'
 import { inspectRenderedVideo } from '@/lib/motion-checks'
+import { formatDeliveryDuration } from '@/lib/render-timing'
 
 const run = promisify(execFile)
 export const ffmpegBin = () => process.env.FFMPEG_PATH || 'ffmpeg'
@@ -445,6 +446,7 @@ async function applyCtaOverlay(dir: string, input: string, cta: FlowCtaOverlay, 
 }
 
 export async function assembleFlowProject(userId: string, projectId: string) {
+  const assembleStartMs = Date.now()
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flowasm-'))
   try {
     const project = await getFlowProject(userId, projectId)
@@ -640,7 +642,20 @@ export async function assembleFlowProject(userId: string, projectId: string) {
       srtUrl,
       error: burn && !burned ? 'Legenda não foi gravada no vídeo (ffmpeg sem suporte). O arquivo .srt está disponível.' : null,
     })
-    return { finalUrl, srtUrl, burned, ctaApplied, motionCheck, takes: picked.length, seconds: Math.round(durations.reduce((a, b) => a + b, 0)) }
+    const assembleDurationMs = Math.max(0, Date.now() - assembleStartMs)
+    const assembleDurationLabel = formatDeliveryDuration(assembleDurationMs)
+    console.log(`[Flow] ✅ Montagem do projeto ${projectId} concluída em ${assembleDurationLabel} (${picked.length} takes)`)
+    return {
+      finalUrl,
+      srtUrl,
+      burned,
+      ctaApplied,
+      motionCheck,
+      takes: picked.length,
+      seconds: Math.round(durations.reduce((a, b) => a + b, 0)),
+      assembleDurationMs,
+      assembleDurationLabel,
+    }
   } catch (err: any) {
     await setFlowProjectAssembly(userId, projectId, { status: 'assemble_failed', error: String(err?.message || err).slice(0, 400) }).catch(() => {})
     throw err

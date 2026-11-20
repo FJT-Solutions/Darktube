@@ -31,6 +31,7 @@ import { replaceVideoAudio, replaceProjectAudio } from '@/lib/flow-audio-replace
 import { getUserApiKey } from '@/lib/database';
 import { pool } from '@/lib/db-client';
 import { runQueuedRenderTask } from '@/lib/render-queue';
+import { computeRenderTiming } from '@/lib/render-timing';
 
 const DARKTUBE_BASE_URL = process.env.DARKTUBE_BASE_URL || 'https://darktube.fjt-solutions.com';
 
@@ -998,7 +999,7 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
   const userId = project.user_id;
 
   const { rows: jobs } = await pool.query(
-    'SELECT id, take_index, kind, role, status, params, result_url, error_message, finished_at, created_at FROM public.flow_jobs WHERE project_id = $1 ORDER BY take_index ASC NULLS FIRST, created_at ASC',
+    'SELECT id, take_index, kind, role, status, params, result_url, error_message, claimed_at, finished_at, created_at FROM public.flow_jobs WHERE project_id = $1 ORDER BY take_index ASC NULLS FIRST, created_at ASC',
     [projectId]
   );
 
@@ -1065,12 +1066,16 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     ? (project.srt_url.startsWith('http') ? project.srt_url : `${DARKTUBE_BASE_URL}${project.srt_url}`)
     : null;
 
+  let assembleDurationMs: number | null = null;
+  let assembleDurationLabel: string | null = null;
   if (allTakesDone && !finalUrl && assembleIfReady) {
     try {
       console.log(`[MCP DarkTube] Todos os ${totalTakes} takes prontos! Montando projeto ${projectId}...`);
       const asmResult = await assembleFlowProject(userId, projectId);
       finalUrl = asmResult.finalUrl.startsWith('http') ? asmResult.finalUrl : `${DARKTUBE_BASE_URL}${asmResult.finalUrl}`;
       srtUrl = asmResult.srtUrl ? (asmResult.srtUrl.startsWith('http') ? asmResult.srtUrl : `${DARKTUBE_BASE_URL}${asmResult.srtUrl}`) : null;
+      assembleDurationMs = asmResult.assembleDurationMs;
+      assembleDurationLabel = asmResult.assembleDurationLabel;
     } catch (asmErr: any) {
       console.warn(`[MCP DarkTube] Erro na montagem automática: ${asmErr.message}`);
     }
@@ -1103,12 +1108,24 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
   // Sem cookie, token, URL nem os dados anexos do log; so a mensagem (com links e segredos mascarados).
   const extension = await readExtensionDiagnostics(userId, projectId, jobs.map((j: any) => String(j.id)));
 
+  const projectTiming = computeRenderTiming({
+    createdAt: project.created_at,
+    finishedAt: finalUrl ? project.assembled_at || new Date().toISOString() : null,
+  });
+
   return {
     success: true,
     projectId,
     title: project.title,
     status: awaitingCharacterApproval ? 'awaiting_character_approval' : project.status,
     awaitingCharacterApproval,
+    timing: {
+      totalDeliveryMs: projectTiming.totalDeliveryMs,
+      totalDeliveryLabel: projectTiming.totalDeliveryLabel,
+      assembleDurationMs,
+      assembleDurationLabel,
+      isRunning: projectTiming.isRunning,
+    },
     extension,
     isComplete: Boolean(finalUrl) || allTakesDone,
     progress: {
@@ -1136,10 +1153,17 @@ export async function getCreativeStatus(input: GetCreativeStatusInput): Promise<
     srtUrl,
     takes: takeJobs.map((j: any) => {
       const takeMeta = project.script?.takes?.find((t: any) => t.n === j.take_index);
+      const tInfo = computeRenderTiming({
+        createdAt: j.created_at,
+        startedAt: j.claimed_at || j.created_at,
+        finishedAt: j.finished_at,
+      });
       return {
         takeIndex: j.take_index,
         kind: j.kind,
         status: j.status,
+        durationMs: tInfo.renderDurationMs ?? tInfo.totalDeliveryMs,
+        durationLabel: tInfo.renderDurationLabel ?? tInfo.totalDeliveryLabel,
         videoUrl: j.result_url ? (j.result_url.startsWith('http') ? j.result_url : `${DARKTUBE_BASE_URL}${j.result_url}`) : null,
         error: j.error_message || null,
         transition: takeMeta?.transition || 'cut',
@@ -1182,6 +1206,8 @@ export async function assembleFlowCreative(input: AssembleCreativeInput) {
     burned: asm.burned,
     takesCount: asm.takes,
     durationSeconds: asm.seconds,
+    assembleDurationMs: asm.assembleDurationMs,
+    assembleDurationLabel: asm.assembleDurationLabel,
     localFile,
   };
 }

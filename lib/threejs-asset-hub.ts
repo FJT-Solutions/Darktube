@@ -1,10 +1,16 @@
 import fs from 'fs';
 import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import { ffmpegBin } from '@/lib/flow-assemble';
+import { getPythonCommand } from '@/lib/python-runtime';
+
+const runExec = promisify(execFile);
 
 export interface Local3dModelItem {
   id: string;
   name: string;
-  source: 'local' | 'polyhaven' | 'polypizza' | 'url';
+  source: 'local' | 'polyhaven' | 'polypizza' | 'sketchfab' | 'url';
   license: string;
   glbUrl: string; // e.g. /threejs-engine/models/...
   tags: string[];
@@ -15,12 +21,34 @@ export interface Local3dModelItem {
 export interface Remote3dAssetCandidate {
   id: string;
   name: string;
-  source: 'local' | 'polyhaven' | 'polypizza';
+  source: 'local' | 'polyhaven' | 'polypizza' | 'sketchfab';
   license: string;
   tags: string[];
   thumbnailUrl?: string;
   downloadUrl?: string;
   glbUrl?: string; // already cached locally
+  requiresToken?: boolean;
+}
+
+export interface WikimediaImageCandidate {
+  id: string;
+  title: string;
+  url: string;
+  thumbUrl: string;
+  license: string;
+  artist: string;
+  width: number;
+  height: number;
+}
+
+export interface FreesoundSfxCandidate {
+  id: string;
+  name: string;
+  source: 'freesound_cc0' | 'builtin_cc0';
+  license: string;
+  durationSec: number;
+  previewUrl: string;
+  tags: string[];
 }
 
 const MODELS_DIR = () => path.resolve(process.cwd(), 'public/threejs-engine/models');
@@ -209,7 +237,278 @@ export async function searchFree3dAssets(query: string, opts?: { limit?: number;
     } catch {}
   }
 
+  // 3) Sketchfab (modelos gratuitos baixáveis; busca é aberta sem chave!)
+  if (q) {
+    try {
+      const sf = await searchSketchfabFreeModels(q, Math.min(8, limit));
+      if (sf.length > 0) sourcesChecked.push('sketchfab');
+      for (const item of sf) remote.push(item);
+    } catch {}
+  }
+
   return { local, remote: remote.slice(0, limit), sourcesChecked };
+}
+
+/** Busca modelos 3D gratuitos para download no Sketchfab v3 Search API (sem necessidade de chave para pesquisa). */
+export async function searchSketchfabFreeModels(
+  query: string,
+  limit = 10,
+  token = process.env.SKETCHFAB_API_TOKEN || ''
+): Promise<Remote3dAssetCandidate[]> {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const url = `https://api.sketchfab.com/v3/search?type=models&downloadable=true&archives_flavours=false&q=${encodeURIComponent(q)}&count=${Math.min(24, Math.max(1, limit))}`;
+  const headers: Record<string, string> = { 'User-Agent': 'DarkTube-3D-Studio/1.0' };
+  if (token) headers.Authorization = `Token ${token}`;
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) return [];
+  const json = await res.json();
+  const rows = Array.isArray(json?.results) ? json.results : [];
+  return rows.slice(0, limit).map((r: any) => {
+    const thumbs = Array.isArray(r?.thumbnails?.images) ? r.thumbnails.images : [];
+    const bestThumb = thumbs.find((t: any) => t.width >= 300)?.url || thumbs[0]?.url;
+    const tags = Array.isArray(r?.tags) ? r.tags.map((t: any) => String(t?.name || t)).filter(Boolean).slice(0, 6) : [];
+    return {
+      id: String(r.uid),
+      name: String(r.name || 'Modelo Sketchfab'),
+      source: 'sketchfab' as const,
+      license: String(r?.license?.label || 'Sketchfab Free'),
+      tags,
+      thumbnailUrl: bestThumb ? String(bestThumb) : undefined,
+      requiresToken: !token,
+    };
+  });
+}
+
+/** Baixa um modelo gratuito do Sketchfab (.glb ou .zip contendo .gltf/.glb) usando SKETCHFAB_API_TOKEN. */
+export async function downloadSketchfabModel(
+  uid: string,
+  token = process.env.SKETCHFAB_API_TOKEN || ''
+): Promise<Local3dModelItem> {
+  const cleanUid = safeSlug(uid);
+  const existing = listLocal3dModels().find((m) => m.id === `sf_${cleanUid}`);
+  if (existing) return existing;
+  if (!token) {
+    throw new Error(
+      'Configure SKETCHFAB_API_TOKEN gratuita (sketchfab.com/settings/password) nas variáveis de ambiente para baixar modelos do Sketchfab automaticamente.'
+    );
+  }
+  const metaRes = await fetch(`https://api.sketchfab.com/v3/models/${encodeURIComponent(uid)}/download`, {
+    headers: { Authorization: `Token ${token}`, 'User-Agent': 'DarkTube-3D-Studio/1.0' },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!metaRes.ok) {
+    throw new Error(`Sketchfab recusou o download (${metaRes.status}). Verifique SKETCHFAB_API_TOKEN.`);
+  }
+  const meta = await metaRes.json();
+  const dlInfo = meta?.glb || meta?.gltf;
+  if (!dlInfo?.url) {
+    throw new Error('Este modelo do Sketchfab não disponibilizou pacote GLB/GLTF gratuito.');
+  }
+
+  const folderName = `sf_${cleanUid}`;
+  const targetDir = path.join(MODELS_DIR(), folderName);
+  fs.mkdirSync(targetDir, { recursive: true });
+
+  const fileRes = await fetch(dlInfo.url, { signal: AbortSignal.timeout(60_000) });
+  if (!fileRes.ok) throw new Error(`Falha ao baixar arquivo do Sketchfab (${fileRes.status})`);
+  const buf = Buffer.from(await fileRes.arrayBuffer());
+
+  let entryRel = 'scene.gltf';
+  if (buf.length >= 16 && buf.readUInt32LE(0) === 0x46546c67) {
+    entryRel = `${cleanUid}.glb`;
+    fs.writeFileSync(path.join(targetDir, entryRel), buf);
+  } else {
+    const zipPath = path.join(targetDir, `${cleanUid}.zip`);
+    fs.writeFileSync(zipPath, buf);
+    const py = getPythonCommand();
+    const extractScript = `
+import json, os, sys, zipfile
+zpath, outdir = sys.argv[1], sys.argv[2]
+entry = None
+with zipfile.ZipFile(zpath, 'r') as zf:
+    zf.extractall(outdir)
+for root, _, files in os.walk(outdir):
+    for f in files:
+        if f.lower().endswith(('.glb', '.gltf')):
+            entry = os.path.relpath(os.path.join(root, f), outdir).replace('\\\\', '/')
+            break
+    if entry:
+        break
+print(json.dumps({"entry": entry}))
+`.trim();
+    const { stdout } = await runExec(py, ['-c', extractScript, zipPath, targetDir], { timeout: 30_000, windowsHide: true });
+    try { fs.unlinkSync(zipPath); } catch {}
+    const parsed = JSON.parse(stdout || '{}');
+    if (!parsed?.entry) throw new Error('Pacote Sketchfab baixado sem arquivo .glb/.gltf interno.');
+    entryRel = String(parsed.entry);
+  }
+
+  return upsertManifestItem({
+    id: folderName,
+    name: `Sketchfab ${cleanUid}`,
+    source: 'sketchfab',
+    license: 'Sketchfab Free',
+    glbUrl: `/threejs-engine/models/${folderName}/${entryRel}`,
+    tags: [cleanUid, 'sketchfab'],
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** Busca imagens reais em domínio público / CC na API aberta da Wikimedia Commons ($0 sem chave). */
+export async function searchWikimediaImages(query: string, limit = 12): Promise<WikimediaImageCandidate[]> {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(q)}&gsrlimit=${Math.min(20, Math.max(1, limit))}&prop=imageinfo&iiprop=url|extmetadata|size|mime&iiurlwidth=640&format=json&origin=*`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'DarkTube-Studio/1.0' },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  const pages = Object.values<any>(json?.query?.pages || {});
+  const out: WikimediaImageCandidate[] = [];
+  for (const p of pages) {
+    const info = Array.isArray(p?.imageinfo) ? p.imageinfo[0] : null;
+    if (!info?.url || !/^image\/(jpeg|png|webp)/i.test(String(info.mime || ''))) continue;
+    const ext = info.extmetadata || {};
+    out.push({
+      id: String(p.pageid || p.title),
+      title: String(p.title || '').replace(/^File:/i, '').slice(0, 120),
+      url: String(info.url),
+      thumbUrl: String(info.thumburl || info.url),
+      license: String(ext?.LicenseShortName?.value || 'Public domain / CC').replace(/<[^>]+>/g, ''),
+      artist: String(ext?.Artist?.value || 'Wikimedia Commons').replace(/<[^>]+>/g, '').slice(0, 80),
+      width: Number(info.width || 0),
+      height: Number(info.height || 0),
+    });
+  }
+  return out;
+}
+
+const BUILTIN_SFX_SPECS: Record<string, { name: string; durationSec: number; tags: string[]; lavfi: string }> = {
+  whoosh: {
+    name: 'Whoosh Transição Rápida',
+    durationSec: 0.45,
+    tags: ['transicao', 'corte', 'vento'],
+    lavfi: 'anoisesrc=d=0.45:c=pink:a=0.45,afade=t=in:st=0:d=0.14,afade=t=out:st=0.2:d=0.25,highpass=f=240,lowpass=f=2400',
+  },
+  pop: {
+    name: 'Pop UI / Balão',
+    durationSec: 0.2,
+    tags: ['pop', 'ui', 'bolha'],
+    lavfi: 'sine=f=680:d=0.18,asetrate=44100*1.35,afade=t=out:st=0.04:d=0.12',
+  },
+  camera_click: {
+    name: 'Click / Flash de Câmera',
+    durationSec: 0.25,
+    tags: ['camera', 'flash', 'foto'],
+    lavfi: 'anoisesrc=d=0.18:c=white:a=0.5,highpass=f=1800,afade=t=out:st=0.02:d=0.14',
+  },
+  bass_drop: {
+    name: 'Bass Drop Impacto Grave',
+    durationSec: 1.1,
+    tags: ['impacto', 'grave', 'virada'],
+    lavfi: 'sine=f=110:d=1.1,afade=t=out:st=0.2:d=0.9,lowpass=f=160',
+  },
+  paper_rustle: {
+    name: 'Papel / Recorte VOX',
+    durationSec: 0.55,
+    tags: ['papel', 'vox', 'documento'],
+    lavfi: 'anoisesrc=d=0.55:c=brown:a=0.4,highpass=f=1200,lowpass=f=4500,afade=t=in:st=0:d=0.08,afade=t=out:st=0.3:d=0.25',
+  },
+  vault_open: {
+    name: 'Cofre / Mecanismo Metálico',
+    durationSec: 0.9,
+    tags: ['cofre', 'metal', 'porta'],
+    lavfi: 'sine=f=180:d=0.85,afade=t=in:st=0:d=0.06,afade=t=out:st=0.4:d=0.45,tremolo=f=12:d=0.5',
+  },
+  alarm_beep: {
+    name: 'Alerta Curto / Alarme',
+    durationSec: 0.65,
+    tags: ['alerta', 'erro', 'suspense'],
+    lavfi: 'sine=f=880:d=0.6,tremolo=f=8:d=0.85,afade=t=out:st=0.45:d=0.15',
+  },
+  typewriter: {
+    name: 'Tecla Dossiê / Máquina de Escrever',
+    durationSec: 0.22,
+    tags: ['texto', 'dossie', 'netflix'],
+    lavfi: 'anoisesrc=d=0.12:c=white:a=0.55,bandpass=f=2200:w=800,afade=t=out:st=0.01:d=0.1',
+  },
+  riser_tension: {
+    name: 'Riser de Tensão',
+    durationSec: 1.4,
+    tags: ['tensao', 'hook', 'documentario'],
+    lavfi: 'anoisesrc=d=1.4:c=pink:a=0.35,afade=t=in:st=0.05:d=1.25,afade=t=out:st=1.3:d=0.1',
+  },
+  impact_boom: {
+    name: 'Impacto Cinematográfico',
+    durationSec: 1.0,
+    tags: ['boom', 'cinema', 'cena'],
+    lavfi: 'sine=f=68:d=1.0,afade=t=out:st=0.08:d=0.9,volume=1.6',
+  },
+};
+
+/** Garante um arquivo .mp3 CC0 procedural local em public/threejs-engine/sfx/<id>.mp3 ($0). */
+export async function ensureBuiltinSfx(sfxId: string): Promise<{ id: string; url: string; path: string }> {
+  const spec = BUILTIN_SFX_SPECS[sfxId];
+  if (!spec) throw new Error(`SFX builtin desconhecido: ${sfxId}`);
+  const sfxDir = path.resolve(process.cwd(), 'public/threejs-engine/sfx');
+  fs.mkdirSync(sfxDir, { recursive: true });
+  const filePath = path.join(sfxDir, `${sfxId}.mp3`);
+  if (!fs.existsSync(filePath)) {
+    await runExec(
+      ffmpegBin(),
+      ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', spec.lavfi, '-c:a', 'libmp3lame', '-b:a', '128k', filePath],
+      { timeout: 15_000, windowsHide: true }
+    );
+  }
+  return { id: sfxId, url: `/threejs-engine/sfx/${sfxId}.mp3`, path: filePath };
+}
+
+/** Busca SFX gratuitos CC0 no Freesound.org (se FREESOUND_API_KEY presente) + banco CC0 procedural local instantâneo. */
+export async function searchFreesoundSfx(
+  query: string,
+  limit = 12,
+  apiKey = process.env.FREESOUND_API_KEY || ''
+): Promise<{ items: FreesoundSfxCandidate[]; freesoundActive: boolean }> {
+  const q = String(query || '').trim().toLowerCase();
+  const builtin: FreesoundSfxCandidate[] = Object.entries(BUILTIN_SFX_SPECS)
+    .filter(([id, s]) => !q || `${id} ${s.name} ${s.tags.join(' ')}`.toLowerCase().includes(q))
+    .map(([id, s]) => ({
+      id,
+      name: s.name,
+      source: 'builtin_cc0' as const,
+      license: 'CC0 Procedural',
+      durationSec: s.durationSec,
+      previewUrl: `/api/studio-3d/assets?sfxPlay=${encodeURIComponent(id)}`,
+      tags: s.tags,
+    }));
+
+  if (!apiKey || !q) {
+    return { items: builtin.slice(0, limit), freesoundActive: false };
+  }
+
+  try {
+    const url = `https://freesound.org/apiv2/search/text/?query=${encodeURIComponent(q)}&filter=${encodeURIComponent('license:"Creative Commons 0"')}&fields=id,name,duration,previews,tags,license&page_size=${Math.min(15, limit)}&token=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return { items: builtin.slice(0, limit), freesoundActive: false };
+    const json = await res.json();
+    const remote: FreesoundSfxCandidate[] = (Array.isArray(json?.results) ? json.results : [])
+      .filter((r: any) => r?.previews?.['preview-hq-mp3'] || r?.previews?.['preview-lq-mp3'])
+      .map((r: any) => ({
+        id: `fs_${r.id}`,
+        name: String(r.name || 'Freesound SFX'),
+        source: 'freesound_cc0' as const,
+        license: 'CC0 (Freesound)',
+        durationSec: +Number(r.duration || 1).toFixed(2),
+        previewUrl: String(r.previews['preview-hq-mp3'] || r.previews['preview-lq-mp3']),
+        tags: Array.isArray(r.tags) ? r.tags.slice(0, 6).map(String) : [],
+      }));
+    return { items: [...remote, ...builtin].slice(0, limit), freesoundActive: true };
+  } catch {
+    return { items: builtin.slice(0, limit), freesoundActive: false };
+  }
 }
 
 /** Baixa um modelo 3D CC0 do Poly Haven (1k glTF + bin + texturas) para cache local permanente ($0). */

@@ -17,8 +17,19 @@ import {
   Layers,
   Mic,
   Link2,
+  Cpu,
+  Image as ImageIcon,
+  Volume2,
+  Wand2,
+  FileJson,
+  Scissors,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react"
 import { toast } from "sonner"
+import { formatDeliveryDuration } from "@/lib/render-timing"
+import { StudioV5Tabs } from "@/components/studio-v5-tabs"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -41,11 +52,30 @@ interface LocalModel {
 interface RemoteCandidate {
   id: string
   name: string
-  source: "polyhaven" | "polypizza" | "local"
+  source: "polyhaven" | "polypizza" | "sketchfab" | "local"
   license: string
   tags: string[]
   thumbnailUrl?: string
   downloadUrl?: string
+}
+
+interface WikimediaItem {
+  id: string
+  title: string
+  url: string
+  thumbUrl: string
+  license: string
+  artist: string
+}
+
+interface SfxItem {
+  id: string
+  name: string
+  source: string
+  license: string
+  durationSec: number
+  previewUrl: string
+  tags: string[]
 }
 
 interface QueueJob {
@@ -54,11 +84,28 @@ interface QueueJob {
   kind: string
   title: string
   status: string
-  progress: number
+  progress_pct?: number
+  progress?: number
   error_message?: string | null
+  result_url?: string | null
+  result_meta?: any
   result_json?: any
   created_at: string
+  started_at?: string | null
   finished_at?: string | null
+  timing?: {
+    totalDeliveryMs?: number | null
+    totalDeliveryLabel?: string | null
+    deliveryTimeMs?: number | null
+    deliveryTimeLabel?: string | null
+    renderDurationMs?: number | null
+    renderDurationLabel?: string | null
+    queueWaitMs?: number | null
+    queueWaitLabel?: string | null
+    elapsedMs?: number | null
+    elapsedLabel?: string | null
+    isRunning?: boolean
+  }
 }
 
 const QUICK_IDEAS = [
@@ -76,6 +123,11 @@ export default function Studio3dPage() {
   const [quality, setQuality] = useState<"alta" | "media" | "basica">("media")
   const [voiceProvider, setVoiceProvider] = useState<"auto" | "elevenlabs" | "openai" | "edge">("auto")
   const [voiceGender, setVoiceGender] = useState<"male" | "female">("male")
+  const [backend, setBackend] = useState<"threejs" | "blender">("threejs")
+  const [runtimeStatus, setRuntimeStatus] = useState<{
+    blender?: { available: boolean; note: string }
+    rhubarb?: { available: boolean; note: string }
+  } | null>(null)
 
   const [generating, setGenerating] = useState(false)
   const [rendering, setRendering] = useState(false)
@@ -83,12 +135,16 @@ export default function Studio3dPage() {
   const [storyboardText, setStoryboardText] = useState("")
   const [metaInfo, setMetaInfo] = useState<{ providerUsed?: string; sceneCount?: number; auditFixes?: string[]; usedGlbModels?: string[] } | null>(null)
 
-  // Biblioteca 3D CC0
+  // Biblioteca V2 ($0): 3D + Wikimedia + SFX CC0
+  const [assetType, setAssetType] = useState<"3d" | "wikimedia" | "sfx">("3d")
   const [assetQuery, setAssetQuery] = useState("")
   const [searchingAssets, setSearchingAssets] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [localModels, setLocalModels] = useState<LocalModel[]>([])
   const [remoteModels, setRemoteModels] = useState<RemoteCandidate[]>([])
+  const [wikimediaItems, setWikimediaItems] = useState<WikimediaItem[]>([])
+  const [sfxItems, setSfxItems] = useState<SfxItem[]>([])
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
   const [sourcesChecked, setSourcesChecked] = useState<string[]>([])
   const [directGlbUrl, setDirectGlbUrl] = useState("")
   const [directGlbName, setDirectGlbName] = useState("")
@@ -100,6 +156,7 @@ export default function Studio3dPage() {
     recentJobs: QueueJob[]
   }>({ activeJob: null, queuedJobs: [], recentJobs: [] })
   const [loadingQueue, setLoadingQueue] = useState(false)
+  const [nowTick, setNowTick] = useState(() => Date.now())
 
   const fetchQueue = useCallback(async (silent = false) => {
     if (!silent) setLoadingQueue(true)
@@ -119,31 +176,51 @@ export default function Studio3dPage() {
     }
   }, [])
 
-  const fetchAssets = useCallback(async (q = "") => {
+  const fetchAssets = useCallback(async (q = "", modeOverride?: "3d" | "wikimedia" | "sfx") => {
+    const mode = modeOverride || assetType
     setSearchingAssets(true)
     try {
-      const res = await fetch(`/api/studio-3d/assets?q=${encodeURIComponent(q)}&limit=18`, { cache: "no-store" })
+      const res = await fetch(`/api/studio-3d/assets?type=${mode}&q=${encodeURIComponent(q)}&limit=18`, { cache: "no-store" })
       const data = await res.json()
       if (data?.success) {
-        setLocalModels(data.local || [])
-        setRemoteModels(data.remote || [])
-        setSourcesChecked(data.sourcesChecked || [])
+        if (mode === "wikimedia") {
+          setWikimediaItems(Array.isArray(data.images) ? data.images : [])
+        } else if (mode === "sfx") {
+          setSfxItems(Array.isArray(data.items) ? data.items : [])
+        } else {
+          setLocalModels(data.local || [])
+          setRemoteModels(data.remote || [])
+          setSourcesChecked(data.sourcesChecked || [])
+        }
       } else {
-        toast.error(data?.error || "Erro ao consultar acervo 3D.")
+        toast.error(data?.error || "Erro ao consultar Acervo V2.")
       }
     } catch {
-      toast.error("Falha ao consultar biblioteca 3D.")
+      toast.error("Falha ao consultar Acervo V2.")
     } finally {
       setSearchingAssets(false)
     }
-  }, [])
+  }, [assetType])
 
   useEffect(() => {
     fetchQueue()
-    fetchAssets("")
+    fetchAssets("", "3d")
+    fetch("/api/studio-3d/blender-status", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.success) setRuntimeStatus({ blender: d.blender, rhubarb: d.rhubarb })
+      })
+      .catch(() => {})
     const timer = setInterval(() => fetchQueue(true), 4000)
     return () => clearInterval(timer)
-  }, [fetchQueue, fetchAssets])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchQueue])
+
+  useEffect(() => {
+    if (!queueData.activeJob) return
+    const tick = setInterval(() => setNowTick(Date.now()), 1000)
+    return () => clearInterval(tick)
+  }, [queueData.activeJob])
 
   async function handleGenerate(mode: "llm" | "preset") {
     setGenerating(true)
@@ -206,6 +283,8 @@ export default function Studio3dPage() {
           kind,
           aspect,
           quality,
+          backend,
+          fallbackToThreeJs: true,
           isDraft: quality === "basica",
           voiceProvider,
           voiceGender,
@@ -216,7 +295,7 @@ export default function Studio3dPage() {
         toast.error(data?.error || "Falha ao enfileirar render 3D.")
         return
       }
-      toast.success(`Job enfileirado na Fila FIFO (posição ${data.position || 1})!`)
+      toast.success(`Job enfileirado na Fila FIFO (posição ${data.positionInQueue || data.queuePosition || data.position || 1})!`)
       fetchQueue(true)
     } catch {
       toast.error("Erro ao enviar job para a Fila FIFO.")
@@ -284,6 +363,39 @@ export default function Studio3dPage() {
     }
   }
 
+  async function handleCopyUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedUrl(url)
+      toast.success("URL copiada!")
+      setTimeout(() => setCopiedUrl((prev) => (prev === url ? null : prev)), 1800)
+    } catch {
+      toast.error("Não foi possível copiar URL.")
+    }
+  }
+
+  async function handleSaveBuiltinSfx(sfxId: string) {
+    setDownloadingId(sfxId)
+    try {
+      const res = await fetch("/api/studio-3d/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "sfx_builtin", assetId: sfxId }),
+      })
+      const data = await res.json()
+      if (!data?.success) {
+        toast.error(data?.error || "Erro ao gerar MP3 CC0.")
+        return
+      }
+      toast.success(`SFX "${sfxId}" pronto em ${data.sfx?.url}!`)
+      await handleCopyUrl(data.sfx?.url || `/threejs-engine/sfx/${sfxId}.mp3`)
+    } catch {
+      toast.error("Erro ao gerar arquivo SFX CC0.")
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   async function handleCancelJob(jobId: string) {
     try {
       const res = await fetch(`/api/render-queue?jobId=${encodeURIComponent(jobId)}`, { method: "DELETE" })
@@ -303,15 +415,25 @@ export default function Studio3dPage() {
     <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 pt-4 sm:pt-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
               <Box className="h-7 w-7 text-primary" />
               Estúdio 3D ($0)
             </h2>
-            <Badge variant="secondary" className="text-xs">Three.js + GLTFLoader + FIFO</Badge>
+            <Badge variant="secondary" className="text-xs">V5 · Three.js + Blender + Puppet + Social</Badge>
+            {runtimeStatus?.blender && (
+              <Badge variant={runtimeStatus.blender.available ? "default" : "outline"} className="text-[11px]">
+                {runtimeStatus.blender.available ? "Blender EEVEE ativo" : "Blender auto-fallback Three.js"}
+              </Badge>
+            )}
+            {runtimeStatus?.rhubarb && (
+              <Badge variant={runtimeStatus.rhubarb.available ? "default" : "outline"} className="text-[11px]">
+                {runtimeStatus.rhubarb.available ? "Rhubarb Lip-Sync" : "Fonemas PT-BR $0"}
+              </Badge>
+            )}
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Diretor de Roteiro 3D com IA, acervo gratuito CC0 (.glb) e renderização MP4 com voz híbrida na Fila FIFO multiusuário.
+            Diretor 3D com IA, Puppet Rig articulado, Acervo V2 CC0 (.glb/Wikimedia/SFX), Virais SVG e Auto-Clipper/Streamer 24/7 na Fila FIFO.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -327,15 +449,24 @@ export default function Studio3dPage() {
       </div>
 
       <Tabs defaultValue="criar" className="space-y-4">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
-          <TabsTrigger value="criar" className="gap-1.5">
-            <Sparkles className="h-3.5 w-3.5" /> Criar Vídeo 3D
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto gap-1">
+          <TabsTrigger value="criar" className="gap-1.5 text-xs">
+            <Sparkles className="h-3.5 w-3.5" /> Vídeo 3D
           </TabsTrigger>
-          <TabsTrigger value="assets" className="gap-1.5">
-            <Layers className="h-3.5 w-3.5" /> Acervo CC0 ({localModels.length})
+          <TabsTrigger value="assets" className="gap-1.5 text-xs">
+            <Layers className="h-3.5 w-3.5" /> Acervo V2 ({localModels.length})
           </TabsTrigger>
-          <TabsTrigger value="fila" className="gap-1.5">
+          <TabsTrigger value="fila" className="gap-1.5 text-xs">
             <Film className="h-3.5 w-3.5" /> Fila FIFO ({queueData.queuedJobs.length + (queueData.activeJob ? 1 : 0)})
+          </TabsTrigger>
+          <TabsTrigger value="puppet" className="gap-1.5 text-xs">
+            <Wand2 className="h-3.5 w-3.5" /> Puppet Studio
+          </TabsTrigger>
+          <TabsTrigger value="virais" className="gap-1.5 text-xs">
+            <FileJson className="h-3.5 w-3.5" /> Virais & Lote
+          </TabsTrigger>
+          <TabsTrigger value="social" className="gap-1.5 text-xs">
+            <Scissors className="h-3.5 w-3.5" /> Lives & Streamer
           </TabsTrigger>
         </TabsList>
 
@@ -418,7 +549,21 @@ export default function Studio3dPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-1 border-t">
+                <div className="grid grid-cols-3 gap-2.5 pt-1 border-t">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Cpu className="h-3 w-3" /> Motor 3D
+                    </label>
+                    <Select value={backend} onValueChange={(v) => setBackend(v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="threejs">Three.js Articulated ($0)</SelectItem>
+                        <SelectItem value="blender">
+                          Blender EEVEE {runtimeStatus?.blender?.available ? "(Ativo)" : "(Auto-fallback Three.js)"}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground flex items-center gap-1">
                       <Mic className="h-3 w-3" /> Motor de Voz
@@ -504,28 +649,70 @@ export default function Studio3dPage() {
           </div>
         </TabsContent>
 
-        {/* ABA 2: ACERVO 3D GRATUITO CC0 */}
+        {/* ABA 2: ACERVO V2 GRATUITO ($0) — 3D + WIKIMEDIA + SFX */}
         <TabsContent value="assets" className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-12">
             <Card className="lg:col-span-8">
               <CardHeader>
-                <CardTitle className="text-base">Buscar Modelos 3D Gratuitos (CC0)</CardTitle>
-                <CardDescription>
-                  Busca ao vivo em Poly Haven (100% CC0 sem chave) e Poly Pizza (quando configurado). Fontes ativas: {sourcesChecked.join(", ") || "local"}.
-                </CardDescription>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base">Acervo V2 ($0): Modelos 3D, Fotos Históricas e SFX CC0</CardTitle>
+                    <CardDescription>
+                      Poly Haven + Sketchfab Free (com SKETCHFAB_API_TOKEN), Wikimedia Commons e banco sonoro CC0. Fontes 3D: {sourcesChecked.join(", ") || "local"}.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant={assetType === "3d" ? "default" : "outline"}
+                      onClick={() => {
+                        setAssetType("3d")
+                        fetchAssets(assetQuery, "3d")
+                      }}
+                    >
+                      <Box className="h-3.5 w-3.5 mr-1" /> 3D (.glb)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={assetType === "wikimedia" ? "default" : "outline"}
+                      onClick={() => {
+                        setAssetType("wikimedia")
+                        fetchAssets(assetQuery || "chernobyl", "wikimedia")
+                      }}
+                    >
+                      <ImageIcon className="h-3.5 w-3.5 mr-1" /> Wikimedia
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={assetType === "sfx" ? "default" : "outline"}
+                      onClick={() => {
+                        setAssetType("sfx")
+                        fetchAssets(assetQuery, "sfx")
+                      }}
+                    >
+                      <Volume2 className="h-3.5 w-3.5 mr-1" /> SFX CC0
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault()
-                    fetchAssets(assetQuery)
+                    fetchAssets(assetQuery, assetType)
                   }}
                   className="flex gap-2"
                 >
                   <Input
                     value={assetQuery}
                     onChange={(e) => setAssetQuery(e.target.value)}
-                    placeholder="Busque em inglês (ex: barrel, lantern, wheel, generator, chair, tree, rock)..."
+                    placeholder={
+                      assetType === "wikimedia"
+                        ? "Busque fotos históricas/reais (ex: chernobyl, titanic, apollo 11)..."
+                        : assetType === "sfx"
+                          ? "Busque ou filtre efeitos sonoros (ex: whoosh, vault, pop, impact)..."
+                          : "Busque modelos 3D em inglês (ex: barrel, lantern, wheel, dragon, generator)..."
+                    }
                   />
                   <Button type="submit" disabled={searchingAssets}>
                     {searchingAssets ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
@@ -533,45 +720,104 @@ export default function Studio3dPage() {
                   </Button>
                 </form>
 
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                  {remoteModels.map((item) => (
-                    <div key={`${item.source}_${item.id}`} className="rounded-lg border p-2.5 flex flex-col justify-between gap-2 bg-card">
-                      <div className="space-y-1.5">
-                        {item.thumbnailUrl && (
-                          <img
-                            src={item.thumbnailUrl}
-                            alt={item.name}
-                            className="w-full h-28 object-cover rounded-md bg-muted"
-                          />
-                        )}
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="text-xs font-semibold leading-tight line-clamp-2">{item.name}</span>
-                          <Badge variant="outline" className="text-[10px] shrink-0">{item.license}</Badge>
+                {assetType === "3d" && (
+                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                    {remoteModels.map((item) => (
+                      <div key={`${item.source}_${item.id}`} className="rounded-lg border p-2.5 flex flex-col justify-between gap-2 bg-card">
+                        <div className="space-y-1.5">
+                          {item.thumbnailUrl && (
+                            <img
+                              src={item.thumbnailUrl}
+                              alt={item.name}
+                              className="w-full h-28 object-cover rounded-md bg-muted"
+                            />
+                          )}
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="text-xs font-semibold leading-tight line-clamp-2">{item.name}</span>
+                            <Badge variant="outline" className="text-[10px] shrink-0">{item.license}</Badge>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">{item.source}</p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">{item.source}</p>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="w-full h-7 text-xs"
+                          disabled={downloadingId === item.id}
+                          onClick={() => handleDownloadRemote(item)}
+                        >
+                          {downloadingId === item.id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3 mr-1" />
+                          )}
+                          Salvar na Biblioteca
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="w-full h-7 text-xs"
-                        disabled={downloadingId === item.id}
-                        onClick={() => handleDownloadRemote(item)}
-                      >
-                        {downloadingId === item.id ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : (
-                          <Download className="h-3 w-3 mr-1" />
-                        )}
-                        Salvar na Biblioteca
-                      </Button>
-                    </div>
-                  ))}
-                  {!searchingAssets && remoteModels.length === 0 && (
-                    <p className="text-xs text-muted-foreground col-span-full py-6 text-center">
-                      Nenhum modelo remoto encontrado para este termo. Tente palavras em inglês (ex: barrel, table, wheel, crate).
-                    </p>
-                  )}
-                </div>
+                    ))}
+                    {!searchingAssets && remoteModels.length === 0 && (
+                      <p className="text-xs text-muted-foreground col-span-full py-6 text-center">
+                        Nenhum modelo remoto encontrado para este termo. Tente palavras em inglês (ex: barrel, table, wheel, crate).
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {assetType === "wikimedia" && (
+                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                    {wikimediaItems.map((img) => (
+                      <div key={img.id} className="rounded-lg border p-2.5 flex flex-col justify-between gap-2 bg-card">
+                        <div className="space-y-1.5">
+                          <img src={img.thumbUrl} alt={img.title} className="w-full h-28 object-cover rounded-md bg-muted" />
+                          <p className="text-xs font-semibold line-clamp-2">{img.title}</p>
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                            <span className="truncate">{img.artist}</span>
+                            <Badge variant="outline" className="text-[9px]">{img.license}</Badge>
+                          </div>
+                        </div>
+                        <Button size="sm" variant="secondary" className="w-full h-7 text-xs" onClick={() => handleCopyUrl(img.url)}>
+                          {copiedUrl === img.url ? <Check className="h-3 w-3 mr-1 text-emerald-500" /> : <Copy className="h-3 w-3 mr-1" />}
+                          Copiar URL p/ Netflix Doc
+                        </Button>
+                      </div>
+                    ))}
+                    {!searchingAssets && wikimediaItems.length === 0 && (
+                      <p className="text-xs text-muted-foreground col-span-full py-6 text-center">
+                        Nenhuma foto encontrada no Wikimedia Commons. Tente um termo em inglês (ex: nuclear plant, earth, skyscraper).
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {assetType === "sfx" && (
+                  <div className="space-y-2">
+                    {sfxItems.map((sfx) => (
+                      <div key={sfx.id} className="rounded-lg border p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{sfx.name}</span>
+                            <Badge variant="outline" className="text-[10px]">{sfx.license}</Badge>
+                            <span className="text-[11px] text-muted-foreground">{sfx.durationSec}s</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground font-mono truncate">{sfx.tags.join(", ")}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <audio controls preload="none" src={sfx.previewUrl} className="h-8 w-44" />
+                          {sfx.source === "builtin_cc0" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={downloadingId === sfx.id}
+                              onClick={() => handleSaveBuiltinSfx(sfx.id)}
+                            >
+                              {downloadingId === sfx.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+                              Gerar MP3
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -634,24 +880,34 @@ export default function Studio3dPage() {
 
         {/* ABA 3: FILA FIFO AO VIVO */}
         <TabsContent value="fila" className="space-y-4">
-          {queueData.activeJob && (
-            <Card className="border-primary/40">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    Renderizando Agora (Prioridade Exclusiva FIFO)
-                  </CardTitle>
-                  <Badge>{queueData.activeJob.engine}</Badge>
-                </div>
-                <CardDescription>{queueData.activeJob.title}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Progress value={queueData.activeJob.progress || 0} />
-                <p className="text-xs text-muted-foreground">{queueData.activeJob.progress || 0}% concluído</p>
-              </CardContent>
-            </Card>
-          )}
+          {queueData.activeJob && (() => {
+            const pct = queueData.activeJob.progress_pct ?? queueData.activeJob.progress ?? 0
+            const baseIso = queueData.activeJob.started_at || queueData.activeJob.created_at
+            const elapsedMs = Math.max(0, nowTick - (Date.parse(baseIso) || nowTick))
+            return (
+              <Card className="border-primary/40">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      Renderizando Agora (Prioridade Exclusiva FIFO)
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono text-xs gap-1">
+                        <Clock className="h-3 w-3 text-amber-500" /> {formatDeliveryDuration(elapsedMs)}
+                      </Badge>
+                      <Badge>{queueData.activeJob.engine}</Badge>
+                    </div>
+                  </div>
+                  <CardDescription>{queueData.activeJob.title}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Progress value={pct} />
+                  <p className="text-xs text-muted-foreground">{pct}% concluído · cronômetro ao vivo</p>
+                </CardContent>
+              </Card>
+            )
+          })()}
 
           {queueData.queuedJobs.length > 0 && (
             <Card>
@@ -680,12 +936,17 @@ export default function Studio3dPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {queueData.recentJobs.map((j) => {
-                const videoUrl = j.result_json?.videoUrl
+                const videoUrl = j.result_url || j.result_meta?.videoUrl || j.result_json?.videoUrl
+                const contactSheetUrl = j.result_meta?.contactSheetUrl || j.result_json?.contactSheetUrl
+                const deliveryLabel = j.timing?.totalDeliveryLabel || j.timing?.deliveryTimeLabel || j.result_meta?.deliveryTimeLabel
+                const renderLabel = j.timing?.renderDurationLabel || j.result_meta?.renderDurationLabel
+                const waitLabel = j.timing?.queueWaitLabel
+                const isDone = j.status === "done" || j.status === "completed"
                 return (
                   <div key={j.id} className="rounded-lg border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="space-y-0.5 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {j.status === "completed" ? (
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isDone ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                         ) : j.status === "failed" ? (
                           <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
@@ -693,12 +954,32 @@ export default function Studio3dPage() {
                           <Clock className="h-4 w-4 text-amber-500 shrink-0" />
                         )}
                         <span className="text-sm font-semibold truncate">{j.title}</span>
-                        <Badge variant="outline" className="text-[10px]">{j.status}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{j.engine}</Badge>
+                        {deliveryLabel && (
+                          <Badge variant="secondary" className="text-[10px] gap-1 font-mono">
+                            <Clock className="h-3 w-3" /> Entrega: {deliveryLabel}
+                          </Badge>
+                        )}
+                        {renderLabel && (
+                          <span className="text-[11px] text-muted-foreground font-mono">
+                            Render: {renderLabel}{waitLabel ? ` · Fila: ${waitLabel}` : ""}
+                          </span>
+                        )}
                       </div>
                       {j.error_message && <p className="text-xs text-destructive">{j.error_message}</p>}
                     </div>
-                    {videoUrl && (
-                      <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
+                      {contactSheetUrl && (
+                        <a
+                          href={contactSheetUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 hover:underline"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> QA Grid
+                        </a>
+                      )}
+                      {videoUrl && (
                         <a
                           href={videoUrl}
                           target="_blank"
@@ -707,8 +988,8 @@ export default function Studio3dPage() {
                         >
                           <Download className="h-3.5 w-3.5" /> Abrir / Baixar MP4
                         </a>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -720,6 +1001,9 @@ export default function Studio3dPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ABAS V5: PUPPET STUDIO, VIRAIS & LOTE, LIVES & STREAMER IA 24/7 */}
+        <StudioV5Tabs onJobEnqueued={() => fetchQueue(true)} />
       </Tabs>
     </div>
   )

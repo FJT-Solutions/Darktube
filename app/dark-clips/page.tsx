@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
+import { computeRenderTiming } from "@/lib/render-timing";
 import {
   Sparkles,
   Download,
@@ -5566,6 +5567,11 @@ export default function DarkClipsPage() {
                           const isRendered = (post.status as string) === "rendered" || (post.status as string) === "completed";
                           const isRendering = (post.status as string) === "rendering";
                           const isFailed = post.status === "failed" || (post.status as string) === "error";
+                          const renderDurationLabel =
+                            post.remodel_data?.render_duration_label ||
+                            (isRendering && post.created_at
+                              ? computeRenderTiming({ createdAt: post.created_at, startedAt: post.created_at }).totalDeliveryLabel
+                              : null);
 
                           return (
                             <div
@@ -5603,6 +5609,12 @@ export default function DarkClipsPage() {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                                {renderDurationLabel && renderDurationLabel !== "—" && (
+                                  <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    {isRendering ? `Renderizando: ${renderDurationLabel}` : `Entrega: ${renderDurationLabel}`}
+                                  </Badge>
+                                )}
                                 {isQueued ? (
                                   <Badge variant="secondary" className="text-[10px] uppercase font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 flex items-center gap-1 animate-pulse">
                                     <Clock className="h-3 w-3 text-amber-400" />

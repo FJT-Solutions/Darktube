@@ -2,23 +2,32 @@ import fs from 'fs';
 import http from 'http';
 import os from 'os';
 import path from 'path';
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
+import { promisify } from 'util';
 import { ffmpegBin } from '@/lib/flow-assemble';
 import { inspectRenderedVideo, type MotionCheckResult } from '@/lib/motion-checks';
+import { formatDeliveryDuration } from '@/lib/render-timing';
+import type { MouthCue } from '@/lib/puppet-studio';
 import type { ThreeJsStoryboard } from '@/lib/threejs-scene-compiler';
 import type { VoiceWord } from '@/lib/voice-resolver';
+
+const runExec = promisify(execFile);
 
 export interface RenderThreeJsOptions {
   storyboard: ThreeJsStoryboard;
   words: VoiceWord[];
+  mouthCues?: MouthCue[];
   audioPath?: string;
   outputPath: string;
   isDraft?: boolean;
+  generateContactSheet?: boolean;
+  contactSheetPath?: string;
   onProgress?: (pct: number) => Promise<void> | void;
 }
 
 export interface RenderThreeJsResult {
   outputPath: string;
+  contactSheetPath?: string;
   width: number;
   height: number;
   fps: number;
@@ -26,6 +35,13 @@ export interface RenderThreeJsResult {
   totalFrames: number;
   gpuAccelerated: boolean;
   motionCheck: MotionCheckResult;
+  qaChecks: {
+    scenesSampled: number;
+    blankFramesDetected: number;
+    passed: boolean;
+  };
+  renderDurationMs: number;
+  renderDurationLabel: string;
 }
 
 const MIME_MAP: Record<string, string> = {
@@ -137,6 +153,7 @@ function startThreeJsStaticServer(engineRoot: string, jobDir: string): Promise<{
 }
 
 export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<RenderThreeJsResult> {
+  const renderStartMs = Date.now();
   const engineRoot = path.resolve(process.cwd(), 'public/threejs-engine');
   if (!fs.existsSync(path.join(engineRoot, 'engine/player.html'))) {
     throw new Error(`Motor Three.js não encontrado em ${engineRoot}`);
@@ -156,6 +173,12 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   fs.mkdirSync(path.dirname(opts.outputPath), { recursive: true });
   fs.writeFileSync(path.join(jobDir, 'storyboard.json'), JSON.stringify(opts.storyboard), 'utf8');
   fs.writeFileSync(path.join(jobDir, 'palavras.json'), JSON.stringify(opts.words || []), 'utf8');
+  if (opts.mouthCues?.length) {
+    fs.writeFileSync(path.join(jobDir, 'mouthCues.json'), JSON.stringify(opts.mouthCues), 'utf8');
+  }
+
+  let generatedContactSheetPath: string | undefined;
+  let qaChecks = { scenesSampled: 0, blankFramesDetected: 0, passed: true };
 
   const { server, port } = await startThreeJsStaticServer(engineRoot, jobDir);
   const executablePath = findBrowserExecutable();
@@ -224,6 +247,58 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
     }
     if (pageErr) throw new Error(`Erro no player 3D: ${pageErr}`);
 
+    // Pre-Render Contact Sheet QA Gate: captura 1 still por cena antes de renderizar o MP4 inteiro
+    if (opts.generateContactSheet !== false && Array.isArray(opts.storyboard.cenas) && opts.storyboard.cenas.length > 0) {
+      const sampleScenes = opts.storyboard.cenas.slice(0, 16);
+      const stillFiles: string[] = [];
+      let blankCount = 0;
+      for (let sIdx = 0; sIdx < sampleScenes.length; sIdx++) {
+        const sc = sampleScenes[sIdx];
+        const sIni = Number(sc.inicio || 0);
+        const sFim = Number(sc.fim || sIni + 2);
+        const midT = Math.min(durationSec, Math.max(0, sIni + (sFim - sIni) * 0.5));
+        await page.evaluate((sec) => (window as any).renderAt(sec), midT);
+        const shotBuf = await page.screenshot({ type: 'jpeg', quality: 82, timeout: 25_000 });
+        if (shotBuf.length < 1500) blankCount++;
+        const shotFile = path.join(jobDir, `qa_${String(sIdx).padStart(2, '0')}.jpg`);
+        fs.writeFileSync(shotFile, shotBuf);
+        stillFiles.push(shotFile);
+      }
+      qaChecks = {
+        scenesSampled: stillFiles.length,
+        blankFramesDetected: blankCount,
+        passed: blankCount === 0,
+      };
+      if (stillFiles.length > 0) {
+        const cols = Math.min(4, Math.ceil(Math.sqrt(stillFiles.length)));
+        const rows = Math.max(1, Math.ceil(stillFiles.length / cols));
+        const targetSheet =
+          opts.contactSheetPath ||
+          opts.outputPath.replace(/\.mp4$/i, '_contact_sheet.jpg');
+        try {
+          await runExec(
+            ffmpegBin(),
+            [
+              '-y',
+              '-loglevel',
+              'error',
+              '-i',
+              path.join(jobDir, 'qa_%02d.jpg'),
+              '-vf',
+              `scale=320:-1,tile=${cols}x${rows}:padding=6:color=0x0f172a`,
+              '-frames:v',
+              '1',
+              targetSheet,
+            ],
+            { timeout: 30_000, windowsHide: true }
+          );
+          if (fs.existsSync(targetSheet)) generatedContactSheetPath = targetSheet;
+        } catch (sheetErr: any) {
+          console.warn('[ThreeJS QA] Aviso ao gerar Contact Sheet:', sheetErr?.message || sheetErr);
+        }
+      }
+    }
+
     const hasAudio = Boolean(opts.audioPath && fs.existsSync(opts.audioPath));
     const ffArgs = [
       '-y',
@@ -287,8 +362,15 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   }
 
   const motionCheck = await inspectRenderedVideo(opts.outputPath, { ffmpegPath: ffmpegBin() });
+  const renderDurationMs = Math.max(0, Date.now() - renderStartMs);
+  const renderDurationLabel = formatDeliveryDuration(renderDurationMs);
+  console.log(
+    `[ThreeJS Render] ✅ MP4 renderizado em ${renderDurationLabel} (${totalFrames} frames, ${durationSec}s, QA=${qaChecks.scenesSampled} cenas)`
+  );
+
   return {
     outputPath: opts.outputPath,
+    contactSheetPath: generatedContactSheetPath,
     width,
     height,
     fps,
@@ -296,5 +378,8 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
     totalFrames,
     gpuAccelerated,
     motionCheck,
+    qaChecks,
+    renderDurationMs,
+    renderDurationLabel,
   };
 }

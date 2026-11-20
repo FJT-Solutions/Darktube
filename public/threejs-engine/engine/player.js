@@ -54,6 +54,7 @@ async function pegarJSON(url, opcional = false) {
 if (!projeto) throw new Error('Faltou ?projeto=projects/<nome> na URL.');
 const sb = await pegarJSON(`/${projeto}/storyboard.json`);
 const palavras = sb.palavras ? (await pegarJSON(`/${projeto}/${sb.palavras}`, true)) || [] : [];
+const mouthCues = sb.mouthCues ? (await pegarJSON(`/${projeto}/${sb.mouthCues}`, true)) || [] : [];
 
 // ---------- palco ----------
 const W = Number(q.get('w')) || sb.formato?.largura || 1080;
@@ -604,6 +605,131 @@ const textosEl = document.getElementById('textos');
 const fx = document.getElementById('fx');
 
 const gltfLoader = new GLTFLoader();
+const texLoader = new THREE.TextureLoader();
+
+const texCache = new Map();
+function loadTextureCached(url) {
+  if (!url) return Promise.resolve(null);
+  if (texCache.has(url)) return texCache.get(url);
+  const p = texLoader.loadAsync(url).then((tex) => {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }).catch(() => null);
+  texCache.set(url, p);
+  return p;
+}
+
+async function loadCutoutObject(o) {
+  const tex = await loadTextureCached(o.cutoutUrl);
+  const img = tex?.image;
+  const aspect = img && img.width && img.height ? img.width / img.height : 1;
+  const desiredH = o.altura !== undefined ? Number(o.altura) : 2.6;
+  const desiredW = desiredH * aspect;
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex || null,
+    color: tex ? '#ffffff' : '#64748b',
+    transparent: true,
+    alphaTest: 0.35,
+    roughness: 0.85,
+    side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(desiredW, desiredH), mat);
+  mesh.position.y = desiredH / 2;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const wrap = new THREE.Group();
+  wrap.name = `cutout:${o.id || 'prop'}`;
+  wrap.add(mesh);
+  return wrap;
+}
+
+async function createPuppetSpriteCharacter(c) {
+  const pup = c.puppet || {};
+  const heightScale = Number(c.escala || pup.altura || 1.0);
+  const root = new THREE.Group();
+  root.name = `puppet:${c.id}`;
+  const spriteH = 1.75 * heightScale;
+  const baseTex = await loadTextureCached(pup.baseCutoutUrl);
+  const aspect = baseTex?.image?.width && baseTex?.image?.height ? baseTex.image.width / baseTex.image.height : 0.65;
+  const spriteW = spriteH * Math.max(0.45, Math.min(1.4, aspect));
+
+  const faceTextures = {};
+  if (pup.expressions && typeof pup.expressions === 'object') {
+    for (const [k, u] of Object.entries(pup.expressions)) {
+      const ft = await loadTextureCached(u);
+      if (ft) faceTextures[k] = ft;
+    }
+  }
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    map: baseTex || null,
+    color: baseTex ? '#ffffff' : '#94a3b8',
+    transparent: true,
+    alphaTest: 0.35,
+    roughness: 0.8,
+    side: THREE.DoubleSide,
+  });
+  const bodyPlane = new THREE.Mesh(new THREE.PlaneGeometry(spriteW, spriteH), bodyMat);
+  bodyPlane.position.y = spriteH / 2;
+  bodyPlane.castShadow = true;
+  root.add(bodyPlane);
+
+  let faceMesh = null;
+  const firstFace = Object.values(faceTextures)[0];
+  if (firstFace) {
+    const fSize = spriteH * 0.28;
+    const faceMat = new THREE.MeshStandardMaterial({
+      map: firstFace,
+      transparent: true,
+      alphaTest: 0.35,
+      roughness: 0.75,
+      side: THREE.DoubleSide,
+    });
+    faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(fSize, fSize), faceMat);
+    faceMesh.position.set(0, spriteH * 0.78, 0.03);
+    faceMesh.visible = false;
+    root.add(faceMesh);
+  }
+
+  // Acessório acoplável opcional
+  let accMesh = null;
+  const firstAccUrl = Array.isArray(pup.accessories) && pup.accessories[0]?.url;
+  if (firstAccUrl) {
+    const accTex = await loadTextureCached(firstAccUrl);
+    if (accTex) {
+      const aSize = spriteH * 0.26;
+      accMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(aSize, aSize),
+        new THREE.MeshStandardMaterial({ map: accTex, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide })
+      );
+      accMesh.position.set(spriteW * 0.26, spriteH * 0.56, 0.04);
+      root.add(accMesh);
+    }
+  }
+
+  // Barra discreta de boca fonêmica para puppets sem textura dedicada de lábios
+  const mouthBar = new THREE.Mesh(
+    new THREE.PlaneGeometry(spriteW * 0.14, spriteH * 0.035),
+    new THREE.MeshBasicMaterial({ color: '#1e1b18', transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+  );
+  mouthBar.position.set(0, spriteH * 0.73, 0.04);
+  mouthBar.visible = false;
+  root.add(mouthBar);
+
+  return {
+    root,
+    heightScale,
+    bodyPlane,
+    bodyMat,
+    baseTex,
+    faceMesh,
+    faceTextures,
+    accMesh,
+    mouthBar,
+    spriteH,
+  };
+}
 
 async function loadGlbObject(o) {
   const raw = String(o.glb || '').trim();
@@ -679,6 +805,8 @@ async function construirCena(def) {
       const loaded = await loadGlbObject(o);
       obj = loaded.obj;
       mixer = loaded.mixer;
+    } else if (o.cutoutUrl) {
+      obj = await loadCutoutObject(o);
     } else {
       obj = makeScenery(o.asset, { ...(o.variante ? { variant: o.variante } : {}), ...(o.params || {}) });
     }
@@ -703,6 +831,15 @@ async function construirCena(def) {
   }
 
   for (const c of def.personagens || []) {
+    if (c.puppet) {
+      const pup = await createPuppetSpriteCharacter(c);
+      grp.add(pup.root);
+      const s = pup.heightScale;
+      const ent = novaEnt(c.id, 'personagem', pup.root, c, [0.9 * s, 1.75 * s, 0.9 * s], { isPuppet: true, pup, escala: s });
+      ent.acoesRaw = (c.acoes || []).slice();
+      ent.camadas = [];
+      continue;
+    }
     const ch = makePreset(c.preset, c.overrides || {});
     grp.add(ch.root);
     const s = ch.heightScale;
@@ -909,8 +1046,21 @@ function cameraEm(cena, t) {
   return { pos, look, fov: fov0 };
 }
 
-// ---------- boca sincronizada com a fala ----------
+const PHONEME_OPENNESS = { A: 0.04, B: 0.35, C: 0.56, D: 0.9, E: 0.68, F: 0.44, G: 0.22, H: 0.5, X: 0.03 };
+
+// ---------- boca sincronizada com a fala (Rhubarb/Fonemas + Fallback Whisper) ----------
 function bocaNaFala(t) {
+  if (mouthCues.length) {
+    let lo = 0;
+    let hi = mouthCues.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const c = mouthCues[mid];
+      if (t < c.start) hi = mid - 1;
+      else if (t >= c.end) lo = mid + 1;
+      else return PHONEME_OPENNESS[c.shape] ?? 0.25;
+    }
+  }
   let lo = 0;
   let hi = palavras.length - 1;
   while (lo <= hi) {
@@ -1062,6 +1212,29 @@ window.renderAt = (t) => {
       }
       ent.holder.visible = vis;
       ent.holder.scale.setScalar(Math.max(0.0001, esc * escAnim));
+    } else if (ent.isPuppet && ent.pup) {
+      const pup = ent.pup;
+      const open = bocaNaFala(t);
+      const acaoAtiva = (ent.acoesRaw || []).find((a) => t >= (a.de ?? -1) && t <= (a.ate ?? 9999));
+      const expr = acaoAtiva?.expressao;
+      if (pup.faceMesh && expr && pup.faceTextures[expr]) {
+        pup.faceMesh.visible = true;
+        pup.faceMesh.material.map = pup.faceTextures[expr];
+        pup.faceMesh.material.needsUpdate = true;
+      } else if (pup.faceMesh) {
+        pup.faceMesh.visible = false;
+      }
+      const talking = open > 0.1 || Boolean(acaoAtiva?.fala);
+      pup.bodyPlane.position.y = (pup.spriteH / 2) + (talking ? Math.abs(Math.sin(t * 9)) * 0.045 : Math.sin(t * 2.4) * 0.015);
+      pup.bodyPlane.rotation.z = acaoAtiva?.clip === 'sit' ? 0 : Math.sin(t * (talking ? 6 : 2)) * (talking ? 0.04 : 0.012);
+      if (acaoAtiva?.clip === 'sit' || acaoAtiva?.clip === 'crouch') {
+        pup.bodyPlane.scale.set(1.04, 0.78, 1);
+        pup.bodyPlane.position.y = pup.spriteH * 0.34;
+      } else {
+        pup.bodyPlane.scale.set(1, 1, 1);
+      }
+      pup.mouthBar.visible = !pup.faceMesh?.visible && talking;
+      pup.mouthBar.scale.set(1, Math.max(0.4, open * 3.2), 1);
     } else {
       for (const camada of ent.camadas) for (const seg of camada) if (seg.fala) seg.params.mouthOpen = bocaNaFala(t);
       animate(ent.ch, ent.camadas, t);

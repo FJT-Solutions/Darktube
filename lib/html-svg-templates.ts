@@ -5,13 +5,24 @@ import {
   type Diorama3dMode,
   type TechCrimsonVisual,
 } from './html-svg-presets-extra';
+import {
+  buildKazChartHtml,
+  buildNetflixDocHtml,
+  buildPaperFinanceHtml,
+  buildVoxPapercutHtml,
+  type HtmlSvgChartItem,
+} from './html-svg-presets-v2';
 
 export type HtmlSvgPreset =
   | 'html_svg_explainer'
   | 'html_svg_character_story'
   | 'html_svg_product_motion'
   | 'html_svg_tech_crimson'
-  | 'html_svg_3d_diorama';
+  | 'html_svg_3d_diorama'
+  | 'html_svg_netflix_doc'
+  | 'html_svg_vox_papercut'
+  | 'html_svg_kaz_chart'
+  | 'html_svg_paper_finance';
 
 export type HtmlSvgExpression = 'happy' | 'shocked' | 'smirk' | 'angry' | 'sad' | 'thinking';
 
@@ -37,6 +48,9 @@ export interface HtmlSvgSceneInput {
   metricLabel?: string;
   visual?: TechCrimsonVisual;
   callout?: string;
+  imageUrl?: string;
+  yearLabel?: string;
+  chartItems?: HtmlSvgChartItem[];
 }
 
 export interface HtmlSvgProjectSpec {
@@ -59,6 +73,10 @@ const DEFAULT_PALETTES: Record<HtmlSvgPreset, [string, string, string]> = {
   html_svg_product_motion: ['#09090B', '#A855F7', '#22D3EE'],
   html_svg_tech_crimson: ['#0A0406', '#F43F5E', '#FACC15'],
   html_svg_3d_diorama: ['#091529', '#F59E0B', '#22C55E'],
+  html_svg_netflix_doc: ['#07080D', '#E50914', '#FACC15'],
+  html_svg_vox_papercut: ['#F4EFE4', '#DC2626', '#FDE047'],
+  html_svg_kaz_chart: ['#090D16', '#38BDF8', '#22C55E'],
+  html_svg_paper_finance: ['#F7F1E3', '#15803D', '#B91C1C'],
 };
 
 const escHtml = (s: unknown): string =>
@@ -79,8 +97,8 @@ export function resolveCanvasDimensions(aspect: '9:16' | '16:9' | '1:1' = '9:16'
   return draft ? { width: 540, height: 960 } : { width: 1080, height: 1920 };
 }
 
-type NormalizedHtmlSvgScene = Required<Omit<HtmlSvgSceneInput, 'visual' | 'callout'>> &
-  Pick<HtmlSvgSceneInput, 'visual' | 'callout'>;
+type NormalizedHtmlSvgScene = Required<Omit<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'yearLabel' | 'chartItems'>> &
+  Pick<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'yearLabel' | 'chartItems'>;
 
 function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
   const raw = Array.isArray(spec.scenes) && spec.scenes.length > 0
@@ -123,6 +141,15 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     metricLabel: String(sc.metricLabel || '').slice(0, 40),
     visual: sc.visual,
     callout: sc.callout ? String(sc.callout).slice(0, 48) : undefined,
+    imageUrl: sc.imageUrl ? String(sc.imageUrl).trim() : undefined,
+    yearLabel: sc.yearLabel ? String(sc.yearLabel).slice(0, 20) : undefined,
+    chartItems: Array.isArray(sc.chartItems)
+      ? sc.chartItems.slice(0, 8).map((c) => ({
+          label: String(c?.label || '').slice(0, 24),
+          value: Number(c?.value) || 0,
+          ...(c?.color ? { color: String(c.color) } : {}),
+        }))
+      : undefined,
   }));
 }
 
@@ -302,7 +329,14 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
           { id: 'c2', name: 'Morangela', skinColor: '#F43F5E', pattern: 'strawberry_seeds' as const },
         ];
 
-  if (preset === 'html_svg_tech_crimson' || preset === 'html_svg_3d_diorama') {
+  if (
+    preset === 'html_svg_tech_crimson' ||
+    preset === 'html_svg_3d_diorama' ||
+    preset === 'html_svg_netflix_doc' ||
+    preset === 'html_svg_vox_papercut' ||
+    preset === 'html_svg_kaz_chart' ||
+    preset === 'html_svg_paper_finance'
+  ) {
     const extraCtx = {
       title: String(spec.title || scheduled[0]?.title || 'DarkTube Studio').slice(0, 80),
       width,
@@ -318,7 +352,15 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
     const extraHtml =
       preset === 'html_svg_tech_crimson'
         ? buildTechCrimsonHtml(extraCtx)
-        : buildDiorama3dHtml(extraCtx);
+        : preset === 'html_svg_3d_diorama'
+          ? buildDiorama3dHtml(extraCtx)
+          : preset === 'html_svg_netflix_doc'
+            ? buildNetflixDocHtml(extraCtx)
+            : preset === 'html_svg_vox_papercut'
+              ? buildVoxPapercutHtml(extraCtx)
+              : preset === 'html_svg_kaz_chart'
+                ? buildKazChartHtml(extraCtx)
+                : buildPaperFinanceHtml(extraCtx);
     return {
       html: extraHtml,
       width,

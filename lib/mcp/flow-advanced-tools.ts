@@ -17,12 +17,19 @@ import { enqueueDetachedRenderTask, getRenderQueueSnapshot, runQueuedRenderTask,
 import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
 import { compileThreeJsStoryboard, type ThreeJsStoryboard, type ThreeJsViralCaptionsConfig } from '@/lib/threejs-scene-compiler';
 import { renderThreeJsToMp4 } from '@/lib/threejs-render';
+import { renderBlenderStoryboard } from '@/lib/blender-bridge';
+import { buildPuppetRigFromChromaPng, generateLipSyncMouthCues } from '@/lib/puppet-studio';
+import { analyzeLiveAudioPeaks, renderAutoLiveClip } from '@/lib/auto-clipper';
 import { generateThreeJsDirection } from '@/lib/threejs-director';
 import {
   downloadExternalGlbToLibrary,
   downloadPolyHavenModel,
+  downloadSketchfabModel,
+  ensureBuiltinSfx,
   listLocal3dModels,
   searchFree3dAssets,
+  searchFreesoundSfx,
+  searchWikimediaImages,
 } from '@/lib/threejs-asset-hub';
 import { getFlowTemplate, MAX_TAKES, clampSecondsForModel, normalizeRealism, type FlowTemplate } from '@/lib/flow-templates';
 import {
@@ -817,6 +824,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
         palette: rendered.palette,
         motionCheck: rendered.motionCheck,
         timelineIssues: rendered.timelineIssues,
+        renderDurationMs: rendered.renderDurationMs,
+        renderDurationLabel: rendered.renderDurationLabel,
       };
     }
   );
@@ -825,6 +834,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
 export interface RenderThreeJsInput {
   kind?: RenderJobKind;
   preset?: 'curiosidade_cratera' | 'custom_storyboard';
+  backend?: 'threejs' | 'blender';
+  fallbackToThreeJs?: boolean;
   topic?: string;
   durationSec?: number;
   quality?: 'alta' | 'media' | 'basica';
@@ -928,14 +939,46 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
       audioDurationSec: kind === 'single_scene' ? undefined : voiceRes.durationSec,
     });
 
-    const rendered = await renderThreeJsToMp4({
-      storyboard: finalCompile.storyboard,
-      words: voiceRes.words,
+    const lipSync = await generateLipSyncMouthCues({
       audioPath: voiceRes.audioPath,
-      outputPath,
-      isDraft: Boolean(input.isDraft),
-      onProgress,
+      words: voiceRes.words,
+      durationSec: finalCompile.storyboard.duracao,
     });
+    const contactSheetPath = path.join(voiceDir, `contact_sheet_${Date.now()}.png`);
+    const useBlender = input.backend === 'blender';
+
+    const rendered = useBlender
+      ? await renderBlenderStoryboard({
+          storyboard: finalCompile.storyboard,
+          words: voiceRes.words,
+          mouthCues: lipSync.cues,
+          audioPath: voiceRes.audioPath,
+          outputPath,
+          isDraft: Boolean(input.isDraft),
+          fallbackToThreeJs: input.fallbackToThreeJs !== false,
+          contactSheetPath,
+          onProgress,
+        })
+      : await renderThreeJsToMp4({
+          storyboard: finalCompile.storyboard,
+          words: voiceRes.words,
+          mouthCues: lipSync.cues,
+          audioPath: voiceRes.audioPath,
+          outputPath,
+          isDraft: Boolean(input.isDraft),
+          generateContactSheet: true,
+          contactSheetPath,
+          onProgress,
+        });
+
+    let contactSheetUrl: string | null = null;
+    try {
+      if (rendered.contactSheetPath && fs.existsSync(rendered.contactSheetPath)) {
+        const qaBuf = fs.readFileSync(rendered.contactSheetPath);
+        const qaPath = await uploadMediaFile(qaBuf, `${safeBase}_qa_${Date.now()}.png`, 'image/png');
+        contactSheetUrl = `https://darktube.fjt-solutions.com${qaPath}`;
+      }
+    } catch {}
 
     try {
       fs.rmSync(voiceDir, { recursive: true, force: true });
@@ -948,9 +991,13 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
       storageUrl = `https://darktube.fjt-solutions.com${storagePath}`;
     } catch {}
 
+    const backendUsed = 'backendUsed' in rendered ? rendered.backendUsed : 'threejs';
+
     return {
       success: true,
-      engine: 'threejs_3d',
+      engine: useBlender ? 'blender_3d' : 'threejs_3d',
+      backendUsed,
+      lipSyncEngine: lipSync.engine,
       kind,
       creditsCost: 0,
       directorProvider,
@@ -961,21 +1008,25 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
       auditFixes: finalCompile.auditFixes,
       localFile: wantLocal ? rendered.outputPath : null,
       videoUrl: storageUrl,
+      contactSheetUrl,
+      qaChecks: rendered.qaChecks,
       width: rendered.width,
       height: rendered.height,
       fps: rendered.fps,
       durationSec: rendered.durationSec,
       totalFrames: rendered.totalFrames,
       motionCheck: rendered.motionCheck,
+      renderDurationMs: rendered.renderDurationMs,
+      renderDurationLabel: rendered.renderDurationLabel,
     };
   };
 
   const queueOpts = {
     userId,
-    engine: 'threejs_3d' as const,
+    engine: input.backend === 'blender' ? ('blender_3d' as const) : ('threejs_3d' as const),
     kind,
     title: input.title || input.topic || input.preset || safeBase,
-    payload: { kind, preset: input.preset || (input.topic ? 'director_llm' : 'curiosidade_cratera'), isDraft: Boolean(input.isDraft) },
+    payload: { kind, backend: input.backend || 'threejs', preset: input.preset || (input.topic ? 'director_llm' : 'curiosidade_cratera'), isDraft: Boolean(input.isDraft) },
   };
 
   if (input.waitForResult === false) {
@@ -994,12 +1045,13 @@ export async function getRenderQueueStatusMcp(input: { jobId?: string }) {
 }
 
 /**
- * 15. Busca e baixa modelos 3D gratuitos CC0 (.glb/.gltf) no cache local, Poly Haven e Poly Pizza.
+ * 15. Acervo V2 ($0): busca e baixa modelos 3D CC0 (Poly Haven, Poly Pizza, Sketchfab), fotos Wikimedia Commons e SFX CC0.
  */
 export async function searchAndDownload3dAssetsMcp(input: {
   query?: string;
   limit?: number;
-  downloadSource?: 'polyhaven' | 'polypizza' | 'url';
+  assetType?: '3d' | 'wikimedia' | 'sfx';
+  downloadSource?: 'polyhaven' | 'polypizza' | 'sketchfab' | 'url' | 'sfx_builtin';
   assetId?: string;
   url?: string;
   name?: string;
@@ -1007,6 +1059,14 @@ export async function searchAndDownload3dAssetsMcp(input: {
   if (input.downloadSource === 'polyhaven' && input.assetId) {
     const saved = await downloadPolyHavenModel(input.assetId);
     return { success: true, action: 'downloaded', model: saved, localCount: listLocal3dModels().length };
+  }
+  if (input.downloadSource === 'sketchfab' && input.assetId) {
+    const saved = await downloadSketchfabModel(input.assetId);
+    return { success: true, action: 'downloaded', model: saved, localCount: listLocal3dModels().length };
+  }
+  if (input.downloadSource === 'sfx_builtin' && input.assetId) {
+    const saved = await ensureBuiltinSfx(input.assetId);
+    return { success: true, action: 'downloaded_sfx', sfx: saved };
   }
   if ((input.downloadSource === 'polypizza' || input.downloadSource === 'url') && input.url) {
     const saved = await downloadExternalGlbToLibrary({
@@ -1016,6 +1076,14 @@ export async function searchAndDownload3dAssetsMcp(input: {
       source: input.downloadSource,
     });
     return { success: true, action: 'downloaded', model: saved, localCount: listLocal3dModels().length };
+  }
+  if (input.assetType === 'wikimedia') {
+    const images = await searchWikimediaImages(input.query || 'history', input.limit || 12);
+    return { success: true, action: 'search_wikimedia', query: input.query, images };
+  }
+  if (input.assetType === 'sfx') {
+    const sfx = await searchFreesoundSfx(input.query || '', input.limit || 12);
+    return { success: true, action: 'search_sfx', ...sfx };
   }
   const found = await searchFree3dAssets(input.query || '', { limit: input.limit || 16 });
   return { success: true, action: 'search', ...found };
@@ -1093,4 +1161,269 @@ export async function generateFlowImageMcp(input: GenerateFlowImageMcpInput) {
     prompt: res.prompt,
     cutout: res.cutout,
   };
+}
+
+/**
+ * 17. Constrói Puppet Rig 2.5D articulado (head/torso/armL/armR/legL/legR + Sticker Swap + Acessórios)
+ * a partir de uma folha em fundo #00FF00 (OpenCV ou FFmpeg proporcional $0).
+ */
+export async function buildPuppetRigMcp(input: {
+  imageUrl: string;
+  characterName?: string;
+  expressionsUrl?: string;
+  gridLayout?: '2x2' | '3x2';
+  accessoriesUrl?: string;
+  outputBaseName?: string;
+}) {
+  if (!input?.imageUrl) {
+    throw new Error('Informe "imageUrl" com a imagem base em fundo #00FF00.');
+  }
+  const rig = await buildPuppetRigFromChromaPng({
+    imageSource: input.imageUrl,
+    characterName: input.characterName || 'Personagem Puppet',
+    expressionsSheetSource: input.expressionsUrl,
+    gridLayout: input.gridLayout === '3x2' ? '3x2' : '2x2',
+    accessoriesSheetSource: input.accessoriesUrl,
+    outputBaseName: input.outputBaseName,
+  });
+  return { success: true, rig };
+}
+
+/**
+ * 18. Auto-Clipper Audio-First para Lives & Podcasts (analisa picos via áudio sem baixar o vídeo completo,
+ * depois corta o trecho selecionado em 9:16 vertical_center ou split_screen com Modo Comentário TTS).
+ */
+export async function autoClipLiveMcp(input: {
+  action?: 'analyze' | 'render';
+  sourceUrl?: string;
+  audioPathOrUrl?: string;
+  minClipSec?: number;
+  maxClipSec?: number;
+  topN?: number;
+  startSec?: number;
+  endSec?: number;
+  layout?: 'vertical_center' | 'split_screen';
+  gameplayUrl?: string;
+  commentIntroText?: string;
+  voiceProvider?: VoiceProviderChoice;
+  voiceGender?: VoiceGender;
+  title?: string;
+  waitForResult?: boolean;
+}) {
+  const userId = await resolveDefaultUserId();
+  if (input.action !== 'render') {
+    const analyzed = await analyzeLiveAudioPeaks({
+      sourceUrl: input.sourceUrl,
+      audioPathOrUrl: input.audioPathOrUrl,
+      minClipSec: input.minClipSec,
+      maxClipSec: input.maxClipSec,
+      topN: input.topN || 4,
+    });
+    return { success: true, action: 'analyze', ...analyzed };
+  }
+
+  const target = String(input.sourceUrl || input.audioPathOrUrl || '').trim();
+  if (!target) {
+    throw new Error('Informe "sourceUrl" da transmissão para renderizar o corte.');
+  }
+  const startSec = Number(input.startSec) || 0;
+  const endSec = Math.max(startSec + 5, Number(input.endSec) || startSec + 28);
+  const title = String(input.title || `Auto-Clip ${Math.round(startSec)}s–${Math.round(endSec)}s`).slice(0, 120);
+
+  const queueOpts = {
+    userId,
+    engine: 'auto_clipper' as const,
+    kind: 'full_video' as const,
+    title,
+    payload: { sourceUrl: target, startSec, endSec, layout: input.layout || 'vertical_center' },
+  };
+  const runJob = async ({ onProgress }: { onProgress: (pct: number) => Promise<void> | void }) =>
+    await renderAutoLiveClip({
+      userId,
+      sourceUrl: target,
+      startSec,
+      endSec,
+      layout: input.layout || 'vertical_center',
+      gameplayUrl: input.gameplayUrl,
+      commentIntroText: input.commentIntroText,
+      voiceProvider: input.voiceProvider || 'auto',
+      voiceGender: input.voiceGender || 'male',
+      title,
+      onProgress,
+    });
+
+  if (input.waitForResult === false) {
+    return await enqueueDetachedRenderTask(queueOpts, runJob);
+  }
+  return await runQueuedRenderTask(queueOpts, runJob);
+}
+
+/**
+ * 19. Enfileira lotes Data-in, Video-out (até 20 vídeos em sequência FIFO) para HTML+SVG V2 ou Three.js 3D.
+ */
+export async function batchRenderMcp(input: {
+  items: Array<{
+    engine?: 'html_svg' | 'threejs_3d';
+    title?: string;
+    preset?: string;
+    aspect?: '9:16' | '16:9' | '1:1';
+    isDraft?: boolean;
+    topic?: string;
+    durationSec?: number;
+    scriptText?: string;
+    spokenScript?: string;
+    palette?: string[];
+    scenes?: any[];
+    storyboard?: Partial<ThreeJsStoryboard>;
+    voiceProvider?: VoiceProviderChoice;
+    voiceGender?: VoiceGender;
+  }>;
+}) {
+  const userId = await resolveDefaultUserId();
+  const items = Array.isArray(input?.items) ? input.items.slice(0, 20) : [];
+  if (items.length === 0) {
+    throw new Error('Envie "items" com 1 a 20 objetos de vídeo para enfileirar em lote.');
+  }
+
+  const jobs: Array<{ index: number; title: string; engine: string; jobId: string; status: string; queuePosition: number }> = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i] || {};
+    const engine: 'html_svg' | 'threejs_3d' = it.engine === 'threejs_3d' ? 'threejs_3d' : 'html_svg';
+    const title = String(it.title || it.topic || `Lote MCP #${i + 1}`).slice(0, 120);
+    const aspect = it.aspect === '16:9' || it.aspect === '1:1' ? it.aspect : '9:16';
+    const isDraft = it.isDraft !== undefined ? Boolean(it.isDraft) : true;
+
+    const queued = await enqueueDetachedRenderTask(
+      {
+        userId,
+        engine,
+        kind: 'full_video',
+        title,
+        payload: { batchIndex: i + 1, preset: it.preset || engine, aspect, isDraft },
+      },
+      async ({ onProgress }) => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_mcp_batch_'));
+        try {
+          if (engine === 'html_svg') {
+            const spoken =
+              String(it.scriptText || '').trim() ||
+              (Array.isArray(it.scenes)
+                ? it.scenes.map((s: any) => s.spokenLine || s.subtitle || s.title).filter(Boolean).join(' ')
+                : title);
+            let audioPath: string | undefined;
+            if (spoken) {
+              const vr = await resolveVoiceWithTimestamps({
+                userId,
+                scriptText: spoken,
+                outputDir: tmpDir,
+                voiceProvider: it.voiceProvider || 'auto',
+                voiceGender: it.voiceGender || 'male',
+                language: 'pt-BR',
+              });
+              audioPath = vr.audioPath;
+            }
+            await onProgress(25);
+            const outMp4 = path.join(tmpDir, `mcp_batch_svg_${i}.mp4`);
+            const rendered = await renderHtmlSvgToMp4({
+              spec: {
+                preset: (it.preset || 'html_svg_explainer') as any,
+                title,
+                aspect,
+                palette: it.palette,
+                scenes: it.scenes,
+              },
+              outputPath: outMp4,
+              draft: isDraft,
+              audioPath,
+            });
+            const storagePath = await uploadMediaFile(
+              fs.readFileSync(rendered.outputPath),
+              `mcp_batch_svg_${Date.now()}_${i}.mp4`,
+              'video/mp4'
+            );
+            return {
+              videoUrl: `https://darktube.fjt-solutions.com${storagePath}`,
+              durationSec: rendered.durationSec,
+              renderDurationMs: rendered.renderDurationMs,
+              renderDurationLabel: rendered.renderDurationLabel,
+            };
+          } else {
+            let workingStoryboard = it.storyboard;
+            let spoken = String(it.spokenScript || it.scriptText || '').trim();
+            if (!workingStoryboard?.cenas?.length) {
+              const dir = await generateThreeJsDirection({
+                userId,
+                topic: it.topic || title,
+                durationSec: Number(it.durationSec) || 24,
+                aspect,
+                quality: isDraft ? 'basica' : 'media',
+                isDraft,
+              });
+              workingStoryboard = dir.compiled.storyboard;
+              if (!spoken) spoken = dir.spokenScript;
+            }
+            const voiceRes = await resolveVoiceWithTimestamps({
+              userId,
+              scriptText: spoken || title,
+              outputDir: tmpDir,
+              voiceProvider: it.voiceProvider || 'auto',
+              voiceGender: it.voiceGender || 'male',
+              language: 'pt-BR',
+            });
+            await onProgress(25);
+            const compiled = compileThreeJsStoryboard({
+              kind: 'full_video',
+              preset: 'custom_storyboard',
+              title,
+              aspect,
+              isDraft,
+              audioDurationSec: voiceRes.durationSec,
+              storyboard: workingStoryboard,
+            });
+            const lipSync = await generateLipSyncMouthCues({
+              audioPath: voiceRes.audioPath,
+              words: voiceRes.words,
+              durationSec: compiled.storyboard.duracao,
+            });
+            const outMp4 = path.join(tmpDir, `mcp_batch_3d_${i}.mp4`);
+            const rendered = await renderThreeJsToMp4({
+              storyboard: compiled.storyboard,
+              words: voiceRes.words,
+              mouthCues: lipSync.cues,
+              audioPath: voiceRes.audioPath,
+              outputPath: outMp4,
+              isDraft,
+              onProgress,
+            });
+            const storagePath = await uploadMediaFile(
+              fs.readFileSync(rendered.outputPath),
+              `mcp_batch_3d_${Date.now()}_${i}.mp4`,
+              'video/mp4'
+            );
+            return {
+              videoUrl: `https://darktube.fjt-solutions.com${storagePath}`,
+              durationSec: rendered.durationSec,
+              renderDurationMs: rendered.renderDurationMs,
+              renderDurationLabel: rendered.renderDurationLabel,
+            };
+          }
+        } finally {
+          try {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+          } catch {}
+        }
+      }
+    );
+    jobs.push({
+      index: i + 1,
+      title,
+      engine,
+      jobId: queued.queueJobId,
+      status: queued.status,
+      queuePosition: queued.positionInQueue,
+    });
+  }
+
+  return { success: true, totalQueued: jobs.length, jobs };
 }

@@ -20,6 +20,9 @@ import {
   getRenderQueueStatusMcp,
   searchAndDownload3dAssetsMcp,
   generateFlowImageMcp,
+  buildPuppetRigMcp,
+  autoClipLiveMcp,
+  batchRenderMcp,
 } from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
@@ -299,7 +302,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_render_html_svg_video',
-    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D low-poly + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks automáticos (Frame 0, paleta hex e duração).',
+    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama, html_svg_netflix_doc, html_svg_vox_papercut, html_svg_kaz_chart, html_svg_paper_finance ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks automáticos.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -311,6 +314,10 @@ const MCP_TOOLS_MANIFEST = [
             'html_svg_product_motion',
             'html_svg_tech_crimson',
             'html_svg_3d_diorama',
+            'html_svg_netflix_doc',
+            'html_svg_vox_papercut',
+            'html_svg_kaz_chart',
+            'html_svg_paper_finance',
           ],
           default: 'html_svg_explainer',
         },
@@ -373,7 +380,21 @@ const MCP_TOOLS_MANIFEST = [
                 ],
                 description: 'Ilustração vetorial para preset = html_svg_tech_crimson',
               },
-              callout: { type: 'string', description: 'Rótulo flutuante ancorado no cenário 3D (html_svg_3d_diorama)' },
+              callout: { type: 'string', description: 'Rótulo flutuante ancorado no cenário 3D (html_svg_3d_diorama / V2)' },
+              imageUrl: { type: 'string', description: 'URL de imagem/foto histórica (Wikimedia Commons) para html_svg_netflix_doc ou html_svg_vox_papercut' },
+              yearLabel: { type: 'string', description: 'Ano/marco exibido na timeline documental (html_svg_netflix_doc / V2)' },
+              chartItems: {
+                type: 'array',
+                description: 'Série de barras para html_svg_kaz_chart',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string' },
+                    value: { type: 'number' },
+                    color: { type: 'string' },
+                  },
+                },
+              },
             },
           },
         },
@@ -398,6 +419,8 @@ const MCP_TOOLS_MANIFEST = [
       properties: {
         kind: { type: 'string', enum: ['single_scene', 'full_video'], default: 'full_video' },
         preset: { type: 'string', enum: ['curiosidade_cratera', 'custom_storyboard'], default: 'curiosidade_cratera' },
+        backend: { type: 'string', enum: ['threejs', 'blender'], default: 'threejs', description: 'Motor 3D: threejs (padrão VPS rápido) ou blender (EEVEE Headless + fallback automático)' },
+        fallbackToThreeJs: { type: 'boolean', default: true, description: 'Se true e Blender não estiver instalado, cai automaticamente para Three.js sem falha.' },
         title: { type: 'string' },
         aspect: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
         fps: { type: 'number', default: 24 },
@@ -443,14 +466,15 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_search_3d_assets',
-    description: 'Busca e baixa modelos 3D gratuitos CC0 (.glb/.gltf) no cache local, Poly Haven API ($0 sem chave) e Poly Pizza API (filtro CC0) para uso no motor Three.js.',
+    description: 'Acervo V2 ($0): busca e baixa modelos 3D gratuitos CC0 (.glb/.gltf no Poly Haven, Poly Pizza e Sketchfab Free), fotos históricas Wikimedia Commons e efeitos sonoros CC0 (Freesound + Builtin procedural).',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Termo de busca em inglês ou português (ex: waterwheel, barrel, generator, house, tree)' },
+        query: { type: 'string', description: 'Termo de busca em inglês ou português (ex: waterwheel, chernobyl, whoosh)' },
         limit: { type: 'number', default: 16 },
-        downloadSource: { type: 'string', enum: ['polyhaven', 'polypizza', 'url'], description: 'Quando preenchido, baixa o modelo para a biblioteca local /threejs-engine/models/' },
-        assetId: { type: 'string', description: 'ID do modelo no Poly Haven ou slug local' },
+        assetType: { type: 'string', enum: ['3d', 'wikimedia', 'sfx'], default: '3d', description: 'Categoria do acervo V2: modelos 3D, fotos Wikimedia ou SFX CC0.' },
+        downloadSource: { type: 'string', enum: ['polyhaven', 'polypizza', 'sketchfab', 'url', 'sfx_builtin'], description: 'Baixa o item para cache local do DarkTube.' },
+        assetId: { type: 'string', description: 'ID/UID do modelo (Poly Haven, Sketchfab) ou ID do SFX builtin (whoosh, pop, vault_open...)' },
         url: { type: 'string', description: 'URL direta .glb (para downloadSource polypizza ou url)' },
         name: { type: 'string', description: 'Nome amigável do modelo' },
       },
@@ -478,6 +502,61 @@ const MCP_TOOLS_MANIFEST = [
         downloadLocal: { type: 'boolean', default: true },
         outputDir: { type: 'string', default: './midia/criativos' },
       },
+    },
+  },
+  {
+    name: 'darktube_build_puppet_rig',
+    description: 'Constrói Puppet Rig 2.5D articulado nas juntas (head, torso, armL, armR, legL, legR) com Sticker Swap de expressões e acessórios a partir de folha em fundo #00FF00 (OpenCV ou FFmpeg proporcional $0).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        imageUrl: { type: 'string', description: 'Caminho local, /api/storage/... ou URL da folha A-Pose #00FF00.' },
+        characterName: { type: 'string', default: 'Personagem Puppet' },
+        expressionsUrl: { type: 'string', description: 'Opcional: grade 2x2 ou 3x2 de rostos em fundo #00FF00.' },
+        gridLayout: { type: 'string', enum: ['2x2', '3x2'], default: '2x2' },
+        accessoriesUrl: { type: 'string', description: 'Opcional: grade 2x2 de chapéus/itens extra.' },
+        outputBaseName: { type: 'string' },
+      },
+      required: ['imageUrl'],
+    },
+  },
+  {
+    name: 'darktube_auto_clip_live',
+    description: 'Auto-Clipper Audio-First ($0) para Lives e Podcasts: em action="analyze" baixa apenas áudio leve e detecta os maiores picos de energia viral; em action="render" recorta apenas o trecho escolhido em 9:16 vertical_center ou split_screen com Modo Comentário TTS e legendas Zero-Símbolos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['analyze', 'render'], default: 'analyze' },
+        sourceUrl: { type: 'string', description: 'Link da live/vídeo ou arquivo local /storage.' },
+        audioPathOrUrl: { type: 'string', description: 'Opcional: faixa de áudio direta.' },
+        minClipSec: { type: 'number', default: 22 },
+        maxClipSec: { type: 'number', default: 40 },
+        topN: { type: 'number', default: 4 },
+        startSec: { type: 'number' },
+        endSec: { type: 'number' },
+        layout: { type: 'string', enum: ['vertical_center', 'split_screen'], default: 'vertical_center' },
+        gameplayUrl: { type: 'string', description: 'Vídeo opcional para metade inferior no layout split_screen.' },
+        commentIntroText: { type: 'string', description: 'Texto falado em Modo Comentário TTS antes do corte.' },
+        voiceProvider: { type: 'string', enum: ['auto', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+        voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
+        title: { type: 'string' },
+        waitForResult: { type: 'boolean', default: true },
+      },
+    },
+  },
+  {
+    name: 'darktube_batch_render',
+    description: 'Renderização Data-in, Video-out em lote na Fila FIFO: aceita até 20 especificações JSON de vídeos (html_svg ou threejs_3d) e devolve os jobIds enfileirados.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          description: 'Lista de 1 a 20 especificações ({ engine, title, preset, aspect, isDraft, topic, scenes, storyboard, scriptText }).',
+          items: { type: 'object' },
+        },
+      },
+      required: ['items'],
     },
   },
 ];
@@ -635,6 +714,15 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_generate_image':
       return await generateFlowImageMcp(args);
+
+    case 'darktube_build_puppet_rig':
+      return await buildPuppetRigMcp(args);
+
+    case 'darktube_auto_clip_live':
+      return await autoClipLiveMcp(args);
+
+    case 'darktube_batch_render':
+      return await batchRenderMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);

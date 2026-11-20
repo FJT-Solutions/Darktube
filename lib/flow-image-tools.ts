@@ -13,7 +13,7 @@ const run = promisify(execFile);
 const ffmpegBin = () => process.env.FFMPEG_PATH || 'ffmpeg';
 const ffprobeBin = () => process.env.FFPROBE_PATH || 'ffprobe';
 
-export type ChromaAssetKind = 'character' | 'expressions' | 'prop' | 'background';
+export type ChromaAssetKind = 'character' | 'expressions' | 'prop' | 'background' | 'puppet_sheet' | 'accessories';
 export type ExpressionGridLayout = '2x2' | '3x2';
 
 export interface BuildNanoBananaPromptInput {
@@ -76,6 +76,22 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
         ? '1) happy smiling, 2) shocked surprised, 3) angry intense, 4) sad worried, 5) thoughtful curious, 6) confident smirk'
         : '1) happy smiling, 2) shocked surprised, 3) angry intense, 4) sad worried';
     return `Character expression sheet arranged in a clean ${grid} grid (${count} separate waist-up portraits of the exact same fictional original adult character with generous spacing between each portrait): ${desc}. Visual style strictly uniform across all ${count} portraits: ${styleDesc}.${isStylized ? ' NO photorealistic skin texture.' : ''} The ${count} expressions in reading order from top-left to bottom-right are: ${exprList}. Identical face, hair and outfit in every cell. ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
+      0,
+      3900
+    );
+  }
+
+  if (kind === 'puppet_sheet') {
+    return `Full-body character turnaround front view in a clean neutral standing A-pose for 2D/2.5D joint puppet rigging: ${desc}. Rendered strictly in style: ${styleDesc}.${isStylized ? ' Stylized flat vector/cartoon look, crisp dark outlines, NO photorealism.' : ''} Head to toe completely inside frame with generous margins, arms slightly angled outward away from torso, legs shoulder-width apart, clear separate hands and feet, even flat studio lighting, ${backdrop} Single character only, no overlapping limbs, no text, no watermark.`.slice(
+      0,
+      3900
+    );
+  }
+
+  if (kind === 'accessories') {
+    const grid = input.gridLayout === '3x2' ? '3x2' : '2x2';
+    const count = grid === '3x2' ? 6 : 4;
+    return `Clean ${grid} sticker sheet of ${count} separate detachable character accessories, outfits and props matching: ${desc}. Rendered in style: ${styleDesc}.${isStylized ? ' Consistent cartoon outline style, NO photorealism.' : ''} Generous uniform spacing between each item so every piece can be cropped cleanly without touching neighbours, ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
       0,
       3900
     );
@@ -290,11 +306,15 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
   const role =
     assetKind === 'expressions'
       ? 'expression_sheet'
-      : assetKind === 'prop'
-        ? 'prop_chroma'
-        : assetKind === 'background'
-          ? 'background_plate'
-          : 'standalone_image';
+      : assetKind === 'puppet_sheet'
+        ? 'puppet_sheet'
+        : assetKind === 'accessories'
+          ? 'accessories_sheet'
+          : assetKind === 'prop'
+            ? 'prop_chroma'
+            : assetKind === 'background'
+              ? 'background_plate'
+              : 'standalone_image';
 
   const job = await createFlowJob({
     userId: req.userId,
@@ -328,7 +348,7 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
     cutout = await removeChromaGreenToPng({
       inputSource: finalJob.result_url,
       outputFilename: `chroma_${assetKind}_${finalJob.id.slice(0, 8)}`,
-      sliceGrid: assetKind === 'expressions' ? req.gridLayout || '2x2' : undefined,
+      sliceGrid: assetKind === 'expressions' || assetKind === 'accessories' ? req.gridLayout || '2x2' : undefined,
       downloadLocal: req.downloadLocal,
       outputDir: req.outputDir,
     });

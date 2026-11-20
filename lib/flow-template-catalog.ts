@@ -1736,4 +1736,124 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
     look: 'commercial direct-response lighting, studio key light with clean green-screen back, crisp appetizing colors for b-roll',
     defaults: { takes: 4, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
   },
+  // ============================================================================
+  // GEOGRAFIA & TIMELAPSE HISTÓRICO Contínuos (Ref #16 / #29)
+  // ============================================================================
+  {
+    id: 'geografia-plano-continuo',
+    niche: 'Curiosidades',
+    subniche: 'Geografia & Fronteiras',
+    name: 'Geografia em plano contínuo',
+    description:
+      'Voo aéreo contínuo sem cortes sobre cadeias de montanhas, fronteiras e estreitos marítimos explicando por que o terreno decide a história.',
+    mode: 'narracao',
+    length: 'curto',
+    trend: 'viral',
+    fields: [
+      {
+        id: 'regiao',
+        label: 'Região ou fenômeno',
+        type: 'text',
+        default: 'Estreito de Ormuz / Cordilheira dos Andes',
+        placeholder: 'Ex.: Canal do Panamá, Bacia Amazônica, Alpes...',
+      },
+      {
+        id: 'angulo',
+        label: 'Foco da narrativa',
+        type: 'select',
+        default: 'estrategico',
+        options: [
+          { value: 'estrategico', label: 'Importância geopolítica e rotas comerciais' },
+          { value: 'geologico', label: 'Formação geológica e extremos climáticos' },
+          { value: 'fronteira', label: 'Por que essa fronteira nunca muda' },
+        ],
+      },
+    ],
+    brief:
+      'Continuous breathtaking aerial geography mini-documentary: unbroken forward glide across dramatic mountains, coastlines, rivers and cities showing how physical terrain dictates routes, trade and borders.',
+    beats: [
+      {
+        fn: 'Hook: sweeping aerial reveal pushing over the dramatic geographic chokepoint or mountain ridge while off-screen narrator states the core paradox',
+        camera: 'continuous high-altitude forward drone glide, crisp terrain relief, smooth motion without sudden jumps',
+        presence: 'faceless',
+        carryOver: 'drone descends seamlessly from high ridge toward the valley corridor below',
+      },
+      {
+        fn: 'Scale & barrier: camera tracks low along winding river canyons, port infrastructure or fortified pass revealing why crossing is so difficult',
+        camera: 'continuous low-altitude tracking shot following the river bend, crisp natural sunlight',
+        presence: 'faceless',
+        carryOver: 'camera glides out over open bay or flat basin as clouds clear',
+      },
+      {
+        fn: 'Convergence beat: sunrise aerial view showing ships, bridges or highways funneling through the narrow strategic corridor',
+        camera: 'continuous wide aerial pull-up revealing the entire geographic system at golden hour',
+        presence: 'faceless',
+      },
+    ],
+    rules: [
+      'Every scene must behave as one continuous forward aerial flight with coherent sun angle, biome colors and topographic logic',
+      'Zero floating infographic maps, neon HUD lines, text labels or fake UI arrows inside the video frame',
+      'Off-screen narrator only; never show talking heads or hosts in screen corners',
+    ],
+    look: 'cinematic aerial documentary, crystal clear atmospheric haze, crisp satellite-to-drone relief lighting, golden hour shadows',
+    defaults: { takes: 3, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
+  },
+  {
+    id: 'city-timelapse-historico',
+    niche: 'Curiosidades',
+    subniche: 'História & Arquitetura',
+    name: 'City timelapse histórico',
+    description:
+      'A mesma coordenada exata vista de um ponto fixo atravessando séculos: da floresta ou vila antiga à metrópole futurista sem cortar o enquadramento.',
+    mode: 'narracao',
+    length: 'curto',
+    trend: 'viral',
+    fields: [
+      {
+        id: 'cidade',
+        label: 'Cidade ou marco histórico',
+        type: 'text',
+        default: 'São Paulo — Vale do Anhangabaú (1850 a 2026)',
+        placeholder: 'Ex.: Manhattan, Tóquio, Rio de Janeiro...',
+      },
+      {
+        id: 'ritmo',
+        label: 'Transformação principal',
+        type: 'select',
+        default: 'seculos',
+        options: [
+          { value: 'seculos', label: 'Terreno natural -> Vila -> Metrópole atual' },
+          { value: 'reconstrucao', label: 'Ruína histórica -> Reconstrução moderna' },
+          { value: 'futuro', label: 'Presente -> Megacidade 2080' },
+        ],
+      },
+    ],
+    brief:
+      'Locked-camera historical city metamorphosis: starting from exact horizon line and river bend, show successive eras growing organically in the same frame.',
+    beats: [
+      {
+        fn: 'Origin era: untouched natural valley or pioneer settlement at dawn along the exact horizon and river curve',
+        camera: 'locked high vantage elevated tripod angle, crisp landscape symmetry, unchanging horizon height',
+        presence: 'faceless',
+        carryOver: 'preserve the exact camera focal length, horizon line height and river bend into the industrial era',
+      },
+      {
+        fn: 'Industrial boom: mid-century brick factories, early avenues, tram lines and scaffolding rising over the exact same streets and riverbank',
+        camera: 'identical locked elevated vantage point, subtle timelapse cloud drift overhead',
+        presence: 'faceless',
+        carryOver: 'preserve exact avenue axes and camera elevation as concrete towers overtake the skyline',
+      },
+      {
+        fn: 'Modern metropolis: dusk cityscape glowing with dense skyscrapers, illuminated bridges and flowing traffic on the identical coordinates',
+        camera: 'identical locked elevated vantage point at blue hour dusk with warm window lights',
+        presence: 'faceless',
+      },
+    ],
+    rules: [
+      'Maintain a strictly identical vantage angle and horizon height across every era so takes look like an anchored time-lapse of one real place',
+      'Zero giant year numbers floating in the sky inside the generated pixels; era captions are added cleanly in post-production',
+    ],
+    look: 'architectural diorama realism, crisp period textures, atmospheric timelapse clouds, golden-to-blue hour progression',
+    defaults: { takes: 3, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
+  },
 ]

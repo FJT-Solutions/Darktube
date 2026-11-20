@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Image as ImageIcon, Sparkles, Scissors, Download, RefreshCw, Layers, Loader2, Copy } from "lucide-react"
+import { Image as ImageIcon, Sparkles, Scissors, Download, RefreshCw, Layers, Loader2, Copy, Clock } from "lucide-react"
+import { computeRenderTiming } from "@/lib/render-timing"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +25,8 @@ interface ImageJobItem {
   result_url: string | null
   error_message: string | null
   created_at: string
+  claimed_at?: string | null
+  finished_at?: string | null
   params?: { aspectRatio?: string; model?: string }
 }
 
@@ -36,13 +39,15 @@ interface CutoutOutput {
 
 const ASSET_KIND_OPTIONS = [
   { value: "character", label: "Personagem Avulso (#00FF00 Chroma)" },
+  { value: "puppet_sheet", label: "Folha Puppet A-Pose Corpo Inteiro (#00FF00)" },
   { value: "expressions", label: "Folha de Expressões 2×2 / 3×2 (#00FF00)" },
+  { value: "accessories", label: "Kit Acessórios & Roupas 2×2 / 3×2 (#00FF00)" },
   { value: "prop", label: "Objeto / Prop Isolado (#00FF00 Chroma)" },
   { value: "background", label: "Cenário / Background Limpo (Sem Pessoas)" },
 ] as const
 
 export function FlowImageStudioPanel() {
-  const [assetKind, setAssetKind] = useState<"character" | "expressions" | "prop" | "background">("character")
+  const [assetKind, setAssetKind] = useState<"character" | "expressions" | "prop" | "background" | "puppet_sheet" | "accessories">("character")
   const [description, setDescription] = useState("")
   const [realismo, setRealismo] = useState("ilustrado2d")
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9" | "1:1">("9:16")
@@ -67,10 +72,11 @@ export function FlowImageStudioPanel() {
     return () => clearInterval(t)
   }, [loadJobs])
 
-  const handleKindChange = (k: "character" | "expressions" | "prop" | "background") => {
+  const handleKindChange = (k: "character" | "expressions" | "prop" | "background" | "puppet_sheet" | "accessories") => {
     setAssetKind(k)
     setChromaGreen(k !== "background")
-    if (k === "expressions") setAspectRatio("1:1")
+    if (k === "expressions" || k === "accessories") setAspectRatio("1:1")
+    if (k === "puppet_sheet") setAspectRatio("9:16")
   }
 
   const handleGenerate = async () => {
@@ -190,9 +196,9 @@ export function FlowImageStudioPanel() {
             </div>
           </div>
 
-          {assetKind === "expressions" && (
+          {(assetKind === "expressions" || assetKind === "accessories") && (
             <div className="space-y-1.5">
-              <label className="text-sm font-medium block">Grade de Expressões para Fatiamento</label>
+              <label className="text-sm font-medium block">Grade para Fatiamento Automático</label>
               <Select value={gridLayout} onValueChange={(v) => setGridLayout(v as any)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -242,20 +248,33 @@ export function FlowImageStudioPanel() {
             <div className="grid gap-4 sm:grid-cols-2">
               {jobs.map((j) => {
                 const cut = cutouts[j.id]
-                const isExpr = j.role === "expression_sheet"
+                const isExpr = j.role === "expression_sheet" || j.role === "accessories_sheet"
+                const timing = computeRenderTiming({
+                  createdAt: j.created_at,
+                  startedAt: j.claimed_at || j.created_at,
+                  finishedAt: j.finished_at,
+                })
                 return (
                   <div key={j.id} className="rounded-xl border bg-card/60 p-3.5 space-y-3 flex flex-col justify-between">
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
                         <Badge variant="secondary" className="text-[10px]">
                           {j.role || "image"} · {j.params?.aspectRatio || "9:16"}
                         </Badge>
-                        <Badge
-                          variant={j.status === "done" ? "default" : "outline"}
-                          className={j.status === "done" ? "bg-emerald-600 text-white text-[10px]" : "text-[10px]"}
-                        >
-                          {j.status === "done" ? "Pronta" : j.status}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          {timing.totalDeliveryLabel && (
+                            <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
+                              <Clock className="h-2.5 w-2.5" />
+                              {j.status === "done" ? `Entrega: ${timing.totalDeliveryLabel}` : timing.totalDeliveryLabel}
+                            </Badge>
+                          )}
+                          <Badge
+                            variant={j.status === "done" ? "default" : "outline"}
+                            className={j.status === "done" ? "bg-emerald-600 text-white text-[10px]" : "text-[10px]"}
+                          >
+                            {j.status === "done" ? "Pronta" : j.status}
+                          </Badge>
+                        </div>
                       </div>
 
                       {j.result_url ? (

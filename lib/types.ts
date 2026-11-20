@@ -352,6 +352,8 @@ export interface DarkClipPost {
     caption?: string
     post_caption?: string
     hashtags?: string[]
+    render_duration_ms?: number
+    render_duration_label?: string
   }
   scheduled_at?: string
   status?: 'draft' | 'queued' | 'rendering' | 'rendered' | 'scheduled' | 'publishing' | 'published' | 'failed'

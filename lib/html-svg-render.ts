@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
 import { ffmpegBin } from './flow-assemble';
+import { formatDeliveryDuration } from './render-timing';
 import { inspectRenderedVideo, type MotionCheckResult } from './motion-checks';
 import {
   compileHtmlSvgDocument,
@@ -26,6 +27,8 @@ export interface HtmlSvgRenderResult {
   palette: string[];
   motionCheck: MotionCheckResult;
   timelineIssues: { errors: string[]; warnings: string[] };
+  renderDurationMs: number;
+  renderDurationLabel: string;
 }
 
 function findBrowserExecutable(): string | undefined {
@@ -57,6 +60,7 @@ function writeChunk(stream: NodeJS.WritableStream, chunk: Buffer): Promise<void>
  * usando Playwright Chromium + FFmpeg, rodando Motion Checks automaticos no MP4 final.
  */
 export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<HtmlSvgRenderResult> {
+  const renderStartMs = Date.now();
   const compiled = compileHtmlSvgDocument(opts.spec, Boolean(opts.draft));
   if (compiled.timelineIssues.errors.length > 0) {
     throw new Error(`Falha na validação pré-render (Motion Checks): ${compiled.timelineIssues.errors.join(' | ')}`);
@@ -155,6 +159,10 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     expectedColors: compiled.palette,
   });
 
+  const renderDurationMs = Math.max(0, Date.now() - renderStartMs);
+  const renderDurationLabel = formatDeliveryDuration(renderDurationMs);
+  console.log(`[HTML+SVG Render] ✅ MP4 renderizado em ${renderDurationLabel} (${totalFrames} frames, ${compiled.durationSec}s)`);
+
   return {
     outputPath: opts.outputPath,
     width: compiled.width,
@@ -165,5 +173,7 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     palette: compiled.palette,
     motionCheck,
     timelineIssues: compiled.timelineIssues,
+    renderDurationMs,
+    renderDurationLabel,
   };
 }

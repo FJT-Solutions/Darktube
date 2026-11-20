@@ -998,9 +998,9 @@ export async function simulateCreditsAction(input: {
   }
 }
 
-/** Enfileira imagem avulsa no Nano Banana (personagem, folha de expressões, prop em #00FF00 ou cenário) */
+/** Enfileira imagem avulsa no Nano Banana (personagem, folha puppet, expressões, acessórios, prop em #00FF00 ou cenário) */
 export async function createStandaloneFlowImageAction(input: {
-  assetKind: "character" | "expressions" | "prop" | "background"
+  assetKind: "character" | "expressions" | "prop" | "background" | "puppet_sheet" | "accessories"
   description: string
   realismo?: string
   aspectRatio?: "9:16" | "16:9" | "1:1"

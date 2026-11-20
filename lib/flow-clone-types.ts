@@ -5,7 +5,37 @@ import type { FlowSfx, FlowTakeKind, FlowTransition } from './flow-script'
 import type { FlowProductionMode } from './flow-template-base'
 
 export type ClonedBeatSourceType = 'filmed' | 'ai_generated' | 'coded_html_svg'
-export type ClonedRecommendedEngine = 'html_svg' | 'remotion' | 'flow'
+export type ClonedRecommendedEngine =
+  | 'bean_2d_3d'
+  | 'stickman_2d_3d'
+  | 'netflix_doc'
+  | 'dossie_2d'
+  | 'mapa_3d'
+  | 'atlas_3d'
+  | 'fern_3d'
+  | 'html_svg'
+  | 'remotion'
+  | 'flow'
+
+export interface ReverseEngineeredEditingMetrics {
+  detectedCutsCount: number
+  cutTimestampsSec: number[]
+  medianShotLengthSec: number
+  cutsPerMinute: number
+  wordsPerMinute: number
+  hookDurationSec: number
+  contactSheetPath?: string
+}
+
+export interface ClonedStoryBible {
+  seriesTitle: string
+  characterArchetype: string
+  characterVisualLock: string
+  worldSettingLock: string
+  recurringHookFormula: string
+  cliffhangerFormula: string
+  captionStyle: string
+}
 
 export interface ClonedSceneBeat {
   n: number
@@ -46,6 +76,8 @@ export interface FlowClonedStructure {
   recommendedEngine?: ClonedRecommendedEngine
   paletteHex?: string[]
   energy?: 'cinematografico' | 'fluido' | 'cinetico'
+  editingMetrics?: ReverseEngineeredEditingMetrics
+  storyBible?: ClonedStoryBible
   providerUsed: FlowProvider
   usedFallbackThumbs: boolean
 }

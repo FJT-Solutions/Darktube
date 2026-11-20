@@ -19,6 +19,7 @@ export interface ThreeJsStoryboard {
   duracao: number;
   audio?: string;
   palavras?: string;
+  mouthCues?: string;
   legendas?: ThreeJsViralCaptionsConfig;
   ambiente?: { fundo?: string; horario?: string; chao?: string; clima?: string; nuvens?: boolean };
   cenas: any[];
@@ -506,6 +507,65 @@ export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThr
         p.pos[0] = Math.sign(p.pos[0]) * 3.4;
         auditFixes.push(`Cena ${i + 1}: personagem ${p.id} trazido para dentro do enquadramento`);
       }
+
+      // Spatial Clipping Guard: evita pernas/personagens atravessando cofres, portas, grades ou barreiras
+      if (Array.isArray(p.pos) && !p.insideSafeZone) {
+        const px = Number(p.pos[0] || 0);
+        const pz = Number(p.pos.length === 2 ? p.pos[1] : p.pos[2] || 0);
+        for (const o of objs) {
+          const idTag = `${o.id || ''} ${o.asset || ''}`.toLowerCase();
+          const isBarrier =
+            Boolean(o.collisionBox) ||
+            /(?:cofre|vault|porta|door|grade|barreira|muro|parede)/i.test(idTag);
+          if (!isBarrier || !Array.isArray(o.pos)) continue;
+          const ox = Number(o.pos[0] || 0);
+          const oz = Number(o.pos.length === 2 ? o.pos[1] : o.pos[2] || 0);
+          const safeHalfW = Number(o.collisionBox?.halfW || 0.85);
+          const safeHalfD = Number(o.collisionBox?.halfD || 0.95);
+          if (Math.abs(px - ox) < safeHalfW && Math.abs(pz - oz) < safeHalfD) {
+            const shiftedZ = pz >= oz ? oz + safeHalfD + 0.55 : oz - safeHalfD - 0.55;
+            if (p.pos.length === 2) p.pos[1] = +shiftedZ.toFixed(2);
+            else p.pos[2] = +shiftedZ.toFixed(2);
+            auditFixes.push(
+              `Cena ${i + 1}: Spatial Clipping Guard reposicionou "${p.id}" fora do batente de "${o.id}" (z=${shiftedZ.toFixed(2)})`
+            );
+          }
+
+          const doorOpenAt = typeof o.abreEm === 'number' ? o.abreEm : typeof o.doorOpenAt === 'number' ? o.doorOpenAt : null;
+          if (doorOpenAt !== null && Array.isArray(p.movimentos)) {
+            for (const mv of p.movimentos) {
+              if (typeof mv.de === 'number' && mv.de < doorOpenAt + 0.35) {
+                const oldDe = mv.de;
+                mv.de = +(doorOpenAt + 0.35).toFixed(2);
+                if (typeof mv.ate === 'number' && mv.ate <= mv.de + 0.4) {
+                  mv.ate = +(mv.de + 1.2).toFixed(2);
+                }
+                auditFixes.push(
+                  `Cena ${i + 1}: movimento de "${p.id}" atrasado de ${oldDe}s para ${mv.de}s aguardando abertura de "${o.id}"`
+                );
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Protege câmera fixa contra spawn dentro de sólidos grandes
+    if (c.camera?.tipo === 'fixa' && Array.isArray(c.camera.pos)) {
+      const cx = Number(c.camera.pos[0] || 0);
+      const cy = Number(c.camera.pos[1] || 0);
+      const cz = Number(c.camera.pos[2] || 0);
+      for (const o of objs) {
+        if (!Array.isArray(o.pos) || o.opacidade !== undefined && o.opacidade < 0.9) continue;
+        const ox = Number(o.pos[0] || 0);
+        const oy = o.pos.length === 3 ? Number(o.pos[1] || 0) : 0;
+        const oz = Number(o.pos.length === 2 ? o.pos[1] : o.pos[2] || 0);
+        const dist = Math.hypot(cx - ox, cy - (oy + 1), cz - oz);
+        if (dist < 0.75) {
+          c.camera.pos[2] = +(cz + 1.8).toFixed(2);
+          auditFixes.push(`Cena ${i + 1}: câmera afastada de "${o.id}" para evitar oclusão`);
+        }
+      }
     }
   }
 
@@ -526,6 +586,7 @@ export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThr
     duracao: totalDur,
     audio: 'narracao.mp3',
     palavras: 'palavras.json',
+    mouthCues: custom?.mouthCues || 'mouthCues.json',
     legendas: { ...DEFAULT_VIRAL_CAPTIONS, ...(custom?.legendas || {}), ...(input.captions || {}) },
     ambiente: custom?.ambiente || { fundo: 'cidade', horario: 'dia', chao: 'concreto', nuvens: true },
     cenas,

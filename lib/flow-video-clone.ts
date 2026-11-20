@@ -26,8 +26,10 @@ import type {
   ClonedBeatSourceType,
   ClonedRecommendedEngine,
   ClonedSceneBeat,
+  ClonedStoryBible,
   CloneCustomization,
   FlowClonedStructure,
+  ReverseEngineeredEditingMetrics,
 } from './flow-clone-types'
 import { normalizeHex, recommendBpmRange, validateBrandPalette, type MotionEnergy } from './motion-checks'
 
@@ -58,21 +60,115 @@ async function probeVideoMeta(videoPath: string): Promise<VideoMeta> {
   }
 }
 
-/** Extrai ate 16 frames nitidos e rotulados com o tempo exato para leitura visual + OCR. */
+/** Detecta os timestamps exatos de cortes reais de cena via filtro select/showinfo do FFmpeg. */
+async function detectRealSceneCuts(videoPath: string | undefined, durationSec: number): Promise<number[]> {
+  if (!videoPath || !fs.existsSync(videoPath)) return []
+  try {
+    const res = await run(
+      ffmpegBin(),
+      ['-hide_banner', '-i', videoPath, '-vf', "select='gt(scene,0.28)',showinfo", '-f', 'null', '-'],
+      { timeout: 30000, maxBuffer: 8 * 1024 * 1024 }
+    ).catch((err: any) => ({ stdout: String(err?.stdout || ''), stderr: String(err?.stderr || '') }))
+    const log = `${res.stdout || ''}\n${res.stderr || ''}`
+    const cuts: number[] = []
+    const re = /pts_time:([0-9]+(?:\.[0-9]+)?)/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(log)) !== null) {
+      const ts = Number(m[1])
+      if (Number.isFinite(ts) && ts > 0.25 && ts < durationSec - 0.25) {
+        if (!cuts.length || ts - cuts[cuts.length - 1] >= 0.4) {
+          cuts.push(Number(ts.toFixed(2)))
+        }
+      }
+    }
+    return cuts
+  } catch {
+    return []
+  }
+}
+
+/** Calcula metricas matematicas de edicao (Median Shot Length, CPM e WPM). */
+function computeEditingMetrics(
+  cutTimestamps: number[],
+  durationSec: number,
+  transcript: string,
+  contactSheetPath?: string
+): ReverseEngineeredEditingMetrics {
+  const safeDur = Math.max(4, durationSec)
+  const sorted = [...cutTimestamps].filter((t) => t > 0 && t < safeDur).sort((a, b) => a - b)
+  const boundaries = [0, ...sorted, safeDur]
+  const shotLengths: number[] = []
+  for (let i = 1; i < boundaries.length; i++) {
+    const len = boundaries[i] - boundaries[i - 1]
+    if (len > 0.2) shotLengths.push(len)
+  }
+  shotLengths.sort((a, b) => a - b)
+  const mid = Math.floor(shotLengths.length / 2)
+  const medianShotLengthSec = shotLengths.length
+    ? Number(
+        (shotLengths.length % 2 !== 0
+          ? shotLengths[mid]
+          : (shotLengths[mid - 1] + shotLengths[mid]) / 2
+        ).toFixed(2)
+      )
+    : Number(safeDur.toFixed(2))
+  const cutsPerMinute = Number(((sorted.length / safeDur) * 60).toFixed(1))
+  const cleanWords = transcript.replace(/\[[0-9.]+s\]/g, '').trim().split(/\s+/).filter(Boolean)
+  const wordsPerMinute = cleanWords.length > 0 ? Math.round((cleanWords.length / safeDur) * 60) : 0
+  const hookDurationSec = Number((sorted[0] || Math.min(3.5, safeDur)).toFixed(2))
+
+  return {
+    detectedCutsCount: sorted.length,
+    cutTimestampsSec: sorted.slice(0, 40),
+    medianShotLengthSec,
+    cutsPerMinute,
+    wordsPerMinute,
+    hookDurationSec,
+    ...(contactSheetPath ? { contactSheetPath } : {}),
+  }
+}
+
+/** Extrai ate 16 frames nitidos priorizando cortes reais detectados e gera Contact Sheet visual em disco. */
 async function extractLabeledFrames(
   videoPath: string | undefined,
   durationSec: number,
-  fallbackFrames: string[]
-): Promise<FlowVisionImage[]> {
+  fallbackFrames: string[],
+  cutTimestamps: number[] = [],
+  fileId: string = 'clip'
+): Promise<{ frames: FlowVisionImage[]; contactSheetPath?: string }> {
   const out: FlowVisionImage[] = []
+  let contactSheetPath: string | undefined
 
   if (videoPath && fs.existsSync(videoPath)) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow_clone_'))
-    const count = Math.min(16, Math.max(6, Math.ceil(durationSec / 2.5)))
     const scaleFilter = "scale=w='if(gt(iw,ih),1024,-2)':h='if(gt(iw,ih),-2,1024)'"
+    const cutTargets = cutTimestamps
+      .map((ts) => Math.min(Math.max(0.2, ts + 0.15), Math.max(0.3, durationSec - 0.2)))
+      .slice(0, 14)
+
+    const uniformTargets: number[] = []
+    const uniformCount = Math.min(16, Math.max(6, Math.ceil(durationSec / 2.5)))
+    for (let i = 0; i < uniformCount; i++) {
+      const ts =
+        uniformCount === 1
+          ? 0.2
+          : Math.min(Math.max(0.2, (i * Math.max(durationSec - 0.4, 1)) / (uniformCount - 1)), Math.max(0.2, durationSec - 0.2))
+      uniformTargets.push(Number(ts.toFixed(2)))
+    }
+
+    const targets: number[] = [0.2]
+    for (const ts of [...cutTargets, ...uniformTargets]) {
+      if (targets.length >= 16) break
+      if (!targets.some((existing) => Math.abs(existing - ts) < 0.85)) {
+        targets.push(Number(ts.toFixed(2)))
+      }
+    }
+    targets.sort((a, b) => a - b)
+
+    const savedPaths: string[] = []
     try {
-      for (let i = 0; i < count; i++) {
-        const ts = count === 1 ? 0 : Math.min(Math.max(0.2, (i * Math.max(durationSec - 0.4, 1)) / (count - 1)), Math.max(0.2, durationSec - 0.2))
+      for (let i = 0; i < targets.length; i++) {
+        const ts = targets[i]
         const fp = path.join(tmpDir, `frame_${String(i).padStart(2, '0')}.jpg`)
         try {
           await run(
@@ -81,20 +177,69 @@ async function extractLabeledFrames(
             { timeout: 15000 }
           )
           if (fs.existsSync(fp) && fs.statSync(fp).size > 0) {
+            savedPaths.push(fp)
+            const isCut = cutTargets.some((c) => Math.abs(c - ts) < 0.2)
             out.push({
               dataBase64: fs.readFileSync(fp).toString('base64'),
               mimeType: 'image/jpeg',
-              label: `[Frame ${i + 1}/${count} em ${ts.toFixed(1)}s]`,
+              label: `[Frame ${i + 1}/${targets.length} em ${ts.toFixed(1)}s${isCut ? ' • PÓS-CORTE' : ''}]`,
             })
           }
         } catch {
           // Segue para os demais frames mesmo se um timestamp falhar
         }
       }
+
+      if (savedPaths.length >= 4) {
+        const cols = savedPaths.length >= 9 ? 4 : savedPaths.length >= 4 ? 2 : savedPaths.length
+        const rows = Math.ceil(savedPaths.length / cols)
+        const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp/contact_sheets' : path.join(process.cwd(), 'tmp', 'contact_sheets')
+        fs.mkdirSync(baseTmp, { recursive: true })
+        const sheetOut = path.join(baseTmp, `contact_${fileId.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}.jpg`)
+        try {
+          await run(
+            ffmpegBin(),
+            [
+              '-y',
+              '-pattern_type',
+              'glob',
+              '-i',
+              path.join(tmpDir, 'frame_*.jpg'),
+              '-vf',
+              `scale=360:-2,tile=${cols}x${rows}:padding=6:color=#111827`,
+              '-q:v',
+              '3',
+              sheetOut,
+            ],
+            { timeout: 20000 }
+          ).catch(async () => {
+            // Windows FFmpeg nao aceita -pattern_type glob; usa sequencia numerada frame_%02d.jpg
+            await run(
+              ffmpegBin(),
+              [
+                '-y',
+                '-i',
+                path.join(tmpDir, 'frame_%02d.jpg'),
+                '-vf',
+                `scale=360:-2,tile=${cols}x${rows}:padding=6:color=#111827`,
+                '-q:v',
+                '3',
+                sheetOut,
+              ],
+              { timeout: 20000 }
+            )
+          })
+          if (fs.existsSync(sheetOut) && fs.statSync(sheetOut).size > 1000) {
+            contactSheetPath = sheetOut
+          }
+        } catch {
+          // Contact sheet e opcional; frames individuais ja estao em memoria
+        }
+      }
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
-    if (out.length > 0) return out
+    if (out.length > 0) return { frames: out, contactSheetPath }
   }
 
   for (let i = 0; i < Math.min(fallbackFrames.length, 16); i++) {
@@ -107,7 +252,7 @@ async function extractLabeledFrames(
       })
     }
   }
-  return out
+  return { frames: out }
 }
 
 function normalizeStructure(
@@ -121,6 +266,7 @@ function normalizeStructure(
     framesAnalyzed: number
     provider: FlowProvider
     usedFallbackThumbs: boolean
+    editingMetrics?: ReverseEngineeredEditingMetrics
   }
 ): FlowClonedStructure {
   const modeRaw = String(raw?.mode || '').trim().toLowerCase()
@@ -212,14 +358,48 @@ function normalizeStructure(
   const energy: MotionEnergy =
     energyRaw === 'cinematografico' || energyRaw === 'cinetico' ? energyRaw : 'fluido'
 
+  const VALID_ENGINES: readonly ClonedRecommendedEngine[] = [
+    'bean_2d_3d',
+    'stickman_2d_3d',
+    'netflix_doc',
+    'dossie_2d',
+    'mapa_3d',
+    'atlas_3d',
+    'fern_3d',
+    'html_svg',
+    'remotion',
+    'flow',
+  ]
   const codedCount = beats.filter((b) => b.sourceType === 'coded_html_svg').length
   const engineRaw = String(raw?.recommendedEngine || '').trim().toLowerCase()
-  const recommendedEngine: ClonedRecommendedEngine =
-    engineRaw === 'html_svg' || engineRaw === 'remotion' || engineRaw === 'flow'
-      ? (engineRaw as ClonedRecommendedEngine)
-      : codedCount >= Math.ceil(beats.length / 2)
-        ? 'html_svg'
-        : 'flow'
+  const recommendedEngine: ClonedRecommendedEngine = (VALID_ENGINES as readonly string[]).includes(engineRaw)
+    ? (engineRaw as ClonedRecommendedEngine)
+    : codedCount >= Math.ceil(beats.length / 2)
+      ? 'html_svg'
+      : 'flow'
+
+  const rawBible = raw?.storyBible && typeof raw.storyBible === 'object' ? raw.storyBible : null
+  const storyBible: ClonedStoryBible = {
+    seriesTitle: String(rawBible?.seriesTitle || raw?.title || 'Série Viral DarkTube').slice(0, 120),
+    characterArchetype: String(
+      rawBible?.characterArchetype ||
+        (Array.isArray(raw?.detectedCharacters) && raw.detectedCharacters[0]) ||
+        'Protagonista expressivo consistente'
+    ).slice(0, 180),
+    characterVisualLock: String(
+      rawBible?.characterVisualLock ||
+        (Array.isArray(raw?.detectedCharacters) ? raw.detectedCharacters.join('; ') : 'Consistência visual fixa por sprite/âncora')
+    ).slice(0, 320),
+    worldSettingLock: String(
+      rawBible?.worldSettingLock ||
+        (Array.isArray(raw?.detectedLocations) ? raw.detectedLocations.join('; ') : 'Cenário contínuo com iluminação dramática')
+    ).slice(0, 260),
+    recurringHookFormula: String(rawBible?.recurringHookFormula || beats[0]?.beat || 'Gancho visual e pergunta aberta nos primeiros 2s').slice(0, 220),
+    cliffhangerFormula: String(
+      rawBible?.cliffhangerFormula || beats[beats.length - 1]?.beat || 'Fechamento com revelação ou gancho para Parte 2'
+    ).slice(0, 220),
+    captionStyle: String(rawBible?.captionStyle || '2 palavras em destaque inferior com contorno forte').slice(0, 160),
+  }
 
   return {
     sourceUrl: ctx.url,
@@ -248,6 +428,8 @@ function normalizeStructure(
     recommendedEngine,
     paletteHex,
     energy,
+    ...(ctx.editingMetrics ? { editingMetrics: ctx.editingMetrics } : {}),
+    storyBible,
     providerUsed: ctx.provider,
     usedFallbackThumbs: ctx.usedFallbackThumbs,
   }
@@ -297,11 +479,19 @@ export async function analyzeVideoStructureFromLink(input: {
       }
     }
 
-    const frames = await extractLabeledFrames(download.videoPath, meta.durationSec, download.framePaths || [])
+    const realCuts = await detectRealSceneCuts(download.videoPath, meta.durationSec)
+    const { frames, contactSheetPath } = await extractLabeledFrames(
+      download.videoPath,
+      meta.durationSec,
+      download.framePaths || [],
+      realCuts,
+      fileId
+    )
     if (frames.length === 0) throw new Error('Não foi possível extrair frames deste vídeo para análise.')
+    const editingMetrics = computeEditingMetrics(realCuts, meta.durationSec, transcript, contactSheetPath)
 
     const system = `You are a senior viral-video reverse engineer and visual OCR analyst.
-You will inspect sequential frames extracted from a reference video (plus its audio transcript when available).
+You will inspect sequential frames extracted from a reference video (plus exact detected cut timestamps, editing math and audio transcript when available).
 Your job is to understand EVERY visual beat, scene cut, camera framing, motion, on-screen OCR text, narrative hook, pacing and audio style so the user can replicate the EXACT structural blueprint while swapping character, story or setting.
 
 Reply with ONE valid JSON object matching this exact schema:
@@ -309,15 +499,24 @@ Reply with ONE valid JSON object matching this exact schema:
   "title": "short descriptive title of the analyzed video (PT-BR)",
   "summary": "2-3 sentences explaining the exact viral structure, hook mechanism and retention pattern (PT-BR)",
   "mode": "dialogo | narracao | ambiente | livre",
-  "visualStyle": "cinematografico | natural | suspense | 3d_toy | 2d_ilustrado",
+  "visualStyle": "cinematografico | natural | suspense | 3d_toy | 2d_ilustrado | bean_2d_3d | fern_3d | dossie_2d | mapa_3d",
   "pacing": "frenetico | dinamico | equilibrado | cadenciado",
   "language": "pt-BR | en-US | es-ES",
   "recommendedTakes": number (between 2 and 12),
   "recommendedSeconds": 4 | 6 | 8 | 10,
   "recommendedModel": "Omni 1.2 Flash" | "Veo 3.1 - Fast" | "Veo 3.1 - Quality",
-  "recommendedEngine": "html_svg | remotion | flow",
+  "recommendedEngine": "bean_2d_3d | stickman_2d_3d | netflix_doc | dossie_2d | mapa_3d | atlas_3d | fern_3d | html_svg | remotion | flow",
   "paletteHex": ["#0B1020", "#38BDF8", "#FACC15"],
   "energy": "cinematografico | fluido | cinetico",
+  "storyBible": {
+    "seriesTitle": "nome/conceito da série ou formato replicável (PT-BR)",
+    "characterArchetype": "arquétipo do personagem recorrente ou narrador visual (PT-BR)",
+    "characterVisualLock": "regras visuais fixas de contorno/traço/figurino para manter 100% de consistência (PT-BR)",
+    "worldSettingLock": "regras de cenário, iluminação e profundidade entre episódios (PT-BR)",
+    "recurringHookFormula": "fórmula de gancho dos primeiros 2 segundos (PT-BR)",
+    "cliffhangerFormula": "fórmula de fechamento/comentário/gancho para parte 2 (PT-BR)",
+    "captionStyle": "posição, quantidade de palavras, tipografia e cor da legenda observada (PT-BR)"
+  },
   "ocrTexts": ["exact text read on screen across frames, in chronological order"],
   "detectedCharacters": ["visual summary of each recurring person/character seen in the video (in English, adult wording)"],
   "detectedLocations": ["visual summary of each environment/location seen in the video (in English)"],
@@ -349,10 +548,14 @@ Rules:
     const userPrompt = [
       `URL de origem: ${cleanUrl} (${platform})`,
       `Duração medida: ${meta.durationSec}s | Formato detectado: ${meta.aspect}`,
+      `Métricas matemáticas de edição (FFmpeg scdet): ${editingMetrics.detectedCutsCount} cortes reais detectados | Duração mediana do plano: ${editingMetrics.medianShotLengthSec}s | Cortes/min: ${editingMetrics.cutsPerMinute} | WPM: ${editingMetrics.wordsPerMinute}`,
+      editingMetrics.cutTimestampsSec.length ? `Timestamps dos cortes reais (s): ${editingMetrics.cutTimestampsSec.join(', ')}` : '',
       `Total de frames anexados em ordem cronológica: ${frames.length}`,
       transcript ? `\nTranscrição do áudio original:\n${transcript.slice(0, 9000)}` : '\n(Sem transcrição de áudio prévia — analise pelos frames e OCR visual.)',
-      '\nAnalise os frames abaixo em ordem cronológica, leia todo o OCR visível e devolva o JSON estruturado cobrindo toda a duração do vídeo.',
-    ].join('\n')
+      '\nAnalise os frames abaixo em ordem cronológica, leia todo o OCR visível, preencha o objeto storyBible para permitir clonagem em série/estilo e devolva o JSON estruturado cobrindo toda a duração do vídeo.',
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     const candidates: Array<{ provider: FlowProvider; apiKey: string }> = [
       { provider: input.provider, apiKey: input.apiKey },
@@ -383,6 +586,7 @@ Rules:
       framesAnalyzed: frames.length,
       provider: usedProvider,
       usedFallbackThumbs: Boolean(download.isFallback),
+      editingMetrics,
     })
   } finally {
     if (fullAudioTmp && fs.existsSync(fullAudioTmp)) {
@@ -495,6 +699,7 @@ export function buildCloneTemplateAndParams(
 export function formatCloneAsVideoMd(s: FlowClonedStructure): string {
   const bpm = recommendBpmRange((s.energy as MotionEnergy) || 'fluido')
   const paletteLine = s.paletteHex?.length ? s.paletteHex.join(', ') : '(não detectada — usar até 3 cores hex)'
+  const m = s.editingMetrics
   const lines = [
     `# VIDEO.md — ${s.title}`,
     '',
@@ -503,9 +708,28 @@ export function formatCloneAsVideoMd(s: FlowClonedStructure): string {
     `- **Estilo & Ritmo:** ${s.visualStyle} · ${s.pacing} · ${bpm.label}`,
     `- **Motor Recomendado:** \`${s.recommendedEngine || 'flow'}\``,
     `- **Paleta Dominante (<=3 hex):** ${paletteLine}`,
+    ...(m
+      ? [
+          `- **Métricas Reais de Edição:** ${m.detectedCutsCount} cortes (${m.cutsPerMinute} cortes/min) · Plano mediano: ${m.medianShotLengthSec}s · Gancho inicial: ${m.hookDurationSec}s${m.wordsPerMinute ? ` · Fala: ${m.wordsPerMinute} WPM` : ''}`,
+          ...(m.contactSheetPath ? [`- **Contact Sheet Visual:** \`${m.contactSheetPath}\``] : []),
+        ]
+      : []),
     '',
     `## Resumo Estrutural`,
     s.summary || '-',
+    ...(s.storyBible
+      ? [
+          '',
+          `## Story Bible & Skill Replicável`,
+          `- **Série / Formato:** ${s.storyBible.seriesTitle}`,
+          `- **Arquétipo do Personagem:** ${s.storyBible.characterArchetype}`,
+          `- **Trava Visual (Consistência):** ${s.storyBible.characterVisualLock}`,
+          `- **Ambiente / Luz:** ${s.storyBible.worldSettingLock}`,
+          `- **Fórmula de Gancho (0–3s):** ${s.storyBible.recurringHookFormula}`,
+          `- **Fórmula de Fechamento:** ${s.storyBible.cliffhangerFormula}`,
+          `- **Estilo de Legenda:** ${s.storyBible.captionStyle}`,
+        ]
+      : []),
     '',
     `## Beats Plano a Plano`,
     '',

@@ -29,8 +29,9 @@ export function ProductionNotifier() {
           if (!isFirstRun.current && activeIdsRef.current.has(item.id)) {
             if (item.status === "completed") {
               activeIdsRef.current.delete(item.id)
+              const timeSuffix = item.deliveryTimeLabel ? ` em ${item.deliveryTimeLabel}` : ""
               toast.success("🎬 Produção Concluída com Sucesso!", {
-                description: "Seu vídeo foi renderizado e já está disponível para baixar.",
+                description: `Seu vídeo foi renderizado${timeSuffix} e já está disponível para baixar.`,
                 duration: 12000,
                 action: item.video_url
                   ? {

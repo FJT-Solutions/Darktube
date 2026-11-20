@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db-client';
+import { computeRenderTiming } from '@/lib/render-timing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,9 +28,18 @@ export async function POST(req: NextRequest) {
         `,
         ['completed', videoUrl, historyId]
       );
-
-      console.log(`[Render Complete Webhook] Vídeo renderizado com sucesso no BD. History ID: ${historyId}`);
-      return NextResponse.json({ success: true, updated: rows[0] });
+      const timing = rows[0]?.dispatched_at
+        ? computeRenderTiming({ createdAt: rows[0].dispatched_at, finishedAt: new Date().toISOString() })
+        : null;
+      console.log(
+        `[Render Complete Webhook] Vídeo renderizado com sucesso no BD. History ID: ${historyId}${timing?.totalDeliveryLabel ? ` — Tempo de entrega: ${timing.totalDeliveryLabel}` : ''}`
+      );
+      return NextResponse.json({
+        success: true,
+        updated: rows[0],
+        deliveryTimeMs: timing?.totalDeliveryMs ?? null,
+        deliveryTimeLabel: timing?.totalDeliveryLabel ?? null,
+      });
     } else {
       const { rows } = await pool.query(
         `

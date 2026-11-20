@@ -59,6 +59,8 @@ export interface FlowTake {
   props?: string[]
   /** Ponte narrativa/visual do take anterior para este take (estado inicial -> estado final). */
   carryOver?: string
+  /** Estado exato do ultimo quadro deste take (pose, objetos na mao, iluminacao) para costurar o proximo corte. */
+  exitSeam?: string
   /** Som da cena (foley e ambiente), em ingles curto. */
   sound: string
   /** Plano e movimento de camera, em ingles. */
@@ -128,7 +130,7 @@ const SCHEMA = `{
   "narratorVoice": "only when there is narration: one fixed narrator voice in English (gender, age range, timbre, pacing), used in every narrated take",
   "locations": [{"id": "l1", "name": "string", "description": "full visual description in English: place, time of day, light sources, textures"}],
   "props": [{"id": "p1", "name": "string", "description": "fixed visual anchor in English (10-20 words: exact colors, count, materials, wrapping/details) for every recurring key object across takes"}],
-  "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "props": ["recurring prop ids visible in this shot"], "carryOver": "short English bridge explaining how this shot picks up directly from the previous take's ending pose/props/emotion and what passes to the next take", "sound": "specific foley and ambience in English", "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch", "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none", "mediaType": "ai_flow | stock_asset"}],
+  "takes": [{"n": 1, "beat": "scene function", "kind": "dialogo | narracao | ambiente", "seconds": 8, "speaker": "character id, narrator or empty", "line": "spoken line or empty", "action": "ONE concrete physical action in English, with the object it touches and the facial expression", "camera": "shot type, lens and movement in English", "location": "location id", "characters": ["visible character ids"], "props": ["recurring prop ids visible in this shot"], "carryOver": "short English bridge explaining how this shot picks up directly from the previous take's ending pose/props/emotion and what passes to the next take", "exitSeam": "exact final frame pose, held prop state and lighting at the end of this take to anchor the next cut", "sound": "specific foley and ambience in English", "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch", "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none", "mediaType": "ai_flow | stock_asset"}],
   "seo": {"title": "string", "caption": "string", "hook": "engagement question", "hashtags": ["#tag"]}
 }`
 
@@ -396,6 +398,7 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
 
     const rawPropIds = Array.isArray(k?.props) ? k.props.map((x: any) => str(x, 20)).filter(Boolean) : []
     const carryOver = str(k?.carryOver, 300)
+    const exitSeam = str(k?.exitSeam, 260)
 
     return {
       n: i + 1,
@@ -408,6 +411,7 @@ export function normalizeScript(raw: any, t: FlowTemplate, params: FlowParams): 
       characters: effChars,
       ...(rawPropIds.length ? { props: rawPropIds } : {}),
       ...(carryOver ? { carryOver } : {}),
+      ...(exitSeam ? { exitSeam } : {}),
       sound: str(k?.sound, 240),
       camera: str(k?.camera, 200),
       beat: str(k?.beat, 160),
@@ -649,6 +653,7 @@ export function buildTakePrompt(
     lines.push(`Sound: ${noEnd(take.sound || 'subtle natural ambience')}.${kind === 'ambiente' || !take.line ? ' No speech.' : ''} No background music.`)
     if (hasRef && visible.length === 0) lines.push('Use the reference image only for kitchen, props and lighting continuity: do not render any person from it.')
     else if (hasRef) lines.push('Use the reference image only for identity: ignore its plain backdrop and place everyone inside the setting above.')
+    if (level <= 1 && take.exitSeam) lines.push(`Exit seam / ending state: ${clipWords(noEnd(take.exitSeam), 24)}.`)
     if (total > 1 && level === 0) lines.push(`Continuity: same ${visible.length ? 'characters, outfits, ' : ''}setting, lighting and color grading as the other scenes of this video.`)
     const hasHandsInAction = /\b(hands?|fingers?|grasp(?:ing|s)?|hold(?:ing|s)?|pour(?:ing|s)?|stir(?:ring|s)?|knead(?:ing|s)?|slic(?:ing|es)?|pull(?:ing|s)?|open(?:ing|s)?|clos(?:ing|es)?|plac(?:ing|es)?|touch(?:ing|es)?)\b/i.test(take.action)
     if (visible.length > 0) {

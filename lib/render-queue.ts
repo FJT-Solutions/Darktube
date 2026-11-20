@@ -1,6 +1,7 @@
 import { pool } from '@/lib/db-client';
+import { computeRenderTiming, type RenderTimingInfo } from '@/lib/render-timing';
 
-export type RenderEngine = 'remotion' | 'html_svg' | 'threejs_3d' | 'flow_assemble';
+export type RenderEngine = 'remotion' | 'html_svg' | 'threejs_3d' | 'blender_3d' | 'flow_assemble' | 'auto_clipper';
 export type RenderJobKind = 'single_scene' | 'full_video';
 export type RenderJobStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -22,13 +23,19 @@ export interface RenderJobRecord {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  timing: RenderTimingInfo;
 }
 
 export interface RenderQueueSnapshot {
   job: RenderJobRecord | null;
   positionInQueue: number;
-  activeJob: Pick<RenderJobRecord, 'id' | 'seq' | 'user_id' | 'engine' | 'kind' | 'title' | 'progress_pct' | 'started_at'> | null;
+  activeJob:
+    | (Pick<RenderJobRecord, 'id' | 'seq' | 'user_id' | 'engine' | 'kind' | 'title' | 'progress_pct' | 'created_at' | 'started_at'> & {
+        timing: RenderTimingInfo;
+      })
+    | null;
   queuedCount: number;
+  queuedJobs: RenderJobRecord[];
   recentJobs: RenderJobRecord[];
 }
 
@@ -54,12 +61,18 @@ function parseJsonSafe(raw: unknown): Record<string, unknown> {
 }
 
 function normalizeJobRow(row: any): RenderJobRecord {
+  const timing = computeRenderTiming({
+    createdAt: row.created_at,
+    startedAt: row.started_at,
+    finishedAt: row.finished_at,
+  });
   return {
     ...row,
     seq: Number(row.seq || 0),
     progress_pct: Number(row.progress_pct || 0),
     payload: parseJsonSafe(row.payload),
     result_meta: parseJsonSafe(row.result_meta),
+    timing,
   };
 }
 
@@ -156,6 +169,7 @@ export async function enqueueRenderJob(input: {
       created_at: now,
       started_at: null,
       finished_at: null,
+      timing: computeRenderTiming({ createdAt: now }),
     };
     return { job, positionInQueue: 1, persistence: 'memory' };
   }
@@ -276,10 +290,33 @@ async function executeClaimedJob<T extends { videoUrl?: string | null }>(
   persistence: 'postgres' | 'memory',
   waitTimeoutMs: number,
   executor: (ctx: { jobId: string; onProgress: (pct: number) => Promise<void> }) => Promise<T>
-): Promise<T & { queueJobId: string; positionInQueue: number; queueMode: 'postgres' | 'memory' }> {
+): Promise<
+  T & {
+    queueJobId: string;
+    positionInQueue: number;
+    queueMode: 'postgres' | 'memory';
+    deliveryTimeMs: number | null;
+    renderDurationMs: number | null;
+    deliveryTimeLabel: string | null;
+    renderDurationLabel: string | null;
+  }
+> {
   if (persistence === 'memory') {
     const task = localChain.then(async () => {
-      return await executor({ jobId: job.id, onProgress: async () => {} });
+      const startedAt = new Date().toISOString();
+      const out = await executor({ jobId: job.id, onProgress: async () => {} });
+      const finishedAt = new Date().toISOString();
+      const timing = computeRenderTiming({ createdAt: job.created_at, startedAt, finishedAt });
+      console.log(
+        `[RenderQueue] ✅ Job ${job.id} (${job.engine}) entregue (mem) — Render: ${timing.renderDurationLabel || '—'} | Total: ${timing.totalDeliveryLabel || '—'}`
+      );
+      return {
+        ...out,
+        deliveryTimeMs: timing.totalDeliveryMs,
+        renderDurationMs: timing.renderDurationMs,
+        deliveryTimeLabel: timing.totalDeliveryLabel,
+        renderDurationLabel: timing.renderDurationLabel,
+      };
     });
     localChain = task.catch(() => {});
     const out = await task;
@@ -307,6 +344,7 @@ async function executeClaimedJob<T extends { videoUrl?: string | null }>(
     throw new Error('Tempo limite aguardando sua vez na fila de renderização.');
   }
 
+  const startedAtIso = new Date().toISOString();
   const hbTimer = setInterval(() => {
     pool
       .query(`UPDATE public.render_jobs SET heartbeat_at = NOW() WHERE id = $1 AND status = 'running'`, [job.id])
@@ -318,8 +356,34 @@ async function executeClaimedJob<T extends { videoUrl?: string | null }>(
       jobId: job.id,
       onProgress: (pct) => updateRenderJobProgress(job.id, pct),
     });
-    await completeRenderJob(job.id, out.videoUrl || null, out as unknown as Record<string, unknown>);
-    return { ...out, queueJobId: job.id, positionInQueue, queueMode: 'postgres' };
+    const finishedAtIso = new Date().toISOString();
+    const timing = computeRenderTiming({
+      createdAt: job.created_at,
+      startedAt: startedAtIso,
+      finishedAt: finishedAtIso,
+    });
+    console.log(
+      `[RenderQueue] ✅ Job ${job.id} (${job.engine}) entregue — Render: ${timing.renderDurationLabel || '—'} | Fila: ${timing.queueWaitLabel || '0s'} | Total: ${timing.totalDeliveryLabel || '—'}`
+    );
+    const enrichedMeta: Record<string, unknown> = {
+      ...(out as unknown as Record<string, unknown>),
+      deliveryTiming: timing,
+      deliveryTimeMs: timing.totalDeliveryMs,
+      renderDurationMs: timing.renderDurationMs,
+      deliveryTimeLabel: timing.totalDeliveryLabel,
+      renderDurationLabel: timing.renderDurationLabel,
+    };
+    await completeRenderJob(job.id, out.videoUrl || null, enrichedMeta);
+    return {
+      ...out,
+      queueJobId: job.id,
+      positionInQueue,
+      queueMode: 'postgres',
+      deliveryTimeMs: timing.totalDeliveryMs,
+      renderDurationMs: timing.renderDurationMs,
+      deliveryTimeLabel: timing.totalDeliveryLabel,
+      renderDurationLabel: timing.renderDurationLabel,
+    };
   } catch (err: any) {
     await failRenderJob(jobIdOrFallback(job.id), err?.message || 'Erro durante renderização');
     throw err;
@@ -347,7 +411,17 @@ export async function runQueuedRenderTask<T extends { videoUrl?: string | null }
     localOnly?: boolean;
   },
   executor: (ctx: { jobId: string; onProgress: (pct: number) => Promise<void> }) => Promise<T>
-): Promise<T & { queueJobId: string; positionInQueue: number; queueMode: 'postgres' | 'memory' }> {
+): Promise<
+  T & {
+    queueJobId: string;
+    positionInQueue: number;
+    queueMode: 'postgres' | 'memory';
+    deliveryTimeMs: number | null;
+    renderDurationMs: number | null;
+    deliveryTimeLabel: string | null;
+    renderDurationLabel: string | null;
+  }
+> {
   const { job, positionInQueue, persistence } = await enqueueRenderJob(opts);
   return await executeClaimedJob(job, positionInQueue, persistence, opts.waitTimeoutMs || 15 * 60 * 1000, executor);
 }
@@ -376,7 +450,7 @@ export async function enqueueDetachedRenderTask<T extends { videoUrl?: string | 
 export async function getRenderQueueSnapshot(userId?: string, jobId?: string): Promise<RenderQueueSnapshot> {
   const ok = await ensureRenderQueueTable();
   if (!ok) {
-    return { job: null, positionInQueue: 0, activeJob: null, queuedCount: 0, recentJobs: [] };
+    return { job: null, positionInQueue: 0, activeJob: null, queuedCount: 0, queuedJobs: [], recentJobs: [] };
   }
   await recoverStaleRenderJobs();
 
@@ -400,19 +474,32 @@ export async function getRenderQueueSnapshot(userId?: string, jobId?: string): P
   }
 
   const activeRes = await pool.query(
-    `SELECT id, seq, user_id, engine, kind, title, progress_pct, started_at
+    `SELECT id, seq, user_id, engine, kind, title, progress_pct, created_at, started_at
      FROM public.render_jobs WHERE status = 'running' ORDER BY seq ASC LIMIT 1`
   );
-  const countRes = await pool.query(`SELECT COUNT(*)::int AS cnt FROM public.render_jobs WHERE status = 'queued'`);
+  const queuedRes = await pool.query(
+    `SELECT * FROM public.render_jobs WHERE status = 'queued' ORDER BY seq ASC LIMIT 30`
+  );
   const recentRes = userId
     ? await pool.query(`SELECT * FROM public.render_jobs WHERE user_id = $1 ORDER BY seq DESC LIMIT 12`, [userId])
     : await pool.query(`SELECT * FROM public.render_jobs ORDER BY seq DESC LIMIT 12`);
 
+  const rawActive = activeRes.rows[0];
+  const activeJob = rawActive
+    ? {
+        ...rawActive,
+        seq: Number(rawActive.seq || 0),
+        progress_pct: Number(rawActive.progress_pct || 0),
+        timing: computeRenderTiming({ createdAt: rawActive.created_at, startedAt: rawActive.started_at }),
+      }
+    : null;
+
   return {
     job,
     positionInQueue,
-    activeJob: activeRes.rows[0] || null,
-    queuedCount: Number(countRes.rows[0]?.cnt || 0),
+    activeJob,
+    queuedCount: queuedRes.rows.length,
+    queuedJobs: queuedRes.rows.map(normalizeJobRow),
     recentJobs: recentRes.rows.map(normalizeJobRow),
   };
 }

@@ -27,7 +27,10 @@ import {
   Calculator,
   Zap,
   ScanEye,
+  Clock,
+  Info,
 } from "lucide-react"
+import { computeRenderTiming } from "@/lib/render-timing"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -45,6 +48,7 @@ import {
   REALISM,
   TAKE_SECONDS,
   VIDEO_MODELS,
+  OLD_MODELS_SUNSET,
   allowedSecondsForModel,
   clampSecondsForModel,
   getFlowTemplate,
@@ -115,6 +119,9 @@ interface JobRow {
   status: string
   error_message: string | null
   result_url: string | null
+  created_at?: string | null
+  claimed_at?: string | null
+  finished_at?: string | null
 }
 
 const MODE_LABEL: Record<string, string> = { dialogo: "Fala", narracao: "Narração", ambiente: "Sem fala", livre: "Livre" }
@@ -655,6 +662,13 @@ export default function FlowPage() {
                       )}
                     </div>
 
+                    <div className="flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-[11px] text-sky-300">
+                      <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-sky-400" />
+                      <span>
+                        <strong>Registro Google Flow ({OLD_MODELS_SUNSET}):</strong> Veo 3.1 (Fast/Quality/Lite) e Omni 1.1 saem do menu do Flow nesta data. O <strong>Omni 1.2 Flash</strong> já é o padrão ativo com troca automática pós-transição.
+                      </span>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3.5">
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -758,6 +772,12 @@ export default function FlowPage() {
                   </p>
                 </button>
                 <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                  {p.delivery_time_label && p.delivery_time_label !== "—" && (
+                    <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground shrink-0">
+                      <Clock className="h-3 w-3" />
+                      {hasVideo || p.assembled_at ? `Entrega: ${p.delivery_time_label}` : `Tempo: ${p.delivery_time_label}`}
+                    </Badge>
+                  )}
                   <Badge variant={st.variant} className={cn("shrink-0", st.className)}>
                     {effStatus === "scheduled" && <CalendarClock className="mr-1 h-3 w-3" />}
                     {effStatus === "published" && <Check className="mr-1 h-3 w-3" />}
@@ -1837,6 +1857,19 @@ function ProjectView({
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {job && (() => {
+                      const jTiming = computeRenderTiming({
+                        createdAt: job.created_at,
+                        startedAt: job.claimed_at || job.created_at,
+                        finishedAt: job.finished_at,
+                      })
+                      return jTiming.totalDeliveryLabel && jTiming.totalDeliveryLabel !== "—" ? (
+                        <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {jTiming.totalDeliveryLabel}
+                        </Badge>
+                      ) : null
+                    })()}
                     {job && (
                       <Badge variant={job.status === "done" ? "default" : "outline"}>
                         {STATUS_LABEL[job.status] ?? job.status}
@@ -2138,7 +2171,15 @@ function ProjectView({
 
       <Card className="min-w-0 overflow-hidden">
         <CardContent className="space-y-3 p-4 min-w-0">
-          <p className="font-medium">3. Montar o vídeo final</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium">3. Montar o vídeo final</p>
+            {project.delivery_time_label && project.delivery_time_label !== "—" && (
+              <Badge variant="outline" className="text-xs gap-1 text-emerald-400 border-emerald-500/30">
+                <Clock className="h-3 w-3" />
+                {project.final_url ? `Entrega total: ${project.delivery_time_label}` : `Decorrido: ${project.delivery_time_label}`}
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">Junta os takes (usando a versão 720p quando existir) e gera a legenda a partir do que é falado: nos vídeos curtos ela é gravada no vídeo; nos longos sai só o arquivo .srt, para ativar no YouTube.</p>
           <div className="flex flex-wrap items-end gap-3 pt-1">
             <div className="space-y-1 w-full sm:w-auto">

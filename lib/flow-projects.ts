@@ -1,5 +1,6 @@
 import { pool } from '@/lib/db-client'
 import type { FlowScript, FlowParams } from '@/lib/flow-script'
+import { computeRenderTiming } from '@/lib/render-timing'
 
 export interface FlowProject {
   id: string
@@ -16,6 +17,8 @@ export interface FlowProject {
   assembled_at: string | null
   created_at: string
   updated_at: string
+  delivery_time_ms?: number | null
+  delivery_time_label?: string | null
   publish_status?: string | null
   scheduled_at?: string | null
   published_at?: string | null
@@ -140,16 +143,34 @@ export async function listFlowProjects(userId: string): Promise<Omit<FlowProject
      LIMIT 100`,
     [userId]
   )
-  return rows.map((r: any) => ({
-    ...r,
-    publish_platforms: parsePlatforms(r.publish_platforms),
-  }))
+  return rows.map((r: any) => {
+    const timing = computeRenderTiming({
+      createdAt: r.created_at,
+      finishedAt: r.assembled_at || (r.final_url ? r.updated_at : null),
+    })
+    return {
+      ...r,
+      delivery_time_ms: timing.totalDeliveryMs,
+      delivery_time_label: timing.totalDeliveryLabel,
+      publish_platforms: parsePlatforms(r.publish_platforms),
+    }
+  })
 }
 
 export async function getFlowProject(userId: string, id: string): Promise<FlowProject | null> {
   await ensureFlowProjectsTable()
   const { rows } = await pool.query(`SELECT * FROM public.flow_projects WHERE id = $1 AND user_id = $2`, [id, userId])
-  return rows[0] ?? null
+  const row = rows[0]
+  if (!row) return null
+  const timing = computeRenderTiming({
+    createdAt: row.created_at,
+    finishedAt: row.assembled_at || (row.final_url ? row.updated_at : null),
+  })
+  return {
+    ...row,
+    delivery_time_ms: timing.totalDeliveryMs,
+    delivery_time_label: timing.totalDeliveryLabel,
+  }
 }
 
 export async function updateFlowProject(

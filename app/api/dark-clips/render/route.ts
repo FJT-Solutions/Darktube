@@ -8,6 +8,7 @@ import { sanitizeVideo } from '@/lib/video-sanitizer';
 import { generateAiRemodelForClip } from '../remodel-ai/route';
 import { logger } from '@/lib/logger';
 import { triggerSocialDispatcher } from '@/lib/social-dispatcher';
+import { computeRenderTiming } from '@/lib/render-timing';
 import fs from 'fs';
 import path from 'path';
 
@@ -201,16 +202,28 @@ export async function POST(req: Request) {
       let lastError = '';
       let activeBaseUrl = '';
 
+      const renderStartedAtIso = new Date().toISOString();
       const finalizeRenderedPost = async (url: string) => {
         renderedVideoUrl = url;
+        const timing = computeRenderTiming({
+          createdAt: initialPost.created_at || renderStartedAtIso,
+          startedAt: renderStartedAtIso,
+          finishedAt: new Date().toISOString(),
+        });
+        console.log(`[DarkClips Render] ✅ Clipe ${initialPost.id} entregue em ${timing.totalDeliveryLabel}`);
         const shouldDispatch = Boolean(
           (dispatchNow || (isFutureSchedule && (!scheduledAt || new Date(scheduledAt) <= new Date()))) &&
           targetAccounts && targetAccounts.length > 0
         );
         const nextStatus = shouldDispatch ? 'publishing' : (isFutureSchedule ? 'scheduled' : 'rendered');
+        const nextRemodel = {
+          ...(initialPost.remodel_data || {}),
+          render_duration_ms: timing.totalDeliveryMs,
+          render_duration_label: timing.totalDeliveryLabel,
+        };
         await pool.query(
-          'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, error_message = NULL WHERE id = $3',
-          [nextStatus, url, initialPost.id]
+          'UPDATE public.dark_clips_posts SET status = $1, rendered_video_url = $2, remodel_data = $4, error_message = NULL WHERE id = $3',
+          [nextStatus, url, initialPost.id, JSON.stringify(nextRemodel)]
         );
         if (shouldDispatch) {
           logger.info(`Iniciando auto-dispatch para ${initialPost.id} após render...`, { context: 'Render' });

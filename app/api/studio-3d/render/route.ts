@@ -3,7 +3,10 @@ import os from 'os';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
+import { renderBlenderStoryboard } from '@/lib/blender-bridge';
+import { generateLipSyncMouthCues } from '@/lib/puppet-studio';
 import { enqueueDetachedRenderTask, type RenderJobKind } from '@/lib/render-queue';
+import { formatDeliveryDuration } from '@/lib/render-timing';
 import { compileThreeJsStoryboard, type ThreeJsStoryboard } from '@/lib/threejs-scene-compiler';
 import { renderThreeJsToMp4 } from '@/lib/threejs-render';
 import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
@@ -25,6 +28,8 @@ export async function POST(req: NextRequest) {
     const aspect = body?.aspect === '16:9' || body?.aspect === '1:1' ? body.aspect : '9:16';
     const quality: 'alta' | 'media' | 'basica' = body?.quality === 'alta' ? 'alta' : body?.quality === 'basica' ? 'basica' : 'media';
     const isDraft = body?.isDraft !== undefined ? Boolean(body.isDraft) : quality === 'basica';
+    const backend: 'threejs' | 'blender' = body?.backend === 'blender' ? 'blender' : 'threejs';
+    const fallbackToThreeJs = body?.fallbackToThreeJs !== false;
     const voiceProvider: VoiceProviderChoice = body?.voiceProvider || 'auto';
     const voiceGender: VoiceGender = body?.voiceGender === 'female' ? 'female' : 'male';
     const audioPathOrUrl = body?.audioPathOrUrl ? String(body.audioPathOrUrl) : undefined;
@@ -37,10 +42,10 @@ export async function POST(req: NextRequest) {
     const queued = await enqueueDetachedRenderTask(
       {
         userId,
-        engine: 'threejs_3d',
+        engine: backend === 'blender' ? 'blender_3d' : 'threejs_3d',
         kind,
         title,
-        payload: { kind, aspect, quality, isDraft, voiceProvider, voiceGender, scenesCount: storyboardInput.cenas.length },
+        payload: { kind, aspect, quality, isDraft, backend, voiceProvider, voiceGender, scenesCount: storyboardInput.cenas.length },
       },
       async ({ onProgress }) => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_studio3d_'));
@@ -69,21 +74,62 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          const outMp4 = path.join(tmpDir, `studio3d_${Date.now()}.mp4`);
-          const rendered = await renderThreeJsToMp4({
-            storyboard: compiled.storyboard,
-            words: voiceRes.words,
+          const lipSync = await generateLipSyncMouthCues({
             audioPath: voiceRes.audioPath,
-            outputPath: outMp4,
-            isDraft,
-            onProgress,
+            words: voiceRes.words,
+            durationSec: compiled.storyboard.duracao,
           });
+
+          const outMp4 = path.join(tmpDir, `studio3d_${Date.now()}.mp4`);
+          const qaSheetPath = path.join(tmpDir, `contact_sheet_${Date.now()}.png`);
+
+          const rendered =
+            backend === 'blender'
+              ? await renderBlenderStoryboard({
+                  storyboard: compiled.storyboard,
+                  words: voiceRes.words,
+                  mouthCues: lipSync.cues,
+                  audioPath: voiceRes.audioPath,
+                  outputPath: outMp4,
+                  isDraft,
+                  fallbackToThreeJs,
+                  contactSheetPath: qaSheetPath,
+                  onProgress,
+                })
+              : await renderThreeJsToMp4({
+                  storyboard: compiled.storyboard,
+                  words: voiceRes.words,
+                  mouthCues: lipSync.cues,
+                  audioPath: voiceRes.audioPath,
+                  outputPath: outMp4,
+                  isDraft,
+                  generateContactSheet: true,
+                  contactSheetPath: qaSheetPath,
+                  onProgress,
+                });
 
           const fileName = `studio3d_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp4`;
           const storagePath = await uploadMediaFile(fs.readFileSync(rendered.outputPath), fileName, 'video/mp4');
 
+          let contactSheetUrl: string | undefined;
+          if (rendered.contactSheetPath && fs.existsSync(rendered.contactSheetPath)) {
+            const sheetName = `studio3d_qa_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.png`;
+            contactSheetUrl = await uploadMediaFile(fs.readFileSync(rendered.contactSheetPath), sheetName, 'image/png');
+          }
+
+          const backendUsed = 'backendUsed' in rendered ? rendered.backendUsed : 'threejs';
+          const renderDurationMs = rendered.renderDurationMs;
+          const renderDurationLabel = rendered.renderDurationLabel || formatDeliveryDuration(renderDurationMs);
+          console.log(
+            `[Studio 3D] ✅ Render concluído em ${renderDurationLabel} (backend=${backendUsed}, lipSync=${lipSync.engine}, qa=${rendered.qaChecks.passed})`
+          );
+
           return {
             videoUrl: storagePath,
+            contactSheetUrl,
+            qaChecks: rendered.qaChecks,
+            lipSyncEngine: lipSync.engine,
+            backendUsed,
             voiceProviderUsed: voiceRes.providerUsed,
             voiceUsed: voiceRes.voiceUsed,
             durationSec: rendered.durationSec,
@@ -92,6 +138,8 @@ export async function POST(req: NextRequest) {
             fps: rendered.fps,
             sceneCount: compiled.sceneCount,
             auditFixes: compiled.auditFixes,
+            renderDurationMs,
+            renderDurationLabel,
           };
         } finally {
           try {

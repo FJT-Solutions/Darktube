@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db-client';
 import { uploadMediaFile } from '@/lib/storage';
 import { triggerSocialDispatcher } from '@/lib/social-dispatcher';
+import { computeRenderTiming } from '@/lib/render-timing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,7 +53,35 @@ export async function POST(req: NextRequest) {
     }
 
     const { rows } = await pool.query(query, queryParams);
-    console.log(`[Production Webhook] Histórico atualizado com sucesso (${status}).`);
+    let deliveryTimeMs: number | null = null;
+    let deliveryTimeLabel: string | null = null;
+    if (rows[0]?.dispatched_at) {
+      const finishedIso = new Date().toISOString();
+      const timing = computeRenderTiming({
+        createdAt: rows[0].dispatched_at,
+        finishedAt: finishedIso,
+      });
+      deliveryTimeMs = timing.totalDeliveryMs;
+      deliveryTimeLabel = timing.totalDeliveryLabel;
+      try {
+        const curPayload =
+          typeof rows[0].payload === 'string'
+            ? JSON.parse(rows[0].payload || '{}')
+            : (rows[0].payload || {});
+        await pool.query(`UPDATE public.remodeling_history SET payload = $1 WHERE id = $2`, [
+          JSON.stringify({
+            ...curPayload,
+            deliveryFinishedAt: finishedIso,
+            deliveryTimeMs,
+            deliveryTimeLabel,
+          }),
+          rows[0].id,
+        ]);
+      } catch {}
+    }
+    console.log(
+      `[Production Webhook] Histórico atualizado com sucesso (${status})${deliveryTimeLabel ? ` — Tempo de entrega: ${deliveryTimeLabel}` : ''}.`
+    );
 
     // Atualizar dark_clips_posts caso o historyId pertença a um render de Dark Clips
     try {
@@ -120,14 +149,22 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        const nextRemodelObj = {
+          ...(typeof currentPost?.remodel_data === 'string'
+            ? (() => { try { return JSON.parse(currentPost.remodel_data); } catch { return {}; } })()
+            : (currentPost?.remodel_data || {})),
+          ...(deliveryTimeMs !== null ? { render_duration_ms: deliveryTimeMs, render_duration_label: deliveryTimeLabel } : {}),
+        };
+
         const dcUpdate = await pool.query(
           `UPDATE public.dark_clips_posts SET
             status = $1,
             rendered_video_url = COALESCE($2, rendered_video_url),
-            error_message = $3
+            error_message = $3,
+            remodel_data = $5
            WHERE id = $4
            RETURNING *`,
-          [finalPostStatus, finalVideoUrl || null, error || null, historyId]
+          [finalPostStatus, finalVideoUrl || null, error || null, historyId, JSON.stringify(nextRemodelObj)]
         );
 
         if (shouldDispatch && dcUpdate.rows.length > 0 && finalVideoUrl) {
@@ -157,7 +194,12 @@ export async function POST(req: NextRequest) {
       console.warn('[Production Webhook] Nota ao atualizar dark_clips_posts:', dcErr);
     }
 
-    return NextResponse.json({ success: true, updated: rows[0] || null });
+    return NextResponse.json({
+      success: true,
+      updated: rows[0] || null,
+      deliveryTimeMs,
+      deliveryTimeLabel,
+    });
   } catch (error: any) {
     console.error('Erro ao processar webhook de conclusão de produção:', error);
     return NextResponse.json(
