@@ -303,7 +303,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_render_html_svg_video',
-    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama, html_svg_netflix_doc, html_svg_vox_papercut, html_svg_kaz_chart, html_svg_paper_finance ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks automáticos.',
+    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama, html_svg_netflix_doc, html_svg_vox_papercut, html_svg_kaz_chart, html_svg_paper_finance, html_svg_2d_puppet ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks + Crítico Visual.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -319,6 +319,7 @@ const MCP_TOOLS_MANIFEST = [
             'html_svg_vox_papercut',
             'html_svg_kaz_chart',
             'html_svg_paper_finance',
+            'html_svg_2d_puppet',
           ],
           default: 'html_svg_explainer',
         },
@@ -424,7 +425,8 @@ const MCP_TOOLS_MANIFEST = [
       type: 'object',
       properties: {
         kind: { type: 'string', enum: ['single_scene', 'full_video'], default: 'full_video' },
-        preset: { type: 'string', enum: ['curiosidade_cratera', 'custom_storyboard'], default: 'curiosidade_cratera' },
+        preset: { type: 'string', enum: ['curiosidade_cratera', 'cartoon_25d_demo', 'custom_storyboard'], default: 'curiosidade_cratera' },
+        estilo: { type: 'string', enum: ['3d', '2.5d_cartoon'], default: '3d', description: 'Estilo visual do motor: 3d (low-poly padrão) ou 2.5d_cartoon (personagens 2D nanquim em mundo 3D pintado com cel-ink, golden hour e contato no chão).' },
         backend: { type: 'string', enum: ['threejs', 'blender'], default: 'threejs', description: 'Motor 3D: threejs (padrão VPS rápido) ou blender (EEVEE Headless + fallback automático)' },
         fallbackToThreeJs: { type: 'boolean', default: true, description: 'Se true e Blender não estiver instalado, cai automaticamente para Three.js sem falha.' },
         title: { type: 'string' },

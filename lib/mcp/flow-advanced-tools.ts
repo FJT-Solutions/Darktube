@@ -23,7 +23,7 @@ import {
   type VoiceGender,
   type VoiceProviderChoice,
 } from '@/lib/voice-resolver';
-import { compileThreeJsStoryboard, type ThreeJsStoryboard, type ThreeJsViralCaptionsConfig } from '@/lib/threejs-scene-compiler';
+import { compileThreeJsStoryboard, type ThreeJsEstilo, type ThreeJsStoryboard, type ThreeJsViralCaptionsConfig } from '@/lib/threejs-scene-compiler';
 import { renderThreeJsToMp4 } from '@/lib/threejs-render';
 import { renderBlenderStoryboard } from '@/lib/blender-bridge';
 import { buildPuppetRigFromChromaPng, generateLipSyncMouthCues } from '@/lib/puppet-studio';
@@ -814,19 +814,28 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
       }
 
       await onProgress(15);
+      const sheetPath = path.join(os.tmpdir(), `dt_htmlsvg_qa_${Date.now()}.png`);
       const rendered = await renderHtmlSvgToMp4({
         spec: input,
         outputPath,
         draft: Boolean(input.isDraft),
         audioPath,
+        generateContactSheet: true,
+        contactSheetPath: sheetPath,
       });
       await onProgress(92);
 
       let storageUrl: string | null = null;
+      let contactSheetUrl: string | null = null;
       try {
         const buf = fs.readFileSync(rendered.outputPath);
         const storagePath = await uploadMediaFile(buf, `${safeBase}_${Date.now()}.mp4`, 'video/mp4');
         storageUrl = `https://darktube.fjt-solutions.com${storagePath}`;
+        if (rendered.contactSheetPath && fs.existsSync(rendered.contactSheetPath)) {
+          const qaPath = await uploadMediaFile(fs.readFileSync(rendered.contactSheetPath), `${safeBase}_qa_${Date.now()}.png`, 'image/png');
+          contactSheetUrl = `https://darktube.fjt-solutions.com${qaPath}`;
+          try { fs.unlinkSync(rendered.contactSheetPath); } catch {}
+        }
       } catch {
         // Segue sem falhar se rodar offline sem banco configurado; arquivo local continua entregue.
       }
@@ -839,6 +848,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
         ...voiceMeta,
         localFile: wantLocal ? rendered.outputPath : null,
         videoUrl: storageUrl,
+        contactSheetUrl,
+        criticReport: rendered.criticReport,
         width: rendered.width,
         height: rendered.height,
         fps: rendered.fps,
@@ -856,7 +867,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
 
 export interface RenderThreeJsInput {
   kind?: RenderJobKind;
-  preset?: 'curiosidade_cratera' | 'custom_storyboard';
+  preset?: 'curiosidade_cratera' | 'cartoon_25d_demo' | 'custom_storyboard';
+  estilo?: ThreeJsEstilo;
   backend?: 'threejs' | 'blender';
   fallbackToThreeJs?: boolean;
   topic?: string;
@@ -915,6 +927,7 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
         topic: input.topic,
         durationSec: input.durationSec,
         kind,
+        estilo: input.estilo,
         aspect: input.aspect || '9:16',
         quality: input.quality || (input.isDraft ? 'basica' : 'media'),
         isDraft: input.isDraft,
@@ -930,6 +943,7 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
     const initialCompile = compileThreeJsStoryboard({
       kind,
       preset: workingStoryboard?.cenas?.length ? 'custom_storyboard' : (input.preset || 'curiosidade_cratera'),
+      estilo: input.estilo,
       title: input.title || input.topic,
       aspect: input.aspect || '9:16',
       fps: input.fps,
@@ -957,6 +971,7 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
     const finalCompile = compileThreeJsStoryboard({
       kind,
       preset: workingStoryboard?.cenas?.length ? 'custom_storyboard' : (input.preset || 'curiosidade_cratera'),
+      estilo: input.estilo,
       title: input.title || input.topic,
       aspect: input.aspect || '9:16',
       fps: input.fps,
@@ -1041,6 +1056,7 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
       videoUrl: storageUrl,
       contactSheetUrl,
       qaChecks: rendered.qaChecks,
+      criticReport: 'criticReport' in rendered ? rendered.criticReport : undefined,
       width: rendered.width,
       height: rendered.height,
       fps: rendered.fps,
@@ -1308,6 +1324,7 @@ export async function autoClipLiveMcp(input: {
 export async function batchRenderMcp(input: {
   items: Array<{
     engine?: 'html_svg' | 'threejs_3d';
+    estilo?: ThreeJsEstilo;
     title?: string;
     preset?: string;
     aspect?: '9:16' | '16:9' | '1:1';
@@ -1434,6 +1451,7 @@ export async function batchRenderMcp(input: {
                 userId,
                 topic: it.topic || title,
                 durationSec: Number(it.durationSec) || 24,
+                estilo: it.estilo,
                 aspect,
                 quality: isDraft ? 'basica' : 'media',
                 isDraft,
@@ -1456,6 +1474,7 @@ export async function batchRenderMcp(input: {
             const compiled = compileThreeJsStoryboard({
               kind: 'full_video',
               preset: 'custom_storyboard',
+              estilo: it.estilo,
               title,
               aspect,
               isDraft,
@@ -1500,6 +1519,7 @@ export async function batchRenderMcp(input: {
               videoUrl: `https://darktube.fjt-solutions.com${storagePath}`,
               contactSheetUrl,
               qaChecks: rendered.qaChecks,
+              criticReport: rendered.criticReport,
               auditFixes: compiled.auditFixes,
               lipSyncEngine: lipSync.engine,
               voiceProviderUsed: voiceRes.providerUsed,

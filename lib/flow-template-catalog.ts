@@ -1770,33 +1770,33 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       },
     ],
     brief:
-      'Continuous breathtaking aerial geography mini-documentary: unbroken forward glide across dramatic mountains, coastlines, rivers and cities showing how physical terrain dictates routes, trade and borders.',
+      'Continuous unbroken aerial satellite-to-ground geography shot (inspired by GeoGlobeTales): start at globe view centered on the target region, swoop smoothly into border lines without a single cut using last-frame chaining, highlight active country border in glowing neon green and trade/hazard tracks in bright yellow lines.',
     beats: [
       {
-        fn: 'Hook: sweeping aerial reveal pushing over the dramatic geographic chokepoint or mountain ridge while off-screen narrator states the core paradox',
-        camera: 'continuous high-altitude forward drone glide, crisp terrain relief, smooth motion without sudden jumps',
+        fn: 'Hook (Clip 1): orbital satellite globe reveal centering the target country or chokepoint with crisp relief and off-screen curiosity question',
+        camera: 'continuous unbroken forward push-in from high orbit down toward the target region without cuts',
         presence: 'faceless',
-        carryOver: 'drone descends seamlessly from high ridge toward the valley corridor below',
+        carryOver: 'use exact last frame of Clip 1 as the starting frame of Clip 2, preserving globe tilt, sun direction and zoom position',
       },
       {
-        fn: 'Scale & barrier: camera tracks low along winding river canyons, port infrastructure or fortified pass revealing why crossing is so difficult',
-        camera: 'continuous low-altitude tracking shot following the river bend, crisp natural sunlight',
+        fn: 'Borders glow (Clip 2): glowing green border ignites around the main country while neighboring frontiers light up subtly across the exact terrain',
+        camera: 'continuous gliding zoom closer along the lit borders without cutting away',
         presence: 'faceless',
-        carryOver: 'camera glides out over open bay or flat basin as clouds clear',
+        carryOver: 'use exact last frame of Clip 2 as the starting frame of Clip 3 so borders stay locked to topography',
       },
       {
-        fn: 'Convergence beat: sunrise aerial view showing ships, bridges or highways funneling through the narrow strategic corridor',
-        camera: 'continuous wide aerial pull-up revealing the entire geographic system at golden hour',
+        fn: 'Conflict & routes (Clip 3): surrounding map darkens slightly for contrast while animated bright yellow tracking lines trace the corridor or double-landlocked path',
+        camera: 'continuous tilted 3D satellite elevation pan over ridges, rivers and straits into the final reveal',
         presence: 'faceless',
       },
     ],
     rules: [
-      'Every scene must behave as one continuous forward aerial flight with coherent sun angle, biome colors and topographic logic',
-      'Zero floating infographic maps, neon HUD lines, text labels or fake UI arrows inside the video frame',
-      'Off-screen narrator only; never show talking heads or hosts in screen corners',
+      'True continuous one-shot illusion: every take MUST chain cleanly from the exact camera angle and zoom of the previous clip last frame',
+      'Photorealistic 3D satellite map terrain (deep ocean blues, crisp land relief) combined with glowing green borders and yellow path lines only when narrative describes frontiers/routes; zero fake floating presenter faces',
+      'Off-screen narrator only; never show talking heads in screen corners',
     ],
-    look: 'cinematic aerial documentary, crystal clear atmospheric haze, crisp satellite-to-drone relief lighting, golden hour shadows',
-    defaults: { takes: 3, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
+    look: 'photorealistic 3D satellite globe terrain, crisp atmospheric depth, studio map lighting, glowing green border and yellow route contrast',
+    defaults: { takes: 3, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
   },
   {
     id: 'city-timelapse-historico',
@@ -1829,31 +1829,140 @@ export const FLOW_TEMPLATE_CATALOG: FlowTemplate[] = [
       },
     ],
     brief:
-      'Locked-camera historical city metamorphosis: starting from exact horizon line and river bend, show successive eras growing organically in the same frame.',
+      'Clean non-AI-slop 3D digital city-builder architectural timelapse: locked-to-smoothly-tracking aerial diorama from exact horizon line and river bend, showing successive historical epochs rising organically over millennia.',
     beats: [
       {
-        fn: 'Origin era: untouched natural valley or pioneer settlement at dawn along the exact horizon and river curve',
-        camera: 'locked high vantage elevated tripod angle, crisp landscape symmetry, unchanging horizon height',
+        fn: 'Origin era: untouched natural valley, river bend and early stone/timber tribal huts at warm dawn along the exact horizon coordinate',
+        camera: 'isometric-to-cinematic elevated diorama vantage angle, crisp polygon terrain lighting, unchanging horizon line',
         presence: 'faceless',
-        carryOver: 'preserve the exact camera focal length, horizon line height and river bend into the industrial era',
+        carryOver: 'preserve exact horizon height, terrain hills and river bend from Clip 1 into Clip 2 industrial growth',
       },
       {
-        fn: 'Industrial boom: mid-century brick factories, early avenues, tram lines and scaffolding rising over the exact same streets and riverbank',
-        camera: 'identical locked elevated vantage point, subtle timelapse cloud drift overhead',
+        fn: 'Growth & upheaval: classical aqueducts, stone walls or mid-century brick avenues and bridges rising directly over the original terrain with subtle environmental smoke and shadows',
+        camera: 'identical elevated vantage point with gentle timelapse cloud drift overhead',
         presence: 'faceless',
-        carryOver: 'preserve exact avenue axes and camera elevation as concrete towers overtake the skyline',
+        carryOver: 'preserve exact street axes and river curve as dense concrete towers overtake the skyline',
       },
       {
-        fn: 'Modern metropolis: dusk cityscape glowing with dense skyscrapers, illuminated bridges and flowing traffic on the identical coordinates',
-        camera: 'identical locked elevated vantage point at blue hour dusk with warm window lights',
+        fn: 'Modern skyline payoff: crisp twilight metropolis glowing with dense illuminated skyscrapers, bridges and flowing traffic on the identical coordinates',
+        camera: 'identical elevated vantage point sweeping softly forward in golden-to-blue hour glow',
         presence: 'faceless',
       },
     ],
     rules: [
+      'Clean crisp 3D city-builder diorama aesthetic with warm architectural lighting and zero smeared AI artifacts',
       'Maintain a strictly identical vantage angle and horizon height across every era so takes look like an anchored time-lapse of one real place',
       'Zero giant year numbers floating in the sky inside the generated pixels; era captions are added cleanly in post-production',
     ],
-    look: 'architectural diorama realism, crisp period textures, atmospheric timelapse clouds, golden-to-blue hour progression',
-    defaults: { takes: 3, seconds: 8, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'hiper' },
+    look: 'clean high-detail 3D architectural city-builder diorama, crisp period terrain textures, warm sunlight shadows, golden-to-blue hour progression',
+    defaults: { takes: 3, seconds: 6, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'estilizado' },
+  },
+  // ============================================================================
+  // VOX PAPER CRAFT & ANATOMIA 3D CONSISTENTE (Ref #23 AIpreneur / #03 Influencia)
+  // ============================================================================
+  {
+    id: 'vox-papercraft-camadas',
+    niche: 'Educação',
+    subniche: 'Documentário Paper Craft',
+    name: 'VOX paper craft em camadas',
+    description:
+      'Construção tátil em papel cortado 3D multicamadas (1 frase = 1 diorama físico de papel com profundidade e sombras), no padrão visual #23.',
+    mode: 'narracao',
+    length: 'curto',
+    trend: 'viral',
+    fields: [
+      {
+        id: 'tema',
+        label: 'História ou fenômeno',
+        type: 'text',
+        default: 'Como um container mudou o comércio mundial',
+        placeholder: 'Ex.: Queda do Muro de Berlim, Crise de 1929...',
+      },
+      {
+        id: 'paleta',
+        label: 'Atmosfera de cores',
+        type: 'select',
+        default: 'editorial',
+        options: [
+          { value: 'editorial', label: 'Papel creme, vermelho editorial e carvão' },
+          { value: 'marinho', label: 'Azul oceano profundo, dourado e branco' },
+          { value: 'historico', label: 'Sépia quente, oliva e terracota' },
+        ],
+      },
+    ],
+    brief:
+      'Tactile layered paper-cut craft animation (VOX / paper theater documentary aesthetic): every visual beat renders a handcrafted 3D diorama built strictly from stacked die-cut cardstock layers with real directional studio shadows, fibrous paper grain, brass brads and physical depth.',
+    beats: [
+      {
+        fn: 'Hook diorama: clean studio stage of stacked matte paper silhouettes establishing the paradox object or historical date',
+        camera: 'slow macro diorama push-in revealing depth between paper foreground, midground and backdrop planes',
+        presence: 'faceless',
+        carryOver: 'maintain the identical tactile matte cardstock grain, warm key light angle and studio paper palette',
+      },
+      {
+        fn: 'Scale mechanism: mechanical sliding cardstock gears, fold-out ships or architectural facades shifting horizontally across paper tracks',
+        camera: 'smooth lateral tracking pan gliding between layered cut-paper planes',
+        presence: 'faceless',
+      },
+      {
+        fn: 'Resolution fold-out: towering stacked paper relief showing the global impact with crisp rim lighting on paper edges',
+        camera: 'subtle slow pull-back revealing the full layered paper diorama composition',
+        presence: 'faceless',
+      },
+    ],
+    rules: [
+      'Every single shot MUST look like physical stacked matte cardstock and hand-cut paper diorama lit in a miniature studio, never flat digital clip-art or glossy 3D plastic',
+      'One crisp visual focal hero object per sentence/beat with clean negative space and crisp soft drop shadows between layers',
+      'No text paragraphs painted inside the paper frames unless short architectural dates/year cutoffs requested by narrative',
+    ],
+    look: 'tactile layered paper-cut craft art, visible cardstock thickness and paper fiber grain, crisp soft directional studio shadow box lighting',
+    defaults: { takes: 4, seconds: 5, aspect: '9:16', model: 'Omni 1.2 Flash', quality: '360p', realismo: 'estilizado' },
+  },
+  {
+    id: 'anatomia-esqueleto-3d',
+    niche: 'Curiosidades',
+    subniche: 'Ciência & Corpo Humano',
+    name: 'Corpo humano / esqueleto 3D consistente',
+    description:
+      'Experimentos científicos e curiosidades do corpo humano usando folha fixa de personagem neutro/esqueleto 3D em 9:16 sem deformação entre cenas (#03).',
+    mode: 'narracao',
+    length: 'curto',
+    trend: 'viral',
+    fields: [
+      {
+        id: 'fenomeno',
+        label: 'Fenômeno fisiológico ou psicológico',
+        type: 'text',
+        default: 'Por que você sente que está caindo ao dormir',
+        placeholder: 'Ex.: O que acontece se não dormir por 48 horas...',
+      },
+    ],
+    brief:
+      'Consistent neutral stylized 3D humanoid / anatomical skeleton character demonstrating surprising biological, brain or physics experiments inside clean minimalist scientific studio environments.',
+    beats: [
+      {
+        fn: 'Hook visceral: full-body or upper-body shot of the consistent 3D neutral/skeleton character experiencing the sudden biological trigger (e.g. hypnic jerk jolt while drifting asleep)',
+        camera: 'dramatic medium shot with crisp X-ray blue/amber studio rim lighting',
+        presence: 'character',
+        carryOver: 'keep the exact same 3D skeleton/neutral figure proportions, skull shape and studio color grade',
+      },
+      {
+        fn: 'Internal mechanism: close-up revealing brain impulse glow, ribcage/spine mechanics or muscle reaction cleanly without gore',
+        camera: 'smooth push-in toward chest/head anatomical highlight',
+        presence: 'character',
+      },
+      {
+        fn: 'Payoff consequence: clear before/after contrast showing how the body resolves the stimulus',
+        camera: 'steady eye-level medium shot returning to clean neutral lighting',
+        presence: 'character',
+      },
+    ],
+    rules: [
+      'Always anchor to the same consistent 9:16 3D anatomical/neutral character silhouette across every shot',
+      'Clean educational 3D render style (no gore, no grotesque textures, clear glowing anatomical highlight zones on spine/brain/ribcage)',
+      'Off-screen narrator only; character reacts physically instead of talking to camera',
+    ],
+    look: 'clean stylized 3D scientific medical animation, matte translucent bone/neutral figure material, volumetric teal and warm amber rim lights',
+    defaults: { takes: 4, seconds: 6, aspect: '9:16', model: 'Veo 3.1 - Fast', quality: '360p', realismo: 'animacao3d' },
   },
 ]

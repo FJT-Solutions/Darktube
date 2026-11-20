@@ -967,3 +967,296 @@ export function buildPaperFinanceHtml(ctx: HtmlSvgV2CompileContext): string {
 </body>
 </html>`;
 }
+
+/**
+ * Preset #22 Eric Michaud / #15 Ink & Bob:
+ * Galeria/estúdio arquitetônico SVG em camadas + Personagem Puppet articulado nas juntas
+ * (olhos com piscada determinística, boca fonêmica, braços que apontam e tarja documental no topo).
+ */
+export function build2dPuppetGalleryHtml(ctx: HtmlSvgV2CompileContext): string {
+  const isVert = ctx.viewH > ctx.viewW;
+  const scaleFactor = Number((ctx.width / ctx.viewW).toFixed(5));
+  const wallBg = ctx.palette[0] || '#EAE0CF';
+  const coatHex = ctx.palette[1] || '#6F243B';
+  const ink = '#1A1614';
+
+  const scenesJson = safeJson(ctx.scenes);
+  const archW = ctx.viewW;
+  const archH = ctx.viewH;
+  const doorW = isVert ? 540 : 460;
+  const doorX = (archW - doorW) / 2;
+  const doorY = isVert ? 380 : 185;
+  const charCenterX = archW * 0.5;
+  const charFootY = isVert ? 1420 : 940;
+
+  const sceneLayers = ctx.scenes
+    .map((sc, i) => {
+      const headerName = esc(sc.title || ctx.title);
+      const headerMeta = esc(sc.subtitle || sc.yearLabel || sc.badge || '');
+      const hasPicture = Boolean(sc.imageUrl && String(sc.imageUrl).trim());
+      return `
+      <div class="pp-scene" id="scene_${i}" style="opacity:${i === 0 ? 1 : 0}">
+        <div class="pp-top-tag">
+          <span class="pp-tag-name">${headerName}</span>
+          ${headerMeta ? `<span class="pp-tag-meta">${headerMeta}</span>` : ''}
+        </div>
+        ${
+          hasPicture
+            ? `<div class="pp-ref-frame">
+                 <div class="pp-ref-pill">REF</div>
+                 <img src="${esc(sc.imageUrl)}" alt="${headerName}" />
+               </div>`
+            : ''
+        }
+        ${sc.callout ? `<div class="pp-callout">${esc(sc.callout)}</div>` : ''}
+        ${sc.spokenLine ? `<div class="pp-caption">${esc(sc.spokenLine)}</div>` : ''}
+      </div>`;
+    })
+    .join('\n');
+
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: ${ctx.width}px; height: ${ctx.height}px; overflow: hidden;
+    background: ${wallBg}; color: ${ink};
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+  }
+  #stage {
+    position: relative; width: ${archW}px; height: ${archH}px;
+    transform-origin: top left; transform: scale(${scaleFactor});
+    background: ${wallBg}; overflow: hidden;
+  }
+  #gallery-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pp-scene { position: absolute; inset: 0; pointer-events: none; }
+  .pp-top-tag {
+    position: absolute; top: ${isVert ? 132 : 44}px; left: 72px; right: ${!isVert ? '180px' : '72px'};
+    display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 14px;
+    background: rgba(24, 24, 27, 0.88); color: #F8FAFC;
+    padding: 16px 26px; border-radius: 6px; width: fit-content; max-width: ${archW - 144}px;
+    box-shadow: 0 12px 26px rgba(0,0,0,0.22);
+  }
+  .pp-tag-name { font-size: ${isVert ? 34 : 30}px; font-weight: 800; letter-spacing: -0.01em; color: #FFFFFF; }
+  .pp-tag-meta { font-size: ${isVert ? 24 : 22}px; font-weight: 500; color: #CBD5E1; }
+  .pp-ref-frame {
+    position: absolute; top: ${isVert ? 240 : 140}px; right: 72px;
+    width: ${isVert ? 250 : 280}px; height: ${isVert ? 310 : 320}px;
+    background: #FBF6EC; border: 5px solid ${ink}; border-radius: 12px;
+    overflow: hidden; box-shadow: 8px 10px 0 ${ink};
+  }
+  .pp-ref-frame img { width: 100%; height: 100%; object-fit: cover; }
+  .pp-ref-pill {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    background: ${ink}; color: #fff; font-size: 16px; font-weight: 900; padding: 4px 10px;
+  }
+  .pp-callout {
+    position: absolute; top: ${isVert ? 260 : 150}px; left: 72px;
+    background: #FEF08A; color: ${ink}; border: 4px solid ${ink};
+    border-radius: 14px; padding: 14px 22px; font-size: 26px; font-weight: 900;
+    box-shadow: 6px 6px 0 ${ink};
+  }
+  .pp-caption {
+    position: absolute; left: 84px; right: 84px; bottom: ${isVert ? 240 : 52}px;
+    background: rgba(17, 24, 39, 0.92); color: #F8FAFC;
+    border: 3.5px solid #FACC15; border-radius: 16px;
+    padding: 22px 30px; font-size: ${isVert ? 32 : 28}px; font-weight: 800;
+    text-align: center; line-height: 1.32;
+    box-shadow: 0 14px 30px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <svg id="gallery-svg" viewBox="0 0 ${archW} ${archH}">
+    <defs>
+      <linearGradient id="ppWall" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${wallBg}"/>
+        <stop offset="100%" stop-color="#D6CBB8"/>
+      </linearGradient>
+      <linearGradient id="ppSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#334155"/>
+        <stop offset="100%" stop-color="#64748B"/>
+      </linearGradient>
+      <linearGradient id="ppInnerRoom" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#6B2124"/>
+        <stop offset="100%" stop-color="#451517"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Parede e chao da galeria -->
+    <rect width="${archW}" height="${archH}" fill="url(#ppWall)"/>
+    <rect x="0" y="${charFootY - 25}" width="${archW}" height="${archH - charFootY + 25}" fill="#B9AA95" stroke="${ink}" stroke-width="5"/>
+
+    <!-- Janelas laterais com ceu -->
+    <g stroke="${ink}" stroke-width="6">
+      <path d="M 35 ${doorY + 60} C 35 ${doorY - 20}, 190 ${doorY - 20}, 190 ${doorY + 60} L 190 ${doorY + 460} L 35 ${doorY + 460} Z" fill="url(#ppSky)"/>
+      <line x1="112" y1="${doorY}" x2="112" y2="${doorY + 460}" stroke-width="4"/>
+      <line x1="35" y1="${doorY + 260}" x2="190" y2="${doorY + 260}" stroke-width="4"/>
+      <path d="M ${archW - 190} ${doorY + 60} C ${archW - 190} ${doorY - 20}, ${archW - 35} ${doorY - 20}, ${archW - 35} ${doorY + 60} L ${archW - 35} ${doorY + 460} L ${archW - 190} ${doorY + 460} Z" fill="url(#ppSky)"/>
+      <line x1="${archW - 112}" y1="${doorY}" x2="${archW - 112}" y2="${doorY + 460}" stroke-width="4"/>
+      <line x1="${archW - 190}" y1="${doorY + 260}" x2="${archW - 35}" y2="${doorY + 260}" stroke-width="4"/>
+    </g>
+
+    <!-- Colunas classicas caneladas (#22) -->
+    ${[-1, 1].map((side) => {
+      const cx = side < 0 ? doorX - 58 : doorX + doorW + 10;
+      return `<g transform="translate(${cx}, 0)">
+        <rect x="0" y="0" width="48" height="${charFootY - 20}" fill="#EFE8DA" stroke="${ink}" stroke-width="6"/>
+        <line x1="16" y1="0" x2="16" y2="${charFootY - 20}" stroke="${ink}" stroke-width="2.5" opacity="0.5"/>
+        <line x1="32" y1="0" x2="32" y2="${charFootY - 20}" stroke="${ink}" stroke-width="2.5" opacity="0.5"/>
+      </g>`;
+    }).join('')}
+
+    <!-- Portal em arco com quadros ao fundo -->
+    <g>
+      <path d="M ${doorX} ${charFootY - 25} L ${doorX} ${doorY + 180} A ${doorW / 2} 180 0 0 1 ${doorX + doorW} ${doorY + 180} L ${doorX + doorW} ${charFootY - 25} Z"
+        fill="#7C5234" stroke="${ink}" stroke-width="8"/>
+      <path d="M ${doorX + 34} ${charFootY - 25} L ${doorX + 34} ${doorY + 188} A ${(doorW - 68) / 2} 152 0 0 1 ${doorX + doorW - 34} ${doorY + 188} L ${doorX + doorW - 34} ${charFootY - 25} Z"
+        fill="url(#ppInnerRoom)" stroke="${ink}" stroke-width="6"/>
+      <g stroke="${ink}" stroke-width="5">
+        <rect x="${doorX + 75}" y="${doorY + 230}" width="115" height="145" fill="#D4AF37"/>
+        <rect x="${doorX + 91}" y="${doorY + 246}" width="83" height="113" fill="#475569"/>
+        <rect x="${doorX + doorW - 220}" y="${doorY + 170}" width="150" height="185" fill="#D4AF37"/>
+        <rect x="${doorX + doorW - 202}" y="${doorY + 188}" width="114" height="149" fill="#94A3B8"/>
+        <circle cx="${doorX + doorW - 145}" cy="${doorY + 250}" r="22" fill="#E2B89B"/>
+        <path d="M ${doorX + doorW - 180} ${doorY + 335} C ${doorX + doorW - 180} ${doorY + 290}, ${doorX + doorW - 110} ${doorY + 290}, ${doorX + doorW - 110} ${doorY + 335} Z" fill="#1E293B"/>
+      </g>
+    </g>
+
+    <!-- Sombra de contato no chao + Personagem Puppet Articulado nas Juntas -->
+    <ellipse cx="${charCenterX}" cy="${charFootY - 8}" rx="125" ry="22" fill="rgba(26,22,20,0.28)"/>
+    <g id="pp_puppet" transform="translate(${charCenterX}, ${charFootY - 20}) scale(${isVert ? 1.12 : 0.94})">
+      <rect x="-54" y="-235" width="46" height="205" rx="8" fill="#94A3B8" stroke="${ink}" stroke-width="6"/>
+      <rect x="8" y="-235" width="46" height="205" rx="8" fill="#94A3B8" stroke="${ink}" stroke-width="6"/>
+      <line x1="-38" y1="-130" x2="-24" y2="-130" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+      <line x1="24" y1="-130" x2="38" y2="-130" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="-32" cy="-16" rx="34" ry="20" fill="#18181B" stroke="${ink}" stroke-width="6"/>
+      <ellipse cx="32" cy="-16" rx="34" ry="20" fill="#18181B" stroke="${ink}" stroke-width="6"/>
+
+      <g id="pp_arm_l" transform="translate(-74, -405)">
+        <path d="M 0 0 L -34 150 L 8 156 L 26 24 Z" fill="${coatHex}" stroke="${ink}" stroke-width="6" stroke-linejoin="round"/>
+        <circle cx="-13" cy="168" r="21" fill="#F4C7A1" stroke="${ink}" stroke-width="6"/>
+      </g>
+
+      <g id="pp_arm_r" transform="translate(74, -405)">
+        <path d="M 0 0 L 36 150 L -8 156 L -26 24 Z" fill="${coatHex}" stroke="${ink}" stroke-width="6" stroke-linejoin="round"/>
+        <circle cx="13" cy="168" r="21" fill="#F4C7A1" stroke="${ink}" stroke-width="6"/>
+      </g>
+
+      <path d="M -78 -420 Q 0 -442 78 -420 L 88 -230 L -88 -230 Z" fill="${coatHex}" stroke="${ink}" stroke-width="6.5" stroke-linejoin="round"/>
+      <path d="M -28 -425 L 0 -360 L 28 -425 Z" fill="#FFFFFF" stroke="${ink}" stroke-width="5"/>
+      <line x1="0" y1="-360" x2="0" y2="-232" stroke="${ink}" stroke-width="4"/>
+      <circle cx="0" cy="-326" r="6" fill="#18181B"/>
+      <circle cx="0" cy="-292" r="6" fill="#18181B"/>
+      <circle cx="0" cy="-258" r="6" fill="#18181B"/>
+      <g transform="translate(0, -405)" fill="#B91C1C" stroke="${ink}" stroke-width="5">
+        <path d="M 0 0 L -36 -22 L -36 22 Z"/>
+        <path d="M 0 0 L 36 -22 L 36 22 Z"/>
+        <path d="M -8 6 L -22 60 L -2 54 Z"/>
+        <path d="M 8 6 L 22 60 L 2 54 Z"/>
+        <circle cx="0" cy="0" r="12"/>
+      </g>
+
+      <g id="pp_head" transform="translate(0, -496)">
+        <path d="M -72 -32 C -90 25, -75 88, -48 92 L 48 92 C 75 88, 90 25, 72 -32 C 62 -92, -62 -92, -72 -32 Z" fill="#4B5563" stroke="${ink}" stroke-width="6"/>
+        <ellipse cx="-68" cy="12" rx="14" ry="20" fill="#F4C7A1" stroke="${ink}" stroke-width="5.5"/>
+        <ellipse cx="68" cy="12" rx="14" ry="20" fill="#F4C7A1" stroke="${ink}" stroke-width="5.5"/>
+        <rect x="-58" y="-68" width="116" height="146" rx="48" fill="#FAD2B4" stroke="${ink}" stroke-width="6"/>
+        <path d="M -58 -16 C -64 -76, -34 -96, 0 -96 C 34 -96, 64 -76, 58 -16 C 46 -56, 22 -70, 0 -70 C -22 -70, -46 -56, -58 -16 Z" fill="#4B5563" stroke="${ink}" stroke-width="5.5"/>
+        <path id="pp_brow_l" d="M -42 -26 L -12 -20" stroke="${ink}" stroke-width="8" stroke-linecap="round"/>
+        <path id="pp_brow_r" d="M 12 -20 L 42 -26" stroke="${ink}" stroke-width="8" stroke-linecap="round"/>
+        <g id="pp_eye_l" transform="translate(-26, 0)">
+          <circle cx="0" cy="0" r="15" fill="#FFFFFF" stroke="${ink}" stroke-width="5"/>
+          <circle cx="2" cy="0" r="6.5" fill="${ink}"/>
+        </g>
+        <g id="pp_eye_r" transform="translate(26, 0)">
+          <circle cx="0" cy="0" r="15" fill="#FFFFFF" stroke="${ink}" stroke-width="5"/>
+          <circle cx="2" cy="0" r="6.5" fill="${ink}"/>
+        </g>
+        <path d="M 0 2 L -6 22 L 6 24" fill="none" stroke="${ink}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path id="pp_mouth" d="M -20 44 Q 0 54 20 44" fill="#7F1D1D" stroke="${ink}" stroke-width="5" stroke-linecap="round"/>
+      </g>
+    </g>
+  </svg>
+  ${sceneLayers}
+</div>
+<script>
+(function() {
+  const SCENES = ${scenesJson};
+  const TOTAL = ${ctx.totalDur};
+  window.__dtSeek = function(timeSec) {
+    const t = Math.max(0, Math.min(TOTAL, Number(timeSec) || 0));
+    let active = SCENES[0];
+    SCENES.forEach(function(sc, idx) {
+      const el = document.getElementById('scene_' + idx);
+      if (!el) return;
+      const on = t >= sc.start && (t < sc.end || (idx === SCENES.length - 1 && t <= sc.end));
+      el.style.opacity = on ? '1' : '0';
+      if (on) active = sc;
+    });
+
+    const talking = Boolean(active && active.spokenLine);
+    const expr = (active && active.expression) || 'happy';
+    const head = document.getElementById('pp_head');
+    const armL = document.getElementById('pp_arm_l');
+    const armR = document.getElementById('pp_arm_r');
+    const eyeL = document.getElementById('pp_eye_l');
+    const eyeR = document.getElementById('pp_eye_r');
+    const browL = document.getElementById('pp_brow_l');
+    const browR = document.getElementById('pp_brow_r');
+    const mouth = document.getElementById('pp_mouth');
+    const pup = document.getElementById('pp_puppet');
+
+    const blinkPhase = t % 3.3;
+    const blinkY = blinkPhase > 3.14 ? Math.max(0.08, Math.abs(Math.cos((blinkPhase - 3.14) * 20))) : 1;
+    if (eyeL) eyeL.setAttribute('transform', 'translate(-26, 0) scale(1,' + blinkY.toFixed(3) + ')');
+    if (eyeR) eyeR.setAttribute('transform', 'translate(26, 0) scale(1,' + blinkY.toFixed(3) + ')');
+
+    if (head) {
+      const tilt = talking ? Math.sin(t * 5.2) * 3.2 : Math.sin(t * 1.8) * 1.1;
+      head.setAttribute('transform', 'translate(0, -496) rotate(' + tilt.toFixed(2) + ')');
+    }
+    if (pup) {
+      const bob = talking ? Math.abs(Math.sin(t * 4.5)) * -5 : Math.sin(t * 2.0) * 2;
+      pup.setAttribute('transform', 'translate(${charCenterX}, ' + (${charFootY - 20} + bob).toFixed(1) + ') scale(${isVert ? 1.12 : 0.94})');
+    }
+    if (armL && armR) {
+      const gR = talking ? -58 + Math.sin(t * 6.5) * 18 : -8 + Math.sin(t * 2) * 3;
+      const gL = talking ? 14 + Math.cos(t * 4.2) * 8 : 4;
+      armL.setAttribute('transform', 'translate(-74, -405) rotate(' + gL.toFixed(1) + ')');
+      armR.setAttribute('transform', 'translate(74, -405) rotate(' + gR.toFixed(1) + ')');
+    }
+    if (browL && browR) {
+      if (expr === 'angry') {
+        browL.setAttribute('d', 'M -44 -28 L -12 -16');
+        browR.setAttribute('d', 'M 12 -16 L 44 -28');
+      } else if (expr === 'shocked') {
+        browL.setAttribute('d', 'M -44 -34 Q -28 -44 -12 -34');
+        browR.setAttribute('d', 'M 12 -34 Q 28 -44 44 -34');
+      } else {
+        browL.setAttribute('d', 'M -42 -26 Q -27 -33 -12 -24');
+        browR.setAttribute('d', 'M 12 -24 Q 27 -33 42 -26');
+      }
+    }
+    if (mouth) {
+      const open = talking ? (0.35 + 0.65 * Math.abs(Math.sin(t * 15.2))) : 0;
+      if (talking) {
+        const w = 16 + open * 8;
+        const h = 4 + open * 15;
+        mouth.setAttribute('d', 'M -' + w.toFixed(1) + ' 44 Q 0 ' + (44 + h * 1.4).toFixed(1) + ' ' + w.toFixed(1) + ' 44 Q 0 ' + (44 - h * 0.4).toFixed(1) + ' -' + w.toFixed(1) + ' 44 Z');
+      } else if (expr === 'shocked') {
+        mouth.setAttribute('d', 'M -12 42 A 12 15 0 1 0 12 42 A 12 15 0 1 0 -12 42 Z');
+      } else {
+        mouth.setAttribute('d', 'M -20 44 Q 0 54 20 44');
+      }
+    }
+  };
+  window.__dtSeek(0);
+})();
+</script>
+</body>
+</html>`;
+}

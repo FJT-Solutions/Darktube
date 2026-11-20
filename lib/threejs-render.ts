@@ -8,6 +8,7 @@ import { findBrowserExecutable } from '@/lib/browser-executable';
 import { ffmpegBin } from '@/lib/flow-assemble';
 import { inspectRenderedVideo, type MotionCheckResult } from '@/lib/motion-checks';
 import { formatDeliveryDuration } from '@/lib/render-timing';
+import { auditContactSheetWithCritic, type VisualCriticReport } from '@/lib/visual-critic';
 import type { MouthCue } from '@/lib/puppet-studio';
 import type { ThreeJsStoryboard } from '@/lib/threejs-scene-compiler';
 import type { VoiceWord } from '@/lib/voice-resolver';
@@ -43,6 +44,7 @@ export interface RenderThreeJsResult {
     occlusionsRemaining?: number;
     passed: boolean;
   };
+  criticReport?: VisualCriticReport;
   renderDurationMs: number;
   renderDurationLabel: string;
 }
@@ -368,10 +370,18 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
   }
 
   const motionCheck = await inspectRenderedVideo(opts.outputPath, { ffmpegPath: ffmpegBin() });
+  const criticReport = await auditContactSheetWithCritic({
+    contactSheetPath: generatedContactSheetPath,
+    title: opts.storyboard.titulo,
+    styleLabel: opts.storyboard.estilo || '3d',
+    expectedScenes: qaChecks.scenesSampled,
+    blankFramesDetected: qaChecks.blankFramesDetected,
+    occlusionsRemaining: qaChecks.occlusionsRemaining,
+  });
   const renderDurationMs = Math.max(0, Date.now() - renderStartMs);
   const renderDurationLabel = formatDeliveryDuration(renderDurationMs);
   console.log(
-    `[ThreeJS Render] ✅ MP4 renderizado em ${renderDurationLabel} (${totalFrames} frames, ${durationSec}s, QA=${qaChecks.scenesSampled} cenas)`
+    `[ThreeJS Render] ✅ MP4 renderizado em ${renderDurationLabel} (${totalFrames} frames, ${durationSec}s, QA=${qaChecks.scenesSampled} cenas, Crítico=${criticReport.score}/10)`
   );
 
   return {
@@ -385,6 +395,7 @@ export async function renderThreeJsToMp4(opts: RenderThreeJsOptions): Promise<Re
     gpuAccelerated,
     motionCheck,
     qaChecks,
+    criticReport,
     renderDurationMs,
     renderDurationLabel,
   };

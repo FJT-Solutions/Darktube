@@ -6,6 +6,7 @@ import {
   type TechCrimsonVisual,
 } from './html-svg-presets-extra';
 import {
+  build2dPuppetGalleryHtml,
   buildKazChartHtml,
   buildNetflixDocHtml,
   buildPaperFinanceHtml,
@@ -22,7 +23,8 @@ export type HtmlSvgPreset =
   | 'html_svg_netflix_doc'
   | 'html_svg_vox_papercut'
   | 'html_svg_kaz_chart'
-  | 'html_svg_paper_finance';
+  | 'html_svg_paper_finance'
+  | 'html_svg_2d_puppet';
 
 export type HtmlSvgExpression = 'happy' | 'shocked' | 'smirk' | 'angry' | 'sad' | 'thinking';
 
@@ -78,6 +80,7 @@ const DEFAULT_PALETTES: Record<HtmlSvgPreset, [string, string, string]> = {
   html_svg_vox_papercut: ['#F4EFE4', '#DC2626', '#FDE047'],
   html_svg_kaz_chart: ['#090D16', '#38BDF8', '#22C55E'],
   html_svg_paper_finance: ['#F7F1E3', '#15803D', '#B91C1C'],
+  html_svg_2d_puppet: ['#EAE0CF', '#6F243B', '#1A1614'],
 };
 
 const escHtml = (s: unknown): string =>
@@ -283,6 +286,7 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
 
   if (spec.customHtml && spec.customHtml.trim()) {
     const dur = Math.max(2, Math.min(120, Number(spec.durationSec) || 8));
+    const unresolvedTpl = /\$\{(?:Array\.from|Math\.|new |props|sc\.)/.test(spec.customHtml);
     return {
       html: spec.customHtml,
       width,
@@ -290,7 +294,12 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
       fps,
       durationSec: dur,
       palette: spec.palette || DEFAULT_PALETTES[preset],
-      timelineIssues: { errors: [], warnings: [] },
+      timelineIssues: {
+        errors: unresolvedTpl
+          ? ['customHtml contém template literal JS não avaliado (${Array.from / ${Math...}); avalie o HTML antes de enviar.']
+          : [],
+        warnings: [],
+      },
     };
   }
 
@@ -337,7 +346,8 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
     preset === 'html_svg_netflix_doc' ||
     preset === 'html_svg_vox_papercut' ||
     preset === 'html_svg_kaz_chart' ||
-    preset === 'html_svg_paper_finance'
+    preset === 'html_svg_paper_finance' ||
+    preset === 'html_svg_2d_puppet'
   ) {
     const extraCtx = {
       title: String(spec.title || scheduled[0]?.title || 'DarkTube Studio').slice(0, 80),
@@ -362,7 +372,9 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
               ? buildVoxPapercutHtml(extraCtx)
               : preset === 'html_svg_kaz_chart'
                 ? buildKazChartHtml(extraCtx)
-                : buildPaperFinanceHtml(extraCtx);
+                : preset === 'html_svg_2d_puppet'
+                  ? build2dPuppetGalleryHtml(extraCtx)
+                  : buildPaperFinanceHtml(extraCtx);
     return {
       html: extraHtml,
       width,

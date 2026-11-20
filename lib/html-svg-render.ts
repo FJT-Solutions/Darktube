@@ -1,17 +1,21 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
+import { promisify } from 'util';
 import { findBrowserExecutable } from './browser-executable';
 import { ffmpegBin } from './flow-assemble';
 import { formatDeliveryDuration } from './render-timing';
 import { inspectRenderedVideo, type MotionCheckResult } from './motion-checks';
 import { searchWikimediaImages } from './threejs-asset-hub';
+import { auditContactSheetWithCritic, type VisualCriticReport } from './visual-critic';
 import {
   compileHtmlSvgDocument,
   type HtmlSvgProjectSpec,
   type HtmlSvgSceneInput,
 } from './html-svg-templates';
+
+const runExec = promisify(execFile);
 
 export interface HtmlSvgRenderOptions {
   spec: HtmlSvgProjectSpec;
@@ -19,10 +23,13 @@ export interface HtmlSvgRenderOptions {
   draft?: boolean;
   audioPath?: string;
   autoEnrichMedia?: boolean;
+  generateContactSheet?: boolean;
+  contactSheetPath?: string;
 }
 
 export interface HtmlSvgRenderResult {
   outputPath: string;
+  contactSheetPath?: string;
   width: number;
   height: number;
   fps: number;
@@ -30,6 +37,7 @@ export interface HtmlSvgRenderResult {
   totalFrames: number;
   palette: string[];
   motionCheck: MotionCheckResult;
+  criticReport?: VisualCriticReport;
   timelineIssues: { errors: string[]; warnings: string[] };
   renderDurationMs: number;
   renderDurationLabel: string;
@@ -153,6 +161,9 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
   fs.writeFileSync(tmpHtml, compiled.html, 'utf8');
 
   const totalFrames = Math.max(1, Math.round(compiled.durationSec * compiled.fps));
+  let generatedContactSheetPath: string | undefined;
+  let blankFramesDetected = 0;
+  let scenesSampled = 0;
 
   try {
     const page = await browser.newPage({
@@ -175,6 +186,65 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
         )
       );
     }).catch(() => {});
+
+    // Contact Sheet QA pré-render (#05/#19): amostra 1 still por cena (ou 4 pontos) antes do encode final
+    if (opts.generateContactSheet !== false) {
+      const sampleTimes: number[] = [];
+      const scenesList = Array.isArray(enrichedSpec.scenes) ? enrichedSpec.scenes : [];
+      if (scenesList.length > 0 && !enrichedSpec.customHtml) {
+        let cur = 0;
+        for (const sc of scenesList.slice(0, 16)) {
+          const d = Math.max(1.5, Math.min(20, Number(sc.durationSec) || 4));
+          sampleTimes.push(Math.min(compiled.durationSec - 0.05, cur + d * 0.52));
+          cur += d;
+        }
+      } else {
+        for (let k = 0; k < 4; k++) {
+          sampleTimes.push(Math.min(compiled.durationSec - 0.05, ((k + 0.5) / 4) * compiled.durationSec));
+        }
+      }
+      const stillFiles: string[] = [];
+      for (let sIdx = 0; sIdx < sampleTimes.length; sIdx++) {
+        const stSec = Math.max(0, sampleTimes[sIdx]);
+        await page.evaluate(
+          ({ timeSec, fpsVal, durVal }) => {
+            const w = window as any;
+            if (typeof w.__dtSeek === 'function') w.__dtSeek(timeSec, Math.round(timeSec * fpsVal), fpsVal, durVal);
+          },
+          { timeSec: stSec, fpsVal: compiled.fps, durVal: compiled.durationSec }
+        );
+        const shotBuf = await page.screenshot({ type: 'jpeg', quality: 82 });
+        if (shotBuf.length < 1500) blankFramesDetected++;
+        const shotPath = path.join(assetDir, `qa_${String(sIdx).padStart(2, '0')}.jpg`);
+        fs.writeFileSync(shotPath, shotBuf);
+        stillFiles.push(shotPath);
+      }
+      scenesSampled = stillFiles.length;
+      if (stillFiles.length > 0) {
+        const cols = Math.min(4, Math.ceil(Math.sqrt(stillFiles.length)));
+        const rows = Math.max(1, Math.ceil(stillFiles.length / cols));
+        const targetSheet = opts.contactSheetPath || opts.outputPath.replace(/\.mp4$/i, '_contact_sheet.jpg');
+        try {
+          await runExec(
+            ffmpegBin(),
+            [
+              '-y',
+              '-loglevel',
+              'error',
+              '-i',
+              path.join(assetDir, 'qa_%02d.jpg'),
+              '-vf',
+              `scale=320:-1,tile=${cols}x${rows}:padding=6:color=0x0f172a`,
+              '-frames:v',
+              '1',
+              targetSheet,
+            ],
+            { timeout: 30_000, windowsHide: true }
+          );
+          if (fs.existsSync(targetSheet)) generatedContactSheetPath = targetSheet;
+        } catch {}
+      }
+    }
 
     const hasAudioFile = Boolean(opts.audioPath && fs.existsSync(opts.audioPath));
     const ffArgs = [
@@ -244,13 +314,22 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     ffmpegPath: ffmpegBin(),
     expectedColors: compiled.palette,
   });
+  const criticReport = await auditContactSheetWithCritic({
+    contactSheetPath: generatedContactSheetPath,
+    title: enrichedSpec.title || 'HTML+SVG Video',
+    styleLabel: enrichedSpec.preset || 'html_svg',
+    expectedScenes: scenesSampled,
+    blankFramesDetected,
+    occlusionsRemaining: 0,
+  });
 
   const renderDurationMs = Math.max(0, Date.now() - renderStartMs);
   const renderDurationLabel = formatDeliveryDuration(renderDurationMs);
-  console.log(`[HTML+SVG Render] ✅ MP4 renderizado em ${renderDurationLabel} (${totalFrames} frames, ${compiled.durationSec}s)`);
+  console.log(`[HTML+SVG Render] ✅ MP4 renderizado em ${renderDurationLabel} (${totalFrames} frames, ${compiled.durationSec}s, Crítico=${criticReport.score}/10)`);
 
   return {
     outputPath: opts.outputPath,
+    contactSheetPath: generatedContactSheetPath,
     width: compiled.width,
     height: compiled.height,
     fps: compiled.fps,
@@ -258,6 +337,7 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     totalFrames,
     palette: compiled.palette,
     motionCheck,
+    criticReport,
     timelineIssues: compiled.timelineIssues,
     renderDurationMs,
     renderDurationLabel,

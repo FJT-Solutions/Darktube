@@ -4,6 +4,7 @@ import { listLocal3dModels } from '@/lib/threejs-asset-hub';
 import {
   compileThreeJsStoryboard,
   type CompileThreeJsResult,
+  type ThreeJsEstilo,
   type ThreeJsQuality,
   type ThreeJsStoryboard,
   type ThreeJsViralCaptionsConfig,
@@ -14,6 +15,7 @@ export interface GenerateThreeJsDirectionInput {
   topic: string;
   durationSec?: number;
   kind?: 'single_scene' | 'full_video';
+  estilo?: ThreeJsEstilo;
   aspect?: '9:16' | '16:9' | '1:1';
   quality?: ThreeJsQuality;
   isDraft?: boolean;
@@ -92,11 +94,23 @@ export async function generateThreeJsDirection(input: GenerateThreeJsDirectionIn
         .join('\n')}`
     : '\n(Nenhum modelo .glb externo no cache local ainda; use apenas os assets procedurais listados acima.)';
 
+  const estilo: ThreeJsEstilo = input.estilo || '3d';
+  const is25d = estilo === '2.5d_cartoon';
+  const estiloRules = is25d
+    ? `
+MODO ESTILO 2.5D CARTOON (#05/#19 ATIVO):
+- Personagens são desenhos 2D em traço nanquim grosso dentro de mundo 3D pintado com contorno de tinta preta.
+- Use horario "dia" na abertura e "dourado" (Golden Hour) nos momentos de clímax ou virada emocional; use chao "paralelepipedo" ou "grama" conforme o cenário.
+- Enquadre personagens SEMPRE de corpo inteiro (com pés apoiados no chão em plano "medio" ou "geral") ou close intencional onde o rosto ocupe 30% a 40% da altura ("close").
+- Troque expressões (smile, grin, laugh, shock, worried, angry, stern, dazed, thinking) e adereços ("prop": "moeda"|"livro"|"carta"|"lupa"|"martelo") nas palavras-chave, nunca deixando trocas a menos de 0.7s do fim da cena.`
+    : '';
+
   const systemPrompt = `Você é o Diretor de Roteiro e Arte 3D do DarkTube (motor Three.js procedural + GLTFLoader).
 Sua missão é criar um roteiro didático viral em português do Brasil (pt-BR) e o JSON completo de cenas 3D.
 
 ${PROCEDURAL_CATALOG_SUMMARY}
 ${glbSection}
+${estiloRules}
 
 REGRAS OBRIGATÓRIAS DE DIREÇÃO:
 1. Retorne APENAS JSON puro com a estrutura:
@@ -113,9 +127,10 @@ REGRAS OBRIGATÓRIAS DE DIREÇÃO:
 7. Nunca cite em camera.alvo ou elementos.ancora um id que não exista em objetos ou personagens daquela mesma cena.`;
 
   const userPrompt = `Tema do vídeo: ${input.topic}
+Estilo visual: ${is25d ? '2.5D Cartoon (personagens 2D nanquim em mundo 3D pintado)' : '3D Low-Poly / Diorama'}
 Modo: ${kind === 'single_scene' ? '1 cena de teste demonstrativa' : `Vídeo completo explicativo de ${durationSec} segundos (${targetScenes} cenas)`}
 Formato: ${input.aspect || '9:16'}
-Crie agora o JSON completo com spokenScript envolvente e cenas 3D ricas e coerentes.`;
+Crie agora o JSON completo com spokenScript envolvente e cenas ricas e coerentes.`;
 
   const raw = await callFlowLLM(provider, apiKey, systemPrompt, userPrompt);
   const parsed = extractJsonBlock(raw);
@@ -135,12 +150,14 @@ Crie agora o JSON completo com spokenScript envolvente e cenas 3D ricas e coeren
   const compiled = compileThreeJsStoryboard({
     kind,
     preset: 'custom_storyboard',
+    estilo,
     title: String(parsed?.titulo || input.topic),
     aspect: input.aspect || '9:16',
     isDraft: input.isDraft ?? (input.quality === 'basica'),
     captions: input.captions,
     storyboard: {
       titulo: String(parsed?.titulo || input.topic),
+      estilo,
       qualidade: input.quality || (input.isDraft ? 'basica' : 'media'),
       duracao: durationSec,
       cenas,

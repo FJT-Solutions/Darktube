@@ -1,4 +1,5 @@
 import type { VoiceWord } from '@/lib/voice-resolver';
+import { validateTimelineClockAndCuts } from '@/lib/visual-critic';
 
 export interface ThreeJsViralCaptionsConfig {
   ativo?: boolean;
@@ -11,9 +12,12 @@ export interface ThreeJsViralCaptionsConfig {
 
 export type ThreeJsQuality = 'alta' | 'media' | 'basica';
 
+export type ThreeJsEstilo = '3d' | '2.5d_cartoon';
+
 export interface ThreeJsStoryboard {
   versao: number;
   titulo: string;
+  estilo?: ThreeJsEstilo;
   qualidade?: ThreeJsQuality;
   formato: { largura: number; altura: number; fps: number };
   duracao: number;
@@ -27,7 +31,8 @@ export interface ThreeJsStoryboard {
 
 export interface CompileThreeJsInput {
   kind?: 'single_scene' | 'full_video';
-  preset?: 'curiosidade_cratera' | 'custom_storyboard';
+  preset?: 'curiosidade_cratera' | 'cartoon_25d_demo' | 'custom_storyboard';
+  estilo?: ThreeJsEstilo;
   title?: string;
   aspect?: '9:16' | '16:9' | '1:1';
   fps?: number;
@@ -433,6 +438,108 @@ function buildRefinedCrateraScenes(): any[] {
  * 3) Enquadramento de personagens + suporte a pedido de 1 cena ou video completo;
  * 4) Legendas virais Word-by-Word em #ffd60a.
  */
+const CARTOON_25D_SPOKEN_SCRIPT = [
+  'Em mil novecentos e vinte e cinco, um homem conseguiu vender a Torre Eiffel.',
+  'E o mais absurdo é que um mês depois ele voltou a Paris e vendeu tudo de novo.',
+  'Com um documento falso na mão, o golpista convenceu o comprador com um simples aperto de mão.',
+  'A vítima teve tanta vergonha do golpe que nunca foi à polícia.',
+].join(' ');
+
+function buildCartoon25dDemoScenes(): any[] {
+  return [
+    {
+      inicio: 0.0,
+      fim: 4.5,
+      estilo: '2.5d_cartoon',
+      ambiente: { fundo: 'cidade', horario: 'dia', chao: 'paralelepipedo' },
+      objetos: [
+        { id: 'rua', asset: 'rua_reta', pos: [0, 0, 0], variante: 'sem_calcada', params: { length: 28 } },
+        { id: 'casa_l', asset: 'casa_colonial', pos: [-6.5, 0, -3.5], giro: 90, variante: 'rosa' },
+        { id: 'loja_r', asset: 'loja', pos: [6.8, 0, -4.5], giro: -90, variante: 'padaria' },
+        { id: 'arv1', asset: 'arvore_redonda', pos: [5.0, 0, -9.0], params: { seed: 7 } },
+        { id: 'arv2', asset: 'arvore_redonda', pos: [-5.2, 0, -10.5], params: { seed: 3 } },
+      ],
+      personagens: [
+        {
+          id: 'lustig',
+          estilo: '2.5d_cartoon',
+          preset: 'homem',
+          pos: [0, 0, 2.2],
+          acoes: [
+            { clip: 'talk', de: 0.1, ate: 2.3, fala: true, expressao: 'grin', prop: 'carta' },
+            { clip: 'wave', de: 2.4, ate: 3.7, expressao: 'laugh' },
+          ],
+        },
+      ],
+      textos: [{ texto: 'PARIS MIL NOVECENTOS E VINTE E CINCO', de: 0.15, ate: 3.7, estilo: 'titulo' }],
+      camera: { tipo: 'enquadrar', alvo: 'lustig', plano: 'medio', angulo: 8, elevacao: 6, deriva: -6, aproxima: 0.92 },
+    },
+    {
+      inicio: 4.5,
+      fim: 9.2,
+      estilo: '2.5d_cartoon',
+      transicao: 'corte',
+      ambiente: { fundo: 'cidade', horario: 'dia', chao: 'paralelepipedo' },
+      objetos: [
+        { id: 'rua', asset: 'rua_reta', pos: [0, 0, 0], variante: 'sem_calcada', params: { length: 28 } },
+        { id: 'casa_l', asset: 'casa_colonial', pos: [-6.5, 0, -3.5], giro: 90, variante: 'azul' },
+        { id: 'loja_r', asset: 'loja', pos: [6.8, 0, -4.5], giro: -90, variante: 'mercado' },
+        { id: 'arv1', asset: 'arvore_redonda', pos: [-4.8, 0, -8.5], params: { seed: 9 } },
+      ],
+      personagens: [
+        {
+          id: 'lustig',
+          estilo: '2.5d_cartoon',
+          preset: 'homem',
+          pos: [-1.1, 0, 2.4],
+          acoes: [
+            { clip: 'talk', de: 4.6, ate: 8.3, fala: true, expressao: 'smile', prop: 'carta' },
+          ],
+        },
+        {
+          id: 'comprador',
+          estilo: '2.5d_cartoon',
+          preset: 'velhinho',
+          pos: [1.1, 0, 2.2],
+          acoes: [
+            { clip: 'point', de: 5.0, ate: 6.5, expressao: 'shock', params: { dir: 'side' } },
+            { clip: 'talk', de: 6.6, ate: 8.4, expressao: 'grin', prop: 'moeda' },
+          ],
+        },
+      ],
+      elementos: [{ tipo: 'icone', icone: 'dinheiro', ancora: 'comprador', alturaRel: 1.18, de: 5.2, ate: 8.4 }],
+      camera: { tipo: 'enquadrar', alvo: 'comprador', plano: 'medio', angulo: -12, elevacao: 7, deriva: 10, aproxima: 0.93 },
+    },
+    {
+      inicio: 9.2,
+      fim: 15.0,
+      estilo: '2.5d_cartoon',
+      transicao: 'corte',
+      ambiente: { fundo: 'cidade', horario: 'dourado', chao: 'paralelepipedo' },
+      objetos: [
+        { id: 'rua', asset: 'rua_reta', pos: [0, 0, 0], variante: 'sem_calcada', params: { length: 28 } },
+        { id: 'casa_l', asset: 'casa_colonial', pos: [-6.5, 0, -3.5], giro: 90, variante: 'rosa' },
+        { id: 'arv1', asset: 'arvore_redonda', pos: [5.5, 0, -7.5], params: { seed: 2 } },
+      ],
+      personagens: [
+        {
+          id: 'comprador',
+          estilo: '2.5d_cartoon',
+          preset: 'velhinho',
+          pos: [0, 0, 2.5],
+          acoes: [
+            { clip: 'surprised', de: 9.4, ate: 11.4, expressao: 'shock' },
+            { clip: 'idle', de: 11.5, ate: 14.2, expressao: 'worried' },
+          ],
+        },
+      ],
+      elementos: [{ tipo: 'icone', icone: 'exclamacao', ancora: 'comprador', alturaRel: 1.2, de: 9.5, ate: 12.8 }],
+      textos: [{ texto: 'NUNCA DENUNCIOU O GOLPE', de: 9.5, ate: 14.1, estilo: 'destaque' }],
+      camera: { tipo: 'enquadrar', alvo: 'comprador', plano: 'close', angulo: 6, elevacao: 4, deriva: -8, aproxima: 0.88 },
+    },
+  ];
+}
+
 export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThreeJsResult {
   const aspect = input.aspect || '9:16';
   const dims =
@@ -444,10 +551,15 @@ export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThr
   const fps = input.fps || (input.isDraft ? 24 : 30);
 
   const custom = input.storyboard;
+  const useCartoonDemo = input.preset === 'cartoon_25d_demo' && !(Array.isArray(custom?.cenas) && custom.cenas.length > 0);
+  const resolvedEstilo: ThreeJsEstilo =
+    input.estilo || custom?.estilo || (useCartoonDemo ? '2.5d_cartoon' : '3d');
   let cenas: any[] =
     Array.isArray(custom?.cenas) && custom.cenas.length > 0
       ? JSON.parse(JSON.stringify(custom.cenas))
-      : buildRefinedCrateraScenes();
+      : useCartoonDemo
+        ? buildCartoon25dDemoScenes()
+        : buildRefinedCrateraScenes();
 
   const auditFixes: string[] = [];
 
@@ -578,9 +690,24 @@ export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThr
     }
   }
 
+  const clockAudit = validateTimelineClockAndCuts(
+    cenas.map((c, idx) => ({
+      index: idx,
+      inicio: Number(c.inicio || 0),
+      fim: Number(c.fim || 0),
+      acoes: Array.isArray(c.personagens) ? c.personagens.flatMap((p: any) => p.acoes || []) : [],
+      movimentos: Array.isArray(c.personagens) ? c.personagens.flatMap((p: any) => p.movimentos || []) : [],
+      textos: c.textos || [],
+      elementos: c.elementos || [],
+    })),
+    { minKeyMarginSec: 0.7, autoClampNearCut: true }
+  );
+  auditFixes.push(...clockAudit.warnings);
+
   const storyboard: ThreeJsStoryboard = {
     versao: 1,
-    titulo: input.title || custom?.titulo || 'Por que a rua abre cratera do nada?',
+    titulo: input.title || custom?.titulo || (useCartoonDemo ? 'O Homem Que Vendeu a Torre Eiffel' : 'Por que a rua abre cratera do nada?'),
+    estilo: resolvedEstilo,
     qualidade: custom?.qualidade || (input.isDraft ? 'basica' : 'media'),
     formato: { ...dims, fps },
     duracao: totalDur,
@@ -588,13 +715,13 @@ export function compileThreeJsStoryboard(input: CompileThreeJsInput): CompileThr
     palavras: 'palavras.json',
     mouthCues: custom?.mouthCues || 'mouthCues.json',
     legendas: { ...DEFAULT_VIRAL_CAPTIONS, ...(custom?.legendas || {}), ...(input.captions || {}) },
-    ambiente: custom?.ambiente || { fundo: 'cidade', horario: 'dia', chao: 'concreto', nuvens: true },
+    ambiente: custom?.ambiente || { fundo: 'cidade', horario: 'dia', chao: useCartoonDemo ? 'paralelepipedo' : 'concreto', nuvens: true },
     cenas,
   };
 
   return {
     storyboard,
-    spokenScript: CRATERA_SPOKEN_SCRIPT,
+    spokenScript: useCartoonDemo ? CARTOON_25D_SPOKEN_SCRIPT : CRATERA_SPOKEN_SCRIPT,
     sceneCount: cenas.length,
     auditFixes,
   };

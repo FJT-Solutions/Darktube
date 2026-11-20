@@ -10,6 +10,7 @@ import {
   makePreset, makeScenery, animate, moveSpeed, setProgress, updateScenery, rollWheels, sceneryBox,
   setupEnvironment, setEnvironmentTime,
 } from '../assets/index.js';
+import { createCartoon25dCharacter, updateCartoon25dCharacter, applyToonInkStyle } from './cartoon25d.js';
 import { criarLegendas } from './legendas.js';
 import { criarFluxo } from './fluxos.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -105,7 +106,12 @@ scene.environmentIntensity = 0.32;
 
 // céu em degradê (cores por horário/clima)
 const CEUS = {
-  dia: ['#2f86e0', '#bfe3fb'], tarde: ['#4a68b0', '#f6bf94'], nublado: ['#7f90a6', '#d0d9e1'], chuva: ['#4c5e78', '#9fadbd'],
+  dia: ['#2f86e0', '#bfe3fb'],
+  tarde: ['#4a68b0', '#f6bf94'],
+  dourado: ['#5c4b8a', '#f7b267'],
+  golden_hour: ['#5c4b8a', '#f7b267'],
+  nublado: ['#7f90a6', '#d0d9e1'],
+  chuva: ['#4c5e78', '#9fadbd'],
 };
 const domo = new THREE.Mesh(
   new THREE.SphereGeometry(600, 24, 16),
@@ -125,7 +131,16 @@ domo.frustumCulled = false;
 scene.add(domo);
 
 // chão com variação de cor (textura procedural), para não parecer um plano liso
-const CHAO = { grama: '#86c15f', terra: '#8a5f3a', areia: '#e6d3a1', concreto: '#bdbdb7', asfalto: '#3b3d42', madeira: '#b98a56', piso: '#d8d2c4' };
+const CHAO = {
+  grama: '#86c15f',
+  terra: '#8a5f3a',
+  areia: '#e6d3a1',
+  concreto: '#bdbdb7',
+  asfalto: '#3b3d42',
+  madeira: '#b98a56',
+  piso: '#d8d2c4',
+  paralelepipedo: '#8c929d',
+};
 function texturaChao() {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
@@ -824,18 +839,30 @@ async function construirCena(def) {
     const holder = new THREE.Group();
     holder.add(obj);
     grp.add(holder);
+    const is25dWorld = sb.estilo === '2.5d_cartoon' || def.estilo === '2.5d_cartoon';
+    if (is25dWorld && !o.glb && !o.cutoutUrl) applyToonInkStyle(obj);
     const s = o.escala || 1;
     holder.scale.setScalar(s);
     const size = sceneryBox(obj).getSize(new THREE.Vector3()).multiplyScalar(s);
     novaEnt(o.id, 'objeto', holder, o, [size.x, size.y, size.z], { obj, escala: s, mixer });
   }
 
+  const sceneIs25d = sb.estilo === '2.5d_cartoon' || def.estilo === '2.5d_cartoon';
   for (const c of def.personagens || []) {
     if (c.puppet) {
       const pup = await createPuppetSpriteCharacter(c);
       grp.add(pup.root);
       const s = pup.heightScale;
       const ent = novaEnt(c.id, 'personagem', pup.root, c, [0.9 * s, 1.75 * s, 0.9 * s], { isPuppet: true, pup, escala: s });
+      ent.acoesRaw = (c.acoes || []).slice();
+      ent.camadas = [];
+      continue;
+    }
+    if (c.estilo === '2.5d_cartoon' || sceneIs25d) {
+      const c25 = createCartoon25dCharacter(c);
+      grp.add(c25.root);
+      const s = c25.heightScale;
+      const ent = novaEnt(c.id, 'personagem', c25.root, c, [0.9 * s, c25.spriteH, 0.9 * s], { isCartoon25d: true, c25, escala: s });
       ent.acoesRaw = (c.acoes || []).slice();
       ent.camadas = [];
       continue;
@@ -999,7 +1026,11 @@ function cameraEm(cena, t) {
   const alvoOlhar = (a) => (Array.isArray(a) ? new THREE.Vector3(...norm3(a, 0)) : centro(cena, a, t));
 
   if (c.tipo === 'fixa') {
-    return { pos: new THREE.Vector3(...norm3(c.pos, 0)), look: alvoOlhar(c.olha), fov: fov0 };
+    const pos = new THREE.Vector3(...norm3(c.pos, 0));
+    const look = alvoOlhar(c.olha);
+    // Slow creep (#05): evita imagem congelada em planos fixos
+    pos.lerp(look, prog * 0.045);
+    return { pos, look, fov: fov0 };
   }
   if (c.tipo === 'travelling') {
     const k = c.easing === 'linear' ? prog : smooth(prog);
@@ -1032,7 +1063,7 @@ function cameraEm(cena, t) {
   const fovV = fov0 * DEG;
   const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspecto);
   let dist = R / Math.tan(Math.min(fovV, fovH) / 2);
-  dist *= lerp(1, c.aproxima ?? 1, smooth(prog));
+  dist *= lerp(1, c.aproxima ?? 0.955, smooth(prog));
   const ang = ((c.angulo || 0) + (c.deriva || 0) * prog) * DEG + ent.yaw0;
   const elev = (c.elevacao ?? (plano === 'topo' ? 70 : plano === 'close' ? 5 : plano === 'medio' ? 10 : 16)) * DEG;
   const look = new THREE.Vector3(p.x, cy, p.z);
@@ -1082,24 +1113,26 @@ function guardCameraOcclusion(cena, cam) {
     return { occludedBeforeGuard: false, occludedAfterGuard: false, guardAdjusted: false };
   }
 
-  // Tenta ângulos alternativos sem obstáculos antes de puxar a câmera muito perto
-  if (cam.isEnquadrar && cam.dist) {
-    const offsets = [
-      [0.62, 0], [-0.62, 0], [1.15, 0.12], [-1.15, 0.12],
-      [1.85, 0.18], [-1.85, 0.18], [0, 0.42], [2.6, 0.15], [-2.6, 0.15],
-    ];
-    for (const [dAng, dElev] of offsets) {
-      const a = cam.ang + dAng;
-      const e = clamp(cam.elev + dElev, 0.08, 1.25);
-      const cand = new THREE.Vector3(
-        cam.look.x + Math.sin(a) * Math.cos(e) * cam.dist,
-        Math.max(0.55, cam.look.y + Math.sin(e) * cam.dist),
-        cam.look.z + Math.cos(a) * Math.cos(e) * cam.dist,
-      );
-      if (!checkRay(cam.look, cand)) {
-        cam.pos.copy(cand);
-        return { occludedBeforeGuard: true, occludedAfterGuard: false, guardAdjusted: true };
-      }
+  // Tenta ângulos e elevações livres para QUALQUER câmera (enquadrar, travelling ou fixa)
+  const rel = new THREE.Vector3().subVectors(cam.pos, cam.look);
+  const baseDist = cam.dist || rel.length() || 4.5;
+  const baseAng = cam.ang ?? Math.atan2(rel.x, rel.z);
+  const baseElev = cam.elev ?? Math.asin(clamp(rel.y / Math.max(0.1, baseDist), -0.8, 0.95));
+  const offsets = [
+    [0.62, 0.04], [-0.62, 0.04], [1.15, 0.14], [-1.15, 0.14],
+    [1.85, 0.22], [-1.85, 0.22], [0, 0.48], [2.6, 0.18], [-2.6, 0.18], [0.35, 0.72],
+  ];
+  for (const [dAng, dElev] of offsets) {
+    const a = baseAng + dAng;
+    const e = clamp(baseElev + dElev, 0.1, 1.28);
+    const cand = new THREE.Vector3(
+      cam.look.x + Math.sin(a) * Math.cos(e) * baseDist,
+      Math.max(0.75, cam.look.y + Math.sin(e) * baseDist),
+      cam.look.z + Math.cos(a) * Math.cos(e) * baseDist,
+    );
+    if (!checkRay(cam.look, cand)) {
+      cam.pos.copy(cand);
+      return { occludedBeforeGuard: true, occludedAfterGuard: false, guardAdjusted: true };
     }
   }
 
@@ -1213,7 +1246,8 @@ window.renderAt = (t) => {
   const chaveAmb = `${horario}|${chao}|${clima}|${decorar}|${fundo}`;
   if (chaveAmb !== horarioAtual) {
     horarioAtual = chaveAmb;
-    setEnvironmentTime(scene, env, horario);
+    const isGolden = horario === 'dourado' || horario === 'golden_hour';
+    setEnvironmentTime(scene, env, isGolden ? 'tarde' : horario);
     const [topo, horiz] = CEUS[clima === 'chuva' ? 'chuva' : horario] || CEUS.dia;
     domo.material.uniforms.topo.value.set(topo);
     domo.material.uniforms.horizonte.value.set(horiz);
@@ -1221,6 +1255,7 @@ window.renderAt = (t) => {
     scene.background = new THREE.Color(horiz);
     scene.fog.near = 70;
     env.hemi.intensity *= 0.8;
+    if (isGolden) { env.sun.color.set('#ffd084'); env.hemi.color.set('#b794f4'); }
     if (clima === 'chuva') { env.sun.intensity *= 0.45; env.hemi.intensity *= 0.9; scene.fog.near = 25; }
     for (const [nome, g] of Object.entries(FUNDOS)) g.visible = nome === fundo;
     domo.visible = fundo !== 'interior';
@@ -1301,6 +1336,8 @@ window.renderAt = (t) => {
       }
       pup.mouthBar.visible = !pup.faceMesh?.visible && talking;
       pup.mouthBar.scale.set(1, Math.max(0.4, open * 3.2), 1);
+    } else if (ent.isCartoon25d) {
+      ent._walkDist = p.dist;
     } else {
       for (const camada of ent.camadas) for (const seg of camada) if (seg.fala) seg.params.mouthOpen = bocaNaFala(t);
       animate(ent.ch, ent.camadas, t);
@@ -1335,6 +1372,11 @@ window.renderAt = (t) => {
   window.__lastFrameQa = { t, ...frameQa };
   camera.position.copy(cam.pos);
   camera.lookAt(cam.look);
+  for (const ent of Object.values(cena.ents)) {
+    if (ent.isCartoon25d) {
+      updateCartoon25dCharacter(ent, t, bocaNaFala(t), cam.pos, ent._walkDist || 0);
+    }
+  }
   if (camera.fov !== cam.fov) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
   const distCam = cam.pos.distanceTo(cam.look);
   const area = clamp(distCam * 0.9, 14, 90);
