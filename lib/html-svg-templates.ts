@@ -1,4 +1,5 @@
-import { validateBrandPalette, validateTimelineStates, type MotionEnergy } from './motion-checks';
+import { checkReadabilityTiming, validateBrandPalette, validateTimelineStates, type MotionEnergy } from './motion-checks';
+import { validateScriptVisualBinding } from './visual-critic';
 import {
   buildDiorama3dHtml,
   buildTechCrimsonHtml,
@@ -13,6 +14,26 @@ import {
   buildVoxPapercutHtml,
   type HtmlSvgChartItem,
 } from './html-svg-presets-v2';
+import {
+  buildDefaultSilhouetteFilmScenes,
+  buildSilhouetteFilmHtml,
+  type SilhouetteSceneKind,
+} from './html-svg-silhouette-film';
+import {
+  buildAmpulhetaDocHtml,
+  buildDefaultAmpulhetaScenes,
+  type AmpulhetaHairStyle,
+  type AmpulhetaSceneKind,
+  type AmpulhetaTriptychItem,
+} from './html-svg-ampulheta-doc';
+import {
+  buildDefaultWhatIfScenes,
+  buildWhatIfStudioHtml,
+  type WhatIfSceneKind,
+  type WhatIfStyleMood,
+  type WhatIfVisualStyle,
+  type WhatIfWordTiming,
+} from './html-svg-whatif-studio';
 
 export type HtmlSvgPreset =
   | 'html_svg_explainer'
@@ -24,9 +45,21 @@ export type HtmlSvgPreset =
   | 'html_svg_vox_papercut'
   | 'html_svg_kaz_chart'
   | 'html_svg_paper_finance'
-  | 'html_svg_2d_puppet';
+  | 'html_svg_2d_puppet'
+  | 'html_svg_silhouette_film'
+  | 'html_svg_ampulheta_doc'
+  | 'html_svg_whatif_studio';
 
-export type HtmlSvgExpression = 'happy' | 'shocked' | 'smirk' | 'angry' | 'sad' | 'thinking';
+export type HtmlSvgExpression =
+  | 'happy'
+  | 'shocked'
+  | 'smirk'
+  | 'angry'
+  | 'sad'
+  | 'thinking'
+  | 'neutral'
+  | 'tired'
+  | 'determined';
 
 export interface HtmlSvgCharacterSpec {
   id: string;
@@ -54,6 +87,27 @@ export interface HtmlSvgSceneInput {
   mediaQuery?: string;
   yearLabel?: string;
   chartItems?: HtmlSvgChartItem[];
+  sceneKind?: SilhouetteSceneKind | AmpulhetaSceneKind | WhatIfSceneKind;
+  shirtColor?: string;
+  dialogueText?: string;
+  quoteAuthor?: string;
+  phoneDate?: string;
+  phoneTime?: string;
+  phoneGoal?: string;
+  raincoat?: boolean;
+  ponytail?: boolean;
+  captionMode?: 'trailer' | 'documentary';
+  hairStyle?: AmpulhetaHairStyle;
+  skinTone?: string;
+  tunicColor?: string;
+  stormy?: boolean;
+  aurora?: boolean;
+  strikeWord?: string;
+  manuscriptLines?: string[];
+  triptychItems?: AmpulhetaTriptychItem[];
+  hudTopics?: string[];
+  activeTopicIndex?: number;
+  mapRegionLabel?: string;
 }
 
 export interface HtmlSvgProjectSpec {
@@ -66,6 +120,9 @@ export interface HtmlSvgProjectSpec {
   characters?: HtmlSvgCharacterSpec[];
   scenes?: HtmlSvgSceneInput[];
   dioramaMode?: Diorama3dMode;
+  styleMood?: WhatIfStyleMood;
+  visualStyle?: WhatIfVisualStyle;
+  words?: WhatIfWordTiming[];
   customHtml?: string;
   durationSec?: number;
 }
@@ -81,6 +138,9 @@ const DEFAULT_PALETTES: Record<HtmlSvgPreset, [string, string, string]> = {
   html_svg_kaz_chart: ['#090D16', '#38BDF8', '#22C55E'],
   html_svg_paper_finance: ['#F7F1E3', '#15803D', '#B91C1C'],
   html_svg_2d_puppet: ['#EAE0CF', '#6F243B', '#1A1614'],
+  html_svg_silhouette_film: ['#07090D', '#E0BC44', '#F3E7D3'],
+  html_svg_ampulheta_doc: ['#0B1020', '#38BDF8', '#FACC15'],
+  html_svg_whatif_studio: ['#161124', '#F2C14E', '#6DB7FF'],
 };
 
 const escHtml = (s: unknown): string =>
@@ -101,13 +161,80 @@ export function resolveCanvasDimensions(aspect: '9:16' | '16:9' | '1:1' = '9:16'
   return draft ? { width: 540, height: 960 } : { width: 1080, height: 1920 };
 }
 
-type NormalizedHtmlSvgScene = Required<Omit<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'mediaQuery' | 'yearLabel' | 'chartItems'>> &
-  Pick<HtmlSvgSceneInput, 'visual' | 'callout' | 'imageUrl' | 'mediaQuery' | 'yearLabel' | 'chartItems'>;
+type NormalizedHtmlSvgScene = Required<
+  Omit<
+    HtmlSvgSceneInput,
+    | 'visual'
+    | 'callout'
+    | 'imageUrl'
+    | 'mediaQuery'
+    | 'yearLabel'
+    | 'chartItems'
+    | 'sceneKind'
+    | 'dialogueText'
+    | 'quoteAuthor'
+    | 'phoneDate'
+    | 'phoneTime'
+    | 'phoneGoal'
+    | 'raincoat'
+    | 'ponytail'
+    | 'captionMode'
+    | 'hairStyle'
+    | 'skinTone'
+    | 'tunicColor'
+    | 'stormy'
+    | 'aurora'
+    | 'strikeWord'
+    | 'manuscriptLines'
+    | 'triptychItems'
+    | 'hudTopics'
+    | 'activeTopicIndex'
+    | 'mapRegionLabel'
+    | 'shirtColor'
+  >
+> &
+  Pick<
+    HtmlSvgSceneInput,
+    | 'visual'
+    | 'callout'
+    | 'imageUrl'
+    | 'mediaQuery'
+    | 'yearLabel'
+    | 'chartItems'
+    | 'sceneKind'
+    | 'dialogueText'
+    | 'quoteAuthor'
+    | 'phoneDate'
+    | 'phoneTime'
+    | 'phoneGoal'
+    | 'raincoat'
+    | 'ponytail'
+    | 'captionMode'
+    | 'hairStyle'
+    | 'skinTone'
+    | 'tunicColor'
+    | 'stormy'
+    | 'aurora'
+    | 'strikeWord'
+    | 'manuscriptLines'
+    | 'triptychItems'
+    | 'hudTopics'
+    | 'activeTopicIndex'
+    | 'mapRegionLabel'
+    | 'shirtColor'
+  >;
 
 function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
-  const raw = Array.isArray(spec.scenes) && spec.scenes.length > 0
-    ? spec.scenes
-    : [
+  const raw: HtmlSvgSceneInput[] =
+    Array.isArray(spec.scenes) && spec.scenes.length > 0
+      ? spec.scenes
+      : spec.preset === 'html_svg_silhouette_film'
+        ? (buildDefaultSilhouetteFilmScenes() as HtmlSvgSceneInput[])
+        : spec.preset === 'html_svg_ampulheta_doc'
+          ? (buildDefaultAmpulhetaScenes() as HtmlSvgSceneInput[])
+          : spec.preset === 'html_svg_whatif_studio'
+            ? (buildDefaultWhatIfScenes() as HtmlSvgSceneInput[])
+            : [
         {
           title: spec.title || 'Vídeos em HTML + SVG',
           subtitle: 'Motor procedural local com custo zero',
@@ -140,7 +267,7 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     durationSec: Math.max(1.5, Math.min(20, Number(sc.durationSec) || 4)),
     icon: sc.icon || (['rocket', 'bolt', 'chart', 'code', 'shield', 'heart'][i % 6] as any),
     speakerId: String(sc.speakerId || spec.characters?.[i % Math.max(1, spec.characters?.length || 1)]?.id || 'c1'),
-    expression: sc.expression || 'happy',
+    expression: (sc.expression || 'happy') as HtmlSvgExpression,
     metricValue: String(sc.metricValue || '').slice(0, 24),
     metricLabel: String(sc.metricLabel || '').slice(0, 40),
     visual: sc.visual,
@@ -155,6 +282,27 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
           ...(c?.color ? { color: String(c.color) } : {}),
         }))
       : undefined,
+    sceneKind: sc.sceneKind,
+    dialogueText: sc.dialogueText ? String(sc.dialogueText).slice(0, 120) : undefined,
+    quoteAuthor: sc.quoteAuthor ? String(sc.quoteAuthor).slice(0, 48) : undefined,
+    phoneDate: sc.phoneDate ? String(sc.phoneDate).slice(0, 28) : undefined,
+    phoneTime: sc.phoneTime ? String(sc.phoneTime).slice(0, 12) : undefined,
+    phoneGoal: sc.phoneGoal ? String(sc.phoneGoal).slice(0, 24) : undefined,
+    raincoat: sc.raincoat,
+    ponytail: sc.ponytail,
+    captionMode: sc.captionMode,
+    hairStyle: sc.hairStyle,
+    skinTone: sc.skinTone,
+    tunicColor: sc.tunicColor,
+    stormy: sc.stormy,
+    aurora: sc.aurora,
+    strikeWord: sc.strikeWord,
+    manuscriptLines: sc.manuscriptLines,
+    triptychItems: sc.triptychItems,
+    hudTopics: sc.hudTopics,
+    activeTopicIndex: sc.activeTopicIndex,
+    mapRegionLabel: sc.mapRegionLabel,
+    shirtColor: sc.shirtColor,
   }));
 }
 
@@ -347,7 +495,10 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
     preset === 'html_svg_vox_papercut' ||
     preset === 'html_svg_kaz_chart' ||
     preset === 'html_svg_paper_finance' ||
-    preset === 'html_svg_2d_puppet'
+    preset === 'html_svg_2d_puppet' ||
+    preset === 'html_svg_silhouette_film' ||
+    preset === 'html_svg_ampulheta_doc' ||
+    preset === 'html_svg_whatif_studio'
   ) {
     const extraCtx = {
       title: String(spec.title || scheduled[0]?.title || 'DarkTube Studio').slice(0, 80),
@@ -360,6 +511,9 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
       scenes: scheduled,
       characters,
       dioramaMode: spec.dioramaMode,
+      styleMood: spec.styleMood,
+      visualStyle: spec.visualStyle,
+      words: spec.words,
     };
     const extraHtml =
       preset === 'html_svg_tech_crimson'
@@ -374,7 +528,15 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
                 ? buildKazChartHtml(extraCtx)
                 : preset === 'html_svg_2d_puppet'
                   ? build2dPuppetGalleryHtml(extraCtx)
-                  : buildPaperFinanceHtml(extraCtx);
+                  : preset === 'html_svg_silhouette_film'
+                    ? buildSilhouetteFilmHtml(extraCtx as any)
+                    : preset === 'html_svg_ampulheta_doc'
+                      ? buildAmpulhetaDocHtml(extraCtx as any)
+                      : preset === 'html_svg_whatif_studio'
+                        ? buildWhatIfStudioHtml(extraCtx as any)
+                        : buildPaperFinanceHtml(extraCtx);
+    const scriptBinding = validateScriptVisualBinding(scheduled);
+    const readCheck = checkReadabilityTiming(scheduled);
     return {
       html: extraHtml,
       width,
@@ -384,7 +546,7 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
       palette: [bgHex, accentHex, secHex],
       timelineIssues: {
         errors: [...palCheck.errors, ...tlCheck.errors],
-        warnings: [...palCheck.warnings, ...tlCheck.warnings],
+        warnings: [...palCheck.warnings, ...tlCheck.warnings, ...scriptBinding.warnings, ...readCheck.warnings],
       },
     };
   }

@@ -23,6 +23,8 @@ import {
 } from './flow-script'
 import { clampSecondsForModel, MAX_TAKES, type FlowProductionMode, type FlowTemplate } from './flow-template-base'
 import type {
+  BreathPauseSegment,
+  CharacterAndEnvBlueprint,
   ClonedBeatSourceType,
   ClonedRecommendedEngine,
   ClonedSceneBeat,
@@ -61,7 +63,7 @@ async function probeVideoMeta(videoPath: string): Promise<VideoMeta> {
 }
 
 /** Detecta os timestamps exatos de cortes reais de cena via filtro select/showinfo do FFmpeg. */
-async function detectRealSceneCuts(videoPath: string | undefined, durationSec: number): Promise<number[]> {
+export async function detectRealSceneCuts(videoPath: string | undefined, durationSec: number): Promise<number[]> {
   if (!videoPath || !fs.existsSync(videoPath)) return []
   try {
     const res = await run(
@@ -87,12 +89,59 @@ async function detectRealSceneCuts(videoPath: string | undefined, durationSec: n
   }
 }
 
-/** Calcula metricas matematicas de edicao (Median Shot Length, CPM e WPM). */
+/**
+ * Escuta os espacos de respiracao e pausas naturais do audio via FFmpeg silencedetect,
+ * permitindo que animacoes, legendas e respiros dramaticos acompanhem o ritmo real.
+ */
+export async function detectAudioBreathPauses(
+  audioOrVideoPath: string | undefined,
+  durationSec: number
+): Promise<{ pauses: BreathPauseSegment[]; silentRatioPct: number }> {
+  if (!audioOrVideoPath || !fs.existsSync(audioOrVideoPath)) {
+    return { pauses: [], silentRatioPct: 0 }
+  }
+  try {
+    const res = await run(
+      ffmpegBin(),
+      ['-hide_banner', '-i', audioOrVideoPath, '-af', 'silencedetect=noise=-32dB:d=0.35', '-vn', '-f', 'null', '-'],
+      { timeout: 25000, maxBuffer: 4 * 1024 * 1024 }
+    ).catch((err: any) => ({ stdout: String(err?.stdout || ''), stderr: String(err?.stderr || '') }))
+    const log = `${res.stdout || ''}\n${res.stderr || ''}`
+    const pauses: BreathPauseSegment[] = []
+    let openStart: number | null = null
+    for (const line of log.split('\n')) {
+      const ms = /silence_start:\s*([0-9.]+)/.exec(line)
+      if (ms) openStart = Number(ms[1])
+      const me = /silence_end:\s*([0-9.]+)\s*\|\s*silence_duration:\s*([0-9.]+)/.exec(line)
+      if (me) {
+        const endSec = Number(me[1])
+        const durSec = Number(me[2])
+        const startSec = openStart !== null ? openStart : Math.max(0, endSec - durSec)
+        if (Number.isFinite(durSec) && durSec >= 0.35) {
+          pauses.push({
+            startSec: Number(startSec.toFixed(2)),
+            endSec: Number(endSec.toFixed(2)),
+            durationSec: Number(durSec.toFixed(2)),
+          })
+        }
+        openStart = null
+      }
+    }
+    const silentSum = pauses.reduce((acc, p) => acc + p.durationSec, 0)
+    const silentRatioPct = durationSec > 0 ? Number(Math.min(100, (silentSum / durationSec) * 100).toFixed(1)) : 0
+    return { pauses: pauses.slice(0, 32), silentRatioPct }
+  } catch {
+    return { pauses: [], silentRatioPct: 0 }
+  }
+}
+
+/** Calcula metricas matematicas de edicao (Median Shot Length, CPM, WPM e respirações de áudio). */
 function computeEditingMetrics(
   cutTimestamps: number[],
   durationSec: number,
   transcript: string,
-  contactSheetPath?: string
+  contactSheetPath?: string,
+  breathInfo?: { pauses: BreathPauseSegment[]; silentRatioPct: number }
 ): ReverseEngineeredEditingMetrics {
   const safeDur = Math.max(4, durationSec)
   const sorted = [...cutTimestamps].filter((t) => t > 0 && t < safeDur).sort((a, b) => a - b)
@@ -125,6 +174,7 @@ function computeEditingMetrics(
     wordsPerMinute,
     hookDurationSec,
     ...(contactSheetPath ? { contactSheetPath } : {}),
+    ...(breathInfo?.pauses?.length ? { breathPauses: breathInfo.pauses, silentRatioPct: breathInfo.silentRatioPct } : {}),
   }
 }
 
@@ -142,12 +192,13 @@ async function extractLabeledFrames(
   if (videoPath && fs.existsSync(videoPath)) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'flow_clone_'))
     const scaleFilter = "scale=w='if(gt(iw,ih),1024,-2)':h='if(gt(iw,ih),-2,1024)'"
+    const isLongForm = durationSec > 90
     const cutTargets = cutTimestamps
       .map((ts) => Math.min(Math.max(0.2, ts + 0.15), Math.max(0.3, durationSec - 0.2)))
-      .slice(0, 14)
+      .slice(0, isLongForm ? 6 : 14)
 
     const uniformTargets: number[] = []
-    const uniformCount = Math.min(16, Math.max(6, Math.ceil(durationSec / 2.5)))
+    const uniformCount = isLongForm ? 12 : Math.min(16, Math.max(6, Math.ceil(durationSec / 2.5)))
     for (let i = 0; i < uniformCount; i++) {
       const ts =
         uniformCount === 1
@@ -157,9 +208,11 @@ async function extractLabeledFrames(
     }
 
     const targets: number[] = [0.2]
-    for (const ts of [...cutTargets, ...uniformTargets]) {
+    const priorityOrder = isLongForm ? [...uniformTargets, ...cutTargets] : [...cutTargets, ...uniformTargets]
+    for (const ts of priorityOrder) {
       if (targets.length >= 16) break
-      if (!targets.some((existing) => Math.abs(existing - ts) < 0.85)) {
+      const minGap = isLongForm ? Math.max(1.5, durationSec / 28) : 0.85
+      if (!targets.some((existing) => Math.abs(existing - ts) < minGap)) {
         targets.push(Number(ts.toFixed(2)))
       }
     }
@@ -187,6 +240,39 @@ async function extractLabeledFrames(
           }
         } catch {
           // Segue para os demais frames mesmo se um timestamp falhar
+        }
+      }
+
+      const stripCandidates = isLongForm
+        ? [0.2, Number((durationSec * 0.42).toFixed(1)), Number((durationSec * 0.80).toFixed(1))]
+        : [0.2, ...cutTimestamps.slice(0, 2)].slice(0, 3)
+      for (let sIdx = 0; sIdx < stripCandidates.length; sIdx++) {
+        const anchor = stripCandidates[sIdx]
+        const subPaths: string[] = []
+        for (let k = 0; k < 4; k++) {
+          const st = Math.min(Math.max(0.1, durationSec - 0.15), anchor + k * 0.45)
+          const subFp = path.join(tmpDir, `strip_${sIdx}_${k}.jpg`)
+          await run(
+            ffmpegBin(),
+            ['-ss', st.toFixed(2), '-i', videoPath, '-frames:v', '1', '-vf', 'scale=320:-2', '-q:v', '4', '-y', subFp],
+            { timeout: 10000 }
+          ).catch(() => {})
+          if (fs.existsSync(subFp)) subPaths.push(subFp)
+        }
+        if (subPaths.length === 4) {
+          const stripOut = path.join(tmpDir, `strip_tile_${sIdx}.jpg`)
+          await run(
+            ffmpegBin(),
+            ['-y', '-i', path.join(tmpDir, `strip_${sIdx}_%d.jpg`), '-vf', 'tile=4x1:padding=4:color=#0f172a', '-q:v', '3', stripOut],
+            { timeout: 12000 }
+          ).catch(() => {})
+          if (fs.existsSync(stripOut) && fs.statSync(stripOut).size > 500) {
+            out.push({
+              dataBase64: fs.readFileSync(stripOut).toString('base64'),
+              mimeType: 'image/jpeg',
+              label: `[Tira Temporal _strip Cena ${sIdx + 1} (${anchor.toFixed(1)}s..${(anchor + 1.35).toFixed(1)}s) — observe direção de câmera e movimento]`,
+            })
+          }
         }
       }
 
@@ -321,6 +407,10 @@ function normalizeStructure(
       sfx,
       presence,
       sourceType,
+      ...(Array.isArray(b?.visualComponents) && b.visualComponents.length
+        ? { visualComponents: b.visualComponents.map((vc: any) => String(vc || '').trim()).filter(Boolean).slice(0, 8) }
+        : {}),
+      ...(b?.scriptVisualBinding ? { scriptVisualBinding: String(b.scriptVisualBinding).slice(0, 220) } : {}),
     }
   })
 
@@ -401,6 +491,20 @@ function normalizeStructure(
     captionStyle: String(rawBible?.captionStyle || '2 palavras em destaque inferior com contorno forte').slice(0, 160),
   }
 
+  const rawBp = raw?.characterAndEnvBlueprint && typeof raw.characterAndEnvBlueprint === 'object' ? raw.characterAndEnvBlueprint : null
+  const toStrList = (arr: any, max = 8): string[] =>
+    Array.isArray(arr) ? arr.map((x: any) => String(x || '').trim()).filter(Boolean).slice(0, max) : []
+  const characterAndEnvBlueprint: CharacterAndEnvBlueprint | undefined = rawBp
+    ? {
+        characterRigStyle: String(rawBp.characterRigStyle || '').slice(0, 220),
+        characterProportions: String(rawBp.characterProportions || '').slice(0, 220),
+        clothingAndProps: toStrList(rawBp.clothingAndProps, 8),
+        environmentLayers: toStrList(rawBp.environmentLayers, 8),
+        hudAndOverlayGrammar: toStrList(rawBp.hudAndOverlayGrammar, 8),
+        internalMotionTriggers: toStrList(rawBp.internalMotionTriggers, 8),
+      }
+    : undefined
+
   return {
     sourceUrl: ctx.url,
     sourcePlatform: ctx.platform,
@@ -426,10 +530,12 @@ function normalizeStructure(
     recommendedSeconds,
     recommendedModel,
     recommendedEngine,
+    ...(raw?.recommendedPreset ? { recommendedPreset: String(raw.recommendedPreset).trim().slice(0, 60) } : {}),
     paletteHex,
     energy,
     ...(ctx.editingMetrics ? { editingMetrics: ctx.editingMetrics } : {}),
     storyBible,
+    ...(characterAndEnvBlueprint ? { characterAndEnvBlueprint } : {}),
     providerUsed: ctx.provider,
     usedFallbackThumbs: ctx.usedFallbackThumbs,
   }
@@ -480,6 +586,7 @@ export async function analyzeVideoStructureFromLink(input: {
     }
 
     const realCuts = await detectRealSceneCuts(download.videoPath, meta.durationSec)
+    const breathInfo = await detectAudioBreathPauses(download.audioPath || download.videoPath, meta.durationSec)
     const { frames, contactSheetPath } = await extractLabeledFrames(
       download.videoPath,
       meta.durationSec,
@@ -488,7 +595,7 @@ export async function analyzeVideoStructureFromLink(input: {
       fileId
     )
     if (frames.length === 0) throw new Error('Não foi possível extrair frames deste vídeo para análise.')
-    const editingMetrics = computeEditingMetrics(realCuts, meta.durationSec, transcript, contactSheetPath)
+    const editingMetrics = computeEditingMetrics(realCuts, meta.durationSec, transcript, contactSheetPath, breathInfo)
 
     const system = `You are a senior viral-video reverse engineer and visual OCR analyst.
 You will inspect sequential frames extracted from a reference video (plus exact detected cut timestamps, editing math and audio transcript when available).
@@ -506,8 +613,17 @@ Reply with ONE valid JSON object matching this exact schema:
   "recommendedSeconds": 4 | 6 | 8 | 10,
   "recommendedModel": "Omni 1.2 Flash" | "Veo 3.1 - Fast" | "Veo 3.1 - Quality",
   "recommendedEngine": "bean_2d_3d | stickman_2d_3d | netflix_doc | dossie_2d | mapa_3d | atlas_3d | fern_3d | html_svg | remotion | flow",
+  "recommendedPreset": "html_svg_ampulheta_doc | html_svg_silhouette_film | html_svg_2d_puppet | html_svg_vox_papercut | html_svg_netflix_doc | cartoon_25d_demo | null",
   "paletteHex": ["#0B1020", "#38BDF8", "#FACC15"],
   "energy": "cinematografico | fluido | cinetico",
+  "characterAndEnvBlueprint": {
+    "characterRigStyle": "descrição técnica da anatomia, traço, olhos, cabelo/barba, braços e pernas dos personagens (PT-BR)",
+    "characterProportions": "proporção cabeça/tronco/pernas, se aparecem de corpo inteiro, atrás de mesa ou em perfil (PT-BR)",
+    "clothingAndProps": ["peças de figurino e objetos recorrentes em cena"],
+    "environmentLayers": ["camadas de fundo, horizonte, texturas, iluminação e profundidade"],
+    "hudAndOverlayGrammar": ["selos de data/ano, legendas de local, barras/pílulas de tópicos, cards comparativos"],
+    "internalMotionTriggers": ["micro-movimentos contínuos que mantêm cenas longas vivas sem parecer frozen"]
+  },
   "storyBible": {
     "seriesTitle": "nome/conceito da série ou formato replicável (PT-BR)",
     "characterArchetype": "arquétipo do personagem recorrente ou narrador visual (PT-BR)",
@@ -534,23 +650,26 @@ Reply with ONE valid JSON object matching this exact schema:
       "transition": "cut | white_flash | whip_pan | zoom_punch | crossfade | glitch",
       "sfx": "whoosh | camera_click | bass_drop | paper_rustle | pop | none",
       "presence": "character | faceless",
-      "sourceType": "filmed | ai_generated | coded_html_svg"
+      "sourceType": "filmed | ai_generated | coded_html_svg",
+      "visualComponents": ["explicit visual components/layers in frame with positions (e.g. bg_blurred_shelves, fg_silhouette_runner, prop_phone_530)"],
+      "scriptVisualBinding": "how what is spoken/read in this timestamp connects 1:1 to a concrete component visible on screen"
     }
   ]
 }
 
 Rules:
 - Read ALL on-screen text carefully (OCR): headlines, top banners, burned-in captions, product labels, CTAs.
-- Group consecutive frames that belong to the same continuous shot/scene into coherent beats (around ${Math.max(3, Math.min(10, Math.round(meta.durationSec / 6)))} beats covering the full ${meta.durationSec}s duration).
+- Group consecutive frames that belong to the same continuous shot/scene into coherent beats (around ${Math.max(3, Math.min(16, Math.round(meta.durationSec / (meta.durationSec > 90 ? 18 : 6))))} beats covering the full ${meta.durationSec}s duration, not only the first minute).
 - Identify accurately whether characters talk on camera ("dialogo"), there is an off-screen voiceover ("narracao"), only visuals/ambient sound ("ambiente"), or a mix ("livre").
 - Always write beat descriptions/summary/title in PT-BR, and camera/action/detectedCharacters/detectedLocations in English.`
 
     const userPrompt = [
       `URL de origem: ${cleanUrl} (${platform})`,
       `Duração medida: ${meta.durationSec}s | Formato detectado: ${meta.aspect}`,
-      `Métricas matemáticas de edição (FFmpeg scdet): ${editingMetrics.detectedCutsCount} cortes reais detectados | Duração mediana do plano: ${editingMetrics.medianShotLengthSec}s | Cortes/min: ${editingMetrics.cutsPerMinute} | WPM: ${editingMetrics.wordsPerMinute}`,
+      `Métricas matemáticas de edição (FFmpeg scdet + silencedetect): ${editingMetrics.detectedCutsCount} cortes reais detectados | Duração mediana do plano: ${editingMetrics.medianShotLengthSec}s | Cortes/min: ${editingMetrics.cutsPerMinute} | WPM: ${editingMetrics.wordsPerMinute} | Silêncio/Respiração: ${editingMetrics.silentRatioPct ?? 0}%`,
       editingMetrics.cutTimestampsSec.length ? `Timestamps dos cortes reais (s): ${editingMetrics.cutTimestampsSec.join(', ')}` : '',
-      `Total de frames anexados em ordem cronológica: ${frames.length}`,
+      editingMetrics.breathPauses?.length ? `Pausas de respiração/silêncio detectadas no áudio (s): ${editingMetrics.breathPauses.slice(0, 12).map((p) => `${p.startSec}-${p.endSec}s`).join(', ')}` : '',
+      `Total de frames e tiras temporais anexados em ordem cronológica: ${frames.length}`,
       transcript ? `\nTranscrição do áudio original:\n${transcript.slice(0, 9000)}` : '\n(Sem transcrição de áudio prévia — analise pelos frames e OCR visual.)',
       '\nAnalise os frames abaixo em ordem cronológica, leia todo o OCR visível, preencha o objeto storyBible para permitir clonagem em série/estilo e devolva o JSON estruturado cobrindo toda a duração do vídeo.',
     ]
@@ -626,9 +745,12 @@ export function buildCloneTemplateAndParams(
   const beatsSummary = structure.beats
     .map(
       (b) =>
-        `Beat ${b.n} (${b.timestamp}, ${b.durationSec}s, kind=${b.kind}, transition=${b.transition}, sfx=${b.sfx}): ${b.beat} | Camera: ${b.camera} | Visual: ${b.action}${b.ocrText ? ` | Original OCR: "${b.ocrText}"` : ''}${b.spokenSummary ? ` | Original line meaning: "${b.spokenSummary}"` : ''}`
+        `Beat ${b.n} (${b.timestamp}, ${b.durationSec}s, kind=${b.kind}, transition=${b.transition}, sfx=${b.sfx}): ${b.beat} | Camera: ${b.camera} | Visual: ${b.action}${b.visualComponents?.length ? ` | Components: [${b.visualComponents.join(', ')}]` : ''}${b.scriptVisualBinding ? ` | Script->Visual: ${b.scriptVisualBinding}` : ''}${b.ocrText ? ` | Original OCR: "${b.ocrText}"` : ''}${b.spokenSummary ? ` | Original line meaning: "${b.spokenSummary}"` : ''}`
     )
     .join('\n')
+  const breathRule = structure.editingMetrics?.breathPauses?.length
+    ? `- AUDIO BREATHING & SILENCE TIMING: Reference audio has ${structure.editingMetrics.silentRatioPct ?? 0}% breathing/pause space (${structure.editingMetrics.breathPauses.slice(0, 6).map((p) => `${p.startSec}s-${p.endSec}s`).join(', ')}). Leave intentional visual holds and scene cuts on natural breathing pauses.`
+    : ''
 
   const template: FlowTemplate = {
     id: 'livre',
@@ -658,6 +780,8 @@ export function buildCloneTemplateAndParams(
         ? `- NEW LOCATION / ENVIRONMENT: Replace the original setting(s) with: "${newLocation}". Match the original framing and lighting mood inside this new environment.`
         : `- Keep locations structurally equivalent to the original video.`,
       keepInstructions ? `- EXTRA USER INSTRUCTIONS: ${keepInstructions}` : '',
+      `- SCRIPT-TO-VISUAL LOCK (MANDATORY): Everything the script mentions in a beat MUST appear visually via concrete on-screen components/props — zero generic filler shots.`,
+      breathRule,
       `Original beat-by-beat skeleton:\n${beatsSummary}`,
     ]
       .filter(Boolean)
@@ -706,11 +830,11 @@ export function formatCloneAsVideoMd(s: FlowClonedStructure): string {
     `- **Fonte:** ${s.sourceUrl} (${s.sourcePlatform})`,
     `- **Formato & Duração:** ${s.aspect} · ${s.durationSec}s · ${s.beats.length} takes`,
     `- **Estilo & Ritmo:** ${s.visualStyle} · ${s.pacing} · ${bpm.label}`,
-    `- **Motor Recomendado:** \`${s.recommendedEngine || 'flow'}\``,
+    `- **Motor Recomendado:** \`${s.recommendedEngine || 'flow'}\`${s.recommendedPreset ? ` · Preset: \`${s.recommendedPreset}\`` : ''}`,
     `- **Paleta Dominante (<=3 hex):** ${paletteLine}`,
     ...(m
       ? [
-          `- **Métricas Reais de Edição:** ${m.detectedCutsCount} cortes (${m.cutsPerMinute} cortes/min) · Plano mediano: ${m.medianShotLengthSec}s · Gancho inicial: ${m.hookDurationSec}s${m.wordsPerMinute ? ` · Fala: ${m.wordsPerMinute} WPM` : ''}`,
+          `- **Métricas Reais de Edição:** ${m.detectedCutsCount} cortes (${m.cutsPerMinute} cortes/min) · Plano mediano: ${m.medianShotLengthSec}s · Gancho inicial: ${m.hookDurationSec}s${m.wordsPerMinute ? ` · Fala: ${m.wordsPerMinute} WPM` : ''}${m.breathPauses?.length ? ` · Respirações/Silêncios: ${m.breathPauses.length} pausas (${m.silentRatioPct ?? 0}%)` : ''}`,
           ...(m.contactSheetPath ? [`- **Contact Sheet Visual:** \`${m.contactSheetPath}\``] : []),
         ]
       : []),
@@ -728,6 +852,26 @@ export function formatCloneAsVideoMd(s: FlowClonedStructure): string {
           `- **Fórmula de Gancho (0–3s):** ${s.storyBible.recurringHookFormula}`,
           `- **Fórmula de Fechamento:** ${s.storyBible.cliffhangerFormula}`,
           `- **Estilo de Legenda:** ${s.storyBible.captionStyle}`,
+        ]
+      : []),
+    ...(s.characterAndEnvBlueprint
+      ? [
+          '',
+          `## Blueprint de Personagem & Ambiente (Rig 2D)`,
+          `- **Rig & Traço:** ${s.characterAndEnvBlueprint.characterRigStyle}`,
+          `- **Proporções & Poses:** ${s.characterAndEnvBlueprint.characterProportions}`,
+          ...(s.characterAndEnvBlueprint.clothingAndProps.length
+            ? [`- **Figurino & Props:** ${s.characterAndEnvBlueprint.clothingAndProps.join(', ')}`]
+            : []),
+          ...(s.characterAndEnvBlueprint.environmentLayers.length
+            ? [`- **Camadas de Ambiente:** ${s.characterAndEnvBlueprint.environmentLayers.join(', ')}`]
+            : []),
+          ...(s.characterAndEnvBlueprint.hudAndOverlayGrammar.length
+            ? [`- **Gramática HUD / Overlays:** ${s.characterAndEnvBlueprint.hudAndOverlayGrammar.join(', ')}`]
+            : []),
+          ...(s.characterAndEnvBlueprint.internalMotionTriggers.length
+            ? [`- **Movimento Contínuo Anti-Frozen:** ${s.characterAndEnvBlueprint.internalMotionTriggers.join(', ')}`]
+            : []),
         ]
       : []),
     '',

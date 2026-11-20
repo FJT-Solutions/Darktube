@@ -1,4 +1,10 @@
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 export interface SceneClockCheckInput {
   index: number;
@@ -210,5 +216,117 @@ Return ONLY valid JSON:
     };
   } catch {
     return fallbackReport;
+  }
+}
+
+export interface ScriptVisualBindingResult {
+  ok: boolean;
+  warnings: string[];
+  boundRatio: number;
+}
+
+/**
+ * Contrato Roteiro <-> Tela: valida se cenas com fala/texto explicativo possuem
+ * componente visual concreto vinculado (cenario, imagem, visual/metricValue ou prop).
+ */
+export function validateScriptVisualBinding(
+  scenes: Array<{
+    title?: string;
+    spokenLine?: string;
+    dialogueText?: string;
+    sceneKind?: string;
+    imageUrl?: string;
+    visual?: string;
+    metricValue?: string;
+    chartItems?: unknown[];
+  }>
+): ScriptVisualBindingResult {
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    return { ok: false, warnings: ['Nenhuma cena informada para validar acoplamento Roteiro <-> Tela.'], boundRatio: 0 };
+  }
+  const warnings: string[] = [];
+  let spokenScenes = 0;
+  let boundScenes = 0;
+
+  for (let i = 0; i < scenes.length; i++) {
+    const s = scenes[i];
+    const line = String(s.spokenLine || s.dialogueText || '').trim();
+    if (!line) continue;
+    spokenScenes++;
+    const hasVisualAnchor = Boolean(
+      s.sceneKind ||
+        s.imageUrl ||
+        s.visual ||
+        s.metricValue ||
+        (Array.isArray(s.chartItems) && s.chartItems.length > 0) ||
+        (s.title && s.title.trim().length > 2)
+    );
+    if (hasVisualAnchor) {
+      boundScenes++;
+    } else {
+      warnings.push(`Cena ${i + 1}: fala "${line.slice(0, 42)}" sem componente visual concreto vinculado.`);
+    }
+  }
+
+  const boundRatio = spokenScenes > 0 ? +(boundScenes / spokenScenes).toFixed(2) : 1;
+  return { ok: warnings.length === 0, warnings, boundRatio };
+}
+
+export interface SideBySidePairInput {
+  label: string;
+  referenceSec: number;
+  candidateSec: number;
+}
+
+/**
+ * Gera prancha comparativa Lado a Lado (Original vs. Clone/Recriacao) para auditoria visual de fidelidade.
+ */
+export async function compareVideoSideBySide(input: {
+  referenceVideoPath: string;
+  candidateVideoPath: string;
+  outputImagePath: string;
+  pairs: SideBySidePairInput[];
+  ffmpegPath?: string;
+}): Promise<{ ok: boolean; outputImagePath: string; pairsCount: number }> {
+  const bin = input.ffmpegPath || process.env.FFMPEG_PATH || 'ffmpeg';
+  if (!fs.existsSync(input.referenceVideoPath) || !fs.existsSync(input.candidateVideoPath) || input.pairs.length === 0) {
+    return { ok: false, outputImagePath: input.outputImagePath, pairsCount: 0 };
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_sbs_'));
+  try {
+    fs.mkdirSync(path.dirname(input.outputImagePath), { recursive: true });
+    for (let i = 0; i < input.pairs.length; i++) {
+      const p = input.pairs[i];
+      const refJpg = path.join(tmpDir, `ref_${i}.jpg`);
+      const candJpg = path.join(tmpDir, `cand_${i}.jpg`);
+      const pairJpg = path.join(tmpDir, `pair_${String(i).padStart(2, '0')}.jpg`);
+      const safeLabel = p.label.replace(/[':]/g, '');
+
+      await execFileAsync(bin, [
+        '-y', '-ss', p.referenceSec.toFixed(2), '-i', input.referenceVideoPath, '-frames:v', '1',
+        '-vf', `scale=480:270,drawtext=text='ORIGINAL ${safeLabel}':x=8:y=8:fontsize=16:fontcolor=yellow:box=1:boxcolor=black@0.75`,
+        refJpg,
+      ], { timeout: 20000, windowsHide: true });
+      await execFileAsync(bin, [
+        '-y', '-ss', p.candidateSec.toFixed(2), '-i', input.candidateVideoPath, '-frames:v', '1',
+        '-vf', `scale=480:270,drawtext=text='CLONE ${safeLabel}':x=8:y=8:fontsize=16:fontcolor=cyan:box=1:boxcolor=black@0.75`,
+        candJpg,
+      ], { timeout: 20000, windowsHide: true });
+      await execFileAsync(bin, [
+        '-y', '-i', refJpg, '-i', candJpg, '-filter_complex', 'hstack=inputs=2', pairJpg,
+      ], { timeout: 20000, windowsHide: true });
+    }
+
+    const rows = Math.max(1, Math.ceil(input.pairs.length / 2));
+    await execFileAsync(bin, [
+      '-y', '-i', path.join(tmpDir, 'pair_%02d.jpg'),
+      '-filter_complex', `tile=2x${rows}:padding=6:color=0x0f172a`,
+      '-q:v', '2', input.outputImagePath,
+    ], { timeout: 30000, windowsHide: true });
+
+    return { ok: fs.existsSync(input.outputImagePath), outputImagePath: input.outputImagePath, pairsCount: input.pairs.length };
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }

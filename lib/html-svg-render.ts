@@ -14,6 +14,18 @@ import {
   type HtmlSvgProjectSpec,
   type HtmlSvgSceneInput,
 } from './html-svg-templates';
+import {
+  buildDefaultSilhouetteFilmScenes,
+  writeSilhouetteAmbientWav,
+} from './html-svg-silhouette-film';
+import {
+  buildDefaultAmpulhetaScenes,
+  writeAmpulhetaAmbientWav,
+} from './html-svg-ampulheta-doc';
+import {
+  buildDefaultWhatIfScenes,
+  writeWhatIfAmbientWav,
+} from './html-svg-whatif-studio';
 
 const runExec = promisify(execFile);
 
@@ -46,8 +58,16 @@ export interface HtmlSvgRenderResult {
 function writeChunk(stream: NodeJS.WritableStream, chunk: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     if (stream.write(chunk)) return resolve();
-    stream.once('drain', resolve);
-    stream.once('error', reject);
+    const onDrain = () => {
+      stream.removeListener('error', onError);
+      resolve();
+    };
+    const onError = (err: Error) => {
+      stream.removeListener('drain', onDrain);
+      reject(err);
+    };
+    stream.once('drain', onDrain);
+    stream.once('error', onError);
   });
 }
 
@@ -190,7 +210,16 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
     // Contact Sheet QA pré-render (#05/#19): amostra 1 still por cena (ou 4 pontos) antes do encode final
     if (opts.generateContactSheet !== false) {
       const sampleTimes: number[] = [];
-      const scenesList = Array.isArray(enrichedSpec.scenes) ? enrichedSpec.scenes : [];
+      const scenesList =
+        Array.isArray(enrichedSpec.scenes) && enrichedSpec.scenes.length > 0
+          ? enrichedSpec.scenes
+          : enrichedSpec.preset === 'html_svg_silhouette_film'
+            ? buildDefaultSilhouetteFilmScenes()
+            : enrichedSpec.preset === 'html_svg_ampulheta_doc'
+              ? buildDefaultAmpulhetaScenes()
+              : enrichedSpec.preset === 'html_svg_whatif_studio'
+                ? buildDefaultWhatIfScenes()
+                : [];
       if (scenesList.length > 0 && !enrichedSpec.customHtml) {
         let cur = 0;
         for (const sc of scenesList.slice(0, 16)) {
@@ -246,7 +275,36 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
       }
     }
 
-    const hasAudioFile = Boolean(opts.audioPath && fs.existsSync(opts.audioPath));
+    let resolvedAudioPath = opts.audioPath && fs.existsSync(opts.audioPath) ? opts.audioPath : undefined;
+    if (!resolvedAudioPath && enrichedSpec.preset === 'html_svg_silhouette_film') {
+      const ambientScenes =
+        Array.isArray(enrichedSpec.scenes) && enrichedSpec.scenes.length > 0
+          ? enrichedSpec.scenes
+          : buildDefaultSilhouetteFilmScenes();
+      try {
+        resolvedAudioPath = writeSilhouetteAmbientWav(
+          path.join(assetDir, 'silhouette_ambient.wav'),
+          ambientScenes,
+          compiled.durationSec
+        );
+      } catch {}
+    } else if (!resolvedAudioPath && enrichedSpec.preset === 'html_svg_ampulheta_doc') {
+      try {
+        resolvedAudioPath = writeAmpulhetaAmbientWav(
+          path.join(assetDir, 'ampulheta_ambient.wav'),
+          compiled.durationSec
+        );
+      } catch {}
+    } else if (!resolvedAudioPath && enrichedSpec.preset === 'html_svg_whatif_studio') {
+      try {
+        resolvedAudioPath = writeWhatIfAmbientWav(
+          path.join(assetDir, 'whatif_ambient.wav'),
+          compiled.durationSec
+        );
+      } catch {}
+    }
+
+    const hasAudioFile = Boolean(resolvedAudioPath && fs.existsSync(resolvedAudioPath));
     const ffArgs = [
       '-y',
       '-f', 'image2pipe',
@@ -254,7 +312,7 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
       '-framerate', String(compiled.fps),
       '-i', '-',
       ...(hasAudioFile
-        ? ['-i', opts.audioPath as string]
+        ? ['-i', resolvedAudioPath as string]
         : ['-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100']),
       '-t', compiled.durationSec.toFixed(3),
       '-c:v', 'libx264',

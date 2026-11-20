@@ -17,6 +17,12 @@ export type ClonedRecommendedEngine =
   | 'remotion'
   | 'flow'
 
+export interface BreathPauseSegment {
+  startSec: number
+  endSec: number
+  durationSec: number
+}
+
 export interface ReverseEngineeredEditingMetrics {
   detectedCutsCount: number
   cutTimestampsSec: number[]
@@ -25,6 +31,8 @@ export interface ReverseEngineeredEditingMetrics {
   wordsPerMinute: number
   hookDurationSec: number
   contactSheetPath?: string
+  breathPauses?: BreathPauseSegment[]
+  silentRatioPct?: number
 }
 
 export interface ClonedStoryBible {
@@ -35,6 +43,15 @@ export interface ClonedStoryBible {
   recurringHookFormula: string
   cliffhangerFormula: string
   captionStyle: string
+}
+
+export interface CharacterAndEnvBlueprint {
+  characterRigStyle: string
+  characterProportions: string
+  clothingAndProps: string[]
+  environmentLayers: string[]
+  hudAndOverlayGrammar: string[]
+  internalMotionTriggers: string[]
 }
 
 export interface ClonedSceneBeat {
@@ -51,6 +68,8 @@ export interface ClonedSceneBeat {
   sfx: FlowSfx
   presence: 'character' | 'faceless'
   sourceType?: ClonedBeatSourceType
+  visualComponents?: string[]
+  scriptVisualBinding?: string
 }
 
 export interface FlowClonedStructure {
@@ -74,10 +93,12 @@ export interface FlowClonedStructure {
   recommendedSeconds: number
   recommendedModel: string
   recommendedEngine?: ClonedRecommendedEngine
+  recommendedPreset?: string
   paletteHex?: string[]
   energy?: 'cinematografico' | 'fluido' | 'cinetico'
   editingMetrics?: ReverseEngineeredEditingMetrics
   storyBible?: ClonedStoryBible
+  characterAndEnvBlueprint?: CharacterAndEnvBlueprint
   providerUsed: FlowProvider
   usedFallbackThumbs: boolean
 }

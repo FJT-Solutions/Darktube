@@ -26,14 +26,48 @@ export interface TimelineStateInput {
   coversSafeZone?: boolean
 }
 
+export interface FrozenSegment {
+  startSec: number
+  endSec: number
+  durationSec: number
+}
+
+export interface VideoSsimResult {
+  ok: boolean
+  ssimAll: number
+  ssimY: number
+}
+
 export interface MotionCheckResult {
   ok: boolean
   frame0Black: boolean
   frame0Pblack: number | null
   durationSec: number
   hasAudio: boolean
+  frozenSegments?: FrozenSegment[]
+  internalFreezeSegments?: FrozenSegment[]
   warnings: string[]
   errors: string[]
+}
+
+function parseFreezeDetectLog(logText: string): FrozenSegment[] {
+  const segments: FrozenSegment[] = []
+  let curStart: number | null = null
+  for (const line of String(logText || '').split('\n')) {
+    const mStart = /freeze_start:\s*([0-9.]+)/.exec(line)
+    if (mStart) curStart = Number(mStart[1])
+    const mDur = /freeze_duration:\s*([0-9.]+)/.exec(line)
+    if (mDur && curStart !== null) {
+      const d = Number(mDur[1])
+      segments.push({
+        startSec: Number(curStart.toFixed(2)),
+        endSec: Number((curStart + d).toFixed(2)),
+        durationSec: Number(d.toFixed(2)),
+      })
+      curStart = null
+    }
+  }
+  return segments
 }
 
 const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
@@ -202,13 +236,107 @@ export async function inspectRenderedVideo(
     warnings.push(...pal.warnings)
   }
 
+  // Lição #4 Fable 5.2 / Reverify: detecta trechos congelados (> 2.5s sem mudança visual) + estagnação no sujeito central
+  let frozenSegments: FrozenSegment[] = []
+  let internalFreezeSegments: FrozenSegment[] = []
+  try {
+    const fRes = await run(
+      bin,
+      ['-hide_banner', '-i', videoPath, '-vf', 'freezedetect=n=0.0005:d=2.5', '-an', '-f', 'null', '-'],
+      { timeout: 30000 }
+    ).catch((err: any) => ({ stdout: String(err?.stdout || ''), stderr: String(err?.stderr || '') }))
+    frozenSegments = parseFreezeDetectLog(`${fRes.stdout || ''}\n${fRes.stderr || ''}`)
+    if (frozenSegments.length > 0 && durationSec > 4) {
+      warnings.push(`Detectado(s) ${frozenSegments.length} trecho(s) estático(s) >= 2.5s (${frozenSegments.map((s) => `${s.startSec}s-${s.endSec}s`).join(', ')}).`)
+    }
+  } catch {}
+
+  try {
+    const cRes = await run(
+      bin,
+      ['-hide_banner', '-i', videoPath, '-vf', 'crop=iw*0.55:ih*0.65:iw*0.225:ih*0.2,freezedetect=n=0.0008:d=3.5', '-an', '-f', 'null', '-'],
+      { timeout: 30000 }
+    ).catch((err: any) => ({ stdout: String(err?.stdout || ''), stderr: String(err?.stderr || '') }))
+    internalFreezeSegments = parseFreezeDetectLog(`${cRes.stdout || ''}\n${cRes.stderr || ''}`)
+    if (internalFreezeSegments.length > 0 && durationSec > 6) {
+      warnings.push(
+        `Sujeito central com pouca ação interna >= 3.5s (${internalFreezeSegments.map((s) => `${s.startSec}s-${s.endSec}s`).join(', ')}).`
+      )
+    }
+  } catch {}
+
   return {
     ok: errors.length === 0,
     frame0Black: isBlack,
     frame0Pblack: pblack,
     durationSec,
     hasAudio,
+    frozenSegments,
+    internalFreezeSegments,
     warnings,
     errors,
   }
+}
+
+/**
+ * Calcula similaridade estrutural (SSIM) entre dois MP4s na mesma escala (padrão HyperFrames V7).
+ */
+export async function measureVideoSsim(
+  candidateVideoPath: string,
+  referenceVideoPath: string,
+  ffmpegPath?: string
+): Promise<VideoSsimResult> {
+  const bin = ffmpegPath || process.env.FFMPEG_PATH || 'ffmpeg'
+  if (!fs.existsSync(candidateVideoPath) || !fs.existsSync(referenceVideoPath)) {
+    return { ok: false, ssimAll: 0, ssimY: 0 }
+  }
+  try {
+    const res = await run(
+      bin,
+      [
+        '-hide_banner',
+        '-i', candidateVideoPath,
+        '-i', referenceVideoPath,
+        '-lavfi', '[0:v]scale=480:270,setsar=1[a];[1:v]scale=480:270,setsar=1[b];[a][b]ssim=shortest=1',
+        '-f', 'null', '-',
+      ],
+      { timeout: 60000 }
+    ).catch((err: any) => ({ stdout: String(err?.stdout || ''), stderr: String(err?.stderr || '') }))
+    const log = `${res.stdout || ''}\n${res.stderr || ''}`
+    const m = /SSIM\s+Y:([0-9.]+)\s+[^\n]*All:([0-9.]+)/i.exec(log)
+    if (!m) return { ok: false, ssimAll: 0, ssimY: 0 }
+    return {
+      ok: true,
+      ssimY: Number(Number(m[1]).toFixed(4)),
+      ssimAll: Number(Number(m[2]).toFixed(4)),
+    }
+  } catch {
+    return { ok: false, ssimAll: 0, ssimY: 0 }
+  }
+}
+
+export interface ReadabilitySceneInput {
+  title?: string
+  subtitle?: string
+  durationSec?: number
+}
+
+/**
+ * Auditor de tempo minimo de leitura (portado de Lemo-Opuscar readcheck.mjs):
+ * garante permanencia suficiente para leitura (~15 caracteres/s + 1.4s de fixacao).
+ */
+export function checkReadabilityTiming(scenes: ReadabilitySceneInput[]): { warnings: string[] } {
+  const warnings: string[] = []
+  ;(scenes || []).forEach((sc, idx) => {
+    const dur = Number(sc.durationSec) || 0
+    const visibleText = `${String(sc.title || '').trim()} ${String(sc.subtitle || '').trim()}`.trim()
+    if (!visibleText || dur <= 0) return
+    const minRecommended = Number((visibleText.length / 15 + 1.4).toFixed(1))
+    if (dur < minRecommended && dur < 2.2) {
+      warnings.push(
+        `Cena ${idx + 1} com pouco tempo de leitura (${dur.toFixed(1)}s para ${visibleText.length} chars; recomendado >= ${minRecommended}s).`
+      )
+    }
+  })
+  return { warnings }
 }

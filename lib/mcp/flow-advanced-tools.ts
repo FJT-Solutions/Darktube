@@ -767,12 +767,20 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
     : os.tmpdir();
   const outputPath = path.join(targetDir, `${safeBase}.mp4`);
   const kind: RenderJobKind = input.kind === 'single_scene' || input.scenes?.length === 1 ? 'single_scene' : 'full_video';
-  const spokenPreview =
-    String(input.scriptText || '').trim() ||
-    (input.scenes || [])
-      .map((s) => s.spokenLine || s.subtitle || s.title)
-      .filter(Boolean)
-      .join(' ');
+  const isSilentSilhouette =
+    (input.preset === 'html_svg_silhouette_film' ||
+      input.preset === 'html_svg_ampulheta_doc' ||
+      input.preset === 'html_svg_whatif_studio') &&
+    !String(input.scriptText || '').trim() &&
+    !input.audioPathOrUrl &&
+    !(input.scenes || []).some((s) => Boolean(s?.spokenLine));
+  const spokenPreview = isSilentSilhouette
+    ? ''
+    : String(input.scriptText || '').trim() ||
+      (input.scenes || [])
+        .map((s) => s.spokenLine || s.subtitle || s.title)
+        .filter(Boolean)
+        .join(' ');
   const chosenVoiceProvider =
     spokenPreview || input.audioPathOrUrl
       ? validateVoiceSelection({
@@ -792,6 +800,7 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
     },
     async ({ onProgress }) => {
       let audioPath: string | undefined;
+      let voiceWords: Array<{ palavra: string; inicio: number; fim: number }> | undefined;
       let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string } = {};
       if ((spokenPreview || input.audioPathOrUrl) && chosenVoiceProvider) {
         const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_voice_'));
@@ -806,6 +815,7 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
           voiceName: input.voiceName,
         });
         audioPath = vr.audioPath;
+        voiceWords = vr.words;
         voiceMeta = {
           voiceProviderUsed: vr.providerUsed,
           voiceUsed: vr.voiceUsed,
@@ -816,7 +826,10 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
       await onProgress(15);
       const sheetPath = path.join(os.tmpdir(), `dt_htmlsvg_qa_${Date.now()}.png`);
       const rendered = await renderHtmlSvgToMp4({
-        spec: input,
+        spec: {
+          ...input,
+          ...(voiceWords?.length && !input.words?.length ? { words: voiceWords } : {}),
+        },
         outputPath,
         draft: Boolean(input.isDraft),
         audioPath,

@@ -303,7 +303,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_render_html_svg_video',
-    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 3D + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama, html_svg_netflix_doc, html_svg_vox_papercut, html_svg_kaz_chart, html_svg_paper_finance, html_svg_2d_puppet ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks + Crítico Visual.',
+    description: 'Motor programático de vídeo $0 (sem créditos de Flow/IA): renderiza animações determinísticas em HTML + SVG + Canvas 2D/3D + física de molas (presets html_svg_explainer, html_svg_character_story, html_svg_product_motion, html_svg_tech_crimson, html_svg_3d_diorama, html_svg_netflix_doc, html_svg_vox_papercut, html_svg_kaz_chart, html_svg_paper_finance, html_svg_2d_puppet, html_svg_silhouette_film, html_svg_ampulheta_doc, html_svg_whatif_studio ou customHtml com window.__dtSeek) para MP4 via Chromium + FFmpeg com Motion Checks + Auditor de Leitura + Crítico Visual.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -320,8 +320,23 @@ const MCP_TOOLS_MANIFEST = [
             'html_svg_kaz_chart',
             'html_svg_paper_finance',
             'html_svg_2d_puppet',
+            'html_svg_silhouette_film',
+            'html_svg_ampulheta_doc',
+            'html_svg_whatif_studio',
           ],
           default: 'html_svg_explainer',
+        },
+        styleMood: {
+          type: 'string',
+          enum: ['dusk', 'midnight', 'golden', 'neon', 'storybook'],
+          default: 'dusk',
+          description: 'Paleta de iluminação para preset = html_svg_whatif_studio',
+        },
+        visualStyle: {
+          type: 'string',
+          enum: ['whatif_2d', 'quadro_negro', 'esboco_neon', 'pixel_art', 'quadrinhos', 'estilo_lego'],
+          default: 'whatif_2d',
+          description: 'Estilo visual renderizado em código para preset = html_svg_whatif_studio (What If 2D, Quadro-Negro, Esboço Neon, Pixel Art, Quadrinhos ou Estilo Lego)',
         },
         dioramaMode: {
           type: 'string',
@@ -385,6 +400,19 @@ const MCP_TOOLS_MANIFEST = [
               callout: { type: 'string', description: 'Rótulo flutuante ancorado no cenário 3D (html_svg_3d_diorama / V2)' },
               imageUrl: { type: 'string', description: 'URL de imagem/foto histórica (Wikimedia Commons) para html_svg_netflix_doc ou html_svg_vox_papercut' },
               yearLabel: { type: 'string', description: 'Ano/marco exibido na timeline documental (html_svg_netflix_doc / V2)' },
+              sceneKind: {
+                type: 'string',
+                enum: ['store_wide', 'store_hands', 'phone_alarm', 'room_window', 'store_counter', 'wall_poster', 'bed_wake', 'rain_street', 'quote_card', 'autumn_avenue', 'calendar_grid', 'green_hill', 'hourglass_intro', 'drakkar_sea', 'island_panorama', 'scribes_desk', 'narrator_interior', 'animated_map', 'triptych_cards', 'council_hud', 'cafe_hook', 'data_compare', 'freeze_10x', 'blueprint', 'big_face', 'action_stage', 'end_cta'],
+                description: 'Cenário cinematográfico para html_svg_silhouette_film, html_svg_ampulheta_doc ou html_svg_whatif_studio',
+              },
+              shirtColor: { type: 'string', description: 'Cor do moletom/camisa do protagonista em html_svg_whatif_studio' },
+              dialogueText: { type: 'string', description: 'Texto curto flutuante em halo escuro (html_svg_silhouette_film)' },
+              quoteAuthor: { type: 'string', description: 'Autor da citação no quote_card (ex: EPICTETUS)' },
+              phoneDate: { type: 'string' },
+              phoneTime: { type: 'string' },
+              phoneGoal: { type: 'string' },
+              raincoat: { type: 'boolean' },
+              ponytail: { type: 'boolean' },
               chartItems: {
                 type: 'array',
                 description: 'Série de barras para html_svg_kaz_chart',

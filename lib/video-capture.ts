@@ -14,12 +14,24 @@ const execPromise = promisify(exec);
  * or fallback to global system PATH when running in local dev.
  */
 function getYtDlpPath(): string {
-    // Check common locations in Docker/standalone
+    // Check common locations in Docker/standalone and Windows local Python Scripts
     const possiblePaths = [
         path.join(process.cwd(), 'yt-dlp'),
+        path.join(process.cwd(), 'yt-dlp.exe'),
         '/app/yt-dlp',
         path.join(process.cwd(), '.next/standalone/yt-dlp')
     ];
+
+    if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
+        const pyRoot = path.join(process.env.LOCALAPPDATA, 'Programs', 'Python');
+        try {
+            if (fs.existsSync(pyRoot)) {
+                for (const dir of fs.readdirSync(pyRoot)) {
+                    possiblePaths.push(path.join(pyRoot, dir, 'Scripts', 'yt-dlp.exe'));
+                }
+            }
+        } catch {}
+    }
     
     for (const p of possiblePaths) {
         if (fs.existsSync(/*turbopackIgnore: true*/ p)) {

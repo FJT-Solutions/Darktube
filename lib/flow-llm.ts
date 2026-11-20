@@ -113,7 +113,7 @@ export async function callFlowVisionLLM(
   images: FlowVisionImage[]
 ): Promise<string> {
   if (!key) throw new Error(`Nenhuma chave ${PROVIDER_LABEL[provider]} salva em Credenciais.`)
-  const list = images.slice(0, 16)
+  const list = images.slice(0, 20)
   if (!list.length) return callFlowLLM(provider, key, system, user)
 
   if (provider === 'gemini') {
@@ -145,7 +145,7 @@ export async function callFlowVisionLLM(
       })
     }
     const url = provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://openrouter.ai/api/v1/chat/completions'
-    return chatCompletions(url, key, MODELS[provider], system, content, PROVIDER_LABEL[provider], 4096)
+    return chatCompletions(url, key, MODELS[provider], system, content, PROVIDER_LABEL[provider], 8192)
   }
 
   const claudeContent: Array<Record<string, any>> = []
