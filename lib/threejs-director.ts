@@ -59,18 +59,22 @@ function extractJsonBlock(raw: string): any {
   return JSON.parse(candidate.slice(firstBrace, lastBrace + 1));
 }
 
-async function resolveDirectorLlm(userId: string, preferred?: FlowProvider): Promise<{ provider: FlowProvider; apiKey: string }> {
+async function resolveDirectorCandidates(userId: string, preferred?: FlowProvider): Promise<Array<{ provider: FlowProvider; apiKey: string }>> {
   const order: FlowProvider[] = [];
   if (preferred && FLOW_PROVIDERS.includes(preferred)) order.push(preferred);
   for (const p of FLOW_PROVIDERS) if (!order.includes(p)) order.push(p);
+  const candidates: Array<{ provider: FlowProvider; apiKey: string }> = [];
   for (const p of order) {
     const key = await getUserApiKey(userId, p).catch(() => '');
-    if (key) return { provider: p, apiKey: key };
+    if (key) candidates.push({ provider: p, apiKey: key });
   }
-  if (process.env.OPENAI_API_KEY) {
-    return { provider: 'openai', apiKey: process.env.OPENAI_API_KEY };
+  if (process.env.OPENAI_API_KEY && !candidates.some((c) => c.provider === 'openai')) {
+    candidates.push({ provider: 'openai', apiKey: process.env.OPENAI_API_KEY });
   }
-  throw new Error('Nenhuma chave de LLM (Gemini, OpenAI, Claude ou OpenRouter) configurada em Credenciais.');
+  if (!candidates.length) {
+    throw new Error('Nenhuma chave de LLM (Gemini, OpenAI, Claude ou OpenRouter) configurada em Credenciais.');
+  }
+  return candidates;
 }
 
 /**
@@ -79,7 +83,7 @@ async function resolveDirectorLlm(userId: string, preferred?: FlowProvider): Pro
  * aproveitando tanto o catálogo procedural quanto modelos .glb CC0 salvos no cache local.
  */
 export async function generateThreeJsDirection(input: GenerateThreeJsDirectionInput): Promise<GenerateThreeJsDirectionResult> {
-  const { provider, apiKey } = await resolveDirectorLlm(input.userId, input.provider);
+  const candidates = await resolveDirectorCandidates(input.userId, input.provider);
   const kind = input.kind || 'full_video';
   const durationSec = kind === 'single_scene'
     ? Math.min(12, Math.max(4, Number(input.durationSec || 6)))
@@ -132,7 +136,23 @@ Modo: ${kind === 'single_scene' ? '1 cena de teste demonstrativa' : `Vídeo comp
 Formato: ${input.aspect || '9:16'}
 Crie agora o JSON completo com spokenScript envolvente e cenas ricas e coerentes.`;
 
-  const raw = await callFlowLLM(provider, apiKey, systemPrompt, userPrompt);
+  let provider: FlowProvider = candidates[0].provider;
+  let raw = '';
+  let lastErr: any = null;
+  for (const cand of candidates) {
+    try {
+      raw = await callFlowLLM(cand.provider, cand.apiKey, systemPrompt, userPrompt);
+      provider = cand.provider;
+      lastErr = null;
+      break;
+    } catch (err: any) {
+      lastErr = err;
+      console.warn(`[ThreeJsDirector] Provedor "${cand.provider}" falhou (${err?.message || err}); tentando próximo fallback.`);
+    }
+  }
+  if (lastErr || !raw) {
+    throw lastErr || new Error('Todos os provedores de LLM falharam ao gerar storyboard 3D.');
+  }
   const parsed = extractJsonBlock(raw);
   const spokenScript = String(parsed?.spokenScript || parsed?.roteiro || input.topic).trim();
   const cenas = Array.isArray(parsed?.cenas) ? parsed.cenas : [];

@@ -55,7 +55,7 @@ export const DEFAULT_VIRAL_CAPTIONS: Required<ThreeJsViralCaptionsConfig> = {
   maiusculas: true,
   corDestaque: '#ffd60a',
   tamanho: 1.32,
-  posicaoY: 0.69,
+  posicaoY: 0.74,
 };
 
 const CRATERA_SPOKEN_SCRIPT = [
@@ -491,7 +491,7 @@ function buildCartoon25dDemoScenes(): any[] {
           id: 'lustig',
           estilo: '2.5d_cartoon',
           preset: 'homem',
-          pos: [-1.1, 0, 2.4],
+          pos: [-0.65, 0, 2.35],
           acoes: [
             { clip: 'talk', de: 4.6, ate: 8.3, fala: true, expressao: 'smile', prop: 'carta' },
           ],
@@ -500,7 +500,7 @@ function buildCartoon25dDemoScenes(): any[] {
           id: 'comprador',
           estilo: '2.5d_cartoon',
           preset: 'velhinho',
-          pos: [1.1, 0, 2.2],
+          pos: [0.65, 0, 2.25],
           acoes: [
             { clip: 'point', de: 5.0, ate: 6.5, expressao: 'shock', params: { dir: 'side' } },
             { clip: 'talk', de: 6.6, ate: 8.4, expressao: 'grin', prop: 'moeda' },
@@ -508,7 +508,7 @@ function buildCartoon25dDemoScenes(): any[] {
         },
       ],
       elementos: [{ tipo: 'icone', icone: 'dinheiro', ancora: 'comprador', alturaRel: 1.18, de: 5.2, ate: 8.4 }],
-      camera: { tipo: 'enquadrar', alvo: 'comprador', plano: 'medio', angulo: -12, elevacao: 7, deriva: 10, aproxima: 0.93 },
+      camera: { tipo: 'enquadrar', alvo: 'comprador', olhaDesloca: [-0.62, 0, 0], plano: 'geral', angulo: -8, elevacao: 7, deriva: 8, aproxima: 0.94 },
     },
     {
       inicio: 9.2,

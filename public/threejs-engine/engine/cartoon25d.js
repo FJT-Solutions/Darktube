@@ -195,20 +195,22 @@ export function drawCartoon25dCanvas(ctx, W, H, opts) {
   ctx.translate(cx, headY);
   ctx.rotate(headTilt);
 
-  // Cabeca oval com sombra suave
+  // Cabeca oval com sombra suave (reconstroi path da cabeca antes de stroke!)
   ctx.fillStyle = pal.skin;
   ctx.strokeStyle = INK;
   ctx.lineWidth = inkW;
+  ctx.save();
   ctx.beginPath();
   ctx.ellipse(0, 0, headR, headR * 1.06, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.save();
   ctx.clip();
   ctx.fillStyle = 'rgba(130, 68, 42, 0.14)';
   ctx.beginPath();
   ctx.ellipse(headR * 0.45, 0, headR * 0.75, headR * 1.08, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, headR, headR * 1.06, 0, 0, Math.PI * 2);
   ctx.stroke();
 
   // Cabelo / Chapeu (com contra-rotacao controlada)
