@@ -30,6 +30,12 @@ import {
 import { toast } from "sonner"
 import { formatDeliveryDuration } from "@/lib/render-timing"
 import { StudioV5Tabs } from "@/components/studio-v5-tabs"
+import {
+  EMPTY_VOICE_SELECTION,
+  VoiceSelectorPanel,
+  validateVoiceStateClient,
+  type VoiceSelectionState,
+} from "@/components/voice-selector-panel"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -121,8 +127,7 @@ export default function Studio3dPage() {
   const [durationSec, setDurationSec] = useState("60")
   const [aspect, setAspect] = useState<"9:16" | "16:9" | "1:1">("9:16")
   const [quality, setQuality] = useState<"alta" | "media" | "basica">("media")
-  const [voiceProvider, setVoiceProvider] = useState<"auto" | "elevenlabs" | "openai" | "edge">("auto")
-  const [voiceGender, setVoiceGender] = useState<"male" | "female">("male")
+  const [voiceSel, setVoiceSel] = useState<VoiceSelectionState>(EMPTY_VOICE_SELECTION)
   const [backend, setBackend] = useState<"threejs" | "blender">("threejs")
   const [runtimeStatus, setRuntimeStatus] = useState<{
     blender?: { available: boolean; note: string }
@@ -271,6 +276,16 @@ export default function Studio3dPage() {
       return
     }
 
+    const voiceErr = validateVoiceStateClient(voiceSel)
+    if (voiceErr) {
+      toast.error(voiceErr)
+      return
+    }
+
+    const guessedGender: "male" | "female" = /francisca|thalita|brenda|nova|shimmer/i.test(voiceSel.voiceId)
+      ? "female"
+      : "male"
+
     setRendering(true)
     try {
       const res = await fetch("/api/studio-3d/render", {
@@ -286,8 +301,11 @@ export default function Studio3dPage() {
           backend,
           fallbackToThreeJs: true,
           isDraft: quality === "basica",
-          voiceProvider,
-          voiceGender,
+          voiceProvider: voiceSel.voiceProvider,
+          voiceId: voiceSel.voiceId || undefined,
+          voiceName: voiceSel.voiceName || undefined,
+          audioPathOrUrl: voiceSel.audioPathOrUrl || undefined,
+          voiceGender: guessedGender,
         }),
       })
       const data = await res.json()
@@ -549,7 +567,7 @@ export default function Studio3dPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2.5 pt-1 border-t">
+                <div className="space-y-3 pt-1 border-t">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground flex items-center gap-1">
                       <Cpu className="h-3 w-3" /> Motor 3D
@@ -564,30 +582,7 @@ export default function Studio3dPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Mic className="h-3 w-3" /> Motor de Voz
-                    </label>
-                    <Select value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as any)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Automático (ElevenLabs → OpenAI → Edge $0)</SelectItem>
-                        <SelectItem value="elevenlabs">ElevenLabs (sua chave)</SelectItem>
-                        <SelectItem value="openai">OpenAI TTS</SelectItem>
-                        <SelectItem value="edge">Edge TTS ($0 grátis)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Voz</label>
-                    <Select value={voiceGender} onValueChange={(v) => setVoiceGender(v as any)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Masculina (Antonio / Adam)</SelectItem>
-                        <SelectItem value="female">Feminina (Francisca / Sarah)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <VoiceSelectorPanel value={voiceSel} onChange={setVoiceSel} compact />
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -955,6 +950,11 @@ export default function Studio3dPage() {
                         )}
                         <span className="text-sm font-semibold truncate">{j.title}</span>
                         <Badge variant="outline" className="text-[10px]">{j.engine}</Badge>
+                        {(j.result_meta?.voiceLabel || j.result_meta?.voiceUsed) && (
+                          <Badge variant="outline" className="text-[10px] gap-1">
+                            <Mic className="h-3 w-3" /> {j.result_meta.voiceLabel || j.result_meta.voiceUsed}
+                          </Badge>
+                        )}
                         {deliveryLabel && (
                           <Badge variant="secondary" className="text-[10px] gap-1 font-mono">
                             <Clock className="h-3 w-3" /> Entrega: {deliveryLabel}

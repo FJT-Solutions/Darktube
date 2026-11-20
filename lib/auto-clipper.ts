@@ -7,7 +7,11 @@ import { pool } from '@/lib/db-client';
 import { cleanCaptionText, ffmpegBin, srtTime, wrapCaption } from '@/lib/flow-assemble';
 import { formatDeliveryDuration } from '@/lib/render-timing';
 import { uploadMediaFile } from '@/lib/storage';
-import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
+import {
+  resolveVoiceWithTimestamps,
+  type VoiceGender,
+  type VoiceProviderChoice,
+} from '@/lib/voice-resolver';
 
 const runExec = promisify(execFile);
 
@@ -260,6 +264,9 @@ export interface RenderAutoClipInput {
   commentIntroText?: string;
   voiceProvider?: VoiceProviderChoice;
   voiceGender?: VoiceGender;
+  voiceId?: string;
+  voiceName?: string;
+  audioPathOrUrl?: string;
   title?: string;
   burnCaptions?: boolean;
   onProgress?: (pct: number) => Promise<void> | void;
@@ -413,12 +420,18 @@ export async function renderAutoLiveClip(input: RenderAutoClipInput): Promise<Re
     let hasCommentIntro = false;
 
     if (commentClean.length >= 6) {
+      if (!input.voiceProvider) {
+        throw new Error('Modo Comentário exige seleção explícita do provedor de voz (voiceProvider).');
+      }
       const voiceRes = await resolveVoiceWithTimestamps({
         userId: input.userId,
         scriptText: commentClean,
         outputDir: tmpDir,
-        voiceProvider: input.voiceProvider || 'auto',
+        audioPathOrUrl: input.audioPathOrUrl,
+        voiceProvider: input.voiceProvider,
         voiceGender: input.voiceGender || 'male',
+        voiceId: input.voiceId,
+        voiceName: input.voiceName,
         language: 'pt-BR',
       });
       const introDur = Math.max(2.2, Math.min(18, voiceRes.durationSec + 0.35));

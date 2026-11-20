@@ -11,7 +11,12 @@ import { uploadMediaFile } from '@/lib/storage';
 import { generateThreeJsDirection } from '@/lib/threejs-director';
 import { renderThreeJsToMp4 } from '@/lib/threejs-render';
 import { compileThreeJsStoryboard } from '@/lib/threejs-scene-compiler';
-import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
+import {
+  resolveVoiceWithTimestamps,
+  validateVoiceSelection,
+  type VoiceGender,
+  type VoiceProviderChoice,
+} from '@/lib/voice-resolver';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 900;
@@ -43,8 +48,31 @@ export async function POST(req: NextRequest) {
       const title = String(it.title || it.topic || `Lote #${i + 1}`).slice(0, 120);
       const aspect: '9:16' | '16:9' | '1:1' = it.aspect === '16:9' || it.aspect === '1:1' ? it.aspect : '9:16';
       const isDraft = it.isDraft !== undefined ? Boolean(it.isDraft) : true;
-      const voiceProvider: VoiceProviderChoice = it.voiceProvider || 'auto';
+      const voiceId = it.voiceId ? String(it.voiceId).trim() : undefined;
+      const voiceName = it.voiceName ? String(it.voiceName).trim() : undefined;
+      const audioPathOrUrl = it.audioPathOrUrl ? String(it.audioPathOrUrl).trim() : undefined;
       const voiceGender: VoiceGender = it.voiceGender === 'female' ? 'female' : 'male';
+      const hasSpoken =
+        engine === 'threejs_3d' ||
+        Boolean(String(it.scriptText || '').trim()) ||
+        Boolean(audioPathOrUrl) ||
+        (Array.isArray(it.scenes) && it.scenes.some((s: any) => s?.spokenLine || s?.subtitle || s?.title));
+
+      let voiceProvider: VoiceProviderChoice | undefined;
+      if (hasSpoken) {
+        try {
+          voiceProvider = validateVoiceSelection({
+            voiceProvider: it.voiceProvider,
+            voiceId,
+            audioPathOrUrl,
+          });
+        } catch (ve: any) {
+          return NextResponse.json(
+            { success: false, error: `Item #${i + 1} ("${title}"): ${ve?.message || 'Seleção de voz inválida.'}` },
+            { status: 400 }
+          );
+        }
+      }
 
       if (engine === 'html_svg') {
         const preset = (it.preset || 'html_svg_explainer') as HtmlSvgPreset;
@@ -54,7 +82,7 @@ export async function POST(req: NextRequest) {
             engine: 'html_svg',
             kind: 'full_video',
             title,
-            payload: { batchIndex: i + 1, preset, aspect, isDraft },
+            payload: { batchIndex: i + 1, preset, aspect, isDraft, voiceProvider, voiceId },
           },
           async ({ onProgress }) => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_batch_svg_'));
@@ -65,16 +93,25 @@ export async function POST(req: NextRequest) {
                   ? it.scenes.map((s: any) => s.spokenLine || s.subtitle || s.title).filter(Boolean).join(' ')
                   : title);
               let audioPath: string | undefined;
-              if (spoken) {
+              let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string } = {};
+              if ((spoken || audioPathOrUrl) && voiceProvider) {
                 const vr = await resolveVoiceWithTimestamps({
                   userId,
                   scriptText: spoken,
                   outputDir: tmpDir,
+                  audioPathOrUrl,
                   voiceProvider,
                   voiceGender,
+                  voiceId,
+                  voiceName,
                   language: 'pt-BR',
                 });
                 audioPath = vr.audioPath;
+                voiceMeta = {
+                  voiceProviderUsed: vr.providerUsed,
+                  voiceUsed: vr.voiceUsed,
+                  voiceLabel: vr.voiceLabel,
+                };
               }
               await onProgress(25);
               const outMp4 = path.join(tmpDir, `batch_${i}_${Date.now()}.mp4`);
@@ -97,6 +134,7 @@ export async function POST(req: NextRequest) {
               );
               return {
                 videoUrl: storagePath,
+                ...voiceMeta,
                 durationSec: rendered.durationSec,
                 renderDurationMs: rendered.renderDurationMs,
                 renderDurationLabel: rendered.renderDurationLabel,
@@ -146,8 +184,11 @@ export async function POST(req: NextRequest) {
                 userId,
                 scriptText: spoken || title,
                 outputDir: tmpDir,
-                voiceProvider,
+                audioPathOrUrl,
+                voiceProvider: voiceProvider!,
                 voiceGender,
+                voiceId,
+                voiceName,
                 language: 'pt-BR',
               });
               await onProgress(25);
@@ -185,6 +226,9 @@ export async function POST(req: NextRequest) {
               );
               return {
                 videoUrl: storagePath,
+                voiceProviderUsed: voiceRes.providerUsed,
+                voiceUsed: voiceRes.voiceUsed,
+                voiceLabel: voiceRes.voiceLabel,
                 durationSec: rendered.durationSec,
                 renderDurationMs: rendered.renderDurationMs,
                 renderDurationLabel: rendered.renderDurationLabel,

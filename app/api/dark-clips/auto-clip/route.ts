@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { analyzeLiveAudioPeaks, renderAutoLiveClip } from '@/lib/auto-clipper';
 import { enqueueDetachedRenderTask } from '@/lib/render-queue';
+import { validateVoiceSelection, type VoiceProviderChoice } from '@/lib/voice-resolver';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 900;
@@ -39,13 +40,29 @@ export async function POST(req: NextRequest) {
     const gameplayUrl = body?.gameplayUrl ? String(body.gameplayUrl) : undefined;
     const title = String(body?.title || `Corte Viral ${Math.round(startSec)}s–${Math.round(endSec)}s`).slice(0, 120);
 
+    let voiceProvider: VoiceProviderChoice | undefined;
+    const voiceId = body?.voiceId ? String(body.voiceId).trim() : undefined;
+    const voiceName = body?.voiceName ? String(body.voiceName).trim() : undefined;
+    const audioPathOrUrl = body?.audioPathOrUrl ? String(body.audioPathOrUrl).trim() : undefined;
+    if (commentIntroText && commentIntroText.trim().length >= 6) {
+      try {
+        voiceProvider = validateVoiceSelection({
+          voiceProvider: body?.voiceProvider,
+          voiceId,
+          audioPathOrUrl,
+        });
+      } catch (ve: any) {
+        return NextResponse.json({ success: false, error: ve?.message || 'Seleção de voz inválida para o Modo Comentário.' }, { status: 400 });
+      }
+    }
+
     const queued = await enqueueDetachedRenderTask(
       {
         userId,
         engine: 'auto_clipper',
         kind: 'full_video',
         title,
-        payload: { sourceUrl, startSec, endSec, layout, hasCommentIntro: Boolean(commentIntroText) },
+        payload: { sourceUrl, startSec, endSec, layout, hasCommentIntro: Boolean(commentIntroText), voiceProvider, voiceId },
       },
       async ({ onProgress }) => {
         return await renderAutoLiveClip({
@@ -56,8 +73,11 @@ export async function POST(req: NextRequest) {
           layout,
           gameplayUrl,
           commentIntroText,
-          voiceProvider: body?.voiceProvider || 'auto',
+          voiceProvider,
           voiceGender: body?.voiceGender === 'female' ? 'female' : 'male',
+          voiceId,
+          voiceName,
+          audioPathOrUrl,
           title,
           onProgress,
         });

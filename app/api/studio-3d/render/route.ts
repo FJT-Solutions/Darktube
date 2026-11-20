@@ -9,7 +9,12 @@ import { enqueueDetachedRenderTask, type RenderJobKind } from '@/lib/render-queu
 import { formatDeliveryDuration } from '@/lib/render-timing';
 import { compileThreeJsStoryboard, type ThreeJsStoryboard } from '@/lib/threejs-scene-compiler';
 import { renderThreeJsToMp4 } from '@/lib/threejs-render';
-import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
+import {
+  resolveVoiceWithTimestamps,
+  validateVoiceSelection,
+  type VoiceGender,
+  type VoiceProviderChoice,
+} from '@/lib/voice-resolver';
 import { uploadMediaFile } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -30,9 +35,20 @@ export async function POST(req: NextRequest) {
     const isDraft = body?.isDraft !== undefined ? Boolean(body.isDraft) : quality === 'basica';
     const backend: 'threejs' | 'blender' = body?.backend === 'blender' ? 'blender' : 'threejs';
     const fallbackToThreeJs = body?.fallbackToThreeJs !== false;
-    const voiceProvider: VoiceProviderChoice = body?.voiceProvider || 'auto';
+    const audioPathOrUrl = body?.audioPathOrUrl ? String(body.audioPathOrUrl).trim() : undefined;
+    const voiceId = body?.voiceId ? String(body.voiceId).trim() : undefined;
+    const voiceName = body?.voiceName ? String(body.voiceName).trim() : undefined;
+    let voiceProvider: VoiceProviderChoice;
+    try {
+      voiceProvider = validateVoiceSelection({
+        voiceProvider: body?.voiceProvider,
+        voiceId,
+        audioPathOrUrl,
+      });
+    } catch (ve: any) {
+      return NextResponse.json({ success: false, error: ve?.message || 'Seleção de voz inválida.' }, { status: 400 });
+    }
     const voiceGender: VoiceGender = body?.voiceGender === 'female' ? 'female' : 'male';
-    const audioPathOrUrl = body?.audioPathOrUrl ? String(body.audioPathOrUrl) : undefined;
     const title = String(body?.title || storyboardInput?.titulo || 'Vídeo 3D DarkTube').slice(0, 120);
 
     if (!storyboardInput?.cenas?.length) {
@@ -45,7 +61,7 @@ export async function POST(req: NextRequest) {
         engine: backend === 'blender' ? 'blender_3d' : 'threejs_3d',
         kind,
         title,
-        payload: { kind, aspect, quality, isDraft, backend, voiceProvider, voiceGender, scenesCount: storyboardInput.cenas.length },
+        payload: { kind, aspect, quality, isDraft, backend, voiceProvider, voiceId, voiceName, voiceGender, scenesCount: storyboardInput.cenas.length },
       },
       async ({ onProgress }) => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_studio3d_'));
@@ -57,6 +73,8 @@ export async function POST(req: NextRequest) {
             audioPathOrUrl,
             voiceProvider,
             voiceGender,
+            voiceId,
+            voiceName,
             language: 'pt-BR',
           });
           await onProgress(15);
@@ -132,6 +150,7 @@ export async function POST(req: NextRequest) {
             backendUsed,
             voiceProviderUsed: voiceRes.providerUsed,
             voiceUsed: voiceRes.voiceUsed,
+            voiceLabel: voiceRes.voiceLabel,
             durationSec: rendered.durationSec,
             width: rendered.width,
             height: rendered.height,

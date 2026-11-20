@@ -15,7 +15,7 @@ import {
 
 const run = promisify(execFile);
 
-export type VoiceProviderChoice = 'auto' | 'external' | 'elevenlabs' | 'openai' | 'edge';
+export type VoiceProviderChoice = 'external' | 'elevenlabs' | 'edge' | 'openai';
 export type VoiceGender = 'male' | 'female';
 
 export interface VoiceWord {
@@ -24,14 +24,56 @@ export interface VoiceWord {
   fim: number;
 }
 
+export interface EdgeVoiceOption {
+  id: string;
+  name: string;
+  gender: VoiceGender;
+  style: string;
+}
+
+export interface OpenAiVoiceOption {
+  id: string;
+  name: string;
+  gender: VoiceGender;
+  note: string;
+}
+
+export interface ElevenLabsVoiceItem {
+  id: string;
+  name: string;
+  category: string;
+  previewUrl?: string;
+  labels?: Record<string, string>;
+}
+
+export const EDGE_PTBR_VOICES: EdgeVoiceOption[] = [
+  { id: 'pt-BR-FranciscaNeural', name: 'Francisca Neural (PT-BR)', gender: 'female', style: 'Natural, clara e versátil' },
+  { id: 'pt-BR-AntonioNeural', name: 'Antônio Neural (PT-BR)', gender: 'male', style: 'Firme, estilo documentário' },
+  { id: 'pt-BR-ThalitaMultilingualNeural', name: 'Thalita Multilíngue (PT-BR)', gender: 'female', style: 'Jovial, ritmo dinâmico' },
+  { id: 'pt-BR-FabioNeural', name: 'Fábio Neural (PT-BR)', gender: 'male', style: 'Conversacional suave' },
+  { id: 'pt-BR-HumbertoNeural', name: 'Humberto Neural (PT-BR)', gender: 'male', style: 'Corporativa e pausada' },
+  { id: 'pt-BR-BrendaNeural', name: 'Brenda Neural (PT-BR)', gender: 'female', style: 'Leve e didática' },
+  { id: 'pt-BR-DonatoNeural', name: 'Donato Neural (PT-BR)', gender: 'male', style: 'Séria / investigativa' },
+  { id: 'pt-BR-ValerioNeural', name: 'Valério Neural (PT-BR)', gender: 'male', style: 'Madura / narrativa' },
+];
+
+export const OPENAI_VOICES: OpenAiVoiceOption[] = [
+  { id: 'onyx', name: 'Onyx (OpenAI tts-1-hd)', gender: 'male', note: 'Grave; sotaque internacional leve' },
+  { id: 'nova', name: 'Nova (OpenAI tts-1-hd)', gender: 'female', note: 'Expressiva; sotaque internacional leve' },
+  { id: 'alloy', name: 'Alloy (OpenAI tts-1-hd)', gender: 'male', note: 'Neutra' },
+  { id: 'echo', name: 'Echo (OpenAI tts-1-hd)', gender: 'male', note: 'Limpa' },
+  { id: 'shimmer', name: 'Shimmer (OpenAI tts-1-hd)', gender: 'female', note: 'Suave' },
+];
+
 export interface ResolveVoiceInput {
   userId: string;
   scriptText: string;
   outputDir: string;
   audioPathOrUrl?: string;
-  voiceProvider?: VoiceProviderChoice;
+  voiceProvider: VoiceProviderChoice;
   voiceGender?: VoiceGender;
   voiceId?: string;
+  voiceName?: string;
   language?: string;
   speed?: number;
 }
@@ -39,8 +81,9 @@ export interface ResolveVoiceInput {
 export interface ResolveVoiceResult {
   audioPath: string;
   durationSec: number;
-  providerUsed: 'external' | 'elevenlabs' | 'openai' | 'edge';
+  providerUsed: VoiceProviderChoice;
   voiceUsed: string;
+  voiceLabel: string;
   words: VoiceWord[];
 }
 
@@ -50,15 +93,42 @@ const EDGE_VOICE_MAP: Record<string, Record<VoiceGender, string>> = {
   es: { male: 'es-ES-AlvaroNeural', female: 'es-ES-ElviraNeural' },
 };
 
-const ELEVENLABS_DEFAULT_VOICES: Record<VoiceGender, string> = {
-  male: 'pNInz6obpgDQGcFmaJgB', // Adam
-  female: 'EXAVITQu4vr4xnSDxMaL', // Sarah
-};
-
 const OPENAI_DEFAULT_VOICES: Record<VoiceGender, string> = {
   male: 'onyx',
   female: 'nova',
 };
+
+/**
+ * Garante seleção explícita da origem da voz (proibido usar cascata automática 'auto').
+ */
+export function validateVoiceSelection(input: {
+  voiceProvider?: unknown;
+  voiceId?: unknown;
+  audioPathOrUrl?: unknown;
+}): VoiceProviderChoice {
+  const raw = String(input?.voiceProvider || '').trim().toLowerCase();
+  if (!raw || raw === 'auto') {
+    throw new Error(
+      'Seleção explícita de voz obrigatória: informe voiceProvider ("external", "elevenlabs", "edge" ou "openai"). A cascata automática ("auto") foi desativada.'
+    );
+  }
+  if (raw !== 'external' && raw !== 'elevenlabs' && raw !== 'edge' && raw !== 'openai') {
+    throw new Error(
+      `Provedor de voz inválido "${raw}". Escolha exatamente um entre: external, elevenlabs, edge ou openai.`
+    );
+  }
+  if (raw === 'external' && !String(input?.audioPathOrUrl || '').trim()) {
+    throw new Error(
+      'Provedor "external" selecionado, mas nenhum áudio foi enviado. Envie o arquivo ou URL em audioPathOrUrl.'
+    );
+  }
+  if (raw === 'elevenlabs' && !String(input?.voiceId || '').trim()) {
+    throw new Error(
+      'Provedor "elevenlabs" exige "voiceId" explícito. Selecione uma voz da sua conta ElevenLabs ou crie/clone uma nova voz antes de renderizar.'
+    );
+  }
+  return raw;
+}
 
 function sanitizeSpokenText(raw: string): string {
   return cleanCaptionText(
@@ -135,6 +205,16 @@ function alignmentToWords(
   return out.filter((w) => w.palavra.length > 0);
 }
 
+async function resolveElevenLabsKey(userId: string): Promise<string> {
+  const userKey = await getUserApiKey(userId, 'elevenlabs').catch(() => '');
+  return (userKey || process.env.ELEVENLABS_API_KEY || process.env.XI_API_KEY || '').trim();
+}
+
+async function resolveOpenAiKey(userId: string): Promise<string> {
+  const userKey = await getUserApiKey(userId, 'openai').catch(() => '');
+  return (userKey || process.env.OPENAI_API_KEY || '').trim();
+}
+
 async function resolveExternalAudio(
   audioInput: string,
   scriptText: string,
@@ -152,11 +232,11 @@ async function resolveExternalAudio(
     if (!res.ok) throw new Error(`Falha ao baixar áudio externo (${res.status})`);
     fs.writeFileSync(rawPath, Buffer.from(await res.arrayBuffer()));
   } else {
-    if (!fs.existsSync(audioInput)) throw new Error(`Áudio externo não encontrado: ${audioInput}`);
-    fs.copyFileSync(audioInput, rawPath);
+    const candidate = fs.existsSync(audioInput) ? audioInput : path.resolve(process.cwd(), audioInput);
+    if (!fs.existsSync(candidate)) throw new Error(`Áudio externo não encontrado: ${audioInput}`);
+    fs.copyFileSync(candidate, rawPath);
   }
 
-  // Corta silêncio inicial para alinhar imediatamente aos 0.1s como no DarkTube replace_audio
   await run(
     ffmpegBin(),
     [
@@ -189,11 +269,13 @@ async function resolveExternalAudio(
     words = proportionalWords(scriptText, durationSec);
   }
 
+  const fileLabel = path.basename(audioInput.split('?')[0]);
   return {
     audioPath: outMp3,
     durationSec,
     providerUsed: 'external',
-    voiceUsed: path.basename(audioInput),
+    voiceUsed: fileLabel,
+    voiceLabel: `Áudio Externo (${fileLabel})`,
     words,
   };
 }
@@ -336,10 +418,117 @@ asyncio.run(main())
 }
 
 /**
- * Resolve voz seguindo a hierarquia combinada:
- * 1) Audio externo (se enviado) -> 2) ElevenLabs (se usuario tiver chave) -> 3) OpenAI TTS -> 4) Edge TTS ($0 fallback).
+ * Resolve as vozes disponíveis para o usuário escolher conscientemente (sem cascata automática).
+ */
+export async function listAvailableVoices(userId: string) {
+  const [elevenKey, openaiKey] = await Promise.all([
+    resolveElevenLabsKey(userId),
+    resolveOpenAiKey(userId),
+  ]);
+
+  let elevenlabsVoices: ElevenLabsVoiceItem[] = [];
+  let elevenlabsError: string | undefined;
+
+  if (elevenKey) {
+    try {
+      const res = await fetch('https://api.elevenlabs.io/v1/voices', {
+        headers: { 'xi-api-key': elevenKey },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        elevenlabsError = `ElevenLabs retornou HTTP ${res.status} ao listar vozes.`;
+      } else {
+        const json = await res.json();
+        const raw = Array.isArray(json?.voices) ? json.voices : [];
+        elevenlabsVoices = raw
+          .map((v: any) => ({
+            id: String(v.voice_id || ''),
+            name: String(v.name || 'Sem nome'),
+            category: String(v.category || 'premade'),
+            previewUrl: v.preview_url ? String(v.preview_url) : undefined,
+            labels: v.labels && typeof v.labels === 'object' ? v.labels : undefined,
+          }))
+          .filter((v: ElevenLabsVoiceItem) => Boolean(v.id))
+          .sort((a: ElevenLabsVoiceItem, b: ElevenLabsVoiceItem) => {
+            const rank = (c: string) => (c === 'cloned' ? 0 : c === 'generated' ? 1 : c === 'professional' ? 2 : 3);
+            return rank(a.category) - rank(b.category) || a.name.localeCompare(b.name);
+          });
+      }
+    } catch (err: any) {
+      elevenlabsError = err?.message || 'Erro de rede ao consultar ElevenLabs.';
+    }
+  }
+
+  return {
+    elevenlabsConnected: Boolean(elevenKey),
+    openaiConnected: Boolean(openaiKey),
+    elevenlabsVoices,
+    elevenlabsError,
+    edgeVoices: EDGE_PTBR_VOICES,
+    openaiVoices: OPENAI_VOICES,
+  };
+}
+
+/**
+ * Cria / clona uma voz na conta ElevenLabs do usuário a partir de um buffer de áudio.
+ */
+export async function cloneElevenLabsVoice(opts: {
+  userId: string;
+  name: string;
+  description?: string;
+  audioBuffer: Buffer;
+  fileName?: string;
+  mimeType?: string;
+}): Promise<{ voiceId: string; name: string }> {
+  const elevenKey = await resolveElevenLabsKey(opts.userId);
+  if (!elevenKey) {
+    throw new Error('Configure sua chave da ElevenLabs em /credentials antes de clonar uma voz.');
+  }
+  const cleanName = String(opts.name || '').trim().slice(0, 60);
+  if (!cleanName) {
+    throw new Error('Informe um nome para a nova voz ElevenLabs.');
+  }
+  if (!opts.audioBuffer?.length) {
+    throw new Error('Envie um arquivo de áudio válido para clonar a voz na ElevenLabs.');
+  }
+
+  const form = new FormData();
+  form.append('name', cleanName);
+  form.append('description', String(opts.description || 'Voz clonada via Estúdio DarkTube').slice(0, 240));
+  form.append(
+    'files',
+    new Blob([new Uint8Array(opts.audioBuffer)], { type: opts.mimeType || 'audio/mpeg' }),
+    opts.fileName || 'amostra_voz.mp3'
+  );
+
+  const res = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+    method: 'POST',
+    headers: { 'xi-api-key': elevenKey },
+    body: form,
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Falha ao clonar voz na ElevenLabs (${res.status}): ${errText.slice(0, 220)}`);
+  }
+  const data = await res.json();
+  if (!data?.voice_id) {
+    throw new Error('ElevenLabs não retornou voice_id após a clonagem.');
+  }
+  return { voiceId: String(data.voice_id), name: cleanName };
+}
+
+/**
+ * Executa exatamente o motor de voz explicitamente escolhido pelo usuário.
+ * Sem cascata automática nem fallback silencioso entre provedores.
  */
 export async function resolveVoiceWithTimestamps(input: ResolveVoiceInput): Promise<ResolveVoiceResult> {
+  const chosenProvider = validateVoiceSelection({
+    voiceProvider: input.voiceProvider,
+    voiceId: input.voiceId,
+    audioPathOrUrl: input.audioPathOrUrl,
+  });
+
   fs.mkdirSync(input.outputDir, { recursive: true });
   const text = sanitizeSpokenText(input.scriptText);
   const gender: VoiceGender = input.voiceGender === 'female' ? 'female' : 'male';
@@ -348,58 +537,55 @@ export async function resolveVoiceWithTimestamps(input: ResolveVoiceInput): Prom
   const speed = Number(input.speed || 1.02);
   const outMp3 = path.join(input.outputDir, 'narracao.mp3');
 
-  const [elevenKey, openaiKey] = await Promise.all([
-    getUserApiKey(input.userId, 'elevenlabs').catch(() => ''),
-    getUserApiKey(input.userId, 'openai').catch(() => ''),
-  ]);
-
-  if (input.audioPathOrUrl && (input.voiceProvider === 'external' || !input.voiceProvider || input.voiceProvider === 'auto')) {
-    return await resolveExternalAudio(input.audioPathOrUrl, text, input.outputDir, openaiKey, lang);
+  if (chosenProvider === 'external') {
+    const openaiKey = await resolveOpenAiKey(input.userId);
+    return await resolveExternalAudio(String(input.audioPathOrUrl), text, input.outputDir, openaiKey, lang);
   }
 
-  const preferred = input.voiceProvider || 'auto';
-
-  if (preferred === 'elevenlabs' || (preferred === 'auto' && elevenKey)) {
+  if (chosenProvider === 'elevenlabs') {
+    const elevenKey = await resolveElevenLabsKey(input.userId);
     if (!elevenKey) {
-      if (preferred === 'elevenlabs') {
-        throw new Error('Chave da ElevenLabs não encontrada nas Credenciais do usuário.');
-      }
-    } else {
-      try {
-        const chosenVoice = input.voiceId || ELEVENLABS_DEFAULT_VOICES[gender];
-        const res = await synthesizeElevenLabs(text, elevenKey, chosenVoice, speed, outMp3);
-        return { audioPath: outMp3, durationSec: res.durationSec, providerUsed: 'elevenlabs', voiceUsed: chosenVoice, words: res.words };
-      } catch (err) {
-        if (preferred === 'elevenlabs') throw err;
-        console.warn('[VoiceResolver] ElevenLabs falhou, tentando próximo fallback:', (err as Error)?.message);
-      }
+      throw new Error('Chave da ElevenLabs não configurada em /credentials. Não há fallback automático.');
     }
+    const chosenVoice = String(input.voiceId || '').trim();
+    const res = await synthesizeElevenLabs(text, elevenKey, chosenVoice, speed, outMp3);
+    return {
+      audioPath: outMp3,
+      durationSec: res.durationSec,
+      providerUsed: 'elevenlabs',
+      voiceUsed: chosenVoice,
+      voiceLabel: input.voiceName ? `ElevenLabs: ${input.voiceName}` : `ElevenLabs (${chosenVoice})`,
+      words: res.words,
+    };
   }
 
-  if (preferred === 'openai' || (preferred === 'auto' && openaiKey)) {
+  if (chosenProvider === 'openai') {
+    const openaiKey = await resolveOpenAiKey(input.userId);
     if (!openaiKey) {
-      if (preferred === 'openai') throw new Error('Chave da OpenAI não encontrada nas Credenciais do usuário.');
-    } else {
-      try {
-        const chosenVoice = input.voiceId || OPENAI_DEFAULT_VOICES[gender];
-        const res = await synthesizeOpenAiTts(text, openaiKey, chosenVoice, speed, lang, outMp3);
-        return { audioPath: outMp3, durationSec: res.durationSec, providerUsed: 'openai', voiceUsed: chosenVoice, words: res.words };
-      } catch (err) {
-        if (preferred === 'openai') throw err;
-        console.warn('[VoiceResolver] OpenAI TTS falhou, caindo para Edge TTS:', (err as Error)?.message);
-      }
+      throw new Error('Chave da OpenAI não configurada em /credentials. Não há fallback automático.');
     }
+    const chosenVoice = String(input.voiceId || OPENAI_DEFAULT_VOICES[gender]).trim();
+    const res = await synthesizeOpenAiTts(text, openaiKey, chosenVoice, speed, lang, outMp3);
+    return {
+      audioPath: outMp3,
+      durationSec: res.durationSec,
+      providerUsed: 'openai',
+      voiceUsed: chosenVoice,
+      voiceLabel: `OpenAI (${chosenVoice})`,
+      words: res.words,
+    };
   }
 
-  const edgeVoice =
-    input.voiceId ||
-    (EDGE_VOICE_MAP[langShort] || EDGE_VOICE_MAP.pt)[gender];
+  // Edge TTS explícito (PT-BR neural)
+  const edgeVoice = String(input.voiceId || (EDGE_VOICE_MAP[langShort] || EDGE_VOICE_MAP.pt)[gender]).trim();
+  const edgeOpt = EDGE_PTBR_VOICES.find((v) => v.id === edgeVoice);
   const edgeRes = await synthesizeEdgeTts(text, edgeVoice, speed, input.outputDir, outMp3);
   return {
     audioPath: outMp3,
     durationSec: edgeRes.durationSec,
     providerUsed: 'edge',
     voiceUsed: edgeVoice,
+    voiceLabel: edgeOpt ? `Edge TTS: ${edgeOpt.name}` : `Edge TTS (${edgeVoice})`,
     words: edgeRes.words,
   };
 }

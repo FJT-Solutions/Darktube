@@ -14,7 +14,15 @@ import { uploadMediaFile } from '@/lib/storage';
 import { renderHtmlSvgToMp4 } from '@/lib/html-svg-render';
 import type { HtmlSvgProjectSpec } from '@/lib/html-svg-templates';
 import { enqueueDetachedRenderTask, getRenderQueueSnapshot, runQueuedRenderTask, type RenderJobKind } from '@/lib/render-queue';
-import { resolveVoiceWithTimestamps, type VoiceGender, type VoiceProviderChoice } from '@/lib/voice-resolver';
+import { readStored } from '@/lib/flow-assemble';
+import {
+  cloneElevenLabsVoice,
+  listAvailableVoices,
+  resolveVoiceWithTimestamps,
+  validateVoiceSelection,
+  type VoiceGender,
+  type VoiceProviderChoice,
+} from '@/lib/voice-resolver';
 import { compileThreeJsStoryboard, type ThreeJsStoryboard, type ThreeJsViralCaptionsConfig } from '@/lib/threejs-scene-compiler';
 import { renderThreeJsToMp4 } from '@/lib/threejs-render';
 import { renderBlenderStoryboard } from '@/lib/blender-bridge';
@@ -739,6 +747,7 @@ export interface RenderHtmlSvgInput extends HtmlSvgProjectSpec {
   voiceProvider?: VoiceProviderChoice;
   voiceGender?: VoiceGender;
   voiceId?: string;
+  voiceName?: string;
   audioPathOrUrl?: string;
   scriptText?: string;
 }
@@ -758,6 +767,20 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
     : os.tmpdir();
   const outputPath = path.join(targetDir, `${safeBase}.mp4`);
   const kind: RenderJobKind = input.kind === 'single_scene' || input.scenes?.length === 1 ? 'single_scene' : 'full_video';
+  const spokenPreview =
+    String(input.scriptText || '').trim() ||
+    (input.scenes || [])
+      .map((s) => s.spokenLine || s.subtitle || s.title)
+      .filter(Boolean)
+      .join(' ');
+  const chosenVoiceProvider =
+    spokenPreview || input.audioPathOrUrl
+      ? validateVoiceSelection({
+          voiceProvider: input.voiceProvider,
+          voiceId: input.voiceId,
+          audioPathOrUrl: input.audioPathOrUrl,
+        })
+      : undefined;
 
   return await runQueuedRenderTask(
     {
@@ -765,30 +788,29 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
       engine: 'html_svg',
       kind,
       title: input.title || input.preset || safeBase,
-      payload: { preset: input.preset || 'html_svg_explainer', aspect: input.aspect || '9:16', isDraft: Boolean(input.isDraft) },
+      payload: { preset: input.preset || 'html_svg_explainer', aspect: input.aspect || '9:16', isDraft: Boolean(input.isDraft), voiceProvider: chosenVoiceProvider, voiceId: input.voiceId },
     },
     async ({ onProgress }) => {
       let audioPath: string | undefined;
-      if (input.audioPathOrUrl || input.scriptText) {
-        const spoken =
-          input.scriptText ||
-          (input.scenes || [])
-            .map((s) => s.spokenLine || s.subtitle || s.title)
-            .filter(Boolean)
-            .join(' ');
-        if (spoken || input.audioPathOrUrl) {
-          const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_voice_'));
-          const vr = await resolveVoiceWithTimestamps({
-            userId,
-            scriptText: spoken,
-            outputDir: voiceDir,
-            audioPathOrUrl: input.audioPathOrUrl,
-            voiceProvider: input.voiceProvider || 'auto',
-            voiceGender: input.voiceGender || 'male',
-            voiceId: input.voiceId,
-          });
-          audioPath = vr.audioPath;
-        }
+      let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string } = {};
+      if ((spokenPreview || input.audioPathOrUrl) && chosenVoiceProvider) {
+        const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_voice_'));
+        const vr = await resolveVoiceWithTimestamps({
+          userId,
+          scriptText: spokenPreview,
+          outputDir: voiceDir,
+          audioPathOrUrl: input.audioPathOrUrl,
+          voiceProvider: chosenVoiceProvider,
+          voiceGender: input.voiceGender || 'male',
+          voiceId: input.voiceId,
+          voiceName: input.voiceName,
+        });
+        audioPath = vr.audioPath;
+        voiceMeta = {
+          voiceProviderUsed: vr.providerUsed,
+          voiceUsed: vr.voiceUsed,
+          voiceLabel: vr.voiceLabel,
+        };
       }
 
       await onProgress(15);
@@ -814,6 +836,7 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
         engine: 'html_svg',
         kind,
         creditsCost: 0,
+        ...voiceMeta,
         localFile: wantLocal ? rendered.outputPath : null,
         videoUrl: storageUrl,
         width: rendered.width,
@@ -850,6 +873,7 @@ export interface RenderThreeJsInput {
   voiceProvider?: VoiceProviderChoice;
   voiceGender?: VoiceGender;
   voiceId?: string;
+  voiceName?: string;
   language?: string;
   speed?: number;
   audioPathOrUrl?: string;
@@ -865,6 +889,11 @@ export interface RenderThreeJsInput {
  */
 export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
   const userId = await resolveDefaultUserId();
+  const chosenVoiceProvider = validateVoiceSelection({
+    voiceProvider: input.voiceProvider,
+    voiceId: input.voiceId,
+    audioPathOrUrl: input.audioPathOrUrl,
+  });
   const safeBase = String(input.fileName || `darktube3d_${Date.now()}`)
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .slice(0, 60);
@@ -916,9 +945,10 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
       scriptText: spokenText,
       outputDir: voiceDir,
       audioPathOrUrl: input.audioPathOrUrl,
-      voiceProvider: input.voiceProvider || 'auto',
+      voiceProvider: chosenVoiceProvider,
       voiceGender: input.voiceGender || 'male',
       voiceId: input.voiceId,
+      voiceName: input.voiceName,
       language: input.language || 'pt-BR',
       speed: input.speed,
     });
@@ -1003,6 +1033,7 @@ export async function renderThreeJsVideoMcp(input: RenderThreeJsInput) {
       directorProvider,
       voiceProviderUsed: voiceRes.providerUsed,
       voiceUsed: voiceRes.voiceUsed,
+      voiceLabel: voiceRes.voiceLabel,
       wordsCount: voiceRes.words.length,
       sceneCount: finalCompile.sceneCount,
       auditFixes: finalCompile.auditFixes,
@@ -1207,6 +1238,8 @@ export async function autoClipLiveMcp(input: {
   commentIntroText?: string;
   voiceProvider?: VoiceProviderChoice;
   voiceGender?: VoiceGender;
+  voiceId?: string;
+  voiceName?: string;
   title?: string;
   waitForResult?: boolean;
 }) {
@@ -1226,6 +1259,14 @@ export async function autoClipLiveMcp(input: {
   if (!target) {
     throw new Error('Informe "sourceUrl" da transmissão para renderizar o corte.');
   }
+  const hasComment = Boolean(input.commentIntroText && input.commentIntroText.trim().length >= 6);
+  const chosenVoiceProvider = hasComment
+    ? validateVoiceSelection({
+        voiceProvider: input.voiceProvider,
+        voiceId: input.voiceId,
+        audioPathOrUrl: input.audioPathOrUrl,
+      })
+    : undefined;
   const startSec = Number(input.startSec) || 0;
   const endSec = Math.max(startSec + 5, Number(input.endSec) || startSec + 28);
   const title = String(input.title || `Auto-Clip ${Math.round(startSec)}s–${Math.round(endSec)}s`).slice(0, 120);
@@ -1235,7 +1276,7 @@ export async function autoClipLiveMcp(input: {
     engine: 'auto_clipper' as const,
     kind: 'full_video' as const,
     title,
-    payload: { sourceUrl: target, startSec, endSec, layout: input.layout || 'vertical_center' },
+    payload: { sourceUrl: target, startSec, endSec, layout: input.layout || 'vertical_center', voiceProvider: chosenVoiceProvider },
   };
   const runJob = async ({ onProgress }: { onProgress: (pct: number) => Promise<void> | void }) =>
     await renderAutoLiveClip({
@@ -1246,8 +1287,11 @@ export async function autoClipLiveMcp(input: {
       layout: input.layout || 'vertical_center',
       gameplayUrl: input.gameplayUrl,
       commentIntroText: input.commentIntroText,
-      voiceProvider: input.voiceProvider || 'auto',
+      voiceProvider: chosenVoiceProvider,
       voiceGender: input.voiceGender || 'male',
+      voiceId: input.voiceId,
+      voiceName: input.voiceName,
+      audioPathOrUrl: input.audioPathOrUrl,
       title,
       onProgress,
     });
@@ -1277,6 +1321,9 @@ export async function batchRenderMcp(input: {
     storyboard?: Partial<ThreeJsStoryboard>;
     voiceProvider?: VoiceProviderChoice;
     voiceGender?: VoiceGender;
+    voiceId?: string;
+    voiceName?: string;
+    audioPathOrUrl?: string;
   }>;
 }) {
   const userId = await resolveDefaultUserId();
@@ -1284,6 +1331,26 @@ export async function batchRenderMcp(input: {
   if (items.length === 0) {
     throw new Error('Envie "items" com 1 a 20 objetos de vídeo para enfileirar em lote.');
   }
+
+  // Valida antecipadamente a seleção explícita de voz de cada item falado antes de enfileirar.
+  const validatedProviders = items.map((it, idx) => {
+    const engine: 'html_svg' | 'threejs_3d' = it?.engine === 'threejs_3d' ? 'threejs_3d' : 'html_svg';
+    const hasSpoken =
+      engine === 'threejs_3d' ||
+      Boolean(String(it?.scriptText || '').trim()) ||
+      Boolean(String(it?.audioPathOrUrl || '').trim()) ||
+      (Array.isArray(it?.scenes) && it.scenes.some((s: any) => s?.spokenLine || s?.subtitle || s?.title));
+    if (!hasSpoken) return undefined;
+    try {
+      return validateVoiceSelection({
+        voiceProvider: it?.voiceProvider,
+        voiceId: it?.voiceId,
+        audioPathOrUrl: it?.audioPathOrUrl,
+      });
+    } catch (ve: any) {
+      throw new Error(`Item #${idx + 1} ("${it?.title || it?.topic || 'Sem título'}"): ${ve?.message}`);
+    }
+  });
 
   const jobs: Array<{ index: number; title: string; engine: string; jobId: string; status: string; queuePosition: number }> = [];
 
@@ -1293,6 +1360,7 @@ export async function batchRenderMcp(input: {
     const title = String(it.title || it.topic || `Lote MCP #${i + 1}`).slice(0, 120);
     const aspect = it.aspect === '16:9' || it.aspect === '1:1' ? it.aspect : '9:16';
     const isDraft = it.isDraft !== undefined ? Boolean(it.isDraft) : true;
+    const chosenVoiceProvider = validatedProviders[i];
 
     const queued = await enqueueDetachedRenderTask(
       {
@@ -1300,7 +1368,7 @@ export async function batchRenderMcp(input: {
         engine,
         kind: 'full_video',
         title,
-        payload: { batchIndex: i + 1, preset: it.preset || engine, aspect, isDraft },
+        payload: { batchIndex: i + 1, preset: it.preset || engine, aspect, isDraft, voiceProvider: chosenVoiceProvider, voiceId: it.voiceId },
       },
       async ({ onProgress }) => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_mcp_batch_'));
@@ -1312,16 +1380,25 @@ export async function batchRenderMcp(input: {
                 ? it.scenes.map((s: any) => s.spokenLine || s.subtitle || s.title).filter(Boolean).join(' ')
                 : title);
             let audioPath: string | undefined;
-            if (spoken) {
+            let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string } = {};
+            if ((spoken || it.audioPathOrUrl) && chosenVoiceProvider) {
               const vr = await resolveVoiceWithTimestamps({
                 userId,
                 scriptText: spoken,
                 outputDir: tmpDir,
-                voiceProvider: it.voiceProvider || 'auto',
+                audioPathOrUrl: it.audioPathOrUrl,
+                voiceProvider: chosenVoiceProvider,
                 voiceGender: it.voiceGender || 'male',
+                voiceId: it.voiceId,
+                voiceName: it.voiceName,
                 language: 'pt-BR',
               });
               audioPath = vr.audioPath;
+              voiceMeta = {
+                voiceProviderUsed: vr.providerUsed,
+                voiceUsed: vr.voiceUsed,
+                voiceLabel: vr.voiceLabel,
+              };
             }
             await onProgress(25);
             const outMp4 = path.join(tmpDir, `mcp_batch_svg_${i}.mp4`);
@@ -1344,6 +1421,7 @@ export async function batchRenderMcp(input: {
             );
             return {
               videoUrl: `https://darktube.fjt-solutions.com${storagePath}`,
+              ...voiceMeta,
               durationSec: rendered.durationSec,
               renderDurationMs: rendered.renderDurationMs,
               renderDurationLabel: rendered.renderDurationLabel,
@@ -1367,8 +1445,11 @@ export async function batchRenderMcp(input: {
               userId,
               scriptText: spoken || title,
               outputDir: tmpDir,
-              voiceProvider: it.voiceProvider || 'auto',
+              audioPathOrUrl: it.audioPathOrUrl,
+              voiceProvider: chosenVoiceProvider!,
               voiceGender: it.voiceGender || 'male',
+              voiceId: it.voiceId,
+              voiceName: it.voiceName,
               language: 'pt-BR',
             });
             await onProgress(25);
@@ -1421,6 +1502,9 @@ export async function batchRenderMcp(input: {
               qaChecks: rendered.qaChecks,
               auditFixes: compiled.auditFixes,
               lipSyncEngine: lipSync.engine,
+              voiceProviderUsed: voiceRes.providerUsed,
+              voiceUsed: voiceRes.voiceUsed,
+              voiceLabel: voiceRes.voiceLabel,
               durationSec: rendered.durationSec,
               renderDurationMs: rendered.renderDurationMs,
               renderDurationLabel: rendered.renderDurationLabel,
@@ -1444,4 +1528,48 @@ export async function batchRenderMcp(input: {
   }
 
   return { success: true, totalQueued: jobs.length, jobs };
+}
+
+/**
+ * 20. Lista vozes disponíveis (ElevenLabs reais da conta, Edge PT-BR, OpenAI) ou clona nova voz ElevenLabs.
+ */
+export async function manageVoicesMcp(input: {
+  action?: 'list' | 'clone';
+  name?: string;
+  description?: string;
+  audioPathOrUrl?: string;
+}) {
+  const userId = await resolveDefaultUserId();
+  if (input?.action === 'clone') {
+    const src = String(input.audioPathOrUrl || '').trim();
+    if (!src) {
+      throw new Error('Informe "audioPathOrUrl" (caminho local, /api/storage/... ou URL) para clonar a voz na ElevenLabs.');
+    }
+    let buffer: Buffer;
+    let fileName = 'amostra.mp3';
+    if (src.startsWith('/api/storage/')) {
+      buffer = await readStored(src);
+      fileName = path.basename(src.split('?')[0]) || fileName;
+    } else if (/^https?:\/\//i.test(src)) {
+      const resp = await fetch(src, { signal: AbortSignal.timeout(45_000) });
+      if (!resp.ok) throw new Error(`Falha ao baixar áudio de amostra (${resp.status})`);
+      buffer = Buffer.from(await resp.arrayBuffer());
+    } else {
+      const resolved = fs.existsSync(src) ? src : path.resolve(process.cwd(), src);
+      if (!fs.existsSync(resolved)) throw new Error(`Arquivo de áudio não encontrado: ${src}`);
+      buffer = fs.readFileSync(resolved);
+      fileName = path.basename(resolved);
+    }
+    const cloned = await cloneElevenLabsVoice({
+      userId,
+      name: String(input.name || 'Nova Voz DarkTube'),
+      description: input.description,
+      audioBuffer: buffer,
+      fileName,
+    });
+    return { success: true, action: 'clone', ...cloned };
+  }
+
+  const catalog = await listAvailableVoices(userId);
+  return { success: true, action: 'list', ...catalog };
 }

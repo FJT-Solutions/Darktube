@@ -23,6 +23,7 @@ import {
   buildPuppetRigMcp,
   autoClipLiveMcp,
   batchRenderMcp,
+  manageVoicesMcp,
 } from '@/lib/mcp/flow-advanced-tools';
 
 export const dynamic = 'force-dynamic';
@@ -404,9 +405,14 @@ const MCP_TOOLS_MANIFEST = [
         downloadLocal: { type: 'boolean', default: true },
         outputDir: { type: 'string', default: './midia/criativos' },
         fileName: { type: 'string' },
-        voiceProvider: { type: 'string', enum: ['auto', 'external', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+        voiceProvider: {
+          type: 'string',
+          enum: ['external', 'elevenlabs', 'edge', 'openai'],
+          description: 'OBRIGATÓRIO escolher explicitamente antes de renderizar com áudio (sem cascata auto): external | elevenlabs | edge | openai',
+        },
         voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
-        audioPathOrUrl: { type: 'string' },
+        voiceId: { type: 'string', description: 'ID da voz (obrigatório se elevenlabs; ou ID neural do Edge PT-BR / OpenAI)' },
+        audioPathOrUrl: { type: 'string', description: 'Caminho ou URL do áudio gravado (obrigatório se voiceProvider=external)' },
         scriptText: { type: 'string' },
       },
     },
@@ -438,9 +444,13 @@ const MCP_TOOLS_MANIFEST = [
             posicaoY: { type: 'number', default: 0.69 },
           },
         },
-        voiceProvider: { type: 'string', enum: ['auto', 'external', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+        voiceProvider: {
+          type: 'string',
+          enum: ['external', 'elevenlabs', 'edge', 'openai'],
+          description: 'OBRIGATÓRIO perguntar e selecionar explicitamente (sem cascata auto): external (áudio enviado), elevenlabs (exige voiceId), edge (PT-BR grátis) ou openai.',
+        },
         voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
-        voiceId: { type: 'string' },
+        voiceId: { type: 'string', description: 'ID da voz (obrigatório quando voiceProvider = elevenlabs)' },
         language: { type: 'string', default: 'pt-BR' },
         speed: { type: 'number', default: 1.02 },
         topic: { type: 'string', description: 'Tema livre em PT-BR: aciona o Diretor 3D com LLM automaticamente quando storyboard não for enviado' },
@@ -537,8 +547,9 @@ const MCP_TOOLS_MANIFEST = [
         layout: { type: 'string', enum: ['vertical_center', 'split_screen'], default: 'vertical_center' },
         gameplayUrl: { type: 'string', description: 'Vídeo opcional para metade inferior no layout split_screen.' },
         commentIntroText: { type: 'string', description: 'Texto falado em Modo Comentário TTS antes do corte.' },
-        voiceProvider: { type: 'string', enum: ['auto', 'elevenlabs', 'openai', 'edge'], default: 'auto' },
+        voiceProvider: { type: 'string', enum: ['external', 'elevenlabs', 'edge', 'openai'], description: 'Obrigatório quando houver commentIntroText (sem cascata auto).' },
         voiceGender: { type: 'string', enum: ['male', 'female'], default: 'male' },
+        voiceId: { type: 'string' },
         title: { type: 'string' },
         waitForResult: { type: 'boolean', default: true },
       },
@@ -546,17 +557,30 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_batch_render',
-    description: 'Renderização Data-in, Video-out em lote na Fila FIFO: aceita até 20 especificações JSON de vídeos (html_svg ou threejs_3d) e devolve os jobIds enfileirados.',
+    description: 'Renderização Data-in, Video-out em lote na Fila FIFO: aceita até 20 especificações JSON (html_svg ou threejs_3d). Todo item com fala DEVE informar voiceProvider explícito (external, elevenlabs+voiceId, edge ou openai) perguntado ao usuário.',
     inputSchema: {
       type: 'object',
       properties: {
         items: {
           type: 'array',
-          description: 'Lista de 1 a 20 especificações ({ engine, title, preset, aspect, isDraft, topic, scenes, storyboard, scriptText }).',
+          description: 'Lista de 1 a 20 especificações ({ engine, title, preset, aspect, isDraft, voiceProvider, voiceId, audioPathOrUrl, topic, scenes, storyboard, scriptText }).',
           items: { type: 'object' },
         },
       },
       required: ['items'],
+    },
+  },
+  {
+    name: 'darktube_manage_voices',
+    description: 'Lista todas as vozes disponíveis (ElevenLabs reais da conta via API, Edge TTS PT-BR neurais e OpenAI) ou clona uma nova voz na ElevenLabs a partir de áudio em sample (action="list" | "clone"). Use ANTES de renderizar quando o usuário quiser selecionar ou criar uma voz.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'clone'], default: 'list' },
+        name: { type: 'string', description: 'Nome da nova voz (quando action="clone")' },
+        description: { type: 'string', description: 'Descrição opcional da voz clonada' },
+        audioPathOrUrl: { type: 'string', description: 'Caminho local, /api/storage/... ou URL da amostra de áudio (quando action="clone")' },
+      },
     },
   },
 ];
@@ -723,6 +747,9 @@ async function executeTool(name: string, args: any) {
 
     case 'darktube_batch_render':
       return await batchRenderMcp(args);
+
+    case 'darktube_manage_voices':
+      return await manageVoicesMcp(args);
 
     default:
       throw new Error(`Ferramenta desconhecida: "${name}". Disponíveis: ${MCP_TOOLS_MANIFEST.map((t) => t.name).join(', ')}.`);

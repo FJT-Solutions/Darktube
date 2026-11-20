@@ -22,6 +22,12 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  EMPTY_VOICE_SELECTION,
+  VoiceSelectorPanel,
+  validateVoiceStateClient,
+  type VoiceSelectionState,
+} from "@/components/voice-selector-panel"
 
 interface GoldenPrompt {
   id: string
@@ -166,6 +172,7 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
 
   // === 2. PRESETS VIRAIS & LOTE ===
   const [batchJson, setBatchJson] = useState(() => JSON.stringify(SAMPLE_BATCH_PRESETS.html_svg_netflix_doc, null, 2))
+  const [batchVoiceSel, setBatchVoiceSel] = useState<VoiceSelectionState>(EMPTY_VOICE_SELECTION)
   const [submittingBatch, setSubmittingBatch] = useState(false)
 
   // === 3. AUTO-CLIPPER & STREAMER IA 24/7 ===
@@ -177,6 +184,7 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
   const [clipLayout, setClipLayout] = useState<"vertical_center" | "split_screen">("split_screen")
   const [gameplayUrl, setGameplayUrl] = useState("")
   const [commentIntroText, setCommentIntroText] = useState("")
+  const [clipVoiceSel, setClipVoiceSel] = useState<VoiceSelectionState>(EMPTY_VOICE_SELECTION)
   const [renderingClipIdx, setRenderingClipIdx] = useState<number | null>(null)
 
   const [personaName, setPersonaName] = useState("Luna IA")
@@ -303,12 +311,46 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
       toast.error("JSON inválido. Confira colchetes, chaves e vírgulas.")
       return
     }
+
+    const needsPanelVoice = parsed.some((it) => {
+      const hasExplicit = Boolean(it?.voiceProvider && it.voiceProvider !== "auto")
+      const hasSpeech =
+        it?.engine === "threejs_3d" ||
+        Boolean(String(it?.scriptText || "").trim()) ||
+        (Array.isArray(it?.scenes) && it.scenes.some((s: any) => s?.spokenLine || s?.subtitle || s?.title))
+      return hasSpeech && !hasExplicit
+    })
+
+    if (needsPanelVoice) {
+      const voiceErr = validateVoiceStateClient(batchVoiceSel)
+      if (voiceErr) {
+        toast.error(voiceErr)
+        return
+      }
+    }
+
+    const enrichedItems = parsed.map((it) => {
+      if (it?.voiceProvider && it.voiceProvider !== "auto") return it
+      return {
+        ...it,
+        ...(batchVoiceSel.voiceProvider
+          ? {
+              voiceProvider: batchVoiceSel.voiceProvider,
+              voiceId: batchVoiceSel.voiceId || undefined,
+              voiceName: batchVoiceSel.voiceName || undefined,
+              audioPathOrUrl: batchVoiceSel.audioPathOrUrl || undefined,
+              voiceGender: /francisca|thalita|brenda|nova|shimmer/i.test(batchVoiceSel.voiceId) ? "female" : "male",
+            }
+          : {}),
+      }
+    })
+
     setSubmittingBatch(true)
     try {
       const res = await fetch("/api/remotion/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: parsed, limit: 20 }),
+        body: JSON.stringify({ items: enrichedItems, limit: 20 }),
       })
       const data = await res.json()
       if (!data?.success) {
@@ -358,6 +400,13 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
   }
 
   async function handleRenderClip(clip: PeakClip) {
+    if (commentIntroText.trim().length >= 6) {
+      const voiceErr = validateVoiceStateClient(clipVoiceSel)
+      if (voiceErr) {
+        toast.error(`Modo Comentário: ${voiceErr}`)
+        return
+      }
+    }
     setRenderingClipIdx(clip.index)
     try {
       const res = await fetch("/api/dark-clips/auto-clip", {
@@ -371,6 +420,15 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
           layout: clipLayout,
           gameplayUrl: gameplayUrl.trim() || undefined,
           commentIntroText: commentIntroText.trim() || undefined,
+          ...(clipVoiceSel.voiceProvider
+            ? {
+                voiceProvider: clipVoiceSel.voiceProvider,
+                voiceId: clipVoiceSel.voiceId || undefined,
+                voiceName: clipVoiceSel.voiceName || undefined,
+                audioPathOrUrl: clipVoiceSel.audioPathOrUrl || undefined,
+                voiceGender: /francisca|thalita|brenda|nova|shimmer/i.test(clipVoiceSel.voiceId) ? "female" : "male",
+              }
+            : {}),
           title: `Corte Viral #${clip.index} (${clip.startSec}s-${clip.endSec}s)`,
         }),
       })
@@ -598,6 +656,12 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
               value={batchJson}
               onChange={(e) => setBatchJson(e.target.value)}
             />
+            <VoiceSelectorPanel
+              value={batchVoiceSel}
+              onChange={setBatchVoiceSel}
+              compact
+              title="Voz do Lote (obrigatório quando os itens têm narração — sem cascata automática)"
+            />
             <Button className="w-full" size="lg" onClick={handleSubmitBatch} disabled={submittingBatch}>
               {submittingBatch ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
               Enfileirar Lote Data-in, Video-out na Fila FIFO ($0)
@@ -659,6 +723,14 @@ export function StudioV5Tabs({ onJobEnqueued }: { onJobEnqueued: () => void }) {
                   placeholder="Modo Comentário: intro TTS (opcional)"
                 />
               </div>
+              {commentIntroText.trim().length > 0 && (
+                <VoiceSelectorPanel
+                  value={clipVoiceSel}
+                  onChange={setClipVoiceSel}
+                  compact
+                  title="Voz do Modo Comentário (sem cascata automática)"
+                />
+              )}
               <Button className="w-full" onClick={handleAnalyzeLive} disabled={analyzingLive}>
                 {analyzingLive ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
                 Detectar Picos Virais via Áudio ($0)
