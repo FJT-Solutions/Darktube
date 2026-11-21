@@ -26,6 +26,7 @@ import {
   buildDefaultWhatIfScenes,
   writeWhatIfAmbientWav,
 } from './html-svg-whatif-studio';
+import { buildDefault3dStageScenes } from './html-svg-3d-stage';
 
 const runExec = promisify(execFile);
 
@@ -145,6 +146,28 @@ async function enrichEditorialMedia(
       sc.imageUrl = imgUrl;
     }
 
+    if (sc.bgUrl && /^https?:\/\//i.test(String(sc.bgUrl))) {
+      const localBg = await cacheRemoteImageToLocal(String(sc.bgUrl), assetDir, i * 100 + 1);
+      if (localBg) sc.bgUrl = localBg;
+    }
+
+    if (Array.isArray(sc.layers) && sc.layers.length > 0) {
+      const nextLayers = [];
+      for (let li = 0; li < sc.layers.length; li++) {
+        const layer: any = { ...sc.layers[li] };
+        const rawUrl = layer.url || layer.bgUrl;
+        if (rawUrl && /^https?:\/\//i.test(String(rawUrl))) {
+          const localLayerUrl = await cacheRemoteImageToLocal(String(rawUrl), assetDir, i * 100 + 10 + li);
+          if (localLayerUrl) {
+            if (layer.url) layer.url = localLayerUrl;
+            if (layer.bgUrl) layer.bgUrl = localLayerUrl;
+          }
+        }
+        nextLayers.push(layer);
+      }
+      sc.layers = nextLayers;
+    }
+
     updatedScenes.push(sc);
   }
 
@@ -219,7 +242,9 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
               ? buildDefaultAmpulhetaScenes()
               : enrichedSpec.preset === 'html_svg_whatif_studio'
                 ? buildDefaultWhatIfScenes()
-                : [];
+                : enrichedSpec.preset === 'html_svg_3d_stage'
+                  ? buildDefault3dStageScenes()
+                  : [];
       if (scenesList.length > 0 && !enrichedSpec.customHtml) {
         let cur = 0;
         for (const sc of scenesList.slice(0, 16)) {

@@ -13,7 +13,7 @@ const run = promisify(execFile);
 const ffmpegBin = () => process.env.FFMPEG_PATH || 'ffmpeg';
 const ffprobeBin = () => process.env.FFPROBE_PATH || 'ffprobe';
 
-export type ChromaAssetKind = 'character' | 'expressions' | 'prop' | 'background' | 'puppet_sheet' | 'accessories';
+export type ChromaAssetKind = 'character' | 'expressions' | 'prop' | 'background' | 'puppet_sheet' | 'accessories' | 'cast_sheet';
 export type ExpressionGridLayout = '2x2' | '3x2';
 
 export interface BuildNanoBananaPromptInput {
@@ -22,6 +22,7 @@ export interface BuildNanoBananaPromptInput {
   realismo?: string;
   chromaGreen?: boolean;
   gridLayout?: ExpressionGridLayout;
+  hasRefImage?: boolean;
 }
 
 export interface ChromaCutoutOptions {
@@ -67,6 +68,11 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
   const isStylized = STYLIZED_REALISMS.includes(normRealismo);
   const useGreen = kind === 'background' ? Boolean(input.chromaGreen) : input.chromaGreen !== false;
   const backdrop = useGreen ? CHROMA_BACKDROP_CLAUSE : 'Clean neutral studio backdrop, soft even lighting, no text, no watermark.';
+  const refClause = input.hasRefImage
+    ? 'Strictly preserve the exact same character identity, face shape, hairstyle, skin tone, clothing and color palette shown in the attached reference image. '
+    : '';
+  const singleFrameGuard =
+    'Single continuous full-bleed scene filling the entire frame; NO split screen, NO stacked panels, NO diptych, NO collage, NO borders.';
 
   if (kind === 'expressions') {
     const grid = input.gridLayout === '3x2' ? '3x2' : '2x2';
@@ -75,14 +81,14 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
       grid === '3x2'
         ? '1) happy smiling, 2) shocked surprised, 3) angry intense, 4) sad worried, 5) thoughtful curious, 6) confident smirk'
         : '1) happy smiling, 2) shocked surprised, 3) angry intense, 4) sad worried';
-    return `Character expression sheet arranged in a clean ${grid} grid (${count} separate waist-up portraits of the exact same fictional original adult character with generous spacing between each portrait): ${desc}. Visual style strictly uniform across all ${count} portraits: ${styleDesc}.${isStylized ? ' NO photorealistic skin texture.' : ''} The ${count} expressions in reading order from top-left to bottom-right are: ${exprList}. Identical face, hair and outfit in every cell. ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
+    return `Character expression sheet arranged in a clean ${grid} grid (${count} separate waist-up portraits of the exact same fictional original adult character with generous spacing between each portrait): ${refClause}${desc}. Visual style strictly uniform across all ${count} portraits: ${styleDesc}.${isStylized ? ' NO photorealistic skin texture.' : ''} The ${count} expressions in reading order from top-left to bottom-right are: ${exprList}. Identical face, hair, skin tone and outfit in every cell. ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
       0,
       3900
     );
   }
 
   if (kind === 'puppet_sheet') {
-    return `Full-body character turnaround front view in a clean neutral standing A-pose for 2D/2.5D joint puppet rigging: ${desc}. Rendered strictly in style: ${styleDesc}.${isStylized ? ' Stylized flat vector/cartoon look, crisp dark outlines, NO photorealism.' : ''} Head to toe completely inside frame with generous margins, arms slightly angled outward away from torso, legs shoulder-width apart, clear separate hands and feet, even flat studio lighting, ${backdrop} Single character only, no overlapping limbs, no text, no watermark.`.slice(
+    return `Full-body character turnaround front view in a clean neutral standing A-pose for 2D/2.5D joint puppet rigging: ${refClause}${desc}. Rendered strictly in style: ${styleDesc}.${isStylized ? ' Stylized flat vector/cartoon look, crisp dark outlines, NO photorealism.' : ''} Head to toe completely inside frame with generous margins, arms slightly angled outward away from torso, legs shoulder-width apart, clear separate hands and feet, even flat studio lighting, ${backdrop} Single character only, no overlapping limbs, no split screen, no text, no watermark.`.slice(
       0,
       3900
     );
@@ -91,28 +97,36 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
   if (kind === 'accessories') {
     const grid = input.gridLayout === '3x2' ? '3x2' : '2x2';
     const count = grid === '3x2' ? 6 : 4;
-    return `Clean ${grid} sticker sheet of ${count} separate detachable character accessories, outfits and props matching: ${desc}. Rendered in style: ${styleDesc}.${isStylized ? ' Consistent cartoon outline style, NO photorealism.' : ''} Generous uniform spacing between each item so every piece can be cropped cleanly without touching neighbours, ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
+    return `Clean ${grid} sticker sheet of ${count} separate detachable character accessories, outfits and props matching: ${refClause}${desc}. Rendered in style: ${styleDesc}.${isStylized ? ' Consistent cartoon outline style, NO photorealism.' : ''} Generous uniform spacing between each item so every piece can be cropped cleanly without touching neighbours, ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
+      0,
+      3900
+    );
+  }
+
+  if (kind === 'cast_sheet') {
+    const grid = input.gridLayout === '3x2' ? '3x2' : '2x2';
+    return `Clean character cast, poses & key props reference sheet arranged in a tidy ${grid} layout with generous spacing between each item: ${refClause}${desc}. Rendered strictly in style: ${styleDesc}.${isStylized ? ' Consistent cartoon outline style, NO photorealism.' : ''} Preserve exact face, hair, skin tone and clothing across every figure and include the requested action poses and isolated story props cleanly separated so each piece can be cropped individually. ${backdrop} No grid lines, no labels, no text, no watermark.`.slice(
       0,
       3900
     );
   }
 
   if (kind === 'prop') {
-    return `Isolated studio product/object render of: ${desc}. Rendered in style: ${styleDesc}. Centered full object completely visible inside frame with margin around all edges, ${backdrop}`.slice(
+    return `Isolated studio product/object render of: ${desc}. Rendered in style: ${styleDesc}. Centered full object completely visible inside frame with margin around all edges, ${singleFrameGuard} ${backdrop}`.slice(
       0,
       3900
     );
   }
 
   if (kind === 'background') {
-    return `Wide establishing background plate without any people or characters: ${desc}. Visual style: ${styleDesc}. Atmospheric depth, clean composition ready to receive foreground characters, no text, no watermark.`.slice(
+    return `Wide establishing background plate without any people or characters: ${desc}. Visual style: ${styleDesc}. Atmospheric depth, clean composition ready to receive foreground characters. ${singleFrameGuard} No text, no watermark.`.slice(
       0,
       3900
     );
   }
 
   // Default: 'character'
-  return `Full-body or waist-up character reference portrait of a fictional original adult character: ${desc}. Rendered strictly in this visual style: ${styleDesc}.${isStylized ? ' Consistent stylized art, NO photorealism.' : ''} Single character centered in frame with clear silhouette, facing the camera, ${backdrop} Single character only, no split screen, no turnaround, no text, no watermark.`.slice(
+  return `Full-body or waist-up character reference portrait of a fictional original adult character: ${refClause}${desc}. Rendered strictly in this visual style: ${styleDesc}.${isStylized ? ' Consistent stylized art, NO photorealism.' : ''} Single character centered in frame with clear silhouette, facing the camera, ${backdrop} Single character only, ${singleFrameGuard} no turnaround, no text, no watermark.`.slice(
     0,
     3900
   );
@@ -281,6 +295,8 @@ export interface StandaloneFlowImageRequest {
   chromaGreen?: boolean;
   gridLayout?: ExpressionGridLayout;
   autoCutout?: boolean;
+  refImageUrl?: string;
+  refImageUrls?: string[];
   waitForSeconds?: number;
   downloadLocal?: boolean;
   outputDir?: string;
@@ -293,6 +309,11 @@ export interface StandaloneFlowImageRequest {
 export async function createStandaloneFlowImageJob(req: StandaloneFlowImageRequest) {
   const assetKind: ChromaAssetKind = req.assetKind || 'character';
   const chromaGreen = assetKind === 'background' ? Boolean(req.chromaGreen) : req.chromaGreen !== false;
+  const cleanRefUrl = typeof req.refImageUrl === 'string' && req.refImageUrl.trim() ? req.refImageUrl.trim() : undefined;
+  const cleanRefUrls = Array.isArray(req.refImageUrls)
+    ? req.refImageUrls.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 4)
+    : undefined;
+  const hasRefImage = Boolean(cleanRefUrl || (cleanRefUrls && cleanRefUrls.length > 0));
   const prompt = (req.customPrompt || '').trim()
     ? String(req.customPrompt).trim()
     : buildNanoBananaAssetPrompt({
@@ -301,6 +322,7 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
         realismo: req.realismo,
         chromaGreen,
         gridLayout: req.gridLayout,
+        hasRefImage,
       });
 
   const role =
@@ -308,7 +330,9 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
       ? 'expression_sheet'
       : assetKind === 'puppet_sheet'
         ? 'puppet_sheet'
-        : assetKind === 'accessories'
+        : assetKind === 'cast_sheet'
+          ? 'cast_sheet'
+          : assetKind === 'accessories'
           ? 'accessories_sheet'
           : assetKind === 'prop'
             ? 'prop_chroma'
@@ -323,6 +347,8 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
     params: {
       aspectRatio: req.aspectRatio || '9:16',
       model: 'Nano Banana',
+      ...(cleanRefUrl ? { refImageUrl: cleanRefUrl } : {}),
+      ...(cleanRefUrls?.length ? { refImageUrls: cleanRefUrls } : {}),
     },
     role,
     deadlineMinutes: 360,
@@ -361,6 +387,43 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
     chromaGreen,
     cutout,
   };
+}
+
+/**
+ * Consulta um job de imagem avulsa no Flow e opcionalmente realiza o recorte #00FF00 ao concluir.
+ */
+export async function getStandaloneFlowImageJobStatus(opts: {
+  userId: string;
+  jobId: string;
+  autoCutout?: boolean;
+  chromaGreen?: boolean;
+  gridLayout?: ExpressionGridLayout;
+  similarity?: number;
+  blend?: number;
+  downloadLocal?: boolean;
+  outputDir?: string;
+}) {
+  const job = await getFlowJob(opts.userId, opts.jobId);
+  if (!job) return null;
+
+  const isSheet = job.role === 'expression_sheet' || job.role === 'accessories_sheet';
+  const isBg = job.role === 'background_plate';
+  const shouldChroma = opts.chromaGreen ?? !isBg;
+  let cutout: ChromaCutoutResult | null = null;
+
+  if (job.status === 'done' && job.result_url && shouldChroma && opts.autoCutout !== false) {
+    cutout = await removeChromaGreenToPng({
+      inputSource: job.result_url,
+      outputFilename: `chroma_${job.role || 'image'}_${job.id.slice(0, 8)}`,
+      sliceGrid: isSheet ? opts.gridLayout || '2x2' : undefined,
+      similarity: opts.similarity,
+      blend: opts.blend,
+      downloadLocal: opts.downloadLocal,
+      outputDir: opts.outputDir,
+    });
+  }
+
+  return { job, cutout };
 }
 
 export async function listStandaloneFlowImageJobs(userId: string, limit = 40): Promise<FlowJob[]> {

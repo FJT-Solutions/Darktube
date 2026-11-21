@@ -770,7 +770,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
   const isSilentSilhouette =
     (input.preset === 'html_svg_silhouette_film' ||
       input.preset === 'html_svg_ampulheta_doc' ||
-      input.preset === 'html_svg_whatif_studio') &&
+      input.preset === 'html_svg_whatif_studio' ||
+      input.preset === 'html_svg_3d_stage') &&
     !String(input.scriptText || '').trim() &&
     !input.audioPathOrUrl &&
     !(input.scenes || []).some((s) => Boolean(s?.spokenLine));
@@ -1150,8 +1151,10 @@ export async function searchAndDownload3dAssetsMcp(input: {
 }
 
 export interface GenerateFlowImageMcpInput {
-  action?: 'generate' | 'cutout_only';
-  assetKind?: 'character' | 'expressions' | 'prop' | 'background';
+  action?: 'generate' | 'cutout_only' | 'status' | 'list';
+  jobId?: string;
+  limit?: number;
+  assetKind?: 'character' | 'expressions' | 'prop' | 'background' | 'puppet_sheet' | 'accessories' | 'cast_sheet';
   description?: string;
   customPrompt?: string;
   realismo?: string;
@@ -1159,6 +1162,8 @@ export interface GenerateFlowImageMcpInput {
   chromaGreen?: boolean;
   gridLayout?: '2x2' | '3x2';
   autoCutout?: boolean;
+  refImageUrl?: string;
+  refImageUrls?: string[];
   imageUrl?: string;
   similarity?: number;
   blend?: number;
@@ -1169,12 +1174,60 @@ export interface GenerateFlowImageMcpInput {
 
 /**
  * 16. Gera imagens avulsas no Nano Banana (Google Flow kind: 'image') com suporte a Fundo Verde Chroma (#00FF00),
- * recorte automático para PNG 32-bit transparente (RGBA) e fatiamento de folha de expressões (2x2 ou 3x2) para
- * animar a $0 nos motores procedurais (Stickman 2.5D, Netflix Doc, Remotion, HTML+SVG, HyperFrames).
+ * imagem de referência (refImageUrl) para consistência de personagem, consulta de status/listagem e recorte RGBA.
  */
 export async function generateFlowImageMcp(input: GenerateFlowImageMcpInput) {
   const userId = await resolveDefaultUserId();
-  const { createStandaloneFlowImageJob, removeChromaGreenToPng } = await import('@/lib/flow-image-tools');
+  const {
+    createStandaloneFlowImageJob,
+    getStandaloneFlowImageJobStatus,
+    listStandaloneFlowImageJobs,
+    removeChromaGreenToPng,
+  } = await import('@/lib/flow-image-tools');
+
+  if (input.action === 'list') {
+    const jobs = await listStandaloneFlowImageJobs(userId, Math.max(1, Math.min(80, Number(input.limit) || 20)));
+    return {
+      success: true,
+      action: 'list',
+      count: jobs.length,
+      jobs: jobs.map((j) => ({
+        jobId: j.id,
+        status: j.status,
+        role: j.role,
+        resultUrl: j.result_url,
+        errorMessage: j.error_message,
+        createdAt: j.created_at,
+        finishedAt: j.finished_at,
+      })),
+    };
+  }
+
+  if (input.action === 'status') {
+    if (!input.jobId) throw new Error('Informe "jobId" para consultar o status da imagem no Flow.');
+    const found = await getStandaloneFlowImageJobStatus({
+      userId,
+      jobId: input.jobId,
+      autoCutout: input.autoCutout !== false,
+      chromaGreen: input.chromaGreen,
+      gridLayout: input.gridLayout,
+      similarity: input.similarity,
+      blend: input.blend,
+      downloadLocal: input.downloadLocal !== false,
+      outputDir: input.outputDir || './midia/criativos',
+    });
+    if (!found) throw new Error(`Job de imagem "${input.jobId}" não encontrado.`);
+    return {
+      success: true,
+      action: 'status',
+      jobId: found.job.id,
+      status: found.job.status,
+      role: found.job.role,
+      resultUrl: found.job.result_url,
+      errorMessage: found.job.error_message,
+      cutout: found.cutout,
+    };
+  }
 
   if (input.action === 'cutout_only' || (input.imageUrl && !input.description && !input.customPrompt)) {
     if (!input.imageUrl) {
@@ -1205,6 +1258,8 @@ export async function generateFlowImageMcp(input: GenerateFlowImageMcpInput) {
     chromaGreen: input.chromaGreen,
     gridLayout: input.gridLayout,
     autoCutout: input.autoCutout !== false,
+    refImageUrl: input.refImageUrl,
+    refImageUrls: input.refImageUrls,
     waitForSeconds: input.waitForSeconds ?? 0,
     downloadLocal: input.downloadLocal !== false,
     outputDir: input.outputDir || './midia/criativos',

@@ -24,6 +24,8 @@ export interface FlowJobParams {
   characterId?: string;
   /** Imagem de referencia do take (folha do personagem ou do elenco), em /api/storage/... */
   refImageUrl?: string;
+  /** Lista opcional de imagens de referencia (ate 4), em /api/storage/... */
+  refImageUrls?: string[];
   /** Usar o video do take anterior como referencia de continuidade (resolvido na entrega do job). */
   refPrevVideo?: boolean;
   /** Preenchido na entrega: video do take anterior. */
@@ -167,6 +169,13 @@ function cleanParams(raw: any): FlowJobParams {
   if (typeof raw.refImageUrl === 'string') {
     const norm = normalizeStorageReference(raw.refImageUrl, 'refImageUrl');
     if (norm) p.refImageUrl = norm;
+  }
+  if (Array.isArray(raw.refImageUrls)) {
+    const refs = raw.refImageUrls
+      .slice(0, 4)
+      .map((u: unknown) => (typeof u === 'string' ? normalizeStorageReference(u, 'refImageUrls') : null))
+      .filter((u: string | null): u is string => Boolean(u));
+    if (refs.length) p.refImageUrls = refs;
   }
   if (raw.refPrevVideo === true) p.refPrevVideo = true;
   if (typeof raw.refPrevFrameUrl === 'string') {

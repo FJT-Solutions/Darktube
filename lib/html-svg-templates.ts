@@ -34,6 +34,12 @@ import {
   type WhatIfVisualStyle,
   type WhatIfWordTiming,
 } from './html-svg-whatif-studio';
+import {
+  build3dStageHtml,
+  buildDefault3dStageScenes,
+  type Stage3DCameraConfig,
+  type Stage3DLayer,
+} from './html-svg-3d-stage';
 
 export type HtmlSvgPreset =
   | 'html_svg_explainer'
@@ -48,7 +54,8 @@ export type HtmlSvgPreset =
   | 'html_svg_2d_puppet'
   | 'html_svg_silhouette_film'
   | 'html_svg_ampulheta_doc'
-  | 'html_svg_whatif_studio';
+  | 'html_svg_whatif_studio'
+  | 'html_svg_3d_stage';
 
 export type HtmlSvgExpression =
   | 'happy'
@@ -108,6 +115,9 @@ export interface HtmlSvgSceneInput {
   hudTopics?: string[];
   activeTopicIndex?: number;
   mapRegionLabel?: string;
+  bgUrl?: string;
+  camera?: Stage3DCameraConfig;
+  layers?: Stage3DLayer[];
 }
 
 export interface HtmlSvgProjectSpec {
@@ -141,6 +151,7 @@ const DEFAULT_PALETTES: Record<HtmlSvgPreset, [string, string, string]> = {
   html_svg_silhouette_film: ['#07090D', '#E0BC44', '#F3E7D3'],
   html_svg_ampulheta_doc: ['#0B1020', '#38BDF8', '#FACC15'],
   html_svg_whatif_studio: ['#161124', '#F2C14E', '#6DB7FF'],
+  html_svg_3d_stage: ['#0B1020', '#38BDF8', '#FACC15'],
 };
 
 const escHtml = (s: unknown): string =>
@@ -191,6 +202,9 @@ type NormalizedHtmlSvgScene = Required<
     | 'activeTopicIndex'
     | 'mapRegionLabel'
     | 'shirtColor'
+    | 'bgUrl'
+    | 'camera'
+    | 'layers'
   >
 > &
   Pick<
@@ -222,6 +236,9 @@ type NormalizedHtmlSvgScene = Required<
     | 'activeTopicIndex'
     | 'mapRegionLabel'
     | 'shirtColor'
+    | 'bgUrl'
+    | 'camera'
+    | 'layers'
   >;
 
 function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
@@ -234,7 +251,9 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
           ? (buildDefaultAmpulhetaScenes() as HtmlSvgSceneInput[])
           : spec.preset === 'html_svg_whatif_studio'
             ? (buildDefaultWhatIfScenes() as HtmlSvgSceneInput[])
-            : [
+            : spec.preset === 'html_svg_3d_stage'
+              ? (buildDefault3dStageScenes() as HtmlSvgSceneInput[])
+              : [
         {
           title: spec.title || 'Vídeos em HTML + SVG',
           subtitle: 'Motor procedural local com custo zero',
@@ -303,6 +322,9 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     activeTopicIndex: sc.activeTopicIndex,
     mapRegionLabel: sc.mapRegionLabel,
     shirtColor: sc.shirtColor,
+    bgUrl: sc.bgUrl,
+    camera: sc.camera,
+    layers: sc.layers,
   }));
 }
 
@@ -435,8 +457,19 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
   if (spec.customHtml && spec.customHtml.trim()) {
     const dur = Math.max(2, Math.min(120, Number(spec.durationSec) || 8));
     const unresolvedTpl = /\$\{(?:Array\.from|Math\.|new |props|sc\.)/.test(spec.customHtml);
+    let htmlOut = spec.customHtml;
+    if (Array.isArray(spec.words) && spec.words.length > 0 && !htmlOut.includes('window.__DT_WORDS')) {
+      const wordsScript = `<script>window.__DT_WORDS=${JSON.stringify(spec.words).replace(/</g, '\\u003c')};</script>`;
+      if (/<\/head>/i.test(htmlOut)) {
+        htmlOut = htmlOut.replace(/<\/head>/i, `${wordsScript}</head>`);
+      } else if (/<body[^>]*>/i.test(htmlOut)) {
+        htmlOut = htmlOut.replace(/<body[^>]*>/i, (m) => `${m}${wordsScript}`);
+      } else {
+        htmlOut = `${wordsScript}${htmlOut}`;
+      }
+    }
     return {
-      html: spec.customHtml,
+      html: htmlOut,
       width,
       height,
       fps,
@@ -498,7 +531,8 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
     preset === 'html_svg_2d_puppet' ||
     preset === 'html_svg_silhouette_film' ||
     preset === 'html_svg_ampulheta_doc' ||
-    preset === 'html_svg_whatif_studio'
+    preset === 'html_svg_whatif_studio' ||
+    preset === 'html_svg_3d_stage'
   ) {
     const extraCtx = {
       title: String(spec.title || scheduled[0]?.title || 'DarkTube Studio').slice(0, 80),
@@ -534,7 +568,9 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
                       ? buildAmpulhetaDocHtml(extraCtx as any)
                       : preset === 'html_svg_whatif_studio'
                         ? buildWhatIfStudioHtml(extraCtx as any)
-                        : buildPaperFinanceHtml(extraCtx);
+                        : preset === 'html_svg_3d_stage'
+                          ? build3dStageHtml(extraCtx as any)
+                          : buildPaperFinanceHtml(extraCtx);
     const scriptBinding = validateScriptVisualBinding(scheduled);
     const readCheck = checkReadabilityTiming(scheduled);
     return {
