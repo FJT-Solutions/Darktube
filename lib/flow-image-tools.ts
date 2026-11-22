@@ -359,7 +359,7 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
     prompt,
     params: {
       aspectRatio: req.aspectRatio || '9:16',
-      model: 'Nano Banana',
+      model: 'Nano Banana Pro',
       ...(cleanRefUrl ? { refImageUrl: cleanRefUrl } : {}),
       ...(cleanRefUrls?.length ? { refImageUrls: cleanRefUrls } : {}),
     },

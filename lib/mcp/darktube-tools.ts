@@ -737,7 +737,7 @@ export async function createCampaignCreative(input: CampaignCreativeInput) {
               prompt: sheetPrompt,
               params: {
                 aspectRatio: String(params.aspect || '9:16'),
-                model: 'Nano Banana',
+                model: 'Nano Banana Pro',
                 characterId: charToGenerate.id,
               },
               projectId: savedProject.id,

@@ -339,10 +339,14 @@
   async function chooseModel(panel, name) {
     const btn = $$(S.modelBtn, panel).find((b) => /nano banana|veo|omni|imagen/i.test(txt(b))) || $(S.modelBtn, panel);
     if (!btn) throw err('model_btn_missing', 'Não achei o seletor de modelo.');
-    if (norm(txt(btn)).includes(norm(name))) return;
+    // Prefix match, not substring: "Nano Banana" used to accept whatever version was selected.
+    const want = norm(name);
+    if (norm(txt(btn)).startsWith(want) && (want !== 'nanobanana')) return;
     btn.click();
     await human(400, 900);
-    const item = $$(S.menuItem).find((i) => norm(txt(i)).includes(norm(name)));
+    const item = $$(S.menuItem)
+      .filter((i) => norm(txt(i)).startsWith(want))
+      .sort((a, b) => norm(txt(a)).length - norm(txt(b)).length)[0];
     if (!item) {
       pressEscape();
       throw err('model_missing', `O modelo "${name}" não está disponível nesta conta.`);

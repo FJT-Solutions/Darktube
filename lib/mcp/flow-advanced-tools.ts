@@ -236,7 +236,7 @@ async function saveAndQueueFlowProject(opts: {
           prompt: sheetPrompt,
           params: {
             aspectRatio: String(params.aspect || '9:16'),
-            model: 'Nano Banana',
+            model: 'Nano Banana Pro',
             characterId: charToGenerate.id,
           },
           projectId: savedProject.id,
@@ -684,7 +684,7 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
           prompt: sheetPrompt,
           params: {
             aspectRatio: String(params.aspect || '9:16'),
-            model: 'Nano Banana',
+            model: 'Nano Banana Pro',
             characterId: c.id,
           },
           projectId,
@@ -707,7 +707,7 @@ export async function reviewProjectCharactersMcp(input: ReviewProjectCharactersI
         prompt: sheetPrompt,
         params: {
           aspectRatio: String(params.aspect || '9:16'),
-          model: 'Nano Banana',
+          model: 'Nano Banana Pro',
           characterId: c.id,
         },
         projectId,
