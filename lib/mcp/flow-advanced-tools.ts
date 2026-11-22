@@ -72,6 +72,7 @@ import {
   getStoryboard,
   listStoryboards,
   reviewStoryboard,
+  storyboardProjectRefs,
   storyboardSummary,
   updateStoryboardPanels,
   type Storyboard,
@@ -1759,6 +1760,8 @@ export async function manageVoicesMcp(input: {
 const storyboardOut = (b: Storyboard, extra: Record<string, unknown> = {}) => ({
   success: true,
   storyboardId: b.id,
+  projectId: b.projectId,
+  kind: b.kind,
   title: b.title,
   sheetUrl: b.sheetUrl,
   ...storyboardSummary(b),
@@ -1771,23 +1774,41 @@ const storyboardOut = (b: Storyboard, extra: Record<string, unknown> = {}) => ({
  * fix rejected panels with update -> repeat until readyToProduce.
  */
 export async function storyboardMcp(input: {
-  action?: 'create' | 'update' | 'review' | 'decide' | 'get' | 'list';
+  action?: 'create' | 'update' | 'review' | 'decide' | 'get' | 'list' | 'refs';
   storyboardId?: string;
+  kind?: string;
+  projectId?: string;
   title?: string;
   logline?: string;
   panels?: any[];
+  bible?: any;
   decisions?: Array<{ index: number; status: 'approved' | 'rejected'; note?: string }>;
   provider?: string;
 }) {
   const userId = await resolveDefaultUserId();
   const action = input?.action || 'get';
-  if (action === 'list') return { success: true, storyboards: await listStoryboards(userId) };
+  if (action === 'list') return { success: true, storyboards: await listStoryboards(userId, 20, input.projectId) };
+  if (action === 'refs') {
+    if (!input.projectId) throw new Error('Informe "projectId" para listar as referências do vídeo.');
+    return { success: true, ...(await storyboardProjectRefs(userId, String(input.projectId))) };
+  }
   if (action === 'create') {
-    return storyboardOut(await createStoryboard(userId, { title: String(input.title || ''), logline: input.logline, panels: input.panels || [] }));
+    return storyboardOut(
+      await createStoryboard(userId, {
+        title: String(input.title || ''),
+        logline: input.logline,
+        panels: input.panels || [],
+        bible: input.bible,
+        kind: input.kind,
+        projectId: input.projectId,
+      })
+    );
   }
   const id = String(input?.storyboardId || '').trim();
   if (!id) throw new Error('Informe "storyboardId" (ou use action="create" / "list").');
-  if (action === 'update') return storyboardOut(await updateStoryboardPanels(userId, id, input.panels || []));
+  if (action === 'update') {
+    return storyboardOut(await updateStoryboardPanels(userId, id, input.panels || [], { bible: input.bible, title: input.title, logline: input.logline }));
+  }
   if (action === 'decide') return storyboardOut(await decideStoryboardPanels(userId, id, input.decisions || []));
   if (action === 'review') {
     const creds = await resolveUserLlmCredential(userId, input.provider || 'openai');
