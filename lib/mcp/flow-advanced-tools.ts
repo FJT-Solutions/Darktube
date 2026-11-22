@@ -1811,7 +1811,9 @@ export async function flowCreditPlanMcp(input: {
   let creditsReadAt: string | null = null;
   if (!Number.isFinite(credits) || credits < 0) {
     const state = await getFlowAgentState(userId).catch(() => null);
-    const live = Number(state?.info?.capabilities?.credits);
+    // the extension sends null when it could not read the balance; Number(null) would fake a 0
+    const rawLive = state?.info?.capabilities?.credits;
+    const live = typeof rawLive === 'number' ? rawLive : NaN;
     if (Number.isFinite(live) && live >= 0) {
       credits = live;
       creditsSource = 'flow';
