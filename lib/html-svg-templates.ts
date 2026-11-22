@@ -118,6 +118,7 @@ export interface HtmlSvgSceneInput {
   bgUrl?: string;
   camera?: Stage3DCameraConfig;
   layers?: Stage3DLayer[];
+  space?: 'stage' | 'bg';
 }
 
 export interface HtmlSvgProjectSpec {
@@ -205,6 +206,7 @@ type NormalizedHtmlSvgScene = Required<
     | 'bgUrl'
     | 'camera'
     | 'layers'
+    | 'space'
   >
 > &
   Pick<
@@ -239,6 +241,7 @@ type NormalizedHtmlSvgScene = Required<
     | 'bgUrl'
     | 'camera'
     | 'layers'
+    | 'space'
   >;
 
 function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
@@ -325,6 +328,7 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     bgUrl: sc.bgUrl,
     camera: sc.camera,
     layers: sc.layers,
+    space: sc.space,
   }));
 }
 
