@@ -47,9 +47,9 @@ For EACH scene you get 2 frames (early and late in the shot), the narration line
 - Facing/gaze: character or creature not facing the target of the action (e.g. the creature should look at the sleeper, not at the wall).
 - Props: object that should be held floating away from the hands; hands anatomy broken or reaching nothing.
 - A cutout pasted as a rectangle with its own background (visible box edges), or a pose that does not match the line (e.g. eyes open when sleeping).
-- The frame does not show what the narration says.
+- The frame does not show what the narration says. Every action spoken in the line (knocked on the door, looked through the peephole, installed the camera, carried the box, laughed) must be visibly performed by the character in a frame of that scene; if an action is only narrated and not shown, report it with "regenerate_sprite" (or "regenerate_background" for a full-frame take) naming the missing action.
 For every problem pick the cheapest correct fix: "adjust_layer" (move/scale/flip/z/occluder of an existing layer), "regenerate_sprite" (the pose/expression/prop asset itself is wrong: generate a new full-body cutout on chroma green with the right pose), or "regenerate_background" (the set is wrong or already contains an object that the cutout duplicates: generate the whole empty set again with the furniture placed right).
-NOT problems (do not report): a character partly hidden behind a counter/bed/blanket on purpose (the staging says so); someone standing on a chair, stool or bed when the staging says so; two sprites of the same character listed with show/hide times (it is a pose swap, only one is visible at a time); deliberate POV framing such as a peephole circle or a CCTV frame.
+NOT problems (do not report): a character partly hidden behind a counter/bed/blanket on purpose (the staging says so); someone standing on a chair, stool or bed when the staging says so; two sprites of the same character listed with show/hide times (it is a pose swap, only one is visible at a time); deliberate POV framing such as a peephole circle or a CCTV frame; a full-frame take where the character is painted inside the set (a full-frame layer swapping over a background of the same room is an intended pose change, not a duplicate); a layer with "aparece em Ns" or a fade-in that is not visible yet in the early frame.
 Ignore captions, color grade, scanlines, film grain and style. Do not invent problems: ok=true when the scene reads correctly. Point at the exact layer (file name from the layer list) in "detail".
 Return ONLY JSON: {"summary":"<one sentence in Brazilian Portuguese>","scenes":[{"index":1,"ok":true,"issues":[{"severity":"high|medium|low","problem":"<Brazilian Portuguese>","fix":"adjust_layer|regenerate_sprite|regenerate_background","detail":"<Brazilian Portuguese concrete instruction: which layer/asset and what to change>"}]}]}`;
 
@@ -143,7 +143,8 @@ export async function previewHtmlSvgStaging(opts: {
         .map((s) => ({ dataBase64: fs.readFileSync(s.file).toString('base64'), mimeType: 'image/jpeg', label: `Cena ${s.scene + 1} · t=${s.t.toFixed(1)}s` }));
       const user = batch
         .map((sc) => {
-          const src: any = specScenes[sc.index - 1] || {};
+          // original spec (not the locally cached copy) so the reviewer sees the real asset names
+          const src: any = (opts.spec.scenes || [])[sc.index - 1] || {};
           const layers = (src.layers || [])
             .filter((l: any) => l.type === 'sprite' || l.type === 'occluder')
             .map((l: any) =>

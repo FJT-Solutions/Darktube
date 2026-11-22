@@ -2550,6 +2550,20 @@
     dtLog('Prompt escrito na caixa do Flow.');
     await attachJobReferences(job);
 
+    // The grid lazy-loads old tiles (fresh tab, uploaded refs): snapshot only after it settles,
+    // otherwise an old tile that renders late is taken as this job's result.
+    {
+      const gridSig = () => $$('img').map((i) => (i.currentSrc || i.src || '').split('?')[0]).filter((s) => s && !s.startsWith('data:')).sort().join('|');
+      let sig = gridSig(), stableSince = Date.now();
+      const tStable = Date.now();
+      while (Date.now() - stableSince < 3000 && Date.now() - tStable < 15000) {
+        await sleep(500);
+        const s = gridSig();
+        if (s !== sig) { sig = s; stableSince = Date.now(); }
+      }
+      dtLog('Grade estabilizada antes do snapshot.', { ms: Date.now() - tStable });
+    }
+
     // Registra os elementos, URLs e digitais dos tiles que JA EXISTIAM antes deste take
     const prevTiles = new Set($$(S.videoTile));
     const prevImageTiles = new Set($$(S.imageTile));

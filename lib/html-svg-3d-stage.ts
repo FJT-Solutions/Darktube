@@ -33,6 +33,12 @@ export interface Stage3DSpriteLayer {
   /** Visible only inside [showAtSec, hideAtSec) of the scene, with a short crossfade (expression swaps) */
   showAtSec?: number;
   hideAtSec?: number;
+  /**
+   * Flipbook: source crops [sx, sy, sw, sh] cycled at frameFps (e.g. a walk sheet with the two leg
+   * poses side by side). Overrides crop. Combine with x/xEnd or heightEnd to walk across or toward camera.
+   */
+  frames?: Array<[number, number, number, number]>;
+  frameFps?: number;
 }
 
 export interface Stage3DOccluderLayer {
@@ -291,7 +297,9 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     if (alpha <= 0.01) return;
     const anchorY = layer.anchorY !== undefined ? clamp(layer.anchorY, 0, 1) : 1;
 
-    const cr = Array.isArray(layer.crop) && layer.crop.length === 4 ? layer.crop : null;
+    const fr = Array.isArray(layer.frames) && layer.frames.length > 0 ? layer.frames : null;
+    const frame = fr ? fr[Math.floor(Math.max(0, localT) * (layer.frameFps || 6)) % fr.length] : null;
+    const cr = frame && frame.length === 4 ? frame : Array.isArray(layer.crop) && layer.crop.length === 4 ? layer.crop : null;
     const srcX = cr ? Math.round(img.naturalWidth * clamp(cr[0], 0, 0.9)) : 0;
     const srcY = cr ? Math.round(img.naturalHeight * clamp(cr[1], 0, 0.9)) : 0;
     const srcW = cr ? Math.max(1, Math.round(img.naturalWidth * clamp(cr[2], 0.1, 1))) : img.naturalWidth;
