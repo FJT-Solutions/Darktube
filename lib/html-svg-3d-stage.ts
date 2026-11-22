@@ -19,8 +19,20 @@ export interface Stage3DSpriteLayer {
   alphaStartSec?: number;
   alphaFadeSec?: number;
   shadow?: boolean;
-  /** Optional normalized source crop [sx, sy, sw, sh] in 0..1 to trim 2x2 sheet edge artifacts */
+  /** Optional normalized source crop [sx, sy, sw, sh] in 0..1 to pick one cell of a 2x2 sheet */
   crop?: [number, number, number, number];
+  /**
+   * 'bg' = x/y are 0..1 coordinates of the sprite anchor inside the background image and height is a
+   * fraction of the background height, so the sprite stays glued to the painted floor/bed/desk under
+   * camera zoom, pan and shake. 'stage' (default) keeps the legacy 1080x1920 perspective projection.
+   */
+  space?: 'stage' | 'bg';
+  heightEnd?: number;
+  /** Vertical anchor inside the sprite: 1 = feet/bottom (default), 0.5 = center (lying figures), 0 = top */
+  anchorY?: number;
+  /** Visible only inside [showAtSec, hideAtSec) of the scene, with a short crossfade (expression swaps) */
+  showAtSec?: number;
+  hideAtSec?: number;
 }
 
 export interface Stage3DOccluderLayer {
@@ -28,6 +40,7 @@ export interface Stage3DOccluderLayer {
   z: number;
   polygon: Array<[number, number]>;
   bgUrl?: string;
+  space?: 'stage' | 'bg';
 }
 
 export interface Stage3DRingLayer {
@@ -39,6 +52,8 @@ export interface Stage3DRingLayer {
   period?: number;
   maxRadius?: number;
   startSec?: number;
+  endSec?: number;
+  space?: 'stage' | 'bg';
 }
 
 export interface Stage3DBadgeLayer {
@@ -77,6 +92,8 @@ export interface Stage3DSceneInput extends Partial<HtmlSvgV2Scene> {
   bgUrl?: string;
   camera?: Stage3DCameraConfig;
   layers?: Stage3DLayer[];
+  /** Default coordinate space for every layer of the scene (see Stage3DSpriteLayer.space) */
+  space?: 'stage' | 'bg';
 }
 
 export interface Stage3DCompileContext extends Omit<HtmlSvgV2CompileContext, 'scenes'> {
@@ -141,7 +158,8 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     spokenLine: String(sc.spokenLine || ''),
     bgAssetId: (sc.bgUrl || sc.imageUrl) ? urlToId.get(String(sc.bgUrl || sc.imageUrl)) || '' : '',
     camera: sc.camera || {},
-    layers: (sc.layers || []).map((l) => {
+    layers: (sc.layers || []).map((raw) => {
+      const l: any = sc.space && !(raw as any).space && raw.type !== 'badge' ? { ...raw, space: sc.space } : raw;
       if (l.type === 'sprite') return { ...l, assetId: urlToId.get(l.url) || '' };
       if (l.type === 'occluder' && l.bgUrl) return { ...l, assetId: urlToId.get(l.bgUrl) || '' };
       return l;
@@ -210,7 +228,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     return { x: px, y: py, scale: persp * (0.94 + 0.06 * camState.zoom) };
   }
 
-  function drawSprite3D(layer, localT, globalT, camState) {
+  function drawSprite3D(layer, localT, globalT, camState, bgRect) {
     const img = getImg(layer.assetId);
     if (!img) return;
     const dur = Math.max(0.5, camState.dur || 4);
@@ -218,6 +236,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     const wx = layer.xEnd !== undefined ? lerp(layer.x, layer.xEnd, prog) : layer.x;
     const wy = layer.yEnd !== undefined ? lerp(layer.y, layer.yEnd, prog) : layer.y;
     const wz = layer.zEnd !== undefined ? lerp(layer.z, layer.zEnd, prog) : layer.z;
+    const wh = layer.heightEnd !== undefined ? lerp(layer.height, layer.heightEnd, prog) : layer.height;
 
     let alpha = layer.alpha !== undefined ? layer.alpha : 1;
     if (layer.alphaStartSec !== undefined) {
@@ -225,7 +244,17 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       const fade = Math.max(0.1, layer.alphaFadeSec || 1.2);
       alpha *= easeOut((localT - layer.alphaStartSec) / fade);
     }
+    const XF = 0.14;
+    if (layer.showAtSec !== undefined) {
+      if (localT < layer.showAtSec) return;
+      alpha *= clamp((localT - layer.showAtSec) / XF, 0, 1);
+    }
+    if (layer.hideAtSec !== undefined) {
+      if (localT >= layer.hideAtSec + XF) return;
+      alpha *= clamp(1 - (localT - layer.hideAtSec) / XF, 0, 1);
+    }
     if (alpha <= 0.01) return;
+    const anchorY = layer.anchorY !== undefined ? clamp(layer.anchorY, 0, 1) : 1;
 
     const cr = Array.isArray(layer.crop) && layer.crop.length === 4 ? layer.crop : null;
     const srcX = cr ? Math.round(img.naturalWidth * clamp(cr[0], 0, 0.9)) : 0;
@@ -234,8 +263,16 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     const srcH = cr ? Math.max(1, Math.round(img.naturalHeight * clamp(cr[3], 0.1, 1))) : img.naturalHeight;
 
     const bob = layer.bobAmp ? Math.sin(globalT * (layer.bobFreq || 5)) * layer.bobAmp : 0;
-    const p = projectPoint(wx, wy + bob, wz, camState);
-    const drawH = (layer.height || 860) * p.scale;
+    let p, drawH;
+    if (layer.space === 'bg' && bgRect) {
+      // Glued to the background image: same zoom/pan/shake as the painted set
+      const k = bgRect.dh / H;
+      p = { x: bgRect.x + wx * bgRect.dw, y: bgRect.y + wy * bgRect.dh + bob * k, scale: k };
+      drawH = (wh || 0.4) * bgRect.dh;
+    } else {
+      p = projectPoint(wx, wy + bob, wz, camState);
+      drawH = (wh || 860) * p.scale;
+    }
     const drawW = drawH * (srcW / srcH);
 
     ctx.save();
@@ -249,7 +286,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     ctx.translate(p.x, p.y);
     if (layer.rot) ctx.rotate(layer.rot);
     ctx.scale(layer.flipX ? -1 : 1, 1);
-    ctx.drawImage(img, srcX, srcY, srcW, srcH, -drawW * 0.5, -drawH, drawW, drawH);
+    ctx.drawImage(img, srcX, srcY, srcW, srcH, -drawW * 0.5, -drawH * anchorY, drawW, drawH);
     ctx.restore();
   }
 
@@ -257,12 +294,14 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     const occImg = layer.assetId ? getImg(layer.assetId) : bgImg;
     if (!occImg || !Array.isArray(layer.polygon) || layer.polygon.length < 3) return;
     const occRect = occImg === bgImg ? bgRect : computeBgRect(occImg, camState);
+    if (!occRect) return;
+    const inBg = layer.space === 'bg';
     // Transform polygon points alongside bgZoom/dx/dy so occluder remains locked to the background furniture
     ctx.save();
     ctx.beginPath();
     layer.polygon.forEach(function(pt, idx) {
-      const sx = W * 0.5 + (pt[0] - W * 0.5) * camState.zoom + camState.dx;
-      const sy = H * 0.5 + (pt[1] - H * 0.5) * camState.zoom + camState.dy;
+      const sx = inBg ? occRect.x + pt[0] * occRect.dw : W * 0.5 + (pt[0] - W * 0.5) * camState.zoom + camState.dx;
+      const sy = inBg ? occRect.y + pt[1] * occRect.dh : H * 0.5 + (pt[1] - H * 0.5) * camState.zoom + camState.dy;
       if (idx === 0) ctx.moveTo(sx, sy);
       else ctx.lineTo(sx, sy);
     });
@@ -272,9 +311,12 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     ctx.restore();
   }
 
-  function drawRing3D(layer, localT, globalT, camState) {
+  function drawRing3D(layer, localT, globalT, camState, bgRect) {
     if (layer.startSec !== undefined && localT < layer.startSec) return;
-    const p = projectPoint(layer.x, layer.y, layer.z, camState);
+    if (layer.endSec !== undefined && localT >= layer.endSec) return;
+    const p = layer.space === 'bg' && bgRect
+      ? { x: bgRect.x + layer.x * bgRect.dw, y: bgRect.y + layer.y * bgRect.dh, scale: bgRect.dh / H }
+      : projectPoint(layer.x, layer.y, layer.z, camState);
     const period = layer.period || 1.2;
     const ph = (globalT % period) / period;
     const maxR = (layer.maxRadius || 150) * p.scale;
@@ -432,9 +474,9 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     });
     for (let i = 0; i < sorted.length; i++) {
       const layer = sorted[i];
-      if (layer.type === 'sprite') drawSprite3D(layer, localT, t, camState);
+      if (layer.type === 'sprite') drawSprite3D(layer, localT, t, camState, bgRect);
       else if (layer.type === 'occluder') drawOccluder3D(layer, bgImg, bgRect, camState);
-      else if (layer.type === 'ring') drawRing3D(layer, localT, t, camState);
+      else if (layer.type === 'ring') drawRing3D(layer, localT, t, camState, bgRect);
       else if (layer.type === 'badge') drawBadge3D(layer, t, camState);
     }
 
