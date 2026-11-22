@@ -23,6 +23,10 @@ export interface BuildNanoBananaPromptInput {
   chromaGreen?: boolean;
   gridLayout?: ExpressionGridLayout;
   hasRefImage?: boolean;
+  /** Uma entrada por célula da grade (expressions/cast_sheet): pose + expressão, ex. "deitado dormindo, olhos fechados". */
+  poseList?: string[];
+  /** Só para background: direção da câmera dentro do cômodo (ex. "da porta olhando para a cama"). */
+  cameraAngle?: string;
 }
 
 export interface ChromaCutoutOptions {
@@ -77,11 +81,13 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
   if (kind === 'expressions') {
     const grid = input.gridLayout === '3x2' ? '3x2' : '2x2';
     const count = grid === '3x2' ? 6 : 4;
-    const exprList =
-      grid === '3x2'
+    const custom = (input.poseList || []).map((p) => String(p || '').trim()).filter(Boolean).slice(0, count);
+    const exprList = custom.length
+      ? custom.map((p, i) => `${i + 1}) ${p}`).join(', ')
+      : grid === '3x2'
         ? '1) happy smiling, 2) shocked surprised, 3) angry intense, 4) sad worried, 5) thoughtful curious, 6) confident smirk'
         : '1) happy smiling, 2) shocked surprised, 3) angry intense, 4) sad worried';
-    return `Character expression sheet arranged in a clean ${grid} grid (${count} separate waist-up portraits of the exact same fictional original adult character with generous spacing between each portrait): ${refClause}${desc}. Visual style strictly uniform across all ${count} portraits: ${styleDesc}.${isStylized ? ' NO photorealistic skin texture.' : ''} The ${count} expressions in reading order from top-left to bottom-right are: ${exprList}. Identical face, hair, skin tone and outfit in every cell. ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
+    return `Character expression sheet arranged in a clean ${grid} grid (${count} separate FULL-BODY figures, head to toe with feet and hands completely visible and never cropped, of the exact same fictional original adult character, each figure fully inside its own cell with generous margin on all sides and spacing between cells): ${refClause}${desc}. Visual style strictly uniform across all ${count} portraits: ${styleDesc}.${isStylized ? ' NO photorealistic skin texture.' : ''} The ${count} poses/expressions in reading order from top-left to bottom-right are: ${exprList}. Identical face, hair, skin tone and outfit in every cell. ${backdrop} No grid border lines, no labels, no numbers, no text, no watermark.`.slice(
       0,
       3900
     );
@@ -105,7 +111,10 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
 
   if (kind === 'cast_sheet') {
     const grid = input.gridLayout === '3x2' ? '3x2' : '2x2';
-    return `Clean character cast, poses & key props reference sheet arranged in a tidy ${grid} layout with generous spacing between each item: ${refClause}${desc}. Rendered strictly in style: ${styleDesc}.${isStylized ? ' Consistent cartoon outline style, NO photorealism.' : ''} Preserve exact face, hair, skin tone and clothing across every figure and include the requested action poses and isolated story props cleanly separated so each piece can be cropped individually. ${backdrop} No grid lines, no labels, no text, no watermark.`.slice(
+    const count = grid === '3x2' ? 6 : 4;
+    const custom = (input.poseList || []).map((p) => String(p || '').trim()).filter(Boolean).slice(0, count);
+    const cellList = custom.length ? ` The ${count} cells in reading order from top-left to bottom-right are: ${custom.map((p, i) => `${i + 1}) ${p}`).join(', ')}.` : '';
+    return `Clean character cast, poses & key props reference sheet arranged in a tidy ${grid} layout with generous spacing between each item: ${refClause}${desc}. Rendered strictly in style: ${styleDesc}.${isStylized ? ' Consistent cartoon outline style, NO photorealism.' : ''} Every character figure is FULL-BODY, head to toe, hands and feet never cropped and fully inside its cell with margin. Preserve exact face, hair, skin tone and clothing across every figure and include the requested action poses and isolated story props cleanly separated so each piece can be cropped individually.${cellList} ${backdrop} No grid lines, no labels, no text, no watermark.`.slice(
       0,
       3900
     );
@@ -119,7 +128,7 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
   }
 
   if (kind === 'background') {
-    return `Wide establishing background plate without any people or characters: ${desc}. Visual style: ${styleDesc}. Atmospheric depth, clean composition ready to receive foreground characters. ${singleFrameGuard} No text, no watermark.`.slice(
+    return `Wide establishing background plate without any people or characters: ${desc}.${input.cameraAngle ? ` Camera angle and viewpoint: ${String(input.cameraAngle).trim()}; keep the room layout geometrically consistent with that viewpoint.` : ''} Visual style: ${styleDesc}. Atmospheric depth, clean composition ready to receive foreground characters. ${singleFrameGuard} No text, no watermark.`.slice(
       0,
       3900
     );
@@ -294,6 +303,8 @@ export interface StandaloneFlowImageRequest {
   aspectRatio?: '9:16' | '16:9' | '1:1';
   chromaGreen?: boolean;
   gridLayout?: ExpressionGridLayout;
+  poseList?: string[];
+  cameraAngle?: string;
   autoCutout?: boolean;
   refImageUrl?: string;
   refImageUrls?: string[];
@@ -322,6 +333,8 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
         realismo: req.realismo,
         chromaGreen,
         gridLayout: req.gridLayout,
+        poseList: req.poseList,
+        cameraAngle: req.cameraAngle,
         hasRefImage,
       });
 

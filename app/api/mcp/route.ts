@@ -526,7 +526,7 @@ const MCP_TOOLS_MANIFEST = [
   },
   {
     name: 'darktube_generate_image',
-    description: 'Gera imagens avulsas no Nano Banana (Google Flow kind: "image") com Fundo Verde Chroma (#00FF00) opcional, imagem de referência (refImageUrl) para consistência, consulta status/list e recorta #00FF00 em PNG 32-bit transparente (RGBA).',
+    description: 'Gera imagens avulsas no Nano Banana (Google Flow kind: "image") com Fundo Verde Chroma (#00FF00) opcional, imagem de referência (refImageUrl) para consistência, consulta status/list e recorta #00FF00 em PNG 32-bit transparente (RGBA). PLANEJE ANTES DE GERAR: leia o roteiro e monte um mapa de ângulos e assets por cena (cenário por cômodo e por ângulo de câmera, elenco/poses de cada personagem em cada ângulo, props). Não existe quantidade fixa: gere quantas peças o roteiro exigir, nem mais nem menos. Quem decide o escopo é a LLM que está conduzindo (agente do Cockpit ou LLM da credencial cadastrada no front do DarkTube).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -540,6 +540,8 @@ const MCP_TOOLS_MANIFEST = [
         aspectRatio: { type: 'string', enum: ['9:16', '16:9', '1:1'], default: '9:16' },
         chromaGreen: { type: 'boolean', default: true, description: 'Se true, gera com fundo verde puro (#00FF00) para recorte PNG transparente.' },
         gridLayout: { type: 'string', enum: ['2x2', '3x2'], default: '2x2', description: 'Para assetKind="expressions" ou cutout_only: fatia a grade em 4 (2x2) ou 6 (3x2) sprites PNG individuais.' },
+        poseList: { type: 'array', items: { type: 'string' }, description: 'Para expressions/cast_sheet: pose + expressão de CADA célula da grade, em inglês e de corpo inteiro (ex. "lying in bed asleep, eyes closed", "sitting up startled, eyes wide"). Gere uma folha por necessidade da história.' },
+        cameraAngle: { type: 'string', description: 'Para background: de onde a câmera olha o cômodo (ex. "from the doorway looking at the bed against the back wall"). Gere um fundo por ângulo e por cômodo. Para cena de câmera de segurança use o ponto de vista da câmera (ex. "high corner of the ceiling looking down diagonally at the whole room, wide-angle CCTV perspective") e gere poses específicas desse ângulo (ex. personagem dormindo visto de cima, criatura de costas ou virada para a câmera) via poseList.' },
         autoCutout: { type: 'boolean', default: true, description: 'Se true e a imagem terminar dentro de waitForSeconds (ou em status), já devolve o PNG transparente recortado.' },
         refImageUrl: { type: 'string', description: 'URL /api/storage/... da imagem de referência (personagem principal) para manter o mesmo personagem em expressões/variações.' },
         refImageUrls: { type: 'array', items: { type: 'string' }, description: 'Lista opcional de até 4 imagens de referência (/api/storage/...).' },

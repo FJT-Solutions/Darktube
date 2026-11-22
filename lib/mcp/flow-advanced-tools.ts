@@ -1161,6 +1161,8 @@ export interface GenerateFlowImageMcpInput {
   aspectRatio?: '9:16' | '16:9' | '1:1';
   chromaGreen?: boolean;
   gridLayout?: '2x2' | '3x2';
+  poseList?: string[];
+  cameraAngle?: string;
   autoCutout?: boolean;
   refImageUrl?: string;
   refImageUrls?: string[];
@@ -1257,6 +1259,8 @@ export async function generateFlowImageMcp(input: GenerateFlowImageMcpInput) {
     aspectRatio: input.aspectRatio || (input.assetKind === 'expressions' ? '1:1' : '9:16'),
     chromaGreen: input.chromaGreen,
     gridLayout: input.gridLayout,
+    poseList: input.poseList,
+    cameraAngle: input.cameraAngle,
     autoCutout: input.autoCutout !== false,
     refImageUrl: input.refImageUrl,
     refImageUrls: input.refImageUrls,
