@@ -112,6 +112,8 @@ export interface Stage3DSceneInput extends Partial<HtmlSvgV2Scene> {
   /** Default coordinate space for every layer of the scene (see Stage3DSpriteLayer.space) */
   space?: 'stage' | 'bg';
   sfx?: Stage3DSfx[];
+  /** Character line: the narrator pauses after this scene's spokenLine while it plays (see lib/dialogue-pauses.ts) */
+  dialogue?: { url: string; volume?: number; gapBeforeSec?: number; gapAfterSec?: number };
 }
 
 export interface Stage3DCompileContext extends Omit<HtmlSvgV2CompileContext, 'scenes'> {

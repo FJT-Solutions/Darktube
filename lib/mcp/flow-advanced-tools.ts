@@ -61,6 +61,7 @@ import { createFlowProject, updateFlowProject, type FlowProject } from '@/lib/fl
 import { createFlowJob, normalizeStorageReference, syncProjectQueuedJobsWithReferences } from '@/lib/flow-jobs';
 import { analyzeVideoStructureFromLink, buildCloneTemplateAndParams, formatCloneAsVideoMd } from '@/lib/flow-video-clone';
 import type { CloneCustomization } from '@/lib/flow-clone-types';
+import { insertDialoguePauses } from '@/lib/dialogue-pauses';
 import {
   getCreativeStatus,
   resolveDefaultUserId,
@@ -807,7 +808,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
     async ({ onProgress }) => {
       let audioPath: string | undefined;
       let voiceWords: Array<{ palavra: string; inicio: number; fim: number }> | undefined;
-      let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string } = {};
+      let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string; dialoguePauses?: number } = {};
+      let dialoguePauses: number | undefined;
       if ((spokenPreview || input.audioPathOrUrl) && chosenVoiceProvider) {
         const voiceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dt_voice_'));
         const vr = await resolveVoiceWithTimestamps({
@@ -822,10 +824,30 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
         });
         audioPath = vr.audioPath;
         voiceWords = vr.words;
+        if (input.preset === 'html_svg_3d_stage' && audioPath && voiceWords?.length && (input.scenes || []).some((s: any) => s?.dialogue?.url || s?.dialogue?.text)) {
+          // character lines given as text are voiced on the server (ElevenLabs/Edge/OpenAI of the user)
+          const synth = async (dl: any, outDir: string) => {
+            const lr = await resolveVoiceWithTimestamps({
+              userId,
+              scriptText: String(dl.text),
+              outputDir: outDir,
+              voiceProvider: dl.voiceProvider || chosenVoiceProvider,
+              voiceGender: dl.voiceGender || 'male',
+              voiceId: dl.voiceId,
+            });
+            return lr.audioPath;
+          };
+          const dp = await insertDialoguePauses(audioPath, voiceWords, (input.scenes || []) as any[], voiceDir, synth);
+          audioPath = dp.audioPath;
+          voiceWords = dp.words;
+          input = { ...input, scenes: dp.scenes as any };
+          dialoguePauses = dp.pauses;
+        }
         voiceMeta = {
           voiceProviderUsed: vr.providerUsed,
           voiceUsed: vr.voiceUsed,
           voiceLabel: vr.voiceLabel,
+          ...(dialoguePauses !== undefined ? { dialoguePauses } : {}),
         };
       }
 
@@ -1505,7 +1527,8 @@ export async function batchRenderMcp(input: {
                 ? it.scenes.map((s: any) => s.spokenLine || s.subtitle || s.title).filter(Boolean).join(' ')
                 : title);
             let audioPath: string | undefined;
-            let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string } = {};
+            let voiceMeta: { voiceProviderUsed?: string; voiceUsed?: string; voiceLabel?: string; dialoguePauses?: number } = {};
+      let dialoguePauses: number | undefined;
             if ((spoken || it.audioPathOrUrl) && chosenVoiceProvider) {
               const vr = await resolveVoiceWithTimestamps({
                 userId,
