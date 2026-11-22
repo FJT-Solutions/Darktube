@@ -458,7 +458,7 @@ export function compileHtmlSvgDocument(spec: HtmlSvgProjectSpec, draft = false):
     const dur = Math.max(2, Math.min(120, Number(spec.durationSec) || 8));
     const unresolvedTpl = /\$\{(?:Array\.from|Math\.|new |props|sc\.)/.test(spec.customHtml);
     let htmlOut = spec.customHtml;
-    if (Array.isArray(spec.words) && spec.words.length > 0 && !htmlOut.includes('window.__DT_WORDS')) {
+    if (Array.isArray(spec.words) && spec.words.length > 0 && !/window\.__DT_WORDS\s*=/.test(htmlOut)) {
       const wordsScript = `<script>window.__DT_WORDS=${JSON.stringify(spec.words).replace(/</g, '\\u003c')};</script>`;
       if (/<\/head>/i.test(htmlOut)) {
         htmlOut = htmlOut.replace(/<\/head>/i, `${wordsScript}</head>`);

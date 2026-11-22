@@ -19,6 +19,8 @@ export interface Stage3DSpriteLayer {
   alphaStartSec?: number;
   alphaFadeSec?: number;
   shadow?: boolean;
+  /** Optional normalized source crop [sx, sy, sw, sh] in 0..1 to trim 2x2 sheet edge artifacts */
+  crop?: [number, number, number, number];
 }
 
 export interface Stage3DOccluderLayer {
@@ -125,7 +127,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       const id = `stage_asset_${idx}`;
       urlToId.set(u, id);
       const safeSrc = u.replace(/"/g, '&quot;');
-      return `<img id="${id}" src="${safeSrc}" crossorigin="anonymous" />`;
+      return `<img id="${id}" src="${safeSrc}" />`;
     })
     .join('\n  ');
 
@@ -153,7 +155,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
 <title>${String(title || 'DarkTube 3D Stage').replace(/</g, '&lt;')}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: ${width}px; height: ${height}px; overflow: hidden; background: ${bgHex}; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: ${bgHex}; }
   canvas { display: block; width: 100%; height: 100%; }
   .preload-assets { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
 </style>
@@ -174,7 +176,8 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
   const ACCENT = ${safeJson(accentHex)};
   const SEC = ${safeJson(secHex)};
   const SCENES = ${safeJson(serializedScenes)};
-  const WORDS = ${safeJson(words || [])};
+  const dtWords = window['__DT_' + 'WORDS'];
+  const WORDS = (Array.isArray(dtWords) && dtWords.length ? dtWords : ${safeJson(words || [])});
 
   const BASE_Z = 300;
   const FOCAL = 700;
@@ -224,10 +227,16 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     }
     if (alpha <= 0.01) return;
 
+    const cr = Array.isArray(layer.crop) && layer.crop.length === 4 ? layer.crop : null;
+    const srcX = cr ? Math.round(img.naturalWidth * clamp(cr[0], 0, 0.9)) : 0;
+    const srcY = cr ? Math.round(img.naturalHeight * clamp(cr[1], 0, 0.9)) : 0;
+    const srcW = cr ? Math.max(1, Math.round(img.naturalWidth * clamp(cr[2], 0.1, 1))) : img.naturalWidth;
+    const srcH = cr ? Math.max(1, Math.round(img.naturalHeight * clamp(cr[3], 0.1, 1))) : img.naturalHeight;
+
     const bob = layer.bobAmp ? Math.sin(globalT * (layer.bobFreq || 5)) * layer.bobAmp : 0;
     const p = projectPoint(wx, wy + bob, wz, camState);
     const drawH = (layer.height || 860) * p.scale;
-    const drawW = drawH * (img.naturalWidth / img.naturalHeight);
+    const drawW = drawH * (srcW / srcH);
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -240,7 +249,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     ctx.translate(p.x, p.y);
     if (layer.rot) ctx.rotate(layer.rot);
     ctx.scale(layer.flipX ? -1 : 1, 1);
-    ctx.drawImage(img, -drawW * 0.5, -drawH, drawW, drawH);
+    ctx.drawImage(img, srcX, srcY, srcW, srcH, -drawW * 0.5, -drawH, drawW, drawH);
     ctx.restore();
   }
 
