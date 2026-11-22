@@ -829,7 +829,7 @@ td{border-bottom:1px solid #d6d3d1;padding:5px 6px;vertical-align:top}td.c{text-
 .refsec{margin-bottom:14px}.refrow{display:grid;grid-template-columns:150px 1fr;gap:12px;border-top:1px dashed #a8a29e;padding:10px 0}.refrow:first-of-type{border-top:0}
 .refrow>b{font-size:12px;letter-spacing:1.4px;text-transform:uppercase;padding-top:4px}
 .strip{display:flex;flex-wrap:wrap;gap:10px}.strip figure img{object-fit:contain;background:#fff}.strip .ph{width:170px}
-.angles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.angles img{width:100%;object-fit:cover}
+.angles{display:grid;grid-template-columns:repeat(auto-fill,240px);gap:12px}.angles img,.angles .ph{width:240px!important;height:auto!important;aspect-ratio:9/16;object-fit:cover}
 .mgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px 16px;font-size:13px}.mgrid span{display:block;font-size:10.5px;letter-spacing:1.3px;color:#a8a29e;font-weight:700}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute"><defs><marker id="sbah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#1c1917"/></marker></defs></svg>
