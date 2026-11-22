@@ -301,6 +301,8 @@ export interface StandaloneFlowImageRequest {
   customPrompt?: string;
   realismo?: string;
   aspectRatio?: '9:16' | '16:9' | '1:1';
+  /** exact Flow model name; sheets default to the faster Nano Banana 2.1, everything else to Pro */
+  model?: string;
   chromaGreen?: boolean;
   gridLayout?: ExpressionGridLayout;
   poseList?: string[];
@@ -359,7 +361,7 @@ export async function createStandaloneFlowImageJob(req: StandaloneFlowImageReque
     prompt,
     params: {
       aspectRatio: req.aspectRatio || '9:16',
-      model: 'Nano Banana Pro',
+      model: req.model?.trim() || (['expression_sheet', 'cast_sheet', 'puppet_sheet', 'accessories_sheet'].includes(role) ? 'Nano Banana 2.1' : 'Nano Banana Pro'),
       ...(cleanRefUrl ? { refImageUrl: cleanRefUrl } : {}),
       ...(cleanRefUrls?.length ? { refImageUrls: cleanRefUrls } : {}),
     },

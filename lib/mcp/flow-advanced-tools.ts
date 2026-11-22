@@ -1332,6 +1332,7 @@ export async function generateFlowImageMcp(input: GenerateFlowImageMcpInput) {
     customPrompt: input.customPrompt,
     realismo: input.realismo,
     aspectRatio: input.aspectRatio || (input.assetKind === 'expressions' ? '1:1' : '9:16'),
+    model: (input as any).model,
     chromaGreen: input.chromaGreen,
     gridLayout: input.gridLayout,
     poseList: input.poseList,
