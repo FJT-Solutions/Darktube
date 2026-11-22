@@ -39,6 +39,7 @@ import {
   buildDefault3dStageScenes,
   type Stage3DCameraConfig,
   type Stage3DLayer,
+  type Stage3DSfx,
 } from './html-svg-3d-stage';
 
 export type HtmlSvgPreset =
@@ -119,6 +120,10 @@ export interface HtmlSvgSceneInput {
   camera?: Stage3DCameraConfig;
   layers?: Stage3DLayer[];
   space?: 'stage' | 'bg';
+  /** Sound effects placed relative to the scene start (html_svg_3d_stage) */
+  sfx?: Stage3DSfx[];
+  /** What the frame must show (who, where, facing what, holding what): read by the staging preview critic */
+  staging?: string;
 }
 
 export interface HtmlSvgProjectSpec {
@@ -207,6 +212,8 @@ type NormalizedHtmlSvgScene = Required<
     | 'camera'
     | 'layers'
     | 'space'
+    | 'sfx'
+    | 'staging'
   >
 > &
   Pick<
@@ -242,6 +249,8 @@ type NormalizedHtmlSvgScene = Required<
     | 'camera'
     | 'layers'
     | 'space'
+    | 'sfx'
+    | 'staging'
   >;
 
 function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {

@@ -12,6 +12,7 @@ import { pool } from '@/lib/db-client';
 import { getUserApiKey } from '@/lib/database';
 import { uploadMediaFile } from '@/lib/storage';
 import { renderHtmlSvgToMp4 } from '@/lib/html-svg-render';
+import { previewHtmlSvgStaging } from '@/lib/html-svg-preview';
 import type { HtmlSvgProjectSpec } from '@/lib/html-svg-templates';
 import { enqueueDetachedRenderTask, getRenderQueueSnapshot, runQueuedRenderTask, type RenderJobKind } from '@/lib/render-queue';
 import { readStored } from '@/lib/flow-assemble';
@@ -750,6 +751,10 @@ export interface RenderHtmlSvgInput extends HtmlSvgProjectSpec {
   voiceName?: string;
   audioPathOrUrl?: string;
   scriptText?: string;
+  /** Staging preview: 2 stills per scene at the real cuts + vision review, no MP4 */
+  previewOnly?: boolean;
+  /** Preferred LLM provider for the preview review (falls back to the other saved credentials) */
+  provider?: FlowProvider;
 }
 
 /**
@@ -826,6 +831,37 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
 
       await onProgress(15);
       const sheetPath = path.join(os.tmpdir(), `dt_htmlsvg_qa_${Date.now()}.png`);
+      if (input.previewOnly) {
+        const creds = await resolveUserLlmCredential(userId, input.provider || 'claude').catch(() => null);
+        const preview = await previewHtmlSvgStaging({
+          spec: { ...input, ...(voiceWords?.length && !input.words?.length ? { words: voiceWords } : {}) },
+          contactSheetPath: sheetPath,
+          credentials: creds ? [{ provider: creds.provider, apiKey: creds.apiKey }, ...creds.fallbackCredentials] : [],
+        });
+        let previewSheetUrl: string | null = null;
+        if (preview.contactSheetPath && fs.existsSync(preview.contactSheetPath)) {
+          try {
+            const qaPath = await uploadMediaFile(fs.readFileSync(preview.contactSheetPath), `${safeBase}_preview_${Date.now()}.png`, 'image/png');
+            previewSheetUrl = `https://darktube.fjt-solutions.com${qaPath}`;
+          } catch {}
+          try { fs.unlinkSync(preview.contactSheetPath); } catch {}
+        }
+        return {
+          success: true,
+          engine: 'html_svg',
+          previewOnly: true,
+          videoUrl: null,
+          creditsCost: 0,
+          ...voiceMeta,
+          contactSheetUrl: previewSheetUrl,
+          contactSheetLayout: 'Folha com 2 quadros por cena (início e fim do plano), na ordem das cenas, 8 por linha.',
+          ...preview,
+          contactSheetPath: undefined,
+          nextStep: preview.passed
+            ? 'Encenação aprovada: renderize com previewOnly=false.'
+            : 'Corrija cada issue (adjust_layer: mude x/y/height/z/flipX/occluder; regenerate_sprite/regenerate_background: gere o asset de novo no darktube_generate_image) e rode a prévia outra vez antes do render final.',
+        };
+      }
       const rendered = await renderHtmlSvgToMp4({
         spec: {
           ...input,

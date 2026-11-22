@@ -86,6 +86,17 @@ export interface Stage3DCameraConfig {
   scanlines?: boolean;
   recLabel?: string;
   peepholeRadius?: number;
+  /** Scene-relative seconds of each knock/impact: short camera jolt + dark flash (replaces the old ring) */
+  knocks?: number[];
+  /** Jolt strength in stage pixels (default 22) */
+  knockAmp?: number;
+}
+
+/** Sound effect placed relative to the scene start (the renderer resolves it to the retimed cut) */
+export interface Stage3DSfx {
+  url: string;
+  atSec?: number;
+  volume?: number;
 }
 
 export interface Stage3DSceneInput extends Partial<HtmlSvgV2Scene> {
@@ -94,6 +105,7 @@ export interface Stage3DSceneInput extends Partial<HtmlSvgV2Scene> {
   layers?: Stage3DLayer[];
   /** Default coordinate space for every layer of the scene (see Stage3DSpriteLayer.space) */
   space?: 'stage' | 'bg';
+  sfx?: Stage3DSfx[];
 }
 
 export interface Stage3DCompileContext extends Omit<HtmlSvgV2CompileContext, 'scenes'> {
@@ -216,6 +228,9 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       SCENES[i].durationSec = Math.max(0.5, SCENES[i].end - SCENES[i].start);
     }
   })();
+
+  // Final cut times (after the voice retime) for the renderer: QA sampling and SFX placement
+  window.__dtScenes = SCENES.map(function(s) { return { start: s.start, end: s.end, title: s.title, spokenLine: s.spokenLine }; });
 
   const BASE_Z = 300;
   const FOCAL = 700;
@@ -456,12 +471,24 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     const shakePer = cam.shakePeriod || 0;
     const shakeActive = shakeAmp > 0 && (shakePer <= 0 || (t % shakePer) < 0.38);
     const shakeX = shakeActive ? Math.sin(t * 58) * shakeAmp : 0;
+    // Knock jolt: damped impulse right after each knock time
+    let joltY = 0, joltX = 0, knockFlash = 0;
+    const knocks = Array.isArray(cam.knocks) ? cam.knocks : [];
+    for (let k = 0; k < knocks.length; k++) {
+      const dt = localT - Number(knocks[k]);
+      if (dt >= 0 && dt < 0.4) {
+        const e = Math.exp(-dt * 11);
+        joltY += Math.sin(dt * 70) * (cam.knockAmp || 22) * e;
+        joltX += Math.sin(dt * 53 + 1.3) * (cam.knockAmp || 22) * 0.45 * e;
+        knockFlash = Math.max(knockFlash, 0.32 * e);
+      }
+    }
 
     const camState = {
       dur: dur,
       zoom: lerp(cam.zoomStart || 1.04, cam.zoomEnd || 1.12, easeOut(prog)),
-      dx: lerp(cam.panX || 0, cam.panXEnd !== undefined ? cam.panXEnd : (cam.panX || 0), prog) + shakeX,
-      dy: lerp(cam.panY || 0, cam.panYEnd !== undefined ? cam.panYEnd : (cam.panY || 0), prog),
+      dx: lerp(cam.panX || 0, cam.panXEnd !== undefined ? cam.panXEnd : (cam.panX || 0), prog) + shakeX + joltX,
+      dy: lerp(cam.panY || 0, cam.panYEnd !== undefined ? cam.panYEnd : (cam.panY || 0), prog) + joltY,
     };
 
     const bgImg = getImg(sc.bgAssetId);
@@ -503,6 +530,11 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     // Apply atmospheric color grade after occluders so foreground furniture shares the same lighting
     if (cam.tintColor) {
       ctx.fillStyle = cam.tintColor;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (knockFlash > 0) {
+      ctx.fillStyle = 'rgba(0, 0, 0, ' + knockFlash.toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
 

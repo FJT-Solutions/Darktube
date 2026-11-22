@@ -103,7 +103,7 @@ async function cacheRemoteImageToLocal(url: string, dir: string, index: number):
   }
 }
 
-async function enrichEditorialMedia(
+export async function enrichEditorialMedia(
   spec: HtmlSvgProjectSpec,
   assetDir: string,
   allowAutoSearch: boolean
@@ -175,6 +175,46 @@ async function enrichEditorialMedia(
 }
 
 /**
+ * Mixes per-scene sound effects (scene.sfx, times relative to the retimed cut) over the narration track.
+ */
+async function mixSceneSfx(
+  videoPath: string,
+  scenes: HtmlSvgSceneInput[],
+  cuts: Array<{ start: number; end: number }>,
+  assetDir: string,
+  durationSec: number
+): Promise<void> {
+  const items: Array<{ file: string; atMs: number; volume: number }> = [];
+  for (let i = 0; i < scenes.length && i < cuts.length; i++) {
+    for (const fx of scenes[i].sfx || []) {
+      if (!fx?.url) continue;
+      let file = fx.url.startsWith('file://') ? fx.url.replace(/^file:\/\//, '') : fx.url;
+      if (/^https?:\/\//i.test(file)) {
+        const res = await fetch(file, { signal: AbortSignal.timeout(20_000) });
+        if (!res.ok) continue;
+        file = path.join(assetDir, `sfx_${items.length}${path.extname(new URL(fx.url).pathname) || '.mp3'}`);
+        fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      }
+      if (!fs.existsSync(file)) continue;
+      const at = cuts[i].start + Math.max(0, Number(fx.atSec) || 0);
+      if (at >= durationSec) continue;
+      items.push({ file, atMs: Math.round(at * 1000), volume: Math.max(0, Math.min(2, Number(fx.volume ?? 0.8))) });
+    }
+  }
+  if (!items.length) return;
+  const tmpOut = videoPath.replace(/\.mp4$/i, '_sfx.mp4');
+  const inputs = items.flatMap((it) => ['-i', it.file]);
+  const chains = items.map((it, k) => `[${k + 1}:a]adelay=${it.atMs}|${it.atMs},volume=${it.volume}[s${k}]`);
+  const filter = `${chains.join(';')};[0:a]${items.map((_, k) => `[s${k}]`).join('')}amix=inputs=${items.length + 1}:normalize=0:duration=first[a]`;
+  await runExec(
+    ffmpegBin(),
+    ['-y', '-loglevel', 'error', '-i', videoPath, ...inputs, '-filter_complex', filter, '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', tmpOut],
+    { timeout: 120_000, windowsHide: true }
+  );
+  fs.renameSync(tmpOut, videoPath);
+}
+
+/**
  * Renderiza uma composicao HTML + SVG frame a frame (deterministica via window.__dtSeek)
  * usando Playwright Chromium + FFmpeg, rodando Motion Checks automaticos no MP4 final.
  */
@@ -230,6 +270,10 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
       );
     }).catch(() => {});
 
+    const sceneCuts: Array<{ start: number; end: number }> = await page
+      .evaluate(() => ((window as any).__dtScenes || []) as Array<{ start: number; end: number }>)
+      .catch(() => []);
+
     // Contact Sheet QA pré-render (#05/#19): amostra 1 still por cena (ou 4 pontos) antes do encode final
     if (opts.generateContactSheet !== false) {
       const sampleTimes: number[] = [];
@@ -245,7 +289,9 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
                 : enrichedSpec.preset === 'html_svg_3d_stage'
                   ? buildDefault3dStageScenes()
                   : [];
-      if (scenesList.length > 0 && !enrichedSpec.customHtml) {
+      if (sceneCuts.length > 0) {
+        for (const c of sceneCuts.slice(0, 16)) sampleTimes.push(Math.min(compiled.durationSec - 0.05, c.start + (c.end - c.start) * 0.55));
+      } else if (scenesList.length > 0 && !enrichedSpec.customHtml) {
         let cur = 0;
         for (const sc of scenesList.slice(0, 16)) {
           const d = Math.max(1.5, Math.min(20, Number(sc.durationSec) || 4));
@@ -385,6 +431,12 @@ export async function renderHtmlSvgToMp4(opts: HtmlSvgRenderOptions): Promise<Ht
 
     ff.stdin.end();
     await ffDone;
+
+    if (hasAudioFile && sceneCuts.length > 0) {
+      await mixSceneSfx(opts.outputPath, enrichedSpec.scenes || [], sceneCuts, assetDir, compiled.durationSec).catch((e) => {
+        console.warn(`[HTML+SVG Render] SFX ignorados: ${e?.message || e}`);
+      });
+    }
   } finally {
     await browser.close().catch(() => {});
     if (fs.existsSync(tmpHtml)) {
