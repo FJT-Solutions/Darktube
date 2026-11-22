@@ -135,7 +135,8 @@ export function buildNanoBananaAssetPrompt(input: BuildNanoBananaPromptInput): s
   }
 
   // Default: 'character'
-  return `Full-body or waist-up character reference portrait of a fictional original adult character: ${refClause}${desc}. Rendered strictly in this visual style: ${styleDesc}.${isStylized ? ' Consistent stylized art, NO photorealism.' : ''} Single character centered in frame with clear silhouette, facing the camera, ${backdrop} Single character only, ${singleFrameGuard} no turnaround, no text, no watermark.`.slice(
+  const angle = /\b(behind|back view|from the back|side profile|profile|costas|perfil)\b/i.test(desc) ? 'in exactly the viewing angle described' : 'facing the camera';
+  return `FULL-BODY character reference (head to feet, nothing cropped) of a fictional original adult character: ${refClause}${desc}. Rendered strictly in this visual style: ${styleDesc}.${isStylized ? ' Consistent stylized art, NO photorealism.' : ''} Single character centered in frame with clear silhouette, ${angle}, ${backdrop} Single character only, ${singleFrameGuard} one single view (not a multi-view sheet), no text, no watermark.`.slice(
     0,
     3900
   );
