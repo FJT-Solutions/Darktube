@@ -197,6 +197,26 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
   const dtWords = window['__DT_' + 'WORDS'];
   const WORDS = (Array.isArray(dtWords) && dtWords.length ? dtWords : ${safeJson(words || [])});
 
+  // Retime scenes to the real voice: each scene starts on the first word of its spokenLine,
+  // so cuts land on the narration instead of on hand-written durationSec guesses.
+  (function retimeToVoice() {
+    if (!WORDS.length || SCENES.length < 2 || SCENES.some(function(s) { return !String(s.spokenLine || '').trim(); })) return;
+    const tok = function(s) { return String(s).split(/\\s+/).filter(function(w) { return /[\\p{L}\\p{N}]/u.test(w); }).length; };
+    const counts = SCENES.map(function(s) { return Math.max(1, tok(s.spokenLine)); });
+    const totalTok = counts.reduce(function(a, b) { return a + b; }, 0);
+    let cum = 0;
+    for (let i = 0; i < SCENES.length; i++) {
+      const idx = Math.min(WORDS.length - 1, Math.round(cum * WORDS.length / totalTok));
+      cum += counts[i];
+      const st = i === 0 ? 0 : Math.max(0, Number(WORDS[idx].inicio) - 0.08);
+      SCENES[i].start = i === 0 ? 0 : Math.max(SCENES[i - 1].start + 0.4, st);
+    }
+    for (let i = 0; i < SCENES.length; i++) {
+      SCENES[i].end = i === SCENES.length - 1 ? TOTAL : SCENES[i + 1].start;
+      SCENES[i].durationSec = Math.max(0.5, SCENES[i].end - SCENES[i].start);
+    }
+  })();
+
   const BASE_Z = 300;
   const FOCAL = 700;
 
