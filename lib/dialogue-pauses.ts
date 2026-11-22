@@ -18,6 +18,9 @@ export interface SceneDialogue {
   voiceProvider?: string;
   voiceId?: string;
   voiceGender?: 'male' | 'female';
+  /** Edge only: pitch like '-20Hz' and speed multiplier (0.85 = 15% slower) to age or darken the voice */
+  pitch?: string;
+  speed?: number;
   volume?: number;
   /** silence before the line starts (default 0.25s) and after it ends (default 0.35s) */
   gapBeforeSec?: number;
@@ -75,6 +78,13 @@ export async function insertDialoguePauses<S extends { spokenLine?: string; dura
       file = path.join(workDir, `dialogue_${i}${path.extname(new URL(String(dl.url)).pathname) || '.mp3'}`);
       fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     }
+    // decode to WAV first: OpenAI TTS mp3 headers report a wrong duration (~2.5s for a 6s line),
+    // which made the narrator come back over the character
+    const wav = path.join(workDir, `dialogue_${i}.wav`);
+    try {
+      await run(ffmpegBin(), ['-y', '-loglevel', 'error', '-i', file, '-ar', '44100', '-ac', '2', wav], { timeout: 60_000, windowsHide: true });
+      file = wav;
+    } catch {}
     const d = await durationOf(file).catch(() => 0);
     if (!d) continue;
     const lastIdx = i + 1 < out.length ? Math.max(firstIdx[i], firstIdx[i + 1] - 1) : words.length - 1;

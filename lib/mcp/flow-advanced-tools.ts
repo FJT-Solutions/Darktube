@@ -834,6 +834,8 @@ export async function renderHtmlSvgVideoMcp(input: RenderHtmlSvgInput) {
               voiceProvider: dl.voiceProvider || chosenVoiceProvider,
               voiceGender: dl.voiceGender || 'male',
               voiceId: dl.voiceId,
+              ...(dl.pitch ? { pitch: String(dl.pitch) } : {}),
+              ...(dl.speed ? { speed: Number(dl.speed) } : {}),
             });
             return lr.audioPath;
           };

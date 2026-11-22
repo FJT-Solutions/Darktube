@@ -76,6 +76,8 @@ export interface ResolveVoiceInput {
   voiceName?: string;
   language?: string;
   speed?: number;
+  /** Edge TTS pitch shift, e.g. '-20Hz' (older/deeper character voices) */
+  pitch?: string;
 }
 
 export interface ResolveVoiceResult {
@@ -354,7 +356,8 @@ async function synthesizeEdgeTts(
   voiceName: string,
   speed: number,
   outputDir: string,
-  outMp3: string
+  outMp3: string,
+  pitch?: string
 ): Promise<{ durationSec: number; words: VoiceWord[] }> {
   const txtPath = path.join(outputDir, 'edge_input.txt');
   const wordsJsonPath = path.join(outputDir, 'edge_words.json');
@@ -365,10 +368,10 @@ async function synthesizeEdgeTts(
 
   const pyScript = `
 import asyncio, json, sys, edge_tts
-txt_p, mp3_p, out_p, voice, rate = sys.argv[1:6]
+txt_p, mp3_p, out_p, voice, rate, pitch = sys.argv[1:7]
 text = open(txt_p, 'r', encoding='utf-8').read().strip()
 async def main():
-    comm = edge_tts.Communicate(text, voice=voice, rate=rate, boundary='WordBoundary')
+    comm = edge_tts.Communicate(text, voice=voice, rate=rate, pitch=pitch, boundary='WordBoundary')
     words = []
     with open(mp3_p, 'wb') as f:
         async for ch in comm.stream():
@@ -386,7 +389,7 @@ asyncio.run(main())
   let lastErr: unknown = null;
   for (const pyBin of [process.env.PYTHON_BIN, 'python3', 'python'].filter(Boolean) as string[]) {
     try {
-      await run(pyBin, ['-c', pyScript, txtPath, outMp3, wordsJsonPath, voiceName, rateStr], {
+      await run(pyBin, ['-c', pyScript, txtPath, outMp3, wordsJsonPath, voiceName, rateStr, /^[+-]\d{1,3}Hz$/.test(String(pitch || '')) ? String(pitch) : '+0Hz'], {
         timeout: 120_000,
         windowsHide: true,
       });
@@ -579,7 +582,7 @@ export async function resolveVoiceWithTimestamps(input: ResolveVoiceInput): Prom
   // Edge TTS explícito (PT-BR neural)
   const edgeVoice = String(input.voiceId || (EDGE_VOICE_MAP[langShort] || EDGE_VOICE_MAP.pt)[gender]).trim();
   const edgeOpt = EDGE_PTBR_VOICES.find((v) => v.id === edgeVoice);
-  const edgeRes = await synthesizeEdgeTts(text, edgeVoice, speed, input.outputDir, outMp3);
+  const edgeRes = await synthesizeEdgeTts(text, edgeVoice, speed, input.outputDir, outMp3, input.pitch);
   return {
     audioPath: outMp3,
     durationSec: edgeRes.durationSec,
