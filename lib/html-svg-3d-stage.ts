@@ -96,6 +96,25 @@ export interface Stage3DCameraConfig {
   knocks?: number[];
   /** Jolt strength in stage pixels (default 22) */
   knockAmp?: number;
+  /** Edit events tied to the narration: the picture reacts to what is being said */
+  events?: Stage3DEditEvent[];
+}
+
+/**
+ * blackout: picture fades to dark (lights went out) and stays dark for durSec (default: until scene end);
+ * lights_on: picture comes back from dark; flicker: unstable light; quake: decaying earthquake shake;
+ * flash: white flash (lightning, gunshot, camera flash); jolt: single impact like a knock.
+ */
+export interface Stage3DEditEvent {
+  type: 'blackout' | 'lights_on' | 'flicker' | 'quake' | 'flash' | 'jolt';
+  /** scene-relative seconds, or anchor on a word of the scene's spokenLine (wins over atSec) */
+  atSec?: number;
+  atWord?: string;
+  durSec?: number;
+  /** fade length for blackout/lights_on (default 0.35s) */
+  fadeSec?: number;
+  /** blackout darkness 0..1 (default 0.94), shake amplitude in px for quake/jolt (default 26) */
+  amount?: number;
 }
 
 /** Sound effect placed relative to the scene start (the renderer resolves it to the retimed cut) */
@@ -236,6 +255,59 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       SCENES[i].durationSec = Math.max(0.5, SCENES[i].end - SCENES[i].start);
     }
   })();
+
+  // Anchor edit events on the spoken word ("apagou a luz" -> blackout when "apagou" is heard)
+  (function anchorEvents() {
+    const norm = function(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^\\p{L}\\p{N}]/gu, ''); };
+    for (let i = 0; i < SCENES.length; i++) {
+      const evs = (SCENES[i].camera && SCENES[i].camera.events) || [];
+      for (let k = 0; k < evs.length; k++) {
+        const ev = evs[k];
+        if (!ev.atWord || !WORDS.length) continue;
+        const target = norm(String(ev.atWord).split(/\\s+/)[0]);
+        const hit = WORDS.find(function(w) {
+          return Number(w.inicio) >= SCENES[i].start - 0.05 && Number(w.inicio) < SCENES[i].end && norm(w.palavra) === target;
+        }) || WORDS.find(function(w) {
+          return Number(w.inicio) >= SCENES[i].start - 0.05 && Number(w.inicio) < SCENES[i].end && norm(w.palavra).indexOf(target) === 0;
+        });
+        if (hit) ev.atSec = Math.max(0, Number(hit.inicio) - SCENES[i].start);
+      }
+    }
+  })();
+
+  // Darkness, flash and shake from the scene's edit events at scene time lt
+  function editFx(cam, lt, sceneDur) {
+    const fx = { dark: 0, flash: 0, dx: 0, dy: 0 };
+    const evs = Array.isArray(cam.events) ? cam.events.slice().sort(function(a, b) { return (a.atSec || 0) - (b.atSec || 0); }) : [];
+    for (let k = 0; k < evs.length; k++) {
+      const ev = evs[k];
+      const at = Number(ev.atSec || 0);
+      const dt = lt - at;
+      if (dt < 0) continue;
+      const fade = Math.max(0.01, Number(ev.fadeSec || 0.35));
+      const dur = ev.durSec !== undefined ? Number(ev.durSec) : sceneDur;
+      if (ev.type === 'blackout') {
+        const lvl = ev.amount !== undefined ? clamp(Number(ev.amount), 0, 1) : 0.94;
+        fx.dark = dt < dur ? lvl * clamp(dt / fade, 0, 1) : (ev.durSec !== undefined ? lvl * clamp(1 - (dt - dur) / fade, 0, 1) : lvl);
+      } else if (ev.type === 'lights_on') {
+        fx.dark = fx.dark * clamp(1 - dt / fade, 0, 1);
+      } else if (ev.type === 'flicker' && dt < (ev.durSec || 1.2)) {
+        const n = hash(Math.floor((at + dt) * 14) + k * 31);
+        fx.dark = Math.max(fx.dark, n > 0.55 ? 0.85 * n : 0);
+      } else if (ev.type === 'quake' && dt < (ev.durSec || 1.6)) {
+        const amp = Number(ev.amount || 26) * (1 - dt / (ev.durSec || 1.6));
+        fx.dx += Math.sin(dt * 47) * amp;
+        fx.dy += Math.sin(dt * 61 + 0.7) * amp * 0.7;
+      } else if (ev.type === 'flash' && dt < 0.45) {
+        fx.flash = Math.max(fx.flash, Math.exp(-dt * 9));
+      } else if (ev.type === 'jolt' && dt < 0.4) {
+        const e = Math.exp(-dt * 11);
+        fx.dy += Math.sin(dt * 70) * Number(ev.amount || 26) * e;
+        fx.dx += Math.sin(dt * 53 + 1.3) * Number(ev.amount || 26) * 0.45 * e;
+      }
+    }
+    return fx;
+  }
 
   // Final cut times (after the voice retime) for the renderer: QA sampling and SFX placement
   window.__dtScenes = SCENES.map(function(s) { return { start: s.start, end: s.end, title: s.title, spokenLine: s.spokenLine }; });
@@ -494,11 +566,12 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       }
     }
 
+    const fx = editFx(cam, localT, dur);
     const camState = {
       dur: dur,
       zoom: lerp(cam.zoomStart || 1.04, cam.zoomEnd || 1.12, easeOut(prog)),
-      dx: lerp(cam.panX || 0, cam.panXEnd !== undefined ? cam.panXEnd : (cam.panX || 0), prog) + shakeX + joltX,
-      dy: lerp(cam.panY || 0, cam.panYEnd !== undefined ? cam.panYEnd : (cam.panY || 0), prog) + joltY,
+      dx: lerp(cam.panX || 0, cam.panXEnd !== undefined ? cam.panXEnd : (cam.panX || 0), prog) + shakeX + joltX + fx.dx,
+      dy: lerp(cam.panY || 0, cam.panYEnd !== undefined ? cam.panYEnd : (cam.panY || 0), prog) + joltY + fx.dy,
     };
 
     const bgImg = getImg(sc.bgAssetId);
@@ -545,6 +618,14 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
 
     if (knockFlash > 0) {
       ctx.fillStyle = 'rgba(0, 0, 0, ' + knockFlash.toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (fx.dark > 0) {
+      ctx.fillStyle = 'rgba(0, 0, 0, ' + fx.dark.toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (fx.flash > 0) {
+      ctx.fillStyle = 'rgba(255, 255, 255, ' + (0.85 * fx.flash).toFixed(3) + ')';
       ctx.fillRect(0, 0, W, H);
     }
 

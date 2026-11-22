@@ -176,3 +176,77 @@ export function simulateCredits({
     },
   };
 }
+
+export interface CreditPlanOption {
+  animatedTakes: number;
+  costPerVideo: number;
+  remainingAfterThisVideo: number;
+  /** full videos with this setup the current balance pays for (this one included); null = no credit spent */
+  videosPossible: number | null;
+}
+
+export interface CreditPlan {
+  credits: number;
+  creditsSource: 'flow' | 'informado' | 'banco';
+  model: string;
+  secondsPerTake: number;
+  costPerTake: number;
+  chosen: CreditPlanOption;
+  /** fewer / more animated takes, to trade richness for number of videos */
+  alternatives: CreditPlanOption[];
+  /** the same animated takes in every video model */
+  byModel: Array<{ model: string; label: string; costPerTake: number; costPerVideo: number; videosPossible: number | null; estimated: boolean }>;
+  maxAnimatedTakesNow: number;
+  note: string;
+}
+
+/**
+ * Plan for animating some takes of a video (stills cost 0 in Nano Banana): cost of this video,
+ * balance left, how many more videos fit, and the trade-offs with fewer/more animated takes or other models.
+ */
+export function planAnimatedTakes(opts: {
+  credits: number;
+  creditsSource?: CreditPlan['creditsSource'];
+  animatedTakes: number;
+  model?: string;
+  secondsPerTake?: number;
+}): CreditPlan {
+  const credits = Math.max(0, Math.floor(Number(opts.credits) || 0));
+  const model = MODEL_CREDIT_COSTS[String(opts.model)] ? String(opts.model) : 'Omni 1.2 Flash';
+  const sec = clampSecondsForModel(Number(opts.secondsPerTake) || 4, model);
+  const costPerTake = getTakeCreditCost(model, sec);
+  const option = (n: number, cpt = costPerTake): CreditPlanOption => {
+    const cost = Math.max(0, n) * cpt;
+    return {
+      animatedTakes: Math.max(0, n),
+      costPerVideo: cost,
+      remainingAfterThisVideo: credits - cost,
+      videosPossible: cost > 0 ? Math.floor(credits / cost) : null,
+    };
+  };
+  const n = Math.max(0, Math.floor(Number(opts.animatedTakes) || 0));
+  const alts = [n - 2, n - 1, n + 1, n + 2].filter((k) => k >= 0 && k !== n).map((k) => option(k));
+  const byModel = Object.values(MODEL_CREDIT_COSTS).map((m) => {
+    const s = clampSecondsForModel(sec, m.model);
+    const cpt = getTakeCreditCost(m.model, s);
+    const o = option(n, cpt);
+    // only Omni 1.2 Flash was measured on the Flow screen; the others are estimates
+    return { model: m.model, label: m.label, costPerTake: cpt, costPerVideo: o.costPerVideo, videosPossible: o.videosPossible, estimated: m.model !== 'Omni 1.2 Flash' };
+  });
+  const chosen = option(n);
+  return {
+    credits,
+    creditsSource: opts.creditsSource || 'informado',
+    model,
+    secondsPerTake: sec,
+    costPerTake,
+    chosen,
+    alternatives: alts,
+    byModel,
+    maxAnimatedTakesNow: costPerTake > 0 ? Math.floor(credits / costPerTake) : 0,
+    note:
+      chosen.remainingAfterThisVideo < 0
+        ? `Faltam ${-chosen.remainingAfterThisVideo} créditos: reduza para ${costPerTake > 0 ? Math.floor(credits / costPerTake) : 0} takes animados ou troque o modelo.`
+        : 'Imagens (Nano Banana) custam 0 crédito; só os takes animados gastam.',
+  };
+}

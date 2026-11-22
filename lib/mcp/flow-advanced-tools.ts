@@ -18,6 +18,7 @@ import { enqueueDetachedRenderTask, getRenderQueueSnapshot, runQueuedRenderTask,
 import { readStored } from '@/lib/flow-assemble';
 import {
   cloneElevenLabsVoice,
+  generateElevenLabsSfx,
   listAvailableVoices,
   resolveVoiceWithTimestamps,
   validateVoiceSelection,
@@ -62,6 +63,19 @@ import { createFlowJob, normalizeStorageReference, syncProjectQueuedJobsWithRefe
 import { analyzeVideoStructureFromLink, buildCloneTemplateAndParams, formatCloneAsVideoMd } from '@/lib/flow-video-clone';
 import type { CloneCustomization } from '@/lib/flow-clone-types';
 import { insertDialoguePauses } from '@/lib/dialogue-pauses';
+import { getFlowAgentState } from '@/lib/flow-jobs';
+import { getUserCredits } from '@/lib/flow-credits-server';
+import { planAnimatedTakes } from '@/lib/flow-credits';
+import {
+  createStoryboard,
+  decideStoryboardPanels,
+  getStoryboard,
+  listStoryboards,
+  reviewStoryboard,
+  storyboardSummary,
+  updateStoryboardPanels,
+  type Storyboard,
+} from '@/lib/storyboard';
 import {
   getCreativeStatus,
   resolveDefaultUserId,
@@ -1687,12 +1701,27 @@ export async function batchRenderMcp(input: {
  * 20. Lista vozes disponíveis (ElevenLabs reais da conta, Edge PT-BR, OpenAI) ou clona nova voz ElevenLabs.
  */
 export async function manageVoicesMcp(input: {
-  action?: 'list' | 'clone';
+  action?: 'list' | 'clone' | 'sfx';
   name?: string;
   description?: string;
   audioPathOrUrl?: string;
+  text?: string;
+  durationSec?: number;
+  promptInfluence?: number;
+  loop?: boolean;
 }) {
   const userId = await resolveDefaultUserId();
+  if (input?.action === 'sfx') {
+    const buf = await generateElevenLabsSfx({
+      userId,
+      text: String(input.text || input.description || ''),
+      durationSec: input.durationSec,
+      promptInfluence: input.promptInfluence,
+      loop: input.loop,
+    });
+    const storagePath = await uploadMediaFile(buf, `sfx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.mp3`, 'audio/mpeg');
+    return { success: true, action: 'sfx', url: `https://darktube.fjt-solutions.com${storagePath}`, storagePath };
+  }
   if (input?.action === 'clone') {
     const src = String(input.audioPathOrUrl || '').trim();
     if (!src) {
@@ -1725,4 +1754,84 @@ export async function manageVoicesMcp(input: {
 
   const catalog = await listAvailableVoices(userId);
   return { success: true, action: 'list', ...catalog };
+}
+
+const storyboardOut = (b: Storyboard, extra: Record<string, unknown> = {}) => ({
+  success: true,
+  storyboardId: b.id,
+  title: b.title,
+  sheetUrl: b.sheetUrl,
+  ...storyboardSummary(b),
+  panels: b.panels.map((p) => ({ index: p.index, status: p.status, note: p.note, action: p.action, animate: p.animate, imageUrl: p.imageUrl })),
+  ...extra,
+});
+
+/**
+ * Storyboard before production: create -> (images) -> review (automatic) and/or decide (manual) ->
+ * fix rejected panels with update -> repeat until readyToProduce.
+ */
+export async function storyboardMcp(input: {
+  action?: 'create' | 'update' | 'review' | 'decide' | 'get' | 'list';
+  storyboardId?: string;
+  title?: string;
+  logline?: string;
+  panels?: any[];
+  decisions?: Array<{ index: number; status: 'approved' | 'rejected'; note?: string }>;
+  provider?: string;
+}) {
+  const userId = await resolveDefaultUserId();
+  const action = input?.action || 'get';
+  if (action === 'list') return { success: true, storyboards: await listStoryboards(userId) };
+  if (action === 'create') {
+    return storyboardOut(await createStoryboard(userId, { title: String(input.title || ''), logline: input.logline, panels: input.panels || [] }));
+  }
+  const id = String(input?.storyboardId || '').trim();
+  if (!id) throw new Error('Informe "storyboardId" (ou use action="create" / "list").');
+  if (action === 'update') return storyboardOut(await updateStoryboardPanels(userId, id, input.panels || []));
+  if (action === 'decide') return storyboardOut(await decideStoryboardPanels(userId, id, input.decisions || []));
+  if (action === 'review') {
+    const creds = await resolveUserLlmCredential(userId, input.provider || 'openai');
+    const r = await reviewStoryboard(userId, id, [{ provider: creds.provider, apiKey: creds.apiKey }, ...creds.fallbackCredentials]);
+    return storyboardOut(r.board, { reviewSummary: r.summary, reviewEngine: r.engine });
+  }
+  return storyboardOut(await getStoryboard(userId, id));
+}
+
+/** Live Flow balance (read by the extension) and the plan for the animated takes of a video. */
+export async function flowCreditPlanMcp(input: {
+  animatedTakes?: number;
+  storyboardId?: string;
+  model?: string;
+  secondsPerTake?: number;
+  credits?: number;
+}) {
+  const userId = await resolveDefaultUserId();
+  let credits = Number(input?.credits);
+  let creditsSource: 'flow' | 'informado' | 'banco' = 'informado';
+  let creditsReadAt: string | null = null;
+  if (!Number.isFinite(credits) || credits < 0) {
+    const state = await getFlowAgentState(userId).catch(() => null);
+    const live = Number(state?.info?.capabilities?.credits);
+    if (Number.isFinite(live) && live >= 0) {
+      credits = live;
+      creditsSource = 'flow';
+      creditsReadAt = state?.info?.capabilitiesAt || null;
+    } else {
+      credits = await getUserCredits(userId);
+      creditsSource = 'banco';
+    }
+  }
+  let animated = Number(input?.animatedTakes);
+  if (!Number.isFinite(animated) && input?.storyboardId) {
+    animated = (await getStoryboard(userId, String(input.storyboardId))).panels.filter((p) => p.animate).length;
+  }
+  const plan = planAnimatedTakes({ credits, creditsSource, animatedTakes: Number.isFinite(animated) ? animated : 0, model: input?.model, secondsPerTake: input?.secondsPerTake });
+  return {
+    success: true,
+    ...plan,
+    creditsReadAt,
+    ...(creditsSource !== 'flow'
+      ? { warning: creditsSource === 'banco' ? 'Saldo do Flow ainda não lido pela extensão: rode o ensaio da extensão com um projeto do Flow aberto. Usei o saldo salvo no DarkTube.' : undefined }
+      : {}),
+  };
 }

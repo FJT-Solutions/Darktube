@@ -70,11 +70,14 @@ export async function insertDialoguePauses<S extends { spokenLine?: string; dura
     let file = dl.url || '';
     if (!file && dl.text && synth) {
       const dir = fs.mkdtempSync(path.join(workDir, `line_${i}_`));
-      file = await synth(dl, dir).catch(() => '');
-      if (!file) continue;
+      // a dropped line used to vanish silently (scene rendered without the character speaking)
+      file = await synth(dl, dir).catch((e) => {
+        throw new Error(`Fala da cena ${i + 1} falhou: ${(e as Error)?.message || e}`);
+      });
+      if (!file) throw new Error(`Fala da cena ${i + 1} não gerou áudio.`);
     } else if (/^https?:\/\//i.test(file)) {
       const res = await fetch(file, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
-      if (!res?.ok) continue;
+      if (!res?.ok) throw new Error(`Fala da cena ${i + 1}: não foi possível baixar ${file} (${res?.status ?? 'rede'}).`);
       file = path.join(workDir, `dialogue_${i}${path.extname(new URL(String(dl.url)).pathname) || '.mp3'}`);
       fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     }
@@ -86,7 +89,7 @@ export async function insertDialoguePauses<S extends { spokenLine?: string; dura
       file = wav;
     } catch {}
     const d = await durationOf(file).catch(() => 0);
-    if (!d) continue;
+    if (!d) throw new Error(`Fala da cena ${i + 1} tem áudio vazio.`);
     const lastIdx = i + 1 < out.length ? Math.max(firstIdx[i], firstIdx[i + 1] - 1) : words.length - 1;
     const before = dl.gapBeforeSec ?? 0.25;
     const len = before + d + (dl.gapAfterSec ?? 0.35);

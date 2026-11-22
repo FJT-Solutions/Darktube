@@ -50,12 +50,9 @@ export const EDGE_PTBR_VOICES: EdgeVoiceOption[] = [
   { id: 'pt-BR-FranciscaNeural', name: 'Francisca Neural (PT-BR)', gender: 'female', style: 'Natural, clara e versátil' },
   { id: 'pt-BR-AntonioNeural', name: 'Antônio Neural (PT-BR)', gender: 'male', style: 'Firme, estilo documentário' },
   { id: 'pt-BR-ThalitaMultilingualNeural', name: 'Thalita Multilíngue (PT-BR)', gender: 'female', style: 'Jovial, ritmo dinâmico' },
-  { id: 'pt-BR-FabioNeural', name: 'Fábio Neural (PT-BR)', gender: 'male', style: 'Conversacional suave' },
-  { id: 'pt-BR-HumbertoNeural', name: 'Humberto Neural (PT-BR)', gender: 'male', style: 'Corporativa e pausada' },
-  { id: 'pt-BR-BrendaNeural', name: 'Brenda Neural (PT-BR)', gender: 'female', style: 'Leve e didática' },
-  { id: 'pt-BR-DonatoNeural', name: 'Donato Neural (PT-BR)', gender: 'male', style: 'Séria / investigativa' },
-  { id: 'pt-BR-ValerioNeural', name: 'Valério Neural (PT-BR)', gender: 'male', style: 'Madura / narrativa' },
 ];
+// Only these three exist in the Edge service (edge-tts --list-voices, 2026-11); Fabio, Humberto,
+// Brenda, Donato and Valerio are Azure-only and produced an empty mp3. Vary characters with pitch/speed.
 
 export const OPENAI_VOICES: OpenAiVoiceOption[] = [
   { id: 'onyx', name: 'Onyx (OpenAI tts-1-hd)', gender: 'male', note: 'Grave; sotaque internacional leve' },
@@ -403,6 +400,9 @@ asyncio.run(main())
     throw new Error(`Edge TTS indisponível no host: ${(lastErr as Error)?.message || String(lastErr)}`);
   }
 
+  if (!fs.existsSync(outMp3) || fs.statSync(outMp3).size < 1024) {
+    throw new Error(`Edge TTS não gerou áudio com a voz "${voiceName}" (voz inexistente ou serviço fora do ar).`);
+  }
   const info = await probe(outMp3);
   const durationSec = Math.max(1, +(info.duration || 0).toFixed(3));
   let words: VoiceWord[] = [];
@@ -522,6 +522,43 @@ export async function cloneElevenLabsVoice(opts: {
 }
 
 /**
+ * Sound effect from a text description (ElevenLabs text-to-sound): knock, scream, thunder, laugh.
+ * Used only for punctual moments of the edit; the narration can stay on Edge.
+ */
+export async function generateElevenLabsSfx(opts: {
+  userId: string;
+  text: string;
+  durationSec?: number;
+  promptInfluence?: number;
+  loop?: boolean;
+}): Promise<Buffer> {
+  const key = await resolveElevenLabsKey(opts.userId);
+  if (!key) throw new Error('Configure a chave da ElevenLabs em /credentials para gerar efeitos sonoros.');
+  const text = String(opts.text || '').trim();
+  if (!text) throw new Error('Descreva o efeito sonoro em "text" (de preferência em inglês, ex.: "three hard knocks on a wooden door").');
+  const body: Record<string, unknown> = {
+    text,
+    model_id: 'eleven_text_to_sound_v2',
+    prompt_influence: Math.max(0, Math.min(1, Number(opts.promptInfluence ?? 0.5))),
+  };
+  if (opts.durationSec) body.duration_seconds = Math.max(0.5, Math.min(30, Number(opts.durationSec)));
+  if (opts.loop) body.loop = true;
+  const res = await fetch('https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128', {
+    method: 'POST',
+    headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`ElevenLabs SFX falhou (${res.status}): ${errText.slice(0, 180)}`);
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length < 1024) throw new Error('ElevenLabs SFX retornou áudio vazio.');
+  return buf;
+}
+
+/**
  * Executa exatamente o motor de voz explicitamente escolhido pelo usuário.
  * Sem cascata automática nem fallback silencioso entre provedores.
  */
@@ -582,6 +619,11 @@ export async function resolveVoiceWithTimestamps(input: ResolveVoiceInput): Prom
   // Edge TTS explícito (PT-BR neural)
   const edgeVoice = String(input.voiceId || (EDGE_VOICE_MAP[langShort] || EDGE_VOICE_MAP.pt)[gender]).trim();
   const edgeOpt = EDGE_PTBR_VOICES.find((v) => v.id === edgeVoice);
+  if (!edgeOpt && edgeVoice.toLowerCase().startsWith('pt-br')) {
+    throw new Error(
+      `Voz Edge "${edgeVoice}" não existe. Use uma destas: ${EDGE_PTBR_VOICES.map((v) => v.id).join(', ')} (diferencie personagens com pitch/speed).`
+    );
+  }
   const edgeRes = await synthesizeEdgeTts(text, edgeVoice, speed, input.outputDir, outMp3, input.pitch);
   return {
     audioPath: outMp3,
