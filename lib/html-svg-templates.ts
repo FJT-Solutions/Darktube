@@ -120,6 +120,8 @@ export interface HtmlSvgSceneInput {
   camera?: Stage3DCameraConfig;
   layers?: Stage3DLayer[];
   space?: 'stage' | 'bg';
+  /** Who speaks the scene's spokenLine (3D stage caption label); empty = narrator */
+  speaker?: string;
   /** Sound effects placed relative to the scene start (html_svg_3d_stage) */
   sfx?: Stage3DSfx[];
   /** What the frame must show (who, where, facing what, holding what): read by the staging preview critic */
@@ -338,6 +340,7 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     camera: sc.camera,
     layers: sc.layers,
     space: sc.space,
+    speaker: String(sc.speaker || ''),
   }));
 }
 
