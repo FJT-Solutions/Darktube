@@ -486,18 +486,30 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     }
     return '';
   }
+  // A whole phrase (up to 4 words) appears when its first word is spoken and stays still until the
+  // next phrase, so the caption does not blink word by word; only the highlight follows the voice.
   function buildChunks() {
     const out = [];
     let cur = null;
     for (let i = 0; i < WORDS.length; i++) {
       const w = WORDS[i];
-      const spk = speakerAt(Number(w.inicio));
+      const mid = (Number(w.inicio) + Number(w.fim)) / 2;
+      const spk = speakerAt(mid);
       const prev = cur && cur.words[cur.words.length - 1];
-      if (!cur || cur.words.length >= 3 || spk !== cur.speaker || (prev && Number(w.inicio) - Number(prev.fim) > 0.35)) {
+      const sentenceEnd = prev && /[.!?…]$/.test(String(prev.palavra || ''));
+      if (!cur || cur.words.length >= 4 || spk !== cur.speaker || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
         cur = { speaker: spk, words: [] };
         out.push(cur);
       }
       cur.words.push(w);
+    }
+    for (let i = 0; i < out.length; i++) {
+      const c = out[i];
+      c.start = Number(c.words[0].inicio);
+      let end = Math.max(Number(c.words[c.words.length - 1].fim) + 0.3, c.start + 0.7);
+      const next = out[i + 1];
+      if (next && Number(next.words[0].inicio) - end < 0.5) end = Number(next.words[0].inicio);
+      c.end = next ? Math.min(end, Number(next.words[0].inicio)) : end;
     }
     return out;
   }
@@ -505,13 +517,11 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
   function drawCaptions(t, activeScene) {
     if (WORDS.length > 0) {
       if (!CHUNKS) CHUNKS = buildChunks();
-      const chunk = CHUNKS.find(function(c) {
-        return t >= Number(c.words[0].inicio) && t <= Number(c.words[c.words.length - 1].fim) + 0.25;
-      });
+      const chunk = CHUNKS.find(function(c) { return t >= c.start && t < c.end; });
       if (!chunk) return;
-      const slice = chunk.words.filter(function(w) { return Number(w.inicio) <= t; });
-      if (!slice.length) return;
-      let activeIdx = slice.length - 1;
+      const slice = chunk.words;
+      let activeIdx = 0;
+      for (let i = 0; i < slice.length; i++) if (Number(slice[i].inicio) <= t) activeIdx = i;
 
       const y = H * 0.855;
       ctx.save();
