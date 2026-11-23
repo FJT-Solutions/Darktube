@@ -486,8 +486,8 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     }
     return '';
   }
-  // A whole phrase (up to 4 words) appears when its first word is spoken and stays still until the
-  // next phrase, so the caption does not blink word by word; only the highlight follows the voice.
+  // A whole phrase (up to 8 words, like a film subtitle) appears when its first word is spoken and
+  // stays still until the next phrase, so the caption does not blink word by word.
   function buildChunks() {
     const out = [];
     let cur = null;
@@ -497,7 +497,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       const spk = speakerAt(mid);
       const prev = cur && cur.words[cur.words.length - 1];
       const sentenceEnd = prev && /[.!?…]$/.test(String(prev.palavra || ''));
-      if (!cur || cur.words.length >= 4 || spk !== cur.speaker || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
+      if (!cur || cur.words.length >= 8 || spk !== cur.speaker || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
         cur = { speaker: spk, words: [] };
         out.push(cur);
       }
@@ -519,41 +519,45 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       if (!CHUNKS) CHUNKS = buildChunks();
       const chunk = CHUNKS.find(function(c) { return t >= c.start && t < c.end; });
       if (!chunk) return;
-      const slice = chunk.words;
-      let activeIdx = 0;
-      for (let i = 0; i < slice.length; i++) if (Number(slice[i].inicio) <= t) activeIdx = i;
-
-      const y = H * 0.855;
+      // Film-style subtitle: sentence case, white with dark outline and soft shadow, no box,
+      // up to two centered lines in the lower third; the speaker name sits in the accent color.
+      const fs = Math.round(H * 0.046);
       ctx.save();
-      ctx.font = '900 50px "Segoe UI", Arial, sans-serif';
-      ctx.textBaseline = 'middle';
-      const gap = 16;
-      const label = chunk.speaker ? chunk.speaker.toUpperCase() + ':' : '';
-      const labelW = label ? ctx.measureText(label).width + gap : 0;
-      const widths = slice.map(function(w) { return ctx.measureText(String(w.palavra || '').toUpperCase()).width; });
-      const totalW = labelW + widths.reduce(function(a, b) { return a + b; }, 0) + gap * (slice.length - 1);
-      let curX = W * 0.5 - totalW * 0.5;
-
-      ctx.fillStyle = 'rgba(7, 11, 22, 0.86)';
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.58)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.roundRect(curX - 34, y - 46, totalW + 68, 92, 22);
-      ctx.fill();
-      ctx.stroke();
-
-      if (label) {
-        ctx.fillStyle = ACCENT;
-        ctx.textAlign = 'left';
-        ctx.fillText(label, curX, y + 2);
-        curX += labelW;
-      }
-      slice.forEach(function(w, idx) {
-        const isCur = idx === activeIdx;
-        ctx.fillStyle = isCur ? SEC : '#F8FAFC';
-        ctx.textAlign = 'left';
-        ctx.fillText(String(w.palavra || '').toUpperCase(), curX, y + 2);
-        curX += widths[idx] + gap;
+      ctx.font = '600 ' + fs + 'px "Segoe UI", Arial, sans-serif';
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
+      const label = chunk.speaker ? chunk.speaker + ': ' : '';
+      const tokens = chunk.words.map(function(w) { return String(w.palavra || ''); });
+      const maxW = W * 0.78;
+      const space = ctx.measureText(' ').width;
+      const lines = [[]];
+      let lineW = label ? ctx.measureText(label).width : 0;
+      tokens.forEach(function(tok) {
+        const tw = ctx.measureText(tok).width;
+        const cur = lines[lines.length - 1];
+        if (cur.length && lineW + space + tw > maxW && lines.length < 2) { lines.push([tok]); lineW = tw; }
+        else { cur.push(tok); lineW += (cur.length > 1 || label ? space : 0) + tw; }
+      });
+      const lineH = fs * 1.25;
+      const baseY = H * 0.93 - (lines.length - 1) * lineH;
+      ctx.lineJoin = 'round';
+      lines.forEach(function(ln, li) {
+        const head = li === 0 ? label : '';
+        const text = ln.join(' ');
+        const headW = head ? ctx.measureText(head).width : 0;
+        const x0 = W * 0.5 - (headW + ctx.measureText(text).width) * 0.5;
+        const y = baseY + li * lineH;
+        const parts = head ? [[head, ACCENT, x0], [text, '#FFFFFF', x0 + headW]] : [[text, '#FFFFFF', x0]];
+        parts.forEach(function(p) {
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+          ctx.shadowBlur = fs * 0.35;
+          ctx.lineWidth = fs * 0.14;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+          ctx.strokeText(p[0], p[2], y);
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = p[1];
+          ctx.fillText(p[0], p[2], y);
+        });
       });
       ctx.restore();
       return;
