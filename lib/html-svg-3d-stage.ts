@@ -131,6 +131,8 @@ export interface Stage3DSceneInput extends Partial<HtmlSvgV2Scene> {
   /** Default coordinate space for every layer of the scene (see Stage3DSpriteLayer.space) */
   space?: 'stage' | 'bg';
   sfx?: Stage3DSfx[];
+  /** Who speaks this scene's spokenLine; shown as "NAME:" before the caption (empty = narrator) */
+  speaker?: string;
   /** Character line: the narrator pauses after this scene's spokenLine while it plays (see lib/dialogue-pauses.ts) */
   dialogue?: { url: string; volume?: number; gapBeforeSec?: number; gapAfterSec?: number };
 }
@@ -195,6 +197,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     title: String(sc.title || ''),
     subtitle: String(sc.subtitle || ''),
     spokenLine: String(sc.spokenLine || ''),
+    speaker: String(sc.speaker || ''),
     bgAssetId: (sc.bgUrl || sc.imageUrl) ? urlToId.get(String(sc.bgUrl || sc.imageUrl)) || '' : '',
     camera: sc.camera || {},
     layers: (sc.layers || []).map((raw) => {
@@ -474,25 +477,51 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     ctx.restore();
   }
 
+  // Caption chunks: max 3 words, split on pauses and on speaker changes, so a caption never
+  // shows words that were not spoken yet and disappears while nobody is talking.
+  let CHUNKS = null;
+  function speakerAt(sec) {
+    for (let i = 0; i < SCENES.length; i++) {
+      if (sec >= SCENES[i].start - 0.05 && sec < SCENES[i].end) return String(SCENES[i].speaker || '');
+    }
+    return '';
+  }
+  function buildChunks() {
+    const out = [];
+    let cur = null;
+    for (let i = 0; i < WORDS.length; i++) {
+      const w = WORDS[i];
+      const spk = speakerAt(Number(w.inicio));
+      const prev = cur && cur.words[cur.words.length - 1];
+      if (!cur || cur.words.length >= 3 || spk !== cur.speaker || (prev && Number(w.inicio) - Number(prev.fim) > 0.35)) {
+        cur = { speaker: spk, words: [] };
+        out.push(cur);
+      }
+      cur.words.push(w);
+    }
+    return out;
+  }
+
   function drawCaptions(t, activeScene) {
     if (WORDS.length > 0) {
-      let activeIdx = -1;
-      for (let i = 0; i < WORDS.length; i++) {
-        if (t >= WORDS[i].inicio && t <= WORDS[i].fim + 0.14) { activeIdx = i; break; }
-        if (t > WORDS[i].fim) activeIdx = i;
-      }
-      if (activeIdx < 0) return;
-      const chunkIdx = Math.floor(activeIdx / 3);
-      const slice = WORDS.slice(chunkIdx * 3, chunkIdx * 3 + 3);
+      if (!CHUNKS) CHUNKS = buildChunks();
+      const chunk = CHUNKS.find(function(c) {
+        return t >= Number(c.words[0].inicio) && t <= Number(c.words[c.words.length - 1].fim) + 0.25;
+      });
+      if (!chunk) return;
+      const slice = chunk.words.filter(function(w) { return Number(w.inicio) <= t; });
       if (!slice.length) return;
+      let activeIdx = slice.length - 1;
 
       const y = H * 0.855;
       ctx.save();
       ctx.font = '900 50px "Segoe UI", Arial, sans-serif';
       ctx.textBaseline = 'middle';
       const gap = 16;
+      const label = chunk.speaker ? chunk.speaker.toUpperCase() + ':' : '';
+      const labelW = label ? ctx.measureText(label).width + gap : 0;
       const widths = slice.map(function(w) { return ctx.measureText(String(w.palavra || '').toUpperCase()).width; });
-      const totalW = widths.reduce(function(a, b) { return a + b; }, 0) + gap * (slice.length - 1);
+      const totalW = labelW + widths.reduce(function(a, b) { return a + b; }, 0) + gap * (slice.length - 1);
       let curX = W * 0.5 - totalW * 0.5;
 
       ctx.fillStyle = 'rgba(7, 11, 22, 0.86)';
@@ -503,8 +532,14 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       ctx.fill();
       ctx.stroke();
 
+      if (label) {
+        ctx.fillStyle = ACCENT;
+        ctx.textAlign = 'left';
+        ctx.fillText(label, curX, y + 2);
+        curX += labelW;
+      }
       slice.forEach(function(w, idx) {
-        const isCur = chunkIdx * 3 + idx === activeIdx;
+        const isCur = idx === activeIdx;
         ctx.fillStyle = isCur ? SEC : '#F8FAFC';
         ctx.textAlign = 'left';
         ctx.fillText(String(w.palavra || '').toUpperCase(), curX, y + 2);
