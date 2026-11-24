@@ -486,7 +486,49 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     }
     return '';
   }
-  // A whole phrase (up to 8 words, like a film subtitle) appears when its first word is spoken and
+  // Captions show numbers as digits ("oitenta e sete" -> "87"); the narration audio keeps the words.
+  const NUM_WORDS = {
+    zero: 0, um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9,
+    dez: 10, onze: 11, doze: 12, treze: 13, quatorze: 14, catorze: 14, quinze: 15, dezesseis: 16, dezessete: 17, dezoito: 18, dezenove: 19,
+    vinte: 20, trinta: 30, quarenta: 40, cinquenta: 50, sessenta: 60, setenta: 70, oitenta: 80, noventa: 90,
+    cem: 100, cento: 100, duzentos: 200, duzentas: 200, trezentos: 300, quatrocentos: 400, quinhentos: 500,
+    seiscentos: 600, setecentos: 700, oitocentos: 800, novecentos: 900, mil: 1000
+  };
+  function numberizeTokens(tokens) {
+    const out = [];
+    const bare = function(tok) { return String(tok).toLowerCase().replace(/[^a-zà-ú]/g, ''); };
+    let i = 0;
+    while (i < tokens.length) {
+      if (!(bare(tokens[i]) in NUM_WORDS)) { out.push(tokens[i]); i++; continue; }
+      let total = 0, group = 0, j = i, last = i, count = 0;
+      while (j < tokens.length) {
+        const b = bare(tokens[j]);
+        if (b === 'e' && j > i && j + 1 < tokens.length && bare(tokens[j + 1]) in NUM_WORDS) { j++; continue; }
+        if (!(b in NUM_WORDS)) break;
+        const v = NUM_WORDS[b];
+        // Parts of one number only shrink ("cento e vinte e três"); a bigger part starts a new number
+        // ("vinte e três e cinquenta" is 23 then 50, not 73).
+        if (count > 0 && v !== 1000 && v >= NUM_WORDS[bare(tokens[last])]) break;
+        if (v === 1000) { total += (group || 1) * 1000; group = 0; } else group += v;
+        last = j; count++; j++;
+        if (/[.,!?…;:]$/.test(String(tokens[last]))) break;
+      }
+      // A lone "um/uma" is usually an article, not a number.
+      if (count === 1 && (bare(tokens[i]) === 'um' || bare(tokens[i]) === 'uma')) { out.push(tokens[i]); i++; continue; }
+      const trail = (String(tokens[last]).match(/[.,!?…;:]+$/) || [''])[0];
+      out.push(String(total + group) + trail);
+      i = last + 1;
+    }
+    // Clock times: "às 23 e 58" -> "às 23h58".
+    for (let k = 1; k + 2 < out.length; k++) {
+      if (/^(à|a)s$/i.test(String(out[k - 1])) && /^\d{1,2}$/.test(out[k]) && bare(out[k + 1]) === 'e' && /^\d{1,2}[.,!?…;:]*$/.test(out[k + 2])) {
+        const h = Number(out[k]), m = parseInt(out[k + 2], 10);
+        if (h < 24 && m < 60) out.splice(k, 3, h + 'h' + String(out[k + 2]).padStart(2, '0'));
+      }
+    }
+    return out;
+  }
+  // A whole phrase (up to 6 words, like a film subtitle) appears when its first word is spoken and
   // stays still until the next phrase, so the caption does not blink word by word.
   function buildChunks() {
     const out = [];
@@ -497,7 +539,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       const spk = speakerAt(mid);
       const prev = cur && cur.words[cur.words.length - 1];
       const sentenceEnd = prev && /[.!?…]$/.test(String(prev.palavra || ''));
-      if (!cur || cur.words.length >= 8 || spk !== cur.speaker || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
+      if (!cur || cur.words.length >= 6 || spk !== cur.speaker || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
         cur = { speaker: spk, words: [] };
         out.push(cur);
       }
@@ -527,15 +569,16 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       ctx.textBaseline = 'alphabetic';
       ctx.textAlign = 'left';
       const label = chunk.speaker ? chunk.speaker + ': ' : '';
-      const tokens = chunk.words.map(function(w) { return String(w.palavra || ''); });
-      const maxW = W * 0.78;
+      const tokens = numberizeTokens(chunk.words.map(function(w) { return String(w.palavra || ''); }));
+      // Keep the text inside the centre 9:16 safe area so a vertical crop of a 16:9 render still fits.
+      const maxW = Math.min(W * 0.78, H * (9 / 16) * 0.9);
       const space = ctx.measureText(' ').width;
       const lines = [[]];
       let lineW = label ? ctx.measureText(label).width : 0;
       tokens.forEach(function(tok) {
         const tw = ctx.measureText(tok).width;
         const cur = lines[lines.length - 1];
-        if (cur.length && lineW + space + tw > maxW && lines.length < 2) { lines.push([tok]); lineW = tw; }
+        if (cur.length && lineW + space + tw > maxW && lines.length < 3) { lines.push([tok]); lineW = tw; }
         else { cur.push(tok); lineW += (cur.length > 1 || label ? space : 0) + tw; }
       });
       const lineH = fs * 1.25;
