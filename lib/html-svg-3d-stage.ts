@@ -584,7 +584,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       if (!chunk) return;
       // Film-style subtitle: sentence case, white with dark outline and soft shadow, no box,
       // up to two centered lines in the lower third; the speaker name sits in the accent color.
-      const fs = Math.round(H * 0.046);
+      const fs = Math.round(H * 0.0426); // ~4px smaller than 0.046 at 1080p
       ctx.save();
       ctx.font = '600 ' + fs + 'px "Segoe UI", Arial, sans-serif';
       ctx.textBaseline = 'alphabetic';
