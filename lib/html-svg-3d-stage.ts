@@ -584,24 +584,31 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       if (!chunk) return;
       // Film-style subtitle: sentence case, white with dark outline and soft shadow, no box,
       // up to two centered lines in the lower third; the speaker name sits in the accent color.
-      const fs = Math.round(H * 0.0426); // ~4px smaller than 0.046 at 1080p
-      ctx.save();
-      ctx.font = '600 ' + fs + 'px "Segoe UI", Arial, sans-serif';
-      ctx.textBaseline = 'alphabetic';
-      ctx.textAlign = 'left';
       const label = chunk.speaker ? chunk.speaker + ': ' : '';
       const tokens = numberizeTokens(chunk.words.map(function(w) { return String(w.palavra || ''); }));
       // Keep the text inside the centre 9:16 safe area so a vertical crop of a 16:9 render still fits.
       const maxW = Math.min(W * 0.78, H * (9 / 16) * 0.9);
-      const space = ctx.measureText(' ').width;
-      const lines = [[]];
-      let lineW = label ? ctx.measureText(label).width : 0;
-      tokens.forEach(function(tok) {
-        const tw = ctx.measureText(tok).width;
-        const cur = lines[lines.length - 1];
-        if (cur.length && lineW + space + tw > maxW && lines.length < 3) { lines.push([tok]); lineW = tw; }
-        else { cur.push(tok); lineW += (cur.length > 1 || label ? space : 0) + tw; }
-      });
+      ctx.save();
+      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = 'left';
+      // Never more than two lines: shrink the font until the phrase wraps into at most two.
+      function wrap(size) {
+        ctx.font = '600 ' + size + 'px "Segoe UI", Arial, sans-serif';
+        const space = ctx.measureText(' ').width;
+        const out = [[]];
+        let lineW = label ? ctx.measureText(label).width : 0;
+        tokens.forEach(function(tok) {
+          const tw = ctx.measureText(tok).width;
+          const cur = out[out.length - 1];
+          if (cur.length && lineW + space + tw > maxW) { out.push([tok]); lineW = tw; }
+          else { cur.push(tok); lineW += (cur.length > 1 || label ? space : 0) + tw; }
+        });
+        return out;
+      }
+      let fs = Math.round(H * 0.0426); // ~4px smaller than 0.046 at 1080p
+      const minFs = Math.round(fs * 0.6);
+      let lines = wrap(fs);
+      while (lines.length > 2 && fs > minFs) { fs -= 1; lines = wrap(fs); }
       const lineH = fs * 1.25;
       const baseY = H * 0.93 - (lines.length - 1) * lineH;
       ctx.lineJoin = 'round';
