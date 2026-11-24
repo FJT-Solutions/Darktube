@@ -122,6 +122,8 @@ export interface HtmlSvgSceneInput {
   space?: 'stage' | 'bg';
   /** Who speaks the scene's spokenLine (3D stage caption label); empty = narrator */
   speaker?: string;
+  /** durationSec was built from the voice track: the 3D stage keeps it (no retime by word count) */
+  lockTiming?: boolean;
   /** Sound effects placed relative to the scene start (html_svg_3d_stage) */
   sfx?: Stage3DSfx[];
   /** What the frame must show (who, where, facing what, holding what): read by the staging preview critic */
@@ -341,6 +343,7 @@ function normalizeScenes(spec: HtmlSvgProjectSpec): NormalizedHtmlSvgScene[] {
     layers: sc.layers,
     space: sc.space,
     speaker: String(sc.speaker || ''),
+    lockTiming: !!sc.lockTiming,
   }));
 }
 

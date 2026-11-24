@@ -135,6 +135,8 @@ export interface Stage3DSceneInput extends Partial<HtmlSvgV2Scene> {
   speaker?: string;
   /** Character line: the narrator pauses after this scene's spokenLine while it plays (see lib/dialogue-pauses.ts) */
   dialogue?: { url: string; volume?: number; gapBeforeSec?: number; gapAfterSec?: number };
+  /** durationSec was built from the real voice track: keep it instead of retiming scenes by word count */
+  lockTiming?: boolean;
 }
 
 export interface Stage3DCompileContext extends Omit<HtmlSvgV2CompileContext, 'scenes'> {
@@ -198,6 +200,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
     subtitle: String(sc.subtitle || ''),
     spokenLine: String(sc.spokenLine || ''),
     speaker: String(sc.speaker || ''),
+    lockTiming: !!sc.lockTiming,
     bgAssetId: (sc.bgUrl || sc.imageUrl) ? urlToId.get(String(sc.bgUrl || sc.imageUrl)) || '' : '',
     camera: sc.camera || {},
     layers: (sc.layers || []).map((raw) => {
@@ -242,7 +245,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
   // Retime scenes to the real voice: each scene starts on the first word of its spokenLine,
   // so cuts land on the narration instead of on hand-written durationSec guesses.
   (function retimeToVoice() {
-    if (!WORDS.length || SCENES.length < 2 || SCENES.some(function(s) { return !String(s.spokenLine || '').trim(); })) return;
+    if (!WORDS.length || SCENES.length < 2 || SCENES.some(function(s) { return s.lockTiming || !String(s.spokenLine || '').trim(); })) return;
     const tok = function(s) { return String(s).split(/\\s+/).filter(function(w) { return /[\\p{L}\\p{N}]/u.test(w); }).length; };
     const counts = SCENES.map(function(s) { return Math.max(1, tok(s.spokenLine)); });
     const totalTok = counts.reduce(function(a, b) { return a + b; }, 0);
@@ -530,6 +533,21 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
   }
   // A whole phrase (up to 6 words, like a film subtitle) appears when its first word is spoken and
   // stays still until the next phrase, so the caption does not blink word by word.
+  function sceneIdxAt(sec) {
+    for (let i = 0; i < SCENES.length; i++) {
+      if (sec >= SCENES[i].start - 0.05 && sec < SCENES[i].end) return i;
+    }
+    return -1;
+  }
+  // A spoken number ("vinte e três e cinquenta e oito") is never split across captions,
+  // so it can be turned into digits/clock time as a whole.
+  function bareTok(w) { return String((w && w.palavra) || '').toLowerCase().replace(/[^a-zà-ú]/g, ''); }
+  function midNumber(prev, w, next) {
+    const isN = function(x) { return bareTok(x) in NUM_WORDS; };
+    if (!prev) return false;
+    if (isN(w) && (isN(prev) || bareTok(prev) === 'e' || /^(à|a)s$/.test(bareTok(prev)))) return true;
+    return bareTok(w) === 'e' && isN(prev) && !!next && isN(next);
+  }
   function buildChunks() {
     const out = [];
     let cur = null;
@@ -537,10 +555,12 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       const w = WORDS[i];
       const mid = (Number(w.inicio) + Number(w.fim)) / 2;
       const spk = speakerAt(mid);
+      const sci = sceneIdxAt(mid);
       const prev = cur && cur.words[cur.words.length - 1];
       const sentenceEnd = prev && /[.!?…]$/.test(String(prev.palavra || ''));
-      if (!cur || cur.words.length >= 6 || spk !== cur.speaker || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
-        cur = { speaker: spk, words: [] };
+      const full = cur && cur.words.length >= 6 && !(cur.words.length < 10 && midNumber(prev, w, WORDS[i + 1]));
+      if (!cur || full || spk !== cur.speaker || sci !== cur.scene || sentenceEnd || (prev && Number(w.inicio) - Number(prev.fim) > 0.5)) {
+        cur = { speaker: spk, scene: sci, words: [] };
         out.push(cur);
       }
       cur.words.push(w);
@@ -552,6 +572,7 @@ export function build3dStageHtml(ctx: Stage3DCompileContext): string {
       const next = out[i + 1];
       if (next && Number(next.words[0].inicio) - end < 0.5) end = Number(next.words[0].inicio);
       c.end = next ? Math.min(end, Number(next.words[0].inicio)) : end;
+      if (c.scene >= 0) c.end = Math.max(c.start + 0.3, Math.min(c.end, SCENES[c.scene].end));
     }
     return out;
   }
