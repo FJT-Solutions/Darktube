@@ -1,6 +1,25 @@
 import React from 'react';
-import { AbsoluteFill, OffthreadVideo, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, useCurrentFrame, staticFile } from 'remotion';
 import { DarkClipsVideoProps, DarkClipArrowType } from '../types';
+
+export const resolveMediaUrl = (url?: string) => {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+  const clean = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+  try {
+    return staticFile(clean);
+  } catch {
+    return trimmed;
+  }
+};
 
 export const renderArrowShape = (
   type: DarkClipArrowType = 'chevron',
@@ -338,6 +357,8 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
   const pulseScale = 1 + Math.sin(bounceCycle * Math.PI * 2) * 0.15;
 
   const hasVideo = !!(videoUrl && videoUrl.trim().length > 0 && !videoUrl.startsWith('blob:'));
+  const finalVideoSrc = resolveMediaUrl(videoUrl);
+  const finalAvatarSrc = resolveMediaUrl(avatarUrl);
   const isLightBg = bgType === 'white';
 
   // Smart Contrast for Header and Subtitles
@@ -371,7 +392,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
         <AbsoluteFill style={{ overflow: 'hidden' }}>
           {hasVideo ? (
             <OffthreadVideo
-              src={videoUrl}
+              src={finalVideoSrc}
               muted
               volume={0}
               onError={(e) => {
@@ -454,9 +475,9 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               zIndex: 20,
             }}
           >
-            {avatarUrl ? (
+            {finalAvatarSrc ? (
               <img
-                src={avatarUrl}
+                src={finalAvatarSrc}
                 alt="Avatar"
                 style={{
                   width: currentAvatarSize,
@@ -632,7 +653,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
               }}
             >
               <OffthreadVideo
-                src={videoUrl}
+                src={finalVideoSrc}
                 muted={muted !== false}
                 volume={muted === false ? 1 : 0}
                 onError={(e) => {
@@ -841,7 +862,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                   }}
                 >
                   <img
-                    src={watermarkImageUrl || avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200'}
+                    src={resolveMediaUrl(watermarkImageUrl || avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200')}
                     alt="Logo"
                     style={{
                       width: '100%',
@@ -883,7 +904,7 @@ export const DarkClipsVideoComposition: React.FC<DarkClipsVideoProps> = ({
                 }}
               >
                 <img
-                  src={watermarkImageUrl || avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200'}
+                  src={resolveMediaUrl(watermarkImageUrl || avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200')}
                   alt="Marca d'água"
                   style={{
                     width: '100%',
