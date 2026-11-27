@@ -28,7 +28,11 @@ import { createFlowProject, updateFlowProject } from '@/lib/flow-projects';
 import { createFlowJob, getFlowAgentState, normalizeStorageReference } from '@/lib/flow-jobs';
 import { assembleFlowProject } from '@/lib/flow-assemble';
 import { replaceVideoAudio, replaceProjectAudio } from '@/lib/flow-audio-replace';
-import { getUserApiKey } from '@/lib/database';
+import { getUserApiKey, getDarkClipPresets } from '@/lib/database';
+import { VideoCaptureService } from '@/lib/video-capture';
+import { sanitizeVideo } from '@/lib/video-sanitizer';
+import { uploadMediaFile } from '@/lib/storage';
+import { generateAiRemodelForClip } from '@/app/api/dark-clips/remodel-ai/route';
 import { pool } from '@/lib/db-client';
 import { runQueuedRenderTask } from '@/lib/render-queue';
 import { computeRenderTiming } from '@/lib/render-timing';
@@ -1269,4 +1273,239 @@ export async function replaceCreativeAudio(input: ReplaceCreativeAudioInput) {
     scriptText,
     syncWhisper: true,
   });
+}
+
+export interface RenderDarkClipInput {
+  videoUrlOrLink: string;
+  layoutName?: string;
+  headline?: {
+    remodelAi?: boolean;
+    mainText?: string;
+    subText?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+  };
+  videoPlacement?: {
+    cropTop?: number;
+    cropBottom?: number;
+    fitMode?: 'contain' | 'cover';
+    borderRadius?: number;
+    scale?: number;
+  };
+  durationInSeconds?: number;
+  downloadLocal?: boolean;
+  outputDir?: string;
+  preferredFileName?: string;
+}
+
+/**
+ * 8. Renderiza Reels faceless no estilo card/perfil viral (DarkClips)
+ * Toda a estilização (fundo preto/branco, cores, fontes, setas) é herdada
+ * diretamente do layout configurado no frontend do DarkTube.
+ */
+export async function renderDarkClipMcp(input: RenderDarkClipInput) {
+  const {
+    videoUrlOrLink,
+    layoutName,
+    headline: headlineInput,
+    videoPlacement: placementInput,
+    durationInSeconds = 15,
+    downloadLocal = true,
+    outputDir = './midia/criativos',
+    preferredFileName,
+  } = input;
+
+  if (!videoUrlOrLink) {
+    throw new Error('O parâmetro "videoUrlOrLink" é obrigatório.');
+  }
+
+  const userId = await resolveDefaultUserId();
+  const presets = await getDarkClipPresets(userId).catch(() => []);
+
+  // 1. Localiza o layout especificado pelo usuário (ou default/primeiro)
+  let selectedPreset: any = null;
+  if (layoutName) {
+    selectedPreset = presets.find((p: any) => p.name?.toLowerCase().trim() === layoutName.toLowerCase().trim());
+  }
+  if (!selectedPreset) {
+    selectedPreset = presets.find((p: any) => p.is_default) || presets[0] || null;
+  }
+
+  // Fallback padrão se não houver preset criado no banco ainda
+  const profileHeader = selectedPreset?.profile_header || {
+    name: 'Dark Clips',
+    handle: '@darkclips',
+    avatarUrl: '',
+    badgeType: 'blue',
+    showHeader: true,
+    scale: 120,
+    paddingTop: 130,
+  };
+
+  const background = selectedPreset?.background_style || {
+    type: 'solid',
+    color: '#000000',
+  };
+
+  let headline = {
+    mainText: 'QUANDO VOCÊ ACHA QUE FINALIZOU O CÓDIGO:',
+    subText: 'O BUG SURGINDO NO PRIMEIRO TESTE:',
+    primaryColor: '#FACC15',
+    secondaryColor: '#FFFFFF',
+    fontSize: 42,
+    ...(selectedPreset?.headline_style || {}),
+  };
+
+  let videoPlacement = {
+    fitMode: 'contain',
+    cropTop: 0,
+    cropBottom: 0,
+    borderRadius: 24,
+    scale: 92,
+    yOffset: 57,
+    ...(selectedPreset?.video_placement || {}),
+  };
+
+  const watermark = selectedPreset?.watermark_style || {};
+  const footer = selectedPreset?.footer_style || {};
+  const arrowsList = selectedPreset?.arrows_list || [];
+
+  // 2. Ingestão de Mídia (Link Externo de Reels/TikTok ou Mídia Local/Storage)
+  let sourceVideoUrl = videoUrlOrLink;
+  if (
+    videoUrlOrLink.startsWith('http') &&
+    !videoUrlOrLink.includes('/api/storage/') &&
+    !/\.(mp4|webm|mov|jpg|jpeg|png)$/i.test(videoUrlOrLink)
+  ) {
+    try {
+      console.log(`[MCP DarkTube DarkClips] Ingestão de link externo: ${videoUrlOrLink}`);
+      const dl = await VideoCaptureService.downloadFromUrl(videoUrlOrLink);
+      if (dl.videoPath && fs.existsSync(dl.videoPath)) {
+        const baseTmp = process.env.NODE_ENV === 'production' ? '/app/tmp' : path.join(process.cwd(), 'tmp');
+        const sanitizedDir = path.join(baseTmp, 'sanitized_clips');
+        if (!fs.existsSync(sanitizedDir)) fs.mkdirSync(sanitizedDir, { recursive: true });
+        const sanitizedPath = path.join(sanitizedDir, `sanitized_${path.basename(dl.videoPath)}`);
+        await sanitizeVideo(dl.videoPath, sanitizedPath);
+
+        const fileBuffer = fs.readFileSync(sanitizedPath);
+        const filename = `clip_${Date.now()}_${Math.random().toString(36).substring(7)}.mp4`;
+        sourceVideoUrl = await uploadMediaFile(fileBuffer, filename, 'video/mp4');
+      }
+    } catch (ingestErr: any) {
+      console.warn(`[MCP DarkTube DarkClips] Ingestão externa falhou (${ingestErr.message}), mantendo URL original.`);
+    }
+  }
+
+  // 3. Remodelagem de Headline com IA se solicitado
+  let remodelData: any = null;
+  if (headlineInput?.remodelAi) {
+    try {
+      const userGeminiKey = await getUserApiKey(userId, 'gemini').catch(() => null);
+      const userOpenAiKey = await getUserApiKey(userId, 'openai').catch(() => null);
+      remodelData = await generateAiRemodelForClip({
+        theme: headlineInput.mainText || selectedPreset?.name || '',
+        userGeminiKey,
+        userOpenAiKey,
+      });
+      if (remodelData?.headline_main) {
+        headline.mainText = remodelData.headline_main;
+        headline.subText = remodelData.headline_sub || headline.subText;
+      }
+    } catch (aiErr: any) {
+      console.warn(`[MCP DarkTube DarkClips] Aviso ao remodelar com IA: ${aiErr.message}`);
+    }
+  }
+
+  if (headlineInput?.mainText) headline.mainText = headlineInput.mainText;
+  if (headlineInput?.subText) headline.subText = headlineInput.subText;
+  if (headlineInput?.primaryColor) headline.primaryColor = headlineInput.primaryColor;
+  if (headlineInput?.secondaryColor) headline.secondaryColor = headlineInput.secondaryColor;
+
+  if (placementInput?.cropTop !== undefined) videoPlacement.cropTop = placementInput.cropTop;
+  if (placementInput?.cropBottom !== undefined) videoPlacement.cropBottom = placementInput.cropBottom;
+  if (placementInput?.fitMode) videoPlacement.fitMode = placementInput.fitMode;
+  if (placementInput?.borderRadius !== undefined) videoPlacement.borderRadius = placementInput.borderRadius;
+  if (placementInput?.scale !== undefined) videoPlacement.scale = placementInput.scale;
+
+  // 4. Montar os inputProps da composição DarkClipsVideo
+  const inputProps = {
+    videoUrl: sourceVideoUrl,
+    durationInSeconds,
+    profileHeader,
+    headline,
+    videoPlacement,
+    background,
+    watermark,
+    footer,
+    arrows: arrowsList[0] || {},
+    arrowsList,
+  };
+
+  const historyId = `darkclip_mcp_${Date.now()}`;
+  const durationInFrames = Math.round(durationInSeconds * 30);
+  const callbackUrl = `${DARKTUBE_BASE_URL}/api/webhooks/production-complete`;
+
+  let renderedVideoUrl = '';
+  let lastError: Error | null = null;
+
+  for (const base of CANDIDATE_URLS) {
+    const cleanBase = base.replace(/\/+$/, '');
+    const endpoint = `${cleanBase}/render`;
+
+    try {
+      console.log(`[MCP DarkTube DarkClips] Despachando para Remotion em ${endpoint}...`);
+      const attempt = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          compositionId: 'DarkClipsVideo',
+          historyId,
+          callbackUrl,
+          inputProps,
+          durationInFrames,
+        }),
+        signal: AbortSignal.timeout(300000),
+      });
+
+      if (attempt.ok) {
+        const result = await attempt.json();
+        const rawVideoUrl = result.videoUrl || result.url || result.outputUrl || '';
+        renderedVideoUrl = rawVideoUrl.startsWith('http')
+          ? rawVideoUrl
+          : `${DARKTUBE_BASE_URL}${rawVideoUrl.startsWith('/') ? '' : '/'}${rawVideoUrl}`;
+        console.log(`[MCP DarkTube DarkClips] Render concluído com sucesso: ${renderedVideoUrl}`);
+        break;
+      } else {
+        const txt = await attempt.text().catch(() => attempt.statusText);
+        console.warn(`[MCP DarkTube DarkClips] Candidato ${cleanBase} falhou HTTP ${attempt.status}: ${txt}`);
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[MCP DarkTube DarkClips] Falha ao conectar em ${cleanBase}: ${err.message}`);
+    }
+  }
+
+  if (!renderedVideoUrl) {
+    throw new Error(`Falha ao renderizar clipe no Remotion Server: ${lastError?.message || 'Nenhum servidor respondeu'}`);
+  }
+
+  let localFileResult: any = null;
+  if (downloadLocal && renderedVideoUrl) {
+    const defaultName = `darkclip_${Date.now()}.mp4`;
+    localFileResult = await downloadCreativeToLocal(renderedVideoUrl, outputDir, preferredFileName || defaultName);
+  }
+
+  return {
+    success: true,
+    layoutName: selectedPreset?.name || layoutName || 'Layout Padrão',
+    videoUrl: renderedVideoUrl,
+    localFile: localFileResult?.filePath || null,
+    durationSeconds,
+    headline: {
+      mainText: headline.mainText,
+      subText: headline.subText,
+    },
+    postCaption: remodelData?.post_caption || null,
+    hashtags: remodelData?.hashtags || [],
+  };
 }

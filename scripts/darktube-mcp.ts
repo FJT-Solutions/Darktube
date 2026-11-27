@@ -21,6 +21,7 @@ import {
   getCreativeStatus,
   assembleFlowCreative,
   replaceCreativeAudio,
+  renderDarkClipMcp,
 } from '../lib/mcp/darktube-tools';
 import {
   analyzeVideoLinkMcp,
@@ -30,6 +31,7 @@ import {
   getRenderQueueStatusMcp,
   searchAndDownload3dAssetsMcp,
 } from '../lib/mcp/flow-advanced-tools';
+import { DARKTUBE_SFX_SEARCH_TOOL_SCHEMA, sfxSearchMcp } from '../lib/mcp/sfx-tools';
 
 const server = new Server(
   {
@@ -285,6 +287,49 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
+      {
+        name: 'darktube_render_darkclip',
+        description: 'Renderiza Reels faceless no estilo card/perfil viral (9:16) a partir de link de vídeo concorrente ou imagem/vídeo IA. A estilização visual completa (fundo preto/branco, fontes, setas, proporções) é carregada diretamente pelo nome do layout configurado no frontend do DarkTube.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            videoUrlOrLink: {
+              type: 'string',
+              description: 'Link do Reels/TikTok/Shorts concorrente (para download e recorte automático) OU URL/caminho de imagem ou vídeo gerado no Flow/Nano Banana.',
+            },
+            layoutName: {
+              type: 'string',
+              description: 'Nome do layout configurado no frontend do DarkTube (ex: "Layout1"). Se omitido, usa o layout padrão salvo.',
+              default: 'Layout1',
+            },
+            headline: {
+              type: 'object',
+              description: 'Opções de gancho viral e textos do clipe.',
+              properties: {
+                remodelAi: { type: 'boolean', description: 'Se true, IA gera gancho viral e copy com base no vídeo/tema' },
+                mainText: { type: 'string', description: 'Texto primário fixo superior (ex: "QUANDO VOCÊ COMEÇA DO ZERO:")' },
+                subText: { type: 'string', description: 'Texto secundário fixo inferior' },
+                primaryColor: { type: 'string', description: 'Cor do destaque (ex: #FACC15 ou #ff9500)' },
+              },
+            },
+            videoPlacement: {
+              type: 'object',
+              description: 'Ajuste de enquadramento e corte de bordas.',
+              properties: {
+                cropTop: { type: 'number', description: '% de corte no topo para remover cabeçalho antigo do concorrente' },
+                cropBottom: { type: 'number', description: '% de corte na base para remover legendas velhas' },
+                fitMode: { type: 'string', enum: ['contain', 'cover'], description: 'Modo de encaixe na moldura' },
+              },
+            },
+            durationInSeconds: { type: 'number', description: 'Duração em segundos do clipe (default: 15)', default: 15 },
+            downloadLocal: { type: 'boolean', description: 'Se true, baixa o MP4 para o disco local', default: true },
+            outputDir: { type: 'string', default: './midia/criativos' },
+            preferredFileName: { type: 'string', description: 'Nome customizado para o MP4' },
+          },
+          required: ['videoUrlOrLink'],
+        },
+      },
+      DARKTUBE_SFX_SEARCH_TOOL_SCHEMA,
     ],
   };
 });
@@ -352,6 +397,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'darktube_search_3d_assets':
         result = await searchAndDownload3dAssetsMcp(args as any);
+        break;
+
+      case 'darktube_sfx_search':
+        result = await sfxSearchMcp(args as any);
+        break;
+
+      case 'darktube_render_darkclip':
+      case 'darktube_create_darkclip':
+        result = await renderDarkClipMcp(args as any);
         break;
 
       default:
